@@ -1,7 +1,8 @@
 ---
 name: penpot-design
-description: Code to Design + Design to Code 双向设计系统工作流 + Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供脚本；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」时使用。
-version: 1.1.0
+description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」时使用。"
+version: 1.2.0
+license: MIT
 ---
 
 # penpot-design：Code ↔ Design 双向工作流
@@ -10,6 +11,17 @@ version: 1.1.0
 
 1. **Code → Design**：给一个 **URL** 或 **一组图片** → 产出 DESIGN.md + Penpot 固定结构设计系统（16 页）。
 2. **Design → Code**：给一个 Penpot 设计文件 → 输出 **Qt4/5/6** 或 **React/Vue** 代码，**pixel-perfect**，PIL 验收。
+
+## When to Use（何时使用）
+
+在以下场景加载本技能，按对应的参考文档展开：
+
+- 用户给出网址 / 截图 / 设计图，要求「生成设计系统」「产出 DESIGN.md」「建 Penpot 设计系统」。
+- 用户要求用 Penpot MCP 批量建页 / 建组件 / 建大屏、注册库组件、批量修复对齐或中文乱码。
+- 用户要求把既有 React / UI 组件库复刻成设计系统。
+- 用户要求把 Penpot 设计稿转成 Qt4/5/6 或 React/Vue 代码，或做像素级还原验收。
+
+不适用场景：与 Penpot / 设计系统 / 设计稿转码无关的一般编码任务。
 
 ## 参考文档地图（按需读取）
 
