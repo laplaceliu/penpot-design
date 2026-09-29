@@ -1,0 +1,56 @@
+# Why: Caddy terminates HTTPS at `penpot.local` and forwards to the in-namespace
+# Penpot frontend nginx. The previous compose exposed the frontend on
+# 127.0.0.1:9001 over plain HTTP — but Penpot 2.17's bundle calls
+# `allowRunFromHttpSchema` and other secure-context APIs that fail in a
+# non-HTTPS origin. Going straight to HTTPS removes that constraint and also
+# gives the Orca webview a proper secure context when it loads the URL.
+#
+# Layout:
+#   browser / orca webview
+#        │
+#        ▼ https://penpot.local
+#   Caddy (port 443, internal CA)
+#        │
+#        ▼ plain http://penpot-frontend:8080
+#   Penpot frontend nginx
+#        │
+#        ├─ /api/*  → penpot-backend:6060
+#        ├─ /api/mcp/* → penpot-mcp:4401
+#        └─ /        → SPA bundle
+#
+# The Caddy container exposes its ACME / pki data directory at
+# /data/caddy so the host can install the leaf cert into the system trust
+# store (or hand it to the Orca webview).
+
+{
+    # pki block is intentionally omitted — the caddy:2 image already creates
+    # an internal CA on first boot. We use the `tls internal` directive below
+    # to sign the leaf cert for `penpot.local` from that CA.
+}
+
+penpot.local {
+    tls internal
+
+    # Why: same-origin static route so Penpot plugin-sandbox scripts can fetch
+    # local assets (e.g. product screenshots for poster work) without tripping
+    # the SPA's CSP connect-src, which blocks cross-origin (127.0.0.1) fetches.
+    # Files are copied into /data/caddy/shots on the host; loopback-only.
+    handle_path /shots/* {
+        root * /data/caddy/shots
+        file_server
+    }
+
+    reverse_proxy penpot-frontend:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    log {
+        output file /data/caddy/access.log {
+            roll_size 10MiB
+            roll_keep 5
+        }
+    }
+}

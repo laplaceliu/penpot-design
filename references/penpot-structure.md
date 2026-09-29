@@ -1,0 +1,110 @@
+# Penpot 设计系统固定结构（本技能定义的输出契约）
+
+每次 code-to-design 任务**必须**产出同一套固定结构：一个 Penpot 文件 = 16 个编号页面；每页一个根板；组件规格板结构统一。与 DESIGN.md 的关系：DESIGN.md 是 token 与设计依据的**单一事实源**，Penpot 文件是其**可视化实现**，token 名/色值/字阶/圆角/间距刻度一一对应。
+
+## 1. 文件级约定
+
+- 文件名：`<系统名>-<风格关键词>.penpot`（如 `蓝色-科技风-发光.penpot`）
+- 版本特性：components/v2、variants/v1、design-tokens/v1、layout/grid
+- tokens 全部录入 `penpot.library.local.tokens`（addSet + addToken；type: `color` / `borderRadius` / `dimension`）
+- 含 CJK 文本一律 Noto Sans SC（Penpot 无字体栈回退）
+- 组件名分隔符一律 `·`（**禁止 `/`**，赋值静默失败）：`Button·Primary·Default`
+- 坐标走 8px 栅格；构建期直接放最终坐标，永不移动已建好的板
+
+## 2. 页面总表（16 页，固定编号与顺序）
+
+分层原则：01–02 基础（token 可视化）→ 03–07 控件（按任务域：输入→选择→集合→展示，一组件只归一页）→ 08–10 模式（导航/浮层/反馈）→ 11–12 场景（可视化/布局）→ 13–15 交付。
+
+| # | 页面名 | 必含内容板 |
+|---|--------|-----------|
+| 00 | `00 · 封面` | 系统名大标题、版本+日期、风格关键词条、主色带 6 格、页面目录清单 |
+| 01 | `01 · 设计基础` | F1 色板、F2 字阶、F3 间距与栅格、F4 圆角、F5 阴影/发光、F6 图标、F7 描边与分割线 |
+| 02 | `02 · 颜色系统` | C1 语义色、C2 深浅主题对照、C3 状态色、C4 渐变、C5 WCAG 对比度校验表 |
+| 03 | `03 · 基础控件` | Button（Type×State×Size 矩阵）、IconButton、ButtonGroup、Switch、Checkbox、Radio、Segmented |
+| 04 | `04 · 文本与输入` | Input、Textarea、InputNumber、SearchBox、Slider、Upload、FileTrigger、DropZone、ColorPicker、Form 容器（label/helper/error 三态） |
+| 05 | `05 · 选择器` | Select、AutoComplete、Cascader、TreeSelect、Transfer、DatePicker、TimePicker、DateRangeField、Calendar、RangeCalendar、DateField、TimeField |
+| 06 | `06 · 数据集合` | Table（排序/筛选/展开/固定列）、List、Tree、Descriptions、Statistic、Timeline、Pagination |
+| 07 | `07 · 展示` | Card（≥3 尺寸）、Tag/Chip、Badge、Avatar、Image、Video、FileCard、Carousel、Collapse、Divider |
+| 08 | `08 · 导航` | TopNav、Sidebar/Menu、Tabs、Breadcrumb、Stepper、Dropdown、ContextMenu、CommandMenu、Toolbar、Anchor、BackTop、Keyboard 快捷键表 |
+| 09 | `09 · 浮层` | Modal、Dialog、Drawer、Sheet、Popover、Tooltip、Popconfirm + 定位/遮罩规范板 |
+| 10 | `10 · 反馈与状态` | Toast、Notification、Alert、Result、Skeleton、Progress、Spinner、Empty、ErrorState |
+| 11 | `11 · 数据可视化` | 图例、KPI 卡、折线/柱状/饼图示例、仪表盘部件、图表色彩映射 |
+| 12 | `12 · 布局模式` | Layout 壳（12 栅格标注）、PageHeader、Grid/Space、ScrollArea、响应式断点、Empty/404/Error 整页模板 |
+| 13 | `13 · 组件索引` | 全部库组件实例缩略网格 + 名称 + 所属页坐标（design-to-code 映射表） |
+| 14 | `14 · Demo` | 板阵（全部用库组件实例组装）：必建六板 1920×1080——Dashboard、Landing、Login、List 管理页（搜索+筛选+表格+分页）、Detail 详情页（描述+操作区+Timeline）、Settings 表单页（分组表单+危险操作区）；可选两板——Empty/404 状态板、Mobile 375 应用板 |
+| 15 | `15 · 参考仿写` | 可选：仿写对象对照分析；无对象则省略并在 DESIGN.md `omitted` 声明 |
+
+## 3. 每页必含元素（页面解剖契约）
+
+每页（00 可简化）必须有且仅有一个顶层根板，所有元素挂入：
+
+```
+NN-PageRoot（1920 × 可变高，clipContent = false）
+├── NN-Header  页头区 1920×160
+│   ├── 页码 + 中文名 + 英文名（32px 标题，左对齐）
+│   ├── 一句话页面说明（16px，secondary 色）
+│   ├── token chips 条（本页 token 名 + 色块）
+│   └── 版本 + 日期（右上角，label-sm）
+├── <内容区：规格板阵列>
+└── NN-Footer  页脚 1920×80
+    ├── 本页 token 引用清单
+    └── 「← NN-上页名   NN-下页名 →」导航条
+```
+
+硬性规则：
+1. 一切元素挂进 PageRoot（导出页头才不会丢组件）。
+2. `clipContent = false`，发光/阴影不被裁剪。
+3. Header/Footer/内容板坐标固定（§5），禁止自由摆放。
+4. 页头板退化（崩溃损伤 100×100）会导致整页导出全黑——每批构建后核对 Header 尺寸。
+
+## 4. 组件规格板（Spec Board）契约
+
+板名 = 组件英文名（如 `Button`），内部结构固定：
+
+```
+Button（880 × N，表面底，rounded.md）
+├── 标题行：中文名 + 英文名
+├── Anatomy 解剖板：引线标注 padding / gap / 圆角 / 图标位 / 文字位
+├── 变体矩阵（行=State，列=Type 或 Size）
+│   ├── 行：Default / Hover / Pressed / Focused / Disabled（交互件全五态；展示件 Default/Disabled）
+│   ├── 列：Type（Primary/Secondary/Tertiary/Ghost/Danger…）或 Size（S/M/L）
+│   └── 每格 = 变体板 `Button·Primary·Default`，格下 caption：`W×H · padding · {tokens}`
+├── 使用规范条：Do 一行 + Don't 一行（各配 48px 小示意）
+└── 库组件主实例（母版形状放 'AI Component Masters' 母版板）
+```
+
+注册纪律（详见 references/mcp-automation.md §4）：
+- 注册一律用 `AI Component Masters` 母版板的形状执行 `createComponent([shape])`；`comp.remove()` 连主实例一起删，绝不在展示板形状上注册/重注册。
+- 变体容器用 `penpotUtils.createVariantContainer`（输入必须是已注册主实例）；reparent 后重置 `parentX/parentY`。
+
+## 5. 坐标与栅格规范
+
+| 项 | 值 |
+|---|---|
+| PageRoot 宽 | 1920 |
+| 内容区 | x ∈ [80, 1840] |
+| 标准规格板 | 560 宽，3 列 x = 80 / 680 / 1280，列间距 40 |
+| 大型规格板 | 880 宽，2 列 x = 80 / 1000 |
+| 板垂直间距 / 板内区块 / 元素 | 48 / 24 / 8–16 |
+| Header / Footer 高 | 160 / 80，内容从 y=240 起 |
+
+## 6. 与 DESIGN.md 的映射（design-to-code 依据）
+
+| DESIGN.md | Penpot | 代码实现 |
+|---|---|---|
+| `colors.*` | 01-F1 色板 + tokens 集 | 主题变量（QSS var / CSS custom properties） |
+| `typography.*` | 01-F2 字阶 | 字体 token / TextStyles |
+| `spacing.*` | 01-F3 间距栅格 | 布局常量 |
+| `rounded.*` | 01-F4 圆角 | radius 常量 |
+| `components.<name>` | 03–12 页规格板 + 库组件 | 代码组件（同名映射，见 13 索引页） |
+| Do's and Don'ts | 各规格板使用规范条 | 代码评审检查项 |
+
+## 7. 交付自检清单
+
+- [ ] 16 页齐全（15 可选）且命名/顺序正确
+- [ ] 每页唯一 PageRoot，Header/Footer 就位，clipContent=false
+- [ ] 组件规格板符合 §4 契约，变体命名 `组件·属性·属性`
+- [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值
+- [ ] 组件全部注册为库组件（母版在 AI Component Masters），13 索引页信息完整
+- [ ] 14 Demo 六板全部由库组件实例组装
+- [ ] 每页 `export_shape` 导出 PNG 验收通过（无 100×100 退化、无裁剪、无偏移）

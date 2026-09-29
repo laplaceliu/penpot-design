@@ -1,0 +1,244 @@
+# Why: production-style single-host deployment for the Penpot 2.17 design platform.
+# Borrows shapes from the official `penpotapp/penpot` docker-compose at
+# https://github.com/penpot/penpot/blob/main/docker/images/docker-compose.yaml
+# Retargeted at a long-lived external data dir so multiple orca installs can
+# point at the same instance. Frontend exposed on loopback only — remote
+# clients reach the frontend through a host-side tunnel, never through the
+# public bind.
+
+# Why: no `name:` key on purpose. Compose derives the project name from this
+# directory, so two checkouts sitting next to each other get separate stacks
+# instead of fighting over — and worse, recreating — each other's containers.
+# Set COMPOSE_PROJECT_NAME in .env to pin it to a fixed value such as `penpot`.
+
+# Why: x-* keys are Docker Compose's anchor namespace; each `x-` here is merged
+# into the right service block via the `<<: [*name, ...]` shorthand. We use the
+# 2.16+/2.17-recommended flat env vars (PENPOT_DATABASE_URI etc.) instead of the
+# older `-c key=value` flag form so this file tracks the upstream self-hosting
+# guide.
+x-flags: &penpot-flags
+  PENPOT_FLAGS: disable-email-verification enable-prepl-server enable-mcp enable-registration enable-login-with-password
+
+x-body-size: &penpot-body-size
+  PENPOT_HTTP_SERVER_MAX_BODY_SIZE: "367001600"
+  PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE: "367001600"
+
+x-uri: &penpot-public-uri
+  # External URL the browser is told to reach. The internal Docker DNS
+  # (`penpot-frontend`) is what the frontend nginx actually binds; this is the
+  # public-facing origin that gets injected into API responses.
+  PENPOT_PUBLIC_URI: ${PENPOT_PUBLIC_URI:-https://penpot.local}
+
+x-secret-key: &penpot-secret-key
+  # Why: rotate this before exposing the instance beyond localhost. Both the
+  # backend and the exporter must agree on the same key for HMAC handshake.
+  PENPOT_SECRET_KEY: ${PENPOT_SECRET_KEY:-change-me-in-production-please}
+
+x-redis: &penpot-redis
+  # Why: on the compose network the valkey service is reachable by its service
+  # key (`penpot-valkey`), not the bare `valkey` name. The bare name does not
+  # resolve here, so the exporter/backend redis connections failed with
+  # `getaddrinfo EAI_AGAIN valkey`.
+  PENPOT_REDIS_URI: redis://penpot-valkey/0
+
+networks:
+  penpot:
+
+volumes:
+  penpot_postgres_v15:
+  penpot_assets:
+
+services:
+  penpot-frontend:
+    # The official image is nginx + the Penpot SPA bundle. In Penpot 2.17 the
+    # bundled nginx config depends on a `penpot-mcp` upstream at the same
+    # network — see that service below.
+    image: "penpotapp/frontend:${PENPOT_IMAGE_TAG:-2.17}"
+    restart: unless-stopped
+    # Why: 9001 is no longer published to the host. Penpot 2.17's SPA bundle
+    # calls `allowRunFromHttpSchema` and other secure-context APIs that fail in
+    # a non-HTTPS origin, so we now serve the frontend through Caddy on 443.
+    # Caddy terminates TLS and proxies to `penpot-frontend:8080` inside the
+    # network. To expose the raw HTTP port for ad-hoc debugging, change this
+    # to `"127.0.0.1:9001:8080"`.
+    expose:
+      - "8080"
+    volumes:
+      - penpot_assets:/opt/data/assets
+    depends_on:
+      penpot-backend:
+        condition: service_started
+      penpot-exporter:
+        condition: service_started
+      penpot-mcp:
+        condition: service_started
+    environment:
+      <<: [*penpot-flags, *penpot-body-size]
+    networks:
+      - penpot
+
+  penpot-backend:
+    image: "penpotapp/backend:${PENPOT_IMAGE_TAG:-2.17}"
+    restart: unless-stopped
+    volumes:
+      - penpot_assets:/opt/data/assets
+      - ./data/exports:/opt/penpot/data/exports
+    depends_on:
+      penpot-postgres:
+        condition: service_healthy
+      penpot-valkey:
+        condition: service_healthy
+    environment:
+      <<: [*penpot-flags, *penpot-public-uri, *penpot-body-size, *penpot-secret-key, *penpot-redis]
+
+      # Why: the compose service key for postgres is `penpot-postgres`. The bare
+      # `postgres` hostname resolves to an unrelated container on another
+      # network, so it pointed at the wrong database. The `:5432` port must be
+      # explicit and the URI must NOT embed `user:password@`: the PG JDBC driver
+      # fails to parse that form here (mis-reads it as a port / host and reports
+      # "No suitable driver" or "UnknownHostException"). Credentials are passed
+      # separately via PENPOT_DATABASE_USERNAME/PASSWORD below, matching the
+      # official Penpot self-host config.
+      PENPOT_DATABASE_URI: postgresql://penpot-postgres:5432/penpot
+      PENPOT_DATABASE_USERNAME: penpot
+      PENPOT_DATABASE_PASSWORD: penpot
+
+      PENPOT_OBJECTS_STORAGE_BACKEND: fs
+      PENPOT_OBJECTS_STORAGE_FS_DIRECTORY: /opt/data/assets
+
+      PENPOT_TELEMETRY_ENABLED: "false"
+      PENPOT_TELEMETRY_REFERER: compose
+
+      # SMTP is disabled by default so the demo flow works without a relay.
+      # Wire to a real provider (Mailgun, SES, ...) before going live.
+      PENPOT_SMTP_ENABLED: "false"
+    networks:
+      - penpot
+
+  penpot-exporter:
+    # Why: PDF / SVG / fonts rasterization. Stateless from the user's point of
+    # view but still needs the same secret key + redis instance.
+    image: "penpotapp/exporter:${PENPOT_IMAGE_TAG:-2.17}"
+    restart: unless-stopped
+    depends_on:
+      penpot-valkey:
+        condition: service_healthy
+    environment:
+      <<: [*penpot-secret-key, *penpot-public-uri, *penpot-redis]
+      PENPOT_INTERNAL_URI: http://penpot-frontend:8080
+    networks:
+      - penpot
+
+  penpot-mcp:
+    # Why: Penpot 2.17 frontend nginx.conf proxies `/api/mcp/*` (and the plugin
+    # `/manifest.json`) at a service literally named `penpot-mcp` on the same
+    # docker network. The server is shipped as `penpotapp/mcp:2.17`; we just
+    # need a hostname to resolve to. Disabling REMOTE_MODE puts it in
+    # single-tenant self-hosted mode which is what we want — the alternative
+    # binds the MCP server to a public registration endpoint that we
+    # don't want to expose.
+    image: "penpotapp/mcp:${PENPOT_IMAGE_TAG:-2.17}"
+    restart: unless-stopped
+    depends_on:
+      penpot-valkey:
+        condition: service_healthy
+    environment:
+      <<: [*penpot-secret-key, *penpot-public-uri]
+      PENPOT_MCP_SERVER_HOST: 0.0.0.0
+      PENPOT_MCP_SERVER_PORT: "4401"
+      PENPOT_MCP_WEBSOCKET_PORT: "4402"
+      PENPOT_MCP_PLUGIN_SERVER_HOST: 0.0.0.0
+      # Why: REMOTE_MODE=false (single-tenant self-hosted mode) unlocks the
+      # `filePath` parameter on the MCP export_shape tool so scripted exports
+      # can write PNGs directly to disk (mount: ./data/mcp-exports below).
+      # Trade-off: it re-enables the MCP client registration form, but the
+      # whole stack is loopback-only (penpot.local binds 127.0.0.1:443), so
+      # it is not reachable from the LAN. Pin PENPOT_MCP_REGISTRATION_TOKEN
+      # if you ever expose this publicly.
+      PENPOT_MCP_REMOTE_MODE: "false"
+    volumes:
+      # Why: host-visible output directory for MCP export_shape filePath.
+      - ./data/mcp-exports:/data/exports
+    networks:
+      - penpot
+
+  penpot-postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    volumes:
+      - ./data/postgres/data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: penpot
+      POSTGRES_USER: penpot
+      POSTGRES_PASSWORD: penpot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U penpot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - penpot
+
+  penpot-valkey:
+    # Why: Redis-compatible cache + pub/sub. Started with a 128 MiB cap so a
+    # forked backend can't OOM the host. Increase in high-traffic deployments.
+    image: valkey/valkey:7-alpine
+    restart: unless-stopped
+    command: valkey-server --maxmemory 128mb --maxmemory-policy volatile-lfu
+    volumes:
+      - ./data/valkey/data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - penpot
+
+  penpot-caddy:
+    # Why: HTTPS termination on `https://penpot.local`. Caddy signs a leaf
+    # cert from its built-in internal CA on first boot and surfaces the
+    # PKI data at /data/caddy so the host can install the issuing cert
+    # (or use it programmatically with orca's webview).
+    image: "caddy:2-alpine"
+    restart: unless-stopped
+    # Why: make the PKI readable by the host user. Caddy creates
+    # /data/caddy/pki (root CA + leaf cert) *after* this entrypoint starts, and
+    # it does so as root with 0700/0600 modes — so a single chmod up front is a
+    # no-op on the very first boot, which is exactly when the host needs the CA
+    # (./scripts/trust-ca.sh, status.sh, Electron/webview clients). We therefore
+    # relax the modes from a background loop for the first minute, then get out
+    # of the way. a+rX only *adds* read/execute: Caddy keeps ownership and full
+    # write access, so cert renewal is unaffected.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        # Why: this block must not contain a dollar sign anywhere. Compose
+        # interpolates dollar-variables from the *host* environment before the
+        # container sees the string, and this including these comment lines —
+        # they are part of the same block scalar. A command-substitution or
+        # arithmetic loop therefore collapses to an empty variable and dies on
+        # the first comparison, so use a fixed list of literals instead.
+        relax_pki() {
+          for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            chmod -R a+rX /data/caddy/pki /data/caddy/certificates 2>/dev/null || true
+            sleep 5
+          done
+        }
+        relax_pki &
+        exec caddy run --config /etc/caddy/Caddyfile --adapter ""
+    ports:
+      # Why: 443 on the host (loopback by default so the VPN / LAN can't
+      # reach it unintentionally). 2019 is Caddy's internal admin API;
+      # left closed-off for now.
+      - "127.0.0.1:443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data/caddy
+      - ./data/caddy/config:/config
+    depends_on:
+      penpot-frontend:
+        condition: service_started
+    networks:
+      - penpot
