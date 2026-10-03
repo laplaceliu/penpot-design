@@ -1,6 +1,8 @@
 # Design → Code：Qt 输出指南（Qt4 / Qt5 / Qt6 分列）
 
-总原则：**像素级还原 Penpot 设计系统**（pixel-perfect）；按组件索引页（13 页）的规划**分层实现**：token 层 → 原子组件 → 组合组件 → 模块/页面 → Demo 对齐 14 页六板。每层落地后立即用 references/verification.md 的 PIL 流程比对。
+总原则：**像素级还原 Penpot 设计系统**（pixel-perfect）；按组件索引页（13 页）的规划**分层实现**：token 层 → 原子组件 → 组合组件 → 模块/页面 → Demo 对齐 **14 页各所选档位的屏幕板**。每层落地后立即用 references/verification.md 的 PIL 流程比对。
+**档位约束**：先读 DESIGN.md `targetProfiles` 确定目标宽度（web/pad/mobile）；按档位做 Qt 布局自适应
+（QHBoxLayout/QVBoxLayout/Stacked 或 QML 响应式），验收窗口宽 = 该档基准宽，逐档截图比对（见 §4 第 7 条）。
 
 ## 0. 通用：token 层与资源引用（三版本共用基线）
 
@@ -91,5 +93,6 @@ Button {
 2. **坐标对齐**：QSS `padding`/`margin` 与设计解剖板逐项核对；1px 偏移即视为 bug。
 3. **状态完备**：每个交互件实现 Default/Hover/Pressed/Focused/Disabled 五态，颜色逐一取自 DESIGN.md 变体键。
 4. **字体**：家族/字重/字号/行高/字距与 F2 字阶一致；行高在 Qt 用 `QFontMetrics` + 手动 leading 或 QSS `line-height`（QSS 支持有限时用富文本/自绘）。
-5. **截图验证**：每完成一层跑 verification.md 的 PIL 比对（DPR=1、禁动画、固定窗口尺寸 = 设计板尺寸）。
+5. **截图验证**：每完成一层跑 verification.md 的 PIL 比对（DPR=1、禁动画、固定窗口尺寸 = **该档基准宽**：web 1440 / pad 834 / mobile 375）。
 6. **资源零外链**：构建产物不依赖工作区相对路径图片；全部 qrc 编译进二进制。
+7. **响应式 / 档位**：`targetProfiles` 含多档时，用 Qt 布局自适应（QHBoxLayout⇄QVBoxLayout 堆叠、QML 响应式）实现 pad/mobile 单列布局，触控目标 ≥44px；单一档位可固定该窗口宽。逐档分别截图与 Penpot 对应板比对。

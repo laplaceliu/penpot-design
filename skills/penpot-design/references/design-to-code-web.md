@@ -1,6 +1,8 @@
 # Design → Code：Web 输出指南（React / Vue 分列）
 
-总原则：**pixel-perfect 还原 Penpot 设计系统**；按 13 组件索引页规划**分层实现**：tokens → atoms → molecules → organisms → pages（对齐 14 页 Demo 六板）。每层落地即跑 references/verification.md 的 PIL 比对。
+总原则：**pixel-perfect 还原 Penpot 设计系统**；按 13 组件索引页规划**分层实现**：tokens → atoms → molecules → organisms → pages（对齐 14 页 Demo **各所选档位的屏幕板**）。每层落地即跑 references/verification.md 的 PIL 比对。
+**档位约束**：先读 DESIGN.md `targetProfiles` 确定目标宽度（web/pad/mobile）；按档位实现响应式
+（CSS 媒体断点），验收 viewport 宽 = 该档基准宽，逐档截图比对（见 §3 第 7 条）。
 
 ## 0. 通用：token 层与资源引用（两框架共用基线）
 
@@ -98,5 +100,6 @@ defineProps<{ variant?: 'primary'|'secondary'|'tertiary'|'ghost'|'danger'; size?
 2. **盒模型统一**：`box-sizing: border-box` 全局声明；边框计入尺寸（描边 inner 语义与 Penpot `strokeAlignment='inner'` 对应）。
 3. **字体**：`@font-face` 自托管（同设计字族），`font-weight/line-height/letter-spacing` 逐项对齐 F2 字阶；禁用合成粗体。
 4. **状态完备**：五态逐一实现，色值取自 DESIGN.md 变体键。
-5. **稳定渲染后再截图比对**：禁动画（`prefers-reduced-motion` 或注入 CSS 冻结 transition）、固定 viewport = 设计板宽、DPR=1。
+5. **稳定渲染后再截图比对**：禁动画（`prefers-reduced-motion` 或注入 CSS 冻结 transition）、固定 viewport = **该档基准宽**（web 1440 / pad 834 / mobile 375）、DPR=1。
 6. **资源零外链**：所有图片/图标 import 打包，不依赖运行时相对路径。
+7. **响应式 / 档位**：`targetProfiles` 含多档时，用 CSS 媒体断点（`@media (max-width: 834px)` 等）实现 pad/mobile 布局，触控目标 ≥44px；单一档位可固定该宽不做断点。逐档分别截图与 Penpot 对应板比对。

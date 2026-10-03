@@ -23,8 +23,8 @@
 
 ## 3. 截图方法（先标准化再截图）
 
-- **Qt**：QWidget 路线 `widget->grab().save(path)`（隐藏滚动条/焦点框）；窗口固定为设计板尺寸；`QT_SCALE_FACTOR=1`。Qt5 开 AA_UseHighDpiPixmaps 但比对时 DPR=1。
-- **Web**：Playwright `page.screenshot({ clip })` 或元素 `locator.screenshot()`；viewport 宽 = 设计板宽，`deviceScaleFactor: 1`。
+- **Qt**：QWidget 路线 `widget->grab().save(path)`（隐藏滚动条/焦点框）；窗口固定为**该档基准宽**（web 1440 / pad 834 / mobile 375）；`QT_SCALE_FACTOR=1`。Qt5 开 AA_UseHighDpiPixmaps 但比对时 DPR=1。
+- **Web**：Playwright `page.screenshot({ clip })` 或元素 `locator.screenshot()`；viewport 宽 = **该档基准宽**（web 1440 / pad 834 / mobile 375），`deviceScaleFactor: 1`。
 - **标准化**：比对前冻结动画（注入 CSS `* { transition: none !important; animation: none !important }`；Qt 用静态状态）、统一背景（不透明底色）、字体加载完成后截图（`document.fonts.ready`）。
 
 ## 4. 流程（每层实现完执行）
@@ -41,7 +41,7 @@
    - 大块差异 → 按差异类型定位：位置偏移（间距/盒模型）、颜色（token 取值）、字体（字阶映射）、图标（资源引用/缩放）。
    - 仅边缘散点 → 通过。
 5. 修复后回到第 2 步循环，直到达标。
-6. 组件层全部达标后，对 14 页 Demo 六板做**整页比对**（阈值 0.5%）。
+6. 组件层全部达标后，对 14 页 Demo **各所选档位的屏幕板**分别做**整页比对**（阈值 0.5%）。
 7. 汇总报告：组件 × 指标表（用户偏好表格化进度），附 diff 热图路径。
 
 ## 5. 常见差异 → 根因速查

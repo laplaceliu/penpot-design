@@ -10,6 +10,9 @@
 - 含 CJK 文本一律 Noto Sans SC（Penpot 无字体栈回退）
 - 组件名分隔符一律 `·`（**禁止 `/`**，赋值静默失败）：`Button·Primary·Default`
 - 坐标走 8px 栅格；构建期直接放最终坐标，永不移动已建好的板
+- **PageRoot 宽固定 1920 是「规格说明书画布」**（展示组件矩阵 / 规格板），与最终屏幕目标宽度无关。
+  目标屏幕宽度由**视口档位**决定（见 §2.1 与 `references/viewport-profiles.md`），体现在
+  `12 · 布局模式` 各档网格板与 `14 · Demo` 各档屏幕板。设计系统内核（00–13、15）三档共用，只建一次。
 
 ## 2. 页面总表（16 页，固定编号与顺序）
 
@@ -29,10 +32,22 @@
 | 09 | `09 · 浮层` | Modal、Dialog、Drawer、Sheet、Popover、Tooltip、Popconfirm + 定位/遮罩规范板 |
 | 10 | `10 · 反馈与状态` | Toast、Notification、Alert、Result、Skeleton、Progress、Spinner、Empty、ErrorState |
 | 11 | `11 · 数据可视化` | 图例、KPI 卡、折线/柱状/饼图示例、仪表盘部件、图表色彩映射 |
-| 12 | `12 · 布局模式` | Layout 壳（12 栅格标注）、PageHeader、Grid/Space、ScrollArea、响应式断点、Empty/404/Error 整页模板 |
+| 12 | `12 · 布局模式` | 每个所选档位一块布局网格板：web 12 栅格 / pad 8 栅格（窄降 4）/ mobile 4 栅格或单列堆叠；各档 PageHeader、Grid/Space、ScrollArea、响应式断点、Empty/404/Error 整页模板（按档位宽） |
 | 13 | `13 · 组件索引` | 全部库组件实例缩略网格 + 名称 + 所属页坐标（design-to-code 映射表） |
-| 14 | `14 · Demo` | 板阵（全部用库组件实例组装）：必建六板 1920×1080——Dashboard、Landing、Login、List 管理页（搜索+筛选+表格+分页）、Detail 详情页（描述+操作区+Timeline）、Settings 表单页（分组表单+危险操作区）；可选两板——Empty/404 状态板、Mobile 375 应用板 |
+| 14 | `14 · Demo` | 板阵（全部用库组件实例组装）：对**每个所选档位**分别产出该档基准宽的六板——Dashboard、Landing、Login、List 管理页（搜索+筛选+表格+分页）、Detail 详情页（描述+操作区+Timeline）、Settings 表单页（分组表单+危险操作区）；多档可并排放在 1920 画布内（如 5 块 mobile 375 并排）。原「可选 Mobile 375 应用板」升级为各档必备板 |
 | 15 | `15 · 参考仿写` | 可选：仿写对象对照分析；无对象则省略并在 DESIGN.md `omitted` 声明 |
+
+## 2.1 视口档位（profile）—— 决定 12/14 页形态
+
+任务开始前由技能用 `ask_followup_question` 询问用户目标档位（web/pad/mobile，可多选），
+结果写入 DESIGN.md `targetProfiles`。档位定义、基准宽、栅格、触控目标与对产物的完整影响
+见 `references/viewport-profiles.md`。要点：
+
+- `web`：基准宽 1440（设计画布 1920），12 栅格，触控目标 ≥36px（鼠标）。
+- `pad`：基准宽 834，8 栅格（窄降 4），触控目标 ≥44px。
+- `mobile`：基准宽 375，4 栅格或单列堆叠，触控目标 ≥44px。
+- 设计系统内核（00–13、15）三档共用，只建一次；仅 `12` 栅格板与 `14` 屏幕板按档位分别建。
+- `14` 页每块屏幕板宽 = 对应档位基准宽，可多块并排置于 1920 画布。
 
 ## 3. 每页必含元素（页面解剖契约）
 
@@ -87,6 +102,10 @@ Button（880 × N，表面底，rounded.md）
 | 大型规格板 | 880 宽，2 列 x = 80 / 1000 |
 | 板垂直间距 / 板内区块 / 元素 | 48 / 24 / 8–16 |
 | Header / Footer 高 | 160 / 80，内容从 y=240 起 |
+| Demo 屏幕板宽（web） | 1440（landscape）或 1920；置于 14 页 1920 画布 |
+| Demo 屏幕板宽（pad） | 834（portrait）或 1194（landscape） |
+| Demo 屏幕板宽（mobile） | 375（portrait）或 812（landscape）；多块可并排（1920÷375≈5） |
+| 触控目标下限（pad/mobile） | ≥44px（用 token `touchMin`）；web ≥36px |
 
 ## 6. 与 DESIGN.md 的映射（design-to-code 依据）
 
@@ -106,5 +125,5 @@ Button（880 × N，表面底，rounded.md）
 - [ ] 组件规格板符合 §4 契约，变体命名 `组件·属性·属性`
 - [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值
 - [ ] 组件全部注册为库组件（母版在 AI Component Masters），13 索引页信息完整
-- [ ] 14 Demo 六板全部由库组件实例组装
+- [ ] 14 Demo 各所选档位的屏幕板全部由库组件实例组装（每档六板：Dashboard/Landing/Login/List/Detail/Settings）
 - [ ] 每页 `export_shape` 导出 PNG 验收通过（无 100×100 退化、无裁剪、无偏移）

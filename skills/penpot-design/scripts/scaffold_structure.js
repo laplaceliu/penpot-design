@@ -1,6 +1,8 @@
 // scaffold_structure.js —— 按 penpot-structure.md 契约创建固定 16 页骨架
 // 用法：先跑 seed_storage.js；再反复执行本脚本（队列 runner 模式，一次建一批），直至返回 {done:true}。
 // 幂等：页已存在则跳过；PageRoot/页头/页脚已存在不重建。
+// 注意：PageRoot 恒为 1920，这是「规格说明书画布」（展示组件矩阵/规格板），与最终屏幕目标宽度无关。
+// 目标屏幕宽度由视口档位（web/pad/mobile）决定，体现在 12 布局网格板与 14 Demo 屏幕板（见 references/viewport-profiles.md）。
 
 var PAGES = [
   '00 · 封面', '01 · 设计基础', '02 · 颜色系统', '03 · 基础控件', '04 · 文本与输入',

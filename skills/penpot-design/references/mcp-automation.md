@@ -1,6 +1,6 @@
 # Penpot MCP 自动化实战手册（execute_code）
 
-> 迁移自 penpot-mcp-automation 技能（已并入 penpot-design）。沉淀自多轮完整实战（93 组件 + 变体 + 1920×1080 大屏、33 组件 + 库组件 + Dashboard/Landing/Login/List/Detail/Settings 六典型页面）。
+> 迁移自 penpot-mcp-automation 技能（已并入 penpot-design）。沉淀自多轮完整实战（93 组件 + 变体 + 1920×1080 大屏（web 档位）、33 组件 + 库组件 + Dashboard/Landing/Login/List/Detail/Settings 六典型页面）。**现支持 web / pad / mobile 三档视口**（见 `references/viewport-profiles.md`），Demo 与 12 布局网格按所选档位分别构建，任务开头用 `ask_followup_question` 确认目标宽度。
 > 详细机理与代码：api-pitfalls.md（陷阱详解）/ engines.md（机理与配方）/ scripts/*.js（种子与引擎代码）。
 
 通过 `penpot` MCP 的 `execute_code` 工具操作 Penpot 文件。所有代码在该工具的沙箱中执行，30 秒超时。

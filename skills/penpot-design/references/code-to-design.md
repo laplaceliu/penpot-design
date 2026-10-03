@@ -32,17 +32,21 @@
 
 ## 统一构建管线（各入口共用）
 
+0. **确认视口档位**（先读 `references/viewport-profiles.md`）：拿到入口素材后、写 DESIGN.md 之前，
+   用 `ask_followup_question`（multiSelect）问用户目标宽度——`Web 宽屏` / `平板 Pad` / `手机 Mobile`。
+   结果写入 DESIGN.md `targetProfiles`，作为后续所有构建与验收的硬约束。用户已明说（"做个手机端"）可免问。
 1. **连接 Penpot MCP**（references/mcp-connection.md）：验证 4 工具可用、`high_level_overview` 能读文件。
 2. **播种**：`scripts/seed_storage.js`，把 DESIGN.md tokens 同步进 `storage.T` 与 `penpot.library.local.tokens`。
-3. **骨架**：`scripts/scaffold_structure.js` 建 16 页 + PageRoot/页头/页脚。
+3. **骨架**：`scripts/scaffold_structure.js` 建 16 页 + PageRoot/页头/页脚（PageRoot 恒 1920，属规格说明书画布）。
 4. **按页填充**（顺序 = 页码顺序，组件页内部按组件规格板契约 §4）：
    - 01 设计基础 → 02 颜色系统（token 可视化先行，后续页引用）
    - 03–12 组件页：每组件 一板一矩阵；**每板构建完立即 `export_shape` 验收**（越早发现重建成本越低）
+   - `12 · 布局模式`：按 `targetProfiles` 中**每个档位**分别建布局网格板（web 12 列 / pad 8 列 / mobile 4 列或单列堆叠）+ 该档响应式断点与 Empty/404 模板
    - 13 组件索引 + `component-map.json`（组件名 → 页名/坐标/token 引用/变体清单）
-   - 14 Demo 六板（Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单）全部用库组件实例组装
+   - `14 · Demo`：对**每个所选档位**分别产出该档基准宽的六板（Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单），全部用库组件实例组装；多档并排置于 14 页 1920 画布
 5. **注册库组件**：母版放 `AI Component Masters`，`createComponent` + `createVariantContainer`。
-6. **审查修复**：对齐/描边/去裁剪引擎过一遍（engines.md），重点：闭合描边 inner、发光板 clipContent=false、CJK 字体正确。
-7. **验收**：逐页导出 PNG 对照本契约自检清单（penpot-structure.md §7）；请用户在编辑器放大复核。
+6. **审查修复**：对齐/描边/去裁剪引擎过一遍（engines.md），重点：闭合描边 inner、发光板 clipContent=false、CJK 字体正确；**pad/mobile 板核查触控目标 ≥44px**。
+7. **验收**：逐页导出 PNG 对照本契约自检清单（penpot-structure.md §7）；`14` 页逐档位逐板验收；请用户在编辑器放大复核。
 
 ## DESIGN.md 编写要点（两入口通用）
 
@@ -50,3 +54,5 @@
 - 组件 token 尽量引用基础 token（`{colors.primary}`），变体键独立（`button-primary-hover`）。
 - 未知/推断项不编造精确数值：用接近的档位 + 在 prose 标注「自图片估计」。
 - 图标与图片资源约定提前写进 Components/Do's and Don'ts（导出尺寸、命名、@2x），是 design-to-code 阶段 pixel-perfect 的前提。
+- **Layout 章节必须记录 `targetProfiles`**（web/pad/mobile）并据此调整：spacing 刻度（mobile 更紧凑 4/8/12）、
+  触控目标下限（pad/mobile ≥44px，引入 `touchMin` token）、栅格描述按档位分别写，禁止只假设单一宽度。
