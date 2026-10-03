@@ -83,6 +83,8 @@ npx skills add ./
 
 首次跑本地栈：
 
+> **先确认是否已有部署**：用 `./scripts/status.sh`（或 `curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags` 看是否返回 200）探活；并查工作区 `.mcp.json` 是否已含 `penpot` 条目。若服务已在跑且 MCP 已配好，直接验证即可，**无需重装**。详见技能 `references/mcp-connection.md` §0 启动前检查。
+
 ```bash
 cd skills/penpot-design/assets/penpot-server
 cp .env.example .env          # 可选：改镜像 tag / 域名 / secret

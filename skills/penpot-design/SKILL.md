@@ -95,7 +95,21 @@ license: MIT
 5. 注册库组件（母版在 `AI Component Masters`）→ 对齐/描边/去裁剪审查 → 逐页导出 PNG 按自检清单验收
    （14 页逐档位逐板验收）。
 
-## 连接 penpot mcp（速记，详见 references/mcp-connection.md）
+## 启动前检查：确认 Penpot / MCP 是否已就绪（必做，先探测再动作）
+
+技能**不再默认直接安装** Penpot。开始任何部署动作前，先探测当前状态、按最小必要动作处理，避免重复拉镜像（~5min）或误覆盖已有部署。
+
+1. **探测 Penpot 服务**：跑 `assets/penpot-server/scripts/status.{sh,ps1}`，或 `curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags` 看是否 200。
+   - 返回 200 → 服务已在跑，**跳过安装/启动**。
+   - 容器存在但停了 → 只需 `up.{sh,ps1}` 拉起，**不要重装**（数据卷含账号，免 `create-profile`）。
+   - 容器/compose 不存在 → 需要完整安装。
+2. **探测 MCP 客户端配置**：查工作区 `.mcp.json` 是否含 `penpot` 条目（`url: https://penpot.local/mcp/stream`），且 `NODE_EXTRA_CA_CERTS` 已设、CA 证书存在（`$STACK/data/caddy/pki/authorities/local/root.crt`）。
+   - 已配置且端点可达 → **直接进「连接 penpot mcp」验证**，不动任何东西。
+   - 已配置但端点没起 → 仅启动服务。
+   - 未配置 → 配 `.mcp.json` + 跑 `trust-ca` + 重启客户端。
+3. **向用户确认再动手**：把探测结果用一两句话说明（如「Penpot 已在运行、MCP 已配好，直接验证」/「检测到旧部署已停，是否仅启动？」/「未检测到部署，是否完整安装（约 5 分钟拉镜像）？」），用 `ask_followup_question` 确认动作（**复用 / 仅启动 / 完整安装配置**）后再执行。轻量探测本身不询问。
+
+## 连接 penpot mcp（速记，详见 references/mcp-connection.md；启动前务必先按上节做就绪探测，勿直接 install）
 
 - 部署栈自带在 `assets/penpot-server/`（compose 7 服务 + caddy，脚本路径自解析，整目录可搬到任意位置）：Linux/macOS 用 `assets/penpot-server/scripts/*.sh`，**Windows 用同名的 `*.ps1`**（优先 `podman compose`，回退 `docker compose`）→ `https://penpot.local`（`admin@penpot.local` / `penpot123`，需先跑 `create-profile.{sh,ps1}`）。Windows 一键：`.\scripts\install.ps1`。
 - MCP 端点：`https://penpot.local/mcp/stream`（HTTP）或 `https://penpot.local/api/mcp/sse`（SSE）。

@@ -1,5 +1,38 @@
 # 连接 Penpot MCP 指南
 
+## 0. 启动前检查（确认 Penpot / MCP 是否已就绪）
+
+**不要默认直接 `install.ps1` / `up.sh`**。先探测，按最小必要动作处理：既省时间（拉镜像约 5min），也避免误覆盖已有部署或误重跑 `create-profile`。
+
+### 0.1 探测 Penpot 服务状态
+
+- 首选：`scripts/status.{sh,ps1}` —— 输出容器状态 + HTTPS 探活（`/` 与 `/api/main/methods/get-enabled-flags` 的 HTTP 码）。
+  - 两路 probe 均 `200` → **服务已在运行，跳到 §4 验证即可**。
+  - 容器存在但状态非 `Up` → 只需 `up.{sh,ps1}` 拉起，**不要重装**；数据卷（postgres/valkey）保留，账号仍在，免 `create-profile`。
+  - `compose ps` 报错 / 无容器 / 无 `$STACK/docker-compose.yml` → 需要完整安装（§1）。
+- 快速替代（无脚本环境）：`curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags`，返回 200 即已起。
+
+### 0.2 探测 MCP 客户端配置
+
+- 工作区 `.mcp.json` 是否含 `penpot` 条目且 `url` 为 `https://penpot.local/mcp/stream`。
+- `NODE_EXTRA_CA_CERTS` 是否已设置，且 CA 证书文件存在：`$STACK/data/caddy/pki/authorities/local/root.crt`（trust-ca 跑过才会生成）。
+  - 两者都满足且 §0.1 端点可达 → **MCP 已就绪，直接 §4 验证**，不要重跑 trust-ca / 不要改 `.mcp.json`。
+  - 配置在但端点没起 → 仅启动服务（§0.1 的 `up`）。
+  - 未配置 → 按 §3 配置 `.mcp.json` + 跑 `trust-ca` + **重启客户端**。
+
+### 0.3 确认动作（向用户）
+
+把探测结论用一两句话汇报，并用 `ask_followup_question` 让用户确认下一步（轻量探测本身不打扰用户）：
+
+| 探测结论 | 建议动作 | 是否需询问 |
+|---|---|---|
+| 服务在跑 + MCP 已配 | 直接验证（§4） | 否，直接验证 |
+| 服务停了 + MCP 已配 | 仅 `up` 拉起 | 是（确认「仅启动」） |
+| 无部署 / 未配置 | 完整安装 + 配置 | 是（确认「完整安装，约 5min」） |
+| 服务在跑但 MCP 未配 | 仅配 MCP（trust-ca + `.mcp.json` + 重启客户端） | 是 |
+
+> 关键原则：能复用就复用，能只启动就只启动，**绝不**在已就绪时重装或重跑 `create-profile`。
+
 ## 1. 前置：本地 Penpot 部署
 
 部署栈**随本技能自带**：`assets/penpot-server/`（compose 栈 7 服务：penpot-{frontend,backend,exporter,mcp,postgres,valkey} + caddy，Penpot 2.17，Caddy 在 `https://penpot.local` 终止 HTTPS）。完整说明见 `assets/penpot-server/README.md`。
