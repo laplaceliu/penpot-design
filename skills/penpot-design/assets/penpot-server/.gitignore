@@ -1,2 +1,3 @@
-data/
+# Local deployment state — never commit.
 .env
+data/

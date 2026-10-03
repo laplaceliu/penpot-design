@@ -59,9 +59,9 @@ license: MIT
 
 ## 连接 penpot mcp（速记，详见 references/mcp-connection.md）
 
-- 部署栈自带在 `assets/penpot-server/`（compose 7 服务 + caddy，脚本路径自解析，整目录可搬到任意位置）：`assets/penpot-server/scripts/{prewarm,up,trust-ca,create-profile,status}.sh` → `https://penpot.local`（`admin@penpot.local` / `penpot123`，需先跑 `create-profile.sh`）。
+- 部署栈自带在 `assets/penpot-server/`（compose 7 服务 + caddy，脚本路径自解析，整目录可搬到任意位置）：Linux/macOS 用 `assets/penpot-server/scripts/*.sh`，**Windows 用同名的 `*.ps1`**（优先 `podman compose`，回退 `docker compose`）→ `https://penpot.local`（`admin@penpot.local` / `penpot123`，需先跑 `create-profile.{sh,ps1}`）。Windows 一键：`.\scripts\install.ps1`。
 - MCP 端点：`https://penpot.local/mcp/stream`（HTTP）或 `https://penpot.local/api/mcp/sse`（SSE）。
-- 客户端配 `.mcp.json`；自签证书跑一次 `assets/penpot-server/scripts/trust-ca.sh`（自动写 `NODE_EXTRA_CA_CERTS`）并**重启客户端**；CA 每栈目录独立，换目录需重跑。
+- 客户端配 `.mcp.json`；自签证书跑一次 `assets/penpot-server/scripts/trust-ca.{sh,ps1}`（自动写 `NODE_EXTRA_CA_CERTS`）并**重启客户端**；CA 每栈目录独立，换目录需重跑。
 - 验证：4 工具（execute_code / export_shape / high_level_overview / penpot_api_info）→ `penpot_api_info` → `high_level_overview` → execute_code 冒烟。
 - execute_code 纪律：切页异步要防御式校验；storage 易失每批播种；每调用 ≤8 图元/≤10 文本；崩溃损伤查 100×100。完整坑表见 `references/mcp-automation.md` 与 `references/api-pitfalls.md`。
 

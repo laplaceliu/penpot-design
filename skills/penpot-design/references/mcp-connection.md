@@ -4,7 +4,11 @@
 
 部署栈**随本技能自带**：`assets/penpot-server/`（compose 栈 7 服务：penpot-{frontend,backend,exporter,mcp,postgres,valkey} + caddy，Penpot 2.17，Caddy 在 `https://penpot.local` 终止 HTTPS）。完整说明见 `assets/penpot-server/README.md`。
 
-> **为什么没有绝对路径**：栈根目录由 `assets/penpot-server/scripts/lib.sh` 从脚本自身位置反推（`BASH_SOURCE` + 逐级解析符号链接，兼容无 `readlink -f` 的 macOS），`compose.yaml`/`caddy/Caddyfile`/`data/` 全部相对推导。所以把 `assets/penpot-server/` 整目录拷到 `~/penpot`、`/srv/penpot` 或 CI workspace 都一样跑，不用改任何路径。下文的 `$STACK` 指栈目录（默认 = `<SKILL_DIR>/assets/penpot-server`，`<SKILL_DIR>` = 本技能 `SKILL.md` 所在目录）；只剩 `/etc/hosts`、`/usr/local/share/ca-certificates`、`/etc/environment`、`$HOME` 信任库这些"每台机器都固定"的绝对路径。
+> **为什么没有绝对路径**：栈根目录由脚本从自身位置反推，所以把 `assets/penpot-server/` 整目录拷到任意位置（`~/penpot`、`C:\penpot`、CI workspace）都一样跑，不用改任何路径。Linux/macOS 用 `scripts/lib.sh`（`BASH_SOURCE` + 逐级解析符号链接），Windows 用 `scripts/lib.ps1`（`$PSScriptRoot`）。下文的 `$STACK` 指栈目录（默认 = `<SKILL_DIR>/assets/penpot-server`，`<SKILL_DIR>` = 本技能 `SKILL.md` 所在目录）。
+
+**引擎**：脚本自动检测 —— 优先 `podman compose`（Windows 推荐 Podman Desktop），否则回退 `docker compose` / `docker-compose`。
+
+**Linux / macOS（bash）：**
 
 ```bash
 STACK=<SKILL_DIR>/assets/penpot-server   # 目录可整体搬走，$STACK 随之变化
@@ -16,6 +20,23 @@ cd "$STACK" && cp .env.example .env # 可选：改镜像 tag / 域名 / secret
 ./scripts/status.sh                 # 容器状态 + HTTPS 探活 + 证书 + 磁盘占用
 ./scripts/tail-logs.sh <service>    # 跟踪单服务日志
 ./scripts/down.sh [--volumes]       # 停止（--volumes 清数据，不可逆）
+```
+
+**Windows（PowerShell，建议用管理员终端）：**
+
+```powershell
+$STACK = "<SKILL_DIR>\assets\penpot-server"
+cd $STACK
+Copy-Item .env.example .env                              # 可选
+.\scripts\install.ps1                                   # 一键：prewarm→up→trust-ca→create-profile
+# 或分步：
+.\scripts\prewarm.ps1
+.\scripts\up.ps1
+.\scripts\trust-ca.ps1
+.\scripts\create-profile.ps1                            # 建登录账号（新库是空的，必需；幂等）
+.\scripts\status.ps1
+.\scripts\tail-logs.ps1 <service>
+.\scripts\down.ps1 [-Volumes]
 ```
 
 登录凭据（`create-profile.sh` 播种）：`https://penpot.local/`，`admin@penpot.local` / `penpot123`（登录后到 `/auth/profile` 改密码）。主机名改 `PENPOT_HOST` 时要同步改 `.env` 的 `PENPOT_PUBLIC_URI` 与 `caddy/Caddyfile` 站点块。
@@ -41,14 +62,22 @@ cd "$STACK" && cp .env.example .env # 可选：改镜像 tag / 域名 / secret
 ```
 
 - CodeBuddy：写入工作区 `.mcp.json`（或 CodeBuddy MCP 设置面板填上述 URL）。
-- **CA 每栈独立**：`$STACK/data/caddy/pki` 在首次启动时生成，换栈目录/重新拷一份 = 换 CA，浏览器与客户端仍信任旧的就会报错（不是脚本坏了）。解法见 `assets/penpot-server/README.md`「换目录 / 新克隆后浏览器报证书错误」：沿用旧 PKI，或重跑 `trust-ca.sh` 并重启浏览器。
-- 端点走 Caddy 自签 TLS。Node/Electron 客户端不读系统证书库，必须设置（脚本自动写四处，第二条仅用于手动复核/指定）：
+- **CA 每栈独立**：`$STACK/data/caddy/pki` 在首次启动时生成，换栈目录/重新拷一份 = 换 CA，浏览器与客户端仍信任旧的就会报错（不是脚本坏了）。解法见 `assets/penpot-server/README.md`「换目录 / 新克隆后浏览器报证书错误」：沿用旧 PKI，或重跑信任脚本并重启浏览器。
+- 端点走 Caddy 自签 TLS。Node/Electron 客户端不读系统证书库，必须设置（脚本自动处理）。
 
-```bash
-"$STACK/scripts/trust-ca.sh"   # 系统 OpenSSL 库 + NSS(Chrome/Edge/Playwright) + Firefox + NODE_EXTRA_CA_CERTS
-# 脚本会自动写入 ~/.zshenv、~/.bashrc、/etc/environment；手动指定时：
-export NODE_EXTRA_CA_CERTS="$STACK/data/caddy/pki/authorities/local/root.crt"
-```
+  - **Linux/macOS**：`./$STACK/scripts/trust-ca.sh` 会写入系统 OpenSSL 库 + NSS（Chrome/Edge/Playwright）+ Firefox + `NODE_EXTRA_CA_CERTS`（写入 `~/.zshenv`、`~/.bashrc`、`/etc/environment`）。手动指定时：
+
+    ```bash
+    export NODE_EXTRA_CA_CERTS="$STACK/data/caddy/pki/authorities/local/root.crt"
+    ```
+
+  - **Windows**：`.\$STACK\scripts\trust-ca.ps1` 把 CA 装进**当前用户**的 `Trusted Root Certification Authorities` 存储，并写入**用户级** `NODE_EXTRA_CA_CERTS`（无需管理员）。手动指定时（PowerShell）：
+
+    ```powershell
+    $env:NODE_EXTRA_CA_CERTS = "$STACK\data\caddy\pki\authorities\local\root.crt"
+    # 持久化（用户级）：
+    [Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', "$STACK\data\caddy\pki\authorities\local\root.crt", 'User')
+    ```
 
 **设置环境变量后必须重启 AI 客户端**（env 不会注入已运行进程）。否则报：
 
