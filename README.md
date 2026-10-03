@@ -6,7 +6,7 @@
 两个方向共用同一套设计系统契约（DESIGN.md + Penpot 固定结构）：
 
 - **Code → Design**：给 URL / 一组图片 / 既有 React 组件库源码 → 产出 DESIGN.md + Penpot 设计系统（16 页固定结构）。
-- **Design → Code**：给 Penpot 设计文件 → 输出 Qt4/5/6 或 React/Vue 代码，PIL 像素级验收，目标 pixel-perfect。
+- **Design → Code**：给 Penpot 设计文件 → 按所选技术栈（Qt / Web 前端 / LVGL / imgui / MAUI / Flutter …）输出代码，PIL 像素级验收，目标 pixel-perfect；支持 Web 宽屏 / 平板 / 手机三档视口。
 
 ## 安装
 
@@ -48,8 +48,13 @@ npx skills add ./
         │   ├── mcp-automation.md      # execute_code 实战手册
         │   ├── api-pitfalls.md        # Penpot API 陷阱详解
         │   ├── engines.md             # 修复引擎 / 组件工厂 / 页面配方
-        │   ├── design-to-code-qt.md   # Qt4 / Qt5 / Qt6 输出指南
-        │   ├── design-to-code-web.md  # React / Vue 输出指南
+        │   ├── design-to-code-generic.md  # 通用出码纪律（所有栈共用）
+        │   ├── stack-profiles.md      # 技术栈档位：平台族分类 / 运行时询问 / 未知栈处理
+        │   ├── stacks/                # 技术栈适配器注册表
+        │   │   ├── manifest.md        # 栈 → 适配器文档 + 平台族标签
+        │   │   ├── qt.md              # Qt4 / Qt5 / Qt6 适配器
+        │   │   └── web.md             # Web 前端适配器（React/Vue/Angular/Svelte…）
+        │   ├── viewport-profiles.md   # 视口档位：web/pad/mobile 三档
         │   └── verification.md        # PIL 像素级验证流程
         ├── scripts/            # 可直接粘贴进 execute_code / 命令行运行的引擎
         │   ├── seed_storage.js        # 播种引擎（tokens + 工厂函数）
@@ -74,7 +79,7 @@ npx skills add ./
 | 本地 Penpot + MCP（推荐，栈已自带） | Docker Engine + compose 插件；脚本会自动补 `/etc/hosts` |
 | PIL 像素级验收 | Python 3 + `Pillow`（`pip install Pillow`） |
 | DESIGN.md lint / export | Node.js（技能内用 `npx @google/design.md`，无需预装） |
-| Qt / Web 代码输出 | 对应目标工具链（Qt4/5/6 或 React/Vue） |
+| 代码输出 | 对应目标技术栈工具链（Qt / Web 前端 / 其它栈依 `references/stacks/manifest.md` 适配器） |
 
 首次跑本地栈：
 

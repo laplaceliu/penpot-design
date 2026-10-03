@@ -1,6 +1,6 @@
 ---
 name: penpot-design
-description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口，运行时询问用户目标宽度档位并在 DESIGN.md 与构建/验收中据此外约束。"
+description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」「指定/选择技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口与任意 GUI 技术栈，运行时会询问目标宽度档位与目标栈（design→code 前，防默认 React）并在 DESIGN.md 与构建/验收中据此外约束。"
 version: 1.3.0
 license: MIT
 ---
@@ -26,6 +26,19 @@ license: MIT
 
 完整定义与产物映射见 `references/viewport-profiles.md`（务必先读）。
 
+## 技术栈档位（仅 Design → Code 前询问）
+
+本技能支持任意 GUI 技术栈（Qt / Web 前端 / LVGL / imgui / MAUI / Flutter / SwiftUI / Compose …），
+不再只写死 Qt 与 React/Vue。
+
+- **何时问**：只在 **Design → Code** 前用 `ask_followup_question` 确认（两级：先平台族、再框架，
+  multiSelect 视是否多栈）；Code → Design 不强制，可先出通用设计系统、出码时再定栈。
+- **铁律**：未确认 `targetStacks` 不得进入代码生成；**禁止默认 React/Web**；模棱两可就停住问，绝不推测出码。
+- **约束范围**：代码按所选栈实现并验收（viewport/窗口 = 档基准宽）。未知栈按通用纪律 + 问清
+  关键约束出码，并生成草稿适配器。
+- 完整分类、询问规范与适配器模板见 `references/stack-profiles.md`；栈 → 文档映射见
+  `references/stacks/manifest.md`；通用出码纪律见 `references/design-to-code-generic.md`。
+
 ## When to Use（何时使用）
 
 在以下场景加载本技能，按对应的参考文档展开：
@@ -33,7 +46,7 @@ license: MIT
 - 用户给出网址 / 截图 / 设计图，要求「生成设计系统」「产出 DESIGN.md」「建 Penpot 设计系统」。
 - 用户要求用 Penpot MCP 批量建页 / 建组件 / 建大屏、注册库组件、批量修复对齐或中文乱码。
 - 用户要求把既有 React / UI 组件库复刻成设计系统。
-- 用户要求把 Penpot 设计稿转成 Qt4/5/6 或 React/Vue 代码，或做像素级还原验收。
+- 用户要求把 Penpot 设计稿转成任意技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）代码，或做像素级还原验收。
 
 不适用场景：与 Penpot / 设计系统 / 设计稿转码无关的一般编码任务。
 
@@ -48,8 +61,11 @@ license: MIT
 | `references/mcp-automation.md` | **execute_code 实战手册**：会话纪律、布局三方案、陷阱速查、变体/组件、复刻 UI 库、验收纪律 |
 | `references/api-pitfalls.md` | execute_code API 陷阱详解（坐标/Path/描边/裁剪/文本/变体/沙箱/崩溃/导出/布局） |
 | `references/engines.md` | 引擎与配方：修复引擎机理、组件工厂模板、页面组装模式、崩溃重建清单（代码在 scripts/） |
-| `references/design-to-code-qt.md` | Qt4 / Qt5 / Qt6 分列输出指南 |
-| `references/design-to-code-web.md` | React / Vue 分列输出指南（含响应式/档位） |
+| `references/design-to-code-generic.md` | **通用出码纪律**（所有栈共用：分层/token/资源/五态/整数像素/验收） |
+| `references/stack-profiles.md` | **技术栈档位**：平台族分类、运行时询问（仅 design→code 前）、未知栈处理 |
+| `references/stacks/manifest.md` | 技术栈适配器注册表（栈 → 适配器文档 + 平台族标签） |
+| `references/stacks/qt.md` | Qt 适配器（Qt4/5/6 分列） |
+| `references/stacks/web.md` | Web 前端适配器（React/Vue/Angular/Svelte…） |
 | `references/viewport-profiles.md` | **视口档位**：web/pad/mobile 三档定义、运行时询问、对 DESIGN.md 与 12/14 页与验收的影响 |
 | `references/verification.md` | PIL 像素级验证全流程与根因速查 |
 | `scripts/seed_storage.js` | execute_code 播种引擎（tokens + 工厂函数） |
@@ -87,20 +103,26 @@ license: MIT
 - 验证：4 工具（execute_code / export_shape / high_level_overview / penpot_api_info）→ `penpot_api_info` → `high_level_overview` → execute_code 冒烟。
 - execute_code 纪律：切页异步要防御式校验；storage 易失每批播种；每调用 ≤8 图元/≤10 文本；崩溃损伤查 100×100。完整坑表见 `references/mcp-automation.md` 与 `references/api-pitfalls.md`。
 
-## 工作流 2：Design → Code（Qt 与 Web 分开走）
+## 工作流 2：Design → Code（按所选技术栈分走）
 
 入口：Penpot 文件 + DESIGN.md + 13 组件索引页（`component-map.json`）。
 
-**实现组织（行业惯例，两框架相同）**：按组件索引**分层实现**——tokens 层 → 原子（Button/Input…）→ 组合（SearchBox/FormField…）→ 模块（TopNav/DataTable…）→ 页面（对齐 14 页 Demo 各所选档位的屏幕板）。组件名与 Penpot 一一对应；每层落地立即 PIL 验收再进下一层。
-**档位约束**：先读 DESIGN.md `targetProfiles` 确定目标宽度（web/pad/mobile）；代码按档位做响应式
-（CSS 断点 / Qt 布局自适应），验收 viewport / 窗口宽 = 该档基准宽，逐档截图比对。
+> **先确认技术栈**：进入本流程前用 `ask_followup_question` 问 `targetStacks`（两级：平台族→框架，
+> multiSelect 视是否多栈），写入 DESIGN.md。未确认不得出码，禁止默认 React/Web。详见 `references/stack-profiles.md`。
 
-- **Qt4/Qt5/Qt6**：按 `references/design-to-code-qt.md` 分列执行——QSS/QML 变体、`.qrc` 资源系统、`QIcon/QPixmap`、High-DPI 差异（Q4 无 DPR / Q5 需 attribute+@2x / Q6 自动）、阴影发光方案各版本不同。
-- **React/Vue**：按 `references/design-to-code-web.md` 分列执行——`design.md export` 生成 CSS 变量/Tailwind 配置、组件目录规范、五态还原、`srcSet`/SVG 图标方案各框架不同。
+**实现组织（行业惯例，所有栈相同）**：按组件索引**分层实现**——tokens 层 → 原子（Button/Input…）→ 组合（SearchBox/FormField…）→ 模块（TopNav/DataTable…）→ 页面（对齐 14 页 Demo 各所选档位的屏幕板）。组件名与 Penpot 一一对应；每层落地立即 PIL 验收再进下一层。
+**双档位约束**：先读 DESIGN.md `targetProfiles`（视口 web/pad/mobile）与 `targetStacks`（技术栈）；
+代码按档位做响应式、按栈实现，验收 viewport / 窗口宽 = 该档基准宽，逐档截图比对。
+
+- **通用纪律**：先读 `references/design-to-code-generic.md`（分层/token/资源/五态/整数像素/验收）。
+- **选适配器**：据 `targetStacks` 从 `references/stacks/manifest.md` 选对应文档执行
+  （如 `stacks/qt.md` 覆盖 Qt4/5/6、`stacks/web.md` 覆盖 React/Vue/Angular/Svelte）。
+- **未知栈**：manifest 未登记时，按 generic + 向用户问清关键约束（布局模型/样式机制/资源系统/语言/验收手段）出码，
+  并生成草稿适配器 `references/stacks/<key>.md`，回写 manifest（见 `stack-profiles.md` §5）。
 
 **资源引用（重点）**：
-- 图片：一律走资源系统（`.qrc` / bundler import），代码零外链；从 Penpot 导出 @1x/@2x（@3x），**导出尺寸=标注尺寸×倍率**，禁止代码内缩放大图；纯色块/圆角/阴影用代码绘制。
-- 图标：SVG 优先（`currentColor` 着色跟 token），命名与 01 页 F6 图标板一致；图标按钮=24px 图标+标注 padding，居中误差 ≤1px。
+- 图片：一律走该栈资源系统（`.qrc` / bundler import / atlas），代码零外链；从 Penpot 导出 @1x/@2x（@3x），**导出尺寸=标注尺寸×倍率**，禁止代码内缩放大图；纯色块/圆角/阴影用代码绘制。
+- 图标：SVG 优先（`currentColor` 着色跟 token），命名与 01 页 F6 图标板一致；图标按钮=标注图标尺寸+padding，居中误差 ≤1px。
 - 建立资源清单（`component-map.json` 含资源映射），改图先改设计端再导出，单向流动。
 
 ## 验收（强制）：PIL pixel-perfect
