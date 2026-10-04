@@ -32,11 +32,19 @@
 
 ## 统一构建管线（各入口共用）
 
-0. **确认视口档位**（先读 `references/viewport-profiles.md`）：拿到入口素材后、写 DESIGN.md 之前，
-   用 `ask_followup_question`（multiSelect）问用户目标宽度——`Web 宽屏` / `平板 Pad` / `手机 Mobile`。
-   结果写入 DESIGN.md `targetProfiles`，作为后续所有构建与验收的硬约束。用户已明说（"做个手机端"）可免问。
+0. **确认两个启动档位——同一次 `ask_followup_question`（两个问题）问完**（拿到入口素材后、写 DESIGN.md 之前）：
+   - **视口档位**（先读 `references/viewport-profiles.md`）：multiSelect 问目标宽度——`Web 宽屏` / `平板 Pad` / `手机 Mobile`。
+     结果写入 DESIGN.md `targetProfiles`。
+   - **配色模式**（先读 `references/color-schemes.md`）：问是否需要**可切换的**明暗两套（整页翻转），
+     而不只是同一页里深浅区域交替 —— 选项 `只要浅色` / `浅色 + 深色两套`。
+     结果写入 DESIGN.md `## Colors` 章节正文。**提问必须讲清这两个概念的差别**。
+   两个答案共同构成后续所有构建与验收的硬约束。用户已明说（"做个手机端""要有深色模式"）可免问，但仍须落库。
+   两者共同决定 token 结构：只要浅色 → 1 set / 0 theme；两套 → `· Core` + `· Dark`（Core 在前）+ Scheme 组两个 theme。
 1. **连接 Penpot MCP**（references/mcp-connection.md）：验证 4 工具可用、`high_level_overview` 能读文件。
-2. **播种**：`scripts/seed_storage.js`，把 DESIGN.md tokens 同步进 `storage.T` 与 `penpot.library.local.tokens`。
+2. **播种**：`scripts/seed_storage.js` 建工厂函数（`storage.T` 只是 JS 侧色值镜像）→
+   再用 `scripts/token_engine.js` 的 `TK.seed(spec)` **真正录入 Penpot design tokens**
+   （set 按配色模式切：只要浅色 → 1 个 `· Core`；两套 → `· Core` + `· Dark`），
+   最后 `TK.assert()` 必须 PASS。详见 `references/design-tokens.md`。
 3. **骨架**：`scripts/scaffold_structure.js` 建 16 页 + PageRoot/页头/页脚（PageRoot 恒 1920，属规格说明书画布）。
 4. **按页填充**（顺序 = 页码顺序，组件页内部按组件规格板契约 §4）：
    - 01 设计基础 → 02 颜色系统（token 可视化先行，后续页引用）

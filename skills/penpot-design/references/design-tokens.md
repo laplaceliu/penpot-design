@@ -156,24 +156,76 @@ set.addToken({ type: 'color', name: 'color.link', value: '{color.primary}' });
 - 引用**跨 set 解析**（本 set 或任何激活 set 里的同名 token 均可被引用）。
 - 未激活时 `resolvedValue` 仍是 `null` —— 引用链只在激活状态下解析。
 
-## 5. 激活 / Themes / 优先级
+## 5. 激活 / set 与 theme 的区别 / 优先级
 
-```js
-const set = tokens.addSet({ name: 'pix · Core', active: true });    // ✅ 一定要 active:true
-set.toggleActive();                                                  // 直接切换
+### 5.1 Set 与 Theme 的本质区别
+
+| | **TokenSet** | **TokenTheme** |
+|---|---|---|
+| 是什么 | **token 的容器**（真正的数据） | **「哪些 set 应该开着」的预设**（只是一组引用） |
+| 存 token 吗 | **存**（`tokens` / `tokensByType`） | **不存**，只有 `activeSets`（引用其他 set） |
+| 必需吗 | **必需**，没有 set 就无处放 token | **可选**，纯 UI 便利 |
+| 能否单独开关 | 能（`set.toggleActive()`），**但会清空所有 theme 的激活状态** | 能（`theme.toggleActive()`），连带切换其 `activeSets` |
+| 互斥性 | 不互斥，可任意多开 | **同 `group` 内互斥**（激活一个自动停用同组另一个）；**不同 group 可同时激活** |
+| 命名唯一域 | **是**（set 内 name 唯一，且 `.` 是路径） | 不是 |
+| 影响优先级吗 | **是**（`sets` 数组顺序） | 否，只决定"谁开着" |
+
+**一句话：set 是"数据"，theme 是"开关组合"。**
+
+### 5.2 核心规则（实测，比官方文档更明确）
+
+> **`set.active` 是「所有已激活 theme 的并集」的派生值 —— 某 set 处于激活，当且仅当至少有一个激活的 theme 包含它。**
+
+实测逐步核对（3 个 set，2 个 group）：
+
+| 步骤 | 观测到的 set 状态 | 观测到的 theme 状态 |
+|---|---|---|
+| 初始 | 全 off | 全未激活（`activeSets` 仍显示**声明成员**，与激活状态无关） |
+| 激活 `Density/compact` | `dense=ON` | compact=ACTIVE |
+| 激活 `Scheme/dark`（含 base+dark） | `base=ON dark=ON`，**`dense` 保持 ON** | dark 与 compact **同时 ACTIVE** |
+| 激活 `Scheme/light`（同组） | `base=ON`，**`dark` 变 off**，`dense` 保持 ON | dark **被自动停用**，light=ACTIVE |
+| 直接 `base.toggleActive()` | `base=off`，`dense` 保持 ON | **三个 theme 全部被清空** |
+
+三条推论：
+
+1. **激活 theme 不会关掉 theme 之外的 set**（`dense` 一直没被关）——但**停用 theme 会关掉它的 set**（步骤 3 的 `dark`）。
+   所以精确表述是「并集」而不是「只增不减」。
+2. **同组互斥是自动的**，不需要手写停用逻辑 —— 这就是 theme 存在的最大价值：用 axis 表达"只能选一个"的约束。
+3. **直接 toggle set 会清空所有 theme** —— 一旦这么做，就进入了"手动自定义"状态，theme 的 `active` 全部变 false。
+
+### 5.3 优先级（与 theme 无关）
+
+两个**激活** set 定义同名 token → **`sets` 数组中靠后的那个胜出**；停用它则回退到靠前者。
+theme 只决定"谁开着"，**不改变 `sets` 的顺序**。
+
+所以约定：**基础层放前、主题覆盖层放后**：
+
+```
+sets: [ 'pix · Core'(全部基础 token), 'pix · Dark'(只放要覆盖的同名 token) ]
+
+ensureTheme('Scheme', 'Light', ['pix · Core'])
+ensureTheme('Scheme', 'Dark',  ['pix · Core', 'pix · Dark'])   // Dark 在后 → 激活时覆盖 Core
+activateTheme('Scheme', 'Dark')                                 // → color.primary 解析为覆盖值
 ```
 
-**Themes** 是一组「激活哪些 set」的预设，可分组，同组内至多一个生效（用于品牌/密度/暗色等多条轴）：
+### 5.4 API 与引擎
 
 ```js
-const dark = tokens.addTheme({ group: 'Scheme', name: 'dark' });  // 默认 active:false
-dark.addSet(colorSet);        // 接受 TokenSet 或 id
-dark.toggleActive();          // 激活 theme 会把它的 set 一并激活（实测确认）
-// 直接 toggleActive 某个 set 会让所有 theme 变为未激活（表示进入「手动自定义」状态）
+// 原生
+const t = tokens.addTheme({ group: 'Scheme', name: 'Dark' });  // 默认 active:false
+t.addSet(coreSet); t.addSet(darkSet);                          // 接受 TokenSet 或 id
+t.toggleActive();                                              // 激活（同组另一个会被自动停用）
+
+// 引擎（推荐，已封装上述规则）
+TK.ensureTheme('Scheme', 'Dark', ['pix · Core', 'pix · Dark']);
+TK.activateTheme('Scheme', 'Dark');     // 返回 { active, activeSetsNow }
+TK.activeSets();                        // 当前实际激活的 set 名单
 ```
 
-**优先级**（实测）：两个激活 set 定义同名 token → **`sets` 数组中靠后的那个胜出**；停用它则回退到靠前者。
-所以约定：**基础层（基础色/字号/间距）放前，主题覆盖层放后。**
+> ⚠️ **有 theme 时不要直接 `set.toggleActive()`** —— 会清空全部 theme。
+> `TK.ensureSet()` 已自带保护：检测到存在 theme 时默认不再直接 toggle（可用第三个参数 `force` 强制）。
+> `TK.audit()` 也会自动切换判据：无 theme → 未激活 set 算故障；有 theme → 未激活属正常态，
+> 改判「无同组多激活 + 已激活 set 内 token 全部可解析」。
 
 ## 6. 应用 token
 

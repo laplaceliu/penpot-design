@@ -59,6 +59,24 @@
 - 设计系统内核（00–13、15）三档共用，只建一次；仅 `12` 栅格板与 `14` 屏幕板按档位分别建。
 - `14` 页每块屏幕板宽 = 对应档位基准宽，可多块并排置于 1920 画布。
 
+## 2.2 配色模式（color schemes）—— 决定 01/02/14 页形态与 token set 结构
+
+与视口档位**同一批** `ask_followup_question` 询问（一次往返问完），结果写入 DESIGN.md `## Colors` 章节正文。
+定义、产物映射与验收见 `references/color-schemes.md`；set/theme 机制见 `references/design-tokens.md` §5。要点：
+
+- **先分清两个概念**：多数系统天然有「**分节表面极性**」（同一页内深浅区域交替，如 hero 用 ink、正文用 canvas）——
+  那**不是**主题，不需要 theme。本档位问的是「**可切换**的整页明暗翻转」。
+- 答 `只要浅色` → token 建 **1 个 set**（`<系统名> · Core`），**0 个 theme**（pix 当前即此形态）。
+- 答 `浅色 + 深色两套` → token 建 `· Core`（全部）+ `· Dark`（只放覆盖的同名 token），
+  **Core 必须排在前**（`sets` 顺序即优先级，后者胜）；再建 `Scheme` 组两个 theme
+  （Light = {Core}，Dark = {Core, Dark}），同组互斥由 Penpot 自动保证。
+- 产物影响：
+  - `01 设计基础 F1`：色板**双极性并排**。
+  - `02 颜色系统`：C1/C2/C3/**C5 对比度审计 全部双份**（两张表，dark 不是 light 的取反）。
+  - `03–12`：交互组件至少补 dark 极性的状态组；展示件给极性说明。
+  - `14 Demo`：**板数 = 档位数 × 配色数**（2 档位 × 2 配色 = 24 板）。
+  - `12` 布局模式不受影响（布局与配色正交）。
+
 ## 3. 每页必含元素（页面解剖契约）
 
 每页（00 可简化）必须有且仅有一个顶层根板，所有元素挂入：
@@ -136,5 +154,8 @@ Button（880 × N，表面底，rounded.md）
 - [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值；**`storage.TK.audit().ok === true`**
       （所有 set `active:true` + 所有 token `resolvedValueString` 非空，即无失效/断链）
 - [ ] 组件全部注册为库组件（母版在 AI Component Masters），13 索引页信息完整
-- [ ] 14 Demo 各所选档位的屏幕板全部由库组件实例组装（每档六板：Dashboard/Landing/Login/List/Detail/Settings）
+- [ ] 14 Demo 各所选档位的屏幕板全部由库组件实例组装（每档六板：Dashboard/Landing/Login/List/Detail/Settings）；
+      **配色模式选了「两套」时板数 = 档位数 × 配色数**，且两套都导出验收过
+- [ ] 配色模式已按 DESIGN.md `## Colors` 声明落实：只要浅色 → 1 set / 0 theme；
+      两套 → `· Core` + `· Dark`（Core 在前）+ Scheme 组两个 theme，且 **02 页对比度审计有 light/dark 两张表**
 - [ ] 每页 `export_shape` 导出 PNG 验收通过（无 100×100 退化、无裁剪、无偏移）

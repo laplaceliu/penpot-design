@@ -1,7 +1,7 @@
 ---
 name: penpot-design
-description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「录入/校验 Penpot design tokens（17 种 TokenType / set 激活 / token 引用 / themes）」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」「指定/选择技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口与任意 GUI 技术栈，运行时会询问目标宽度档位与目标栈（design→code 前，防默认 React）并在 DESIGN.md 与构建/验收中据此外约束。"
-version: 1.5.0
+description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「录入/校验 Penpot design tokens（17 种 TokenType / set 激活 / token 引用 / themes）」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」「指定/选择技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口、单色/明暗双配色、与任意 GUI 技术栈，启动时会一并询问目标宽度档位与配色模式（是否要可切换的明暗两套 theme），design→code 前询问目标栈（防默认 React），并在 DESIGN.md 与构建/验收中据此外约束。"
+version: 1.6.0
 license: MIT
 ---
 
@@ -25,6 +25,23 @@ license: MIT
   （00–13、15）与档位无关，只建一次、各档共用。
 
 完整定义与产物映射见 `references/viewport-profiles.md`（务必先读）。
+
+## 配色模式（必须：启动时与视口档位同一批询问）
+
+- **两个选项**：`只要浅色`（默认）/ `浅色 + 深色两套`（可切换）。
+- **运行时询问**：与视口档位**放在同一批 `ask_followup_question` 里**（一次往返问完，不要分两轮），
+  问"是否需要**可切换的**明暗两套配色（整页翻转），而不只是同一页里深浅区域交替？"。
+  **必须把这两个选项的差别写进选项描述** —— 多数系统天然有"分节表面极性"（同一页里深浅区域交替），
+  那不是主题，问了容易答非所问。
+- **答案落库**：写入 **DESIGN.md `## Colors` 章节正文**（与 `targetProfiles` 写 `## Layout` 同理），
+  **不要**塞 frontmatter 自定义键（实测能过 lint 但会被忽略，等于无效）。
+- **约束范围**：决定 token 的 set/theme 结构（两套 → `· Core` + `· Dark` + Scheme 组两个 theme，
+  **Core 必须在前**）、`01 F1` 双极性色板、`02` 颜色系统页整体双份（含 C5 对比度审计两张表）、
+  组件规格板的极性说明、以及 `14·Demo` **板数翻倍**（档位数 × 配色数）。
+- **铁律**：dark **不是** light 的取反，**WCAG 必须两套分别审计**；未导出过的组合不得表述为"已验证"。
+
+完整定义、产物映射与验收见 `references/color-schemes.md`（务必先读）。
+Token 的 set/theme 机制细节见 `references/design-tokens.md` §5。
 
 ## 技术栈档位（仅 Design → Code 前询问）
 
@@ -69,6 +86,7 @@ license: MIT
 | `references/stacks/qt.md` | Qt 适配器（Qt4/5/6 分列） |
 | `references/stacks/web.md` | Web 前端适配器（React/Vue/Angular/Svelte…） |
 | `references/viewport-profiles.md` | **视口档位**：web/pad/mobile 三档定义、运行时询问、对 DESIGN.md 与 12/14 页与验收的影响 |
+| `references/color-schemes.md` | **配色模式**：启动时询问（与视口档位同批）、「分节表面极性 vs 可切换主题」的区别、答案落库位置、两套配色的产物映射（token set/theme、01/02/14 页变化）与对比度验收 |
 | `references/verification.md` | PIL 像素级验证全流程与根因速查 |
 | `scripts/seed_storage.js` | execute_code 播种引擎（**`storage.T` 只是 JS 侧色值镜像，不创建 Penpot token** + 工厂函数） |
 | `scripts/token_engine.js` | **Design Tokens 引擎**：`TK.seed`（建集+录 token，自动 `active:true`）/ `TK.apply`（应用+回读校验，捕获静默失败）/ `TK.audit`（未激活/引用断链体检）/ `TK.unbindFill` |
@@ -87,8 +105,14 @@ license: MIT
 
 随后（两方式共用，详见 `references/code-to-design.md`）：
 
-0. **确认视口档位**（先读 `references/viewport-profiles.md`）：用 `ask_followup_question` 问用户
-   目标宽度（web/pad/mobile，可多选），结果写入 DESIGN.md `targetProfiles`，作为后续硬约束。
+0. **确认两个启动档位——用同一次 `ask_followup_question`（两个问题）问完，不要分两轮**：
+   - **视口档位**（先读 `references/viewport-profiles.md`）：目标宽度 web / pad / mobile（可多选）→
+     写入 DESIGN.md `targetProfiles`，作为后续硬约束。
+   - **配色模式**（先读 `references/color-schemes.md`）：`只要浅色` 还是 `浅色 + 深色两套`（可切换）→
+     写入 DESIGN.md `## Colors` 章节正文。
+     **提问时必须讲清「分节表面极性 ≠ 可切换主题」**，否则用户容易答非所问。
+   两个答案共同决定后续的 **token 结构**：只要浅色 → 1 个 set、0 个 theme；
+   两套 → `<系统名> · Core` + `<系统名> · Dark`（Core 在前）+ Scheme 组两个 theme。
 0.5 **【门禁 G1】读并原样粘贴 canonical 脚本**：`scripts/seed_storage.js`（`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`）
    + `scripts/repair_engines.js`（`alignPage`/`vAlignPage`/`fixInner`/`unclip`/`cleanOrphans`）
    + `scripts/audit_layout.js`（`auditPage`）+ `scripts/token_engine.js`（`TK.*`）。
@@ -152,8 +176,10 @@ license: MIT
 > multiSelect 视是否多栈），写入 DESIGN.md。未确认不得出码，禁止默认 React/Web。详见 `references/stack-profiles.md`。
 
 **实现组织（行业惯例，所有栈相同）**：按组件索引**分层实现**——tokens 层 → 原子（Button/Input…）→ 组合（SearchBox/FormField…）→ 模块（TopNav/DataTable…）→ 页面（对齐 14 页 Demo 各所选档位的屏幕板）。组件名与 Penpot 一一对应；每层落地立即 PIL 验收再进下一层。
-**双档位约束**：先读 DESIGN.md `targetProfiles`（视口 web/pad/mobile）与 `targetStacks`（技术栈）；
-代码按档位做响应式、按栈实现，验收 viewport / 窗口宽 = 该档基准宽，逐档截图比对。
+**三档位约束**：先读 DESIGN.md `targetProfiles`（视口 web/pad/mobile）、`targetStacks`（技术栈）与
+`## Colors` 声明的配色模式；
+代码按档位做响应式、按栈实现、按配色走同一套语义 token，验收 = 该档基准宽 × 该配色的截图，**逐组合比对**
+（组合数 = 档位数 × 配色数）。
 
 - **通用纪律**：先读 `references/design-to-code-generic.md`（分层/token/资源/五态/整数像素/验收）。
 - **选适配器**：据 `targetStacks` 从 `references/stacks/manifest.md` 选对应文档执行

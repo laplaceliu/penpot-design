@@ -3,11 +3,14 @@
 所有栈的出码都先遵守本文，再据 DESIGN.md `targetStacks` 从 `references/stacks/manifest.md`
 选对应适配器补差异。原 Qt / Web 两份指南的共性已抽到此处；适配器只写该栈特有部分。
 
-## 0. 双档位约束（开工前必读）
+## 0. 三个档位约束（开工前必读）
 
 - **视口档位 `targetProfiles`**：见 `references/viewport-profiles.md`；验收 viewport/窗口宽 = 该档基准宽，逐档比对。
 - **技术栈档位 `targetStacks`**：见 `references/stack-profiles.md`；**未确认不得进入代码生成，禁止默认 React/Web**。
-- 两者正交：一个设计系统可同时面向 (stack, profile) 组合，例如 web+React 与 mobile+Flutter。
+- **配色模式 `colorSchemes`**：见 `references/color-schemes.md`；两套配色时**必须走同一套语义 token**，
+  禁止在组件里硬编码第二套色值，且**验收组合数 = 档位数 × 配色数**（每档位 × 每配色分别截图比对）。
+  切换机制与持久化（跟随系统 / 手动 / 是否记忆）读 DESIGN.md `## Colors` 与 Do's and Don'ts 的声明。
+- 三者正交：一个设计系统可同时面向 (stack, profile, scheme) 组合，例如 web+React+dark 与 mobile+Flutter+light。
 
 ## 1. 分层实现组织（行业惯例，所有栈相同）
 
