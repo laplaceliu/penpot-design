@@ -7,7 +7,18 @@
 | `scripts/seed_storage.js` | tokens `storage.T`、`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg` | 每会话先跑；storage 丢失后重播种 |
 | `scripts/repair_engines.js` | `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | 跑一次种入 storage，逐页调用 |
 | `scripts/fix_layout.js` | flex 压塌修复（getDesignSize + absRow + fixCol，两轮收敛） | 在目标页直接执行 |
+| `scripts/audit_layout.js` | 定位审计（`auditPage`/`auditAll`，五类签名 + 字体直方图，只读） | 每板建成即跑；收尾后复算 |
+| `scripts/fix_geometry.js` | 几何修补（列偏移/板高/根高/右溢出，四引擎，全支持 dry-run） | 审计出清单后逐页修 |
 | `scripts/scaffold_structure.js` | 固定 16 页骨架 | code-to-design 第一步 |
+
+> **顺序铁律**：`seed_storage.js`（G1）→ 建板（每板 `audit_layout.js` 单板审计，G3）→
+> **阶段一几何**：`fix_geometry.js` 的 `fixGeometryAll({apply:false})` 出清单 → 复核 → `{apply:true}`
+> → **阶段二对齐**：`repair_engines.js` 收尾（`cleanOrphans → alignPage → vAlignPage → fixInner → unclip`，G4）→
+> `audit_layout.js` 复算至 `CLEAN`（G5）。
+>
+> **两阶段不可合并、且不必都跑**：实测 121 条越界全部由几何引擎解决，`vAlignPage` 命中 0；
+> 先跑对齐引擎会在错误基准上吸附、引入误伤。**先诊断签名，再决定调哪个引擎。**
+> 签名判定与噪声规则见 `references/positioning-audit.md`。
 
 通用 runner（引擎/修复逐页执行；**尾部预切下一页，探测前必须先核对 `penpot.currentPage.name`**）：
 

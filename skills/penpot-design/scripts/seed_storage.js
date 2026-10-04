@@ -36,14 +36,19 @@ return (function () {
   };
 
   // ---- 文本工厂：CJK 自动选 Noto Sans SC（Penpot 无 CSS 字体栈回退，applyToText 整段生效）----
+  // 第 6 参 fontRole：'display' 走 display 字体（按 DESIGN.md 替换 _display），其余走正文体。
+  // 铁律：**这个参数必须从一开始就在**。中途才给 mkText 加字体选项，会让前后批次的
+  // display 文字字体不一致，而这类不一致几何审计查不出来（只得靠 auditPage().fonts 直方图）。
   const _noto = penpot.fonts.findByName('Noto Sans SC');
   const _latin = penpot.fonts.findByName('Nunito');
+  const _display = penpot.fonts.findByName('Anton');   // ← 按 DESIGN.md 的 display 字体替换
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
-  storage.mkText = function (str, x, y, size, color, weight) {
+  storage.mkText = function (str, x, y, size, color, weight, fontRole) {
     const t = penpot.createText(str);
     t.x = x; t.y = y;
     const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str);
-    const font = cjk ? _noto : _latin;
+    // CJK 优先：display 字体通常无中文字形，中文一律回落 Noto
+    const font = cjk ? _noto : (fontRole === 'display' && _display ? _display : _latin);
     try { font.applyToText(t, _variant(font, weight || 400)); } catch (e) {}
     if (size) { try { t.fontSize = String(size); } catch (e) {} }
     if (color) { try { t.fills = [{ fillColor: color, fillOpacity: 1 }]; } catch (e) {} }

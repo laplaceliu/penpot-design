@@ -75,6 +75,62 @@ $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
 2. **重载 IDE 窗口 / 重连 MCP servers**，让客户端重新读取配置并注册 penpot 工具；
 3. 另需浏览器里的 Penpot 插件面板处于打开且已连上桥接（WS 4402），`execute_code` 才能触达文件。
 
+### 0.5 排障：浏览器把 Penpot 标签挂起（长会话的头号杀手）
+
+`execute_code` 报：
+
+```
+The Penpot plugin tab appears to be suspended by the browser (no heartbeat for 194s).
+Please click/focus the Penpot tab to wake it, then retry.
+```
+
+**这是浏览器（Chrome Memory Saver / Edge Sleeping tabs）把后台标签休眠了，不是服务或配置的问题。**
+心跳计数器只增不减，说明标签处于冻结态；此时任何工具调用都会失败。
+
+从容器日志能看清完整时序（真实案例）：
+
+```
+01:54:52  Tool #1 failed: No Penpot instance connected for user token.   ← 插件未连
+02:07:26  (PluginBridge): New WebSocket connection established (token provided)  ← 插件连上了
+02:10:40  Tool #3 failed: ... suspended by the browser (no heartbeat for 194s)   ← 立刻被休眠
+```
+
+即"插件刚连上就被挂起"——用户切到 IDE 窗口后，Penpot 标签转入后台即被冻结。
+
+**机理（读容器内 `index.js` 得到，非猜测）**：
+
+```js
+var HEARTBEAT_STALE_THRESHOLD_MS = 3e4;                       // 30s，硬编码
+function assertPluginResponsive(state, now, staleThresholdMs = HEARTBEAT_STALE_THRESHOLD_MS) {
+  const heartbeatAge = now - state.lastHeartbeat;
+  if (heartbeatAge > staleThresholdMs) { throw ... }          // 报错文案即用此常量
+}
+```
+
+- 阈值 **30 秒硬编码，不可用环境变量放宽**；`PENPOT_MCP_TOOL_TIMEOUT_S` 只管工具自身超时，与本检查无关。
+  超过 30s 未收到插件心跳，服务端**拒绝一切工具调用**（`execute_code` / `export_shape` 全挂）。
+- 插件侧心跳报文为 `{type:"heartbeat"}`，服务端每收到一次就刷新 `connection.lastHeartbeat`。
+
+**诊断口诀：看心跳计数是否曾有清零。**
+- 计数**从不清零、单调增长** → 若在"重连后很快（如 34s）就已超阈值"，说明**一次心跳都没来过**，
+  即页面**从一开始就是隐藏态**（不是"可见但被节流"）。
+- 实测反证：本技能的一次真实构建里，浏览器窗口处于**可见但失焦**（焦点在 IDE）状态，
+  一口气跑完约 40 次工具调用、心跳始终正常。**所以"失焦"本身不会导致挂起。**
+- 结论：计数从未清零时，问题几乎一定是 **该标签不是所在窗口的当前选中标签**（同窗口切到了别的 tab），
+  或窗口被最小化 / 被完全遮挡。省电设置（Memory Saver / Sleeping tabs）通常是**第二位**原因。
+
+**处置**：
+1. **在该浏览器窗口里点击 Penpot 标签页，让它成为当前选中标签**（不是仅仅把窗口摆到旁边），然后立刻重试；
+2. 对 `penpot.local` 关闭浏览器省电策略（Chrome: 设置 → 性能 → Memory Saver 里把该站点加白；
+   Edge: 设置 → 系统和性能 → 关闭"使用睡眠标签页"/对站点加白）；
+3. 长会话建议把 Penpot 标签**单独开一个窗口并保持可见**（与 IDE 并排），不要藏在后台标签组里；
+4. 批量自动化时按"小批次 + 每批结束即落盘进度"组织（见 `positioning-audit.md` G6），
+   这样被挂起/断连后能续跑，不必从头再建。
+
+> 判据速记：**`No Penpot instance connected` = 插件没连；`suspended by the browser` = 连了但标签被冻结；
+> `tool does not exist or is not registered` = 客户端丢了 server 注册；`Connect Timeout ... penpot.local:443` = 栈不在跑。**
+> 四种故障的修法完全不同，先看报错原文再动手。
+
 ### 0.5 排障：`No Penpot instance connected for user token`
 
 **这是"客户端↔服务端正常、服务端↔浏览器断开"的专属报错**，与 §0.4 的失联不是一回事，别混。判据：

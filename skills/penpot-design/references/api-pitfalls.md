@@ -176,3 +176,93 @@ execute_code 30s 超时被杀时，调用内的 `penpot.openPage` 可能**未提
 1. 超时后的第一条命令**只做** `openPage(pg) + sleep(400) + return currentPage.name`；
 2. 页名匹配才执行操作；
 3. 全页 remove 前先 `return` 顶层板清单人工确认（或限定 `name.startsWith('xxx')` 条件删除，绝不裸 remove 全部）。
+
+## 12. 属性名必须核对 API，写错会静默失败（最贵的一类坑）
+
+**铁律：给形状写属性前，用 `penpot_api_info`（如 `{"type":"Text"}`）核对属性名；写入后立刻 readback。**
+Penpot 的形状代理对**不存在的属性名不报错**——在 `try/catch` 下就是静默失败，代码"看起来跑了"。
+
+### 12.1 实例：`align` 不是 `horizontalAlign`
+
+文本水平对齐的正确属性是 **`align`**（`"center" | "left" | "right" | "mixed" | "justify" | null`）；
+垂直对齐是 `verticalAlign`。**不存在 `horizontalAlign`**。
+
+```js
+t.horizontalAlign = 'center';   // ✗ 静默失败，属性仍是原值
+t.align = 'center';             // ✓
+// 必须 readback：
+if (t.align !== 'center') throw new Error('align 未生效');   // readback 是唯一判据
+```
+
+实测后果：23 处修复全部未生效，居中/右对齐文本退化为左对齐，导出图上"标签贴左边缘"。
+**诊断口诀：读回 `undefined` ⇒ 属性名错；读回旧值 ⇒ 赋值被拒（类型/取值非法）。**
+
+同类需注意的属性名差异：`strokes[i].strokeAlignment`（不是 `strokeWidthAlignment`）、
+board 的 `clipContent`（不是 `clipsContent`）、椭圆用 `penpot.createEllipse()`。
+
+### 12.2 修正 §10：`layoutChild.absolute = true` **不保证**「移动板子元素不跟随」
+
+§10 曾记「移动板（赋 x/y）absolute 子元素不跟随」。**实测在 Penpot 2.17 上不成立**：
+
+- 某 Demo 板的子元素 `c.layoutChild.absolute` 读回 **`true`**；
+- 把板整体移动 +180px 后，**子元素跟着移动了**（对这些子元素而言 `parentX` 是相对坐标）；
+- 我按"不跟随"多补了一次子树平移 → 子元素总共走了 **+360**，内容整体偏出板 180px。
+
+**正确做法：不要靠推断，先探测。**
+
+```js
+// 移动语义探测：把一块板移 N px，量一个子元素的世界 x 变化
+const probeMoveSemantics = (board, child, dx) => {
+  const before = child.x;
+  try { board.parentX = board.parentX + dx; } catch (e) { board.x = board.x + dx; }
+  const after = child.x;
+  try { board.parentX = board.parentX - dx; } catch (e) { board.x = board.x - dx; }   // 还原
+  return { childFollows: Math.abs((after - before) - dx) < 1, childDelta: after - before };
+};
+// childFollows === true  → 只移板，不要补偿子树
+// childFollows === false → 逐元素平移子树（moveSubtree）
+```
+
+判定后再选策略：跟随 ⇒ 只动板；不跟随 ⇒ `moveSubtree`（先动子孙再动壳）。
+
+### 12.3 exporter 导出随机失败：把 Playwright 的 `networkidle` 改成 `load`
+
+**症状**：`page.goto: Timeout 20000ms exceeded ... waiting until "networkidle"`，
+同一页多块板连续失败、别页偶发成功；exporter 容器资源正常（CPU 0%、内存几百 MB）；
+从 exporter 里 `fetch('http://penpot-frontend:8080/')` 返回 **200**（网络没问题）。
+
+**机理**：`render.html` 会保持长连接（实时同步用），`networkidle`（要求 500ms 内无连接）**永不达成** → 必然 20s 超时。
+所以它和板大小、页大小只是弱相关，表现为"时好时坏"。
+
+**修复**（幂等、可回滚）：
+
+```powershell
+# 容器内 app.js 只有 1 处 networkidle，且必在 wait_until 语境
+$d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
+# 先备份 /opt/penpot/exporter/app.js -> app.js.orig，再把 "networkidle" 替换为 "load"，最后：
+& $d restart penpot-server-penpot-exporter-1
+```
+
+实测：同一块板改前连续 3 次失败，改后**一次成功**。还原：`app.js.orig` 覆盖回去后重启。
+> 提醒：这是容器层补丁，`docker compose up -d --force-recreate` 会重置它；`restart` 保留。
+
+## 13. 同一次构建里所有 cell helper 必须同签名
+
+**事故**：同一次构建脚本里并存两套 helper：
+
+```js
+R(b, x, y, w, h, fill, radius, stroke)              // 矩形：label 前有 h
+X(b, x, y, w, label, size, color, weight, h, align) // 文本：label 前没有 h
+```
+
+把 `X` 当 `R` 用时整串参数错位：`label`←高度、`fontSize`←标签、`h`←字重、颜色全黑。
+一次产生 **23 个畸形文本**（屏上显示垃圾数字、板被撑高 400–570px、顶破行距压住下一行）。
+
+**预防**：① 同段代码内 helper 签名统一；② 或统一改用对象字面量 `{kind:'text', x, y, w, label, size, ...}`
+（本技能 01/02 页用字面量写法，同批零事故）；③ helper 内部**加参数个数/类型断言**，错位立即抛错而不是画歪。
+
+**检测（一击命中）**：扫全体文本，`characters` 为**纯数字**（`/^\d{1,4}$/`）**且 `height ≥ 200`**。
+实测此规则精确命中全部 23 个、零误报。**阈值必须是 200 而不是 36** ——
+正常的数字标签（分页 `1/2/3`、年份 `2026`）盒高只有 **40–44**（住在 40px 胶囊里），
+而畸形文本的盒高是 **400/500/600**（那其实是被错位当作高度的**字重值**），两者差一个数量级。
+可再叠加「`height` 与同级矩形高度不一致」进一步收紧。

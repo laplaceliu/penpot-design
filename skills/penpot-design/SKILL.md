@@ -1,7 +1,7 @@
 ---
 name: penpot-design
 description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」「指定/选择技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口与任意 GUI 技术栈，运行时会询问目标宽度档位与目标栈（design→code 前，防默认 React）并在 DESIGN.md 与构建/验收中据此外约束。"
-version: 1.3.0
+version: 1.4.0
 license: MIT
 ---
 
@@ -60,6 +60,7 @@ license: MIT
 | `references/mcp-connection.md` | 连接 penpot mcp：部署脚本、端点、客户端配置、CA、验证 |
 | `references/mcp-automation.md` | **execute_code 实战手册**：会话纪律、布局三方案、陷阱速查、变体/组件、复刻 UI 库、验收纪律 |
 | `references/api-pitfalls.md` | execute_code API 陷阱详解（坐标/Path/描边/裁剪/文本/变体/沙箱/崩溃/导出/布局） |
+| `references/positioning-audit.md` | **定位审计**：四个定位失效签名（越界/文本居中残差/尺寸退化/页头碰撞）、根因链、预防门禁 G1–G7、标准作业顺序 |
 | `references/engines.md` | 引擎与配方：修复引擎机理、组件工厂模板、页面组装模式、崩溃重建清单（代码在 scripts/） |
 | `references/design-to-code-generic.md` | **通用出码纪律**（所有栈共用：分层/token/资源/五态/整数像素/验收） |
 | `references/stack-profiles.md` | **技术栈档位**：平台族分类、运行时询问（仅 design→code 前）、未知栈处理 |
@@ -71,6 +72,8 @@ license: MIT
 | `scripts/seed_storage.js` | execute_code 播种引擎（tokens + 工厂函数） |
 | `scripts/repair_engines.js` | 修复引擎（alignPage / vAlignPage / fixInner / unclip / cleanOrphans） |
 | `scripts/fix_layout.js` | flex 压塌批量修复引擎（absRow + fixCol，两轮收敛） |
+| `scripts/audit_layout.js` | **定位审计引擎**（只读）：`auditPage` / `auditAll`，**十类签名**（越界/居中残差/尺寸退化/页头碰撞/根级游离/兄弟板重叠/文本重叠/字体/**畸形文本**/**对齐未生效**）+ 判定 `CLEAN`/`NEEDS_REPAIR` |
+| `scripts/fix_geometry.js` | **几何修补引擎**（全部支持 dry-run）：`fixColumnOffset` / `fitBoardHeight` / `fixOverflowRight` / **`reflowRows`** / `fitRootHeight` / `fixGeometryAll` / `moveSubtree` |
 | `scripts/scaffold_structure.js` | 固定 16 页骨架批量构建脚本 |
 | `scripts/pixel_diff.py` | PIL 像素比对工具（热图 + JSON 指标） |
 | `assets/penpot-server/` | **自带部署栈**：compose 7 服务 + caddy/Caddyfile + 8 个运维脚本 + README（路径自解析，整目录可搬迁） |
@@ -84,16 +87,28 @@ license: MIT
 
 0. **确认视口档位**（先读 `references/viewport-profiles.md`）：用 `ask_followup_question` 问用户
    目标宽度（web/pad/mobile，可多选），结果写入 DESIGN.md `targetProfiles`，作为后续硬约束。
+0.5 **【门禁 G1】读并原样粘贴 canonical 脚本**：`scripts/seed_storage.js`（`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`）
+   + `scripts/repair_engines.js`（`alignPage`/`vAlignPage`/`fixInner`/`unclip`/`cleanOrphans`）
+   + `scripts/audit_layout.js`（`auditPage`）。
+   **禁止自造坐标/文本 helper**——事故复盘见 `references/positioning-audit.md`：临时自造 `mkAbsBoard`/文本盒
+   把同一个系统性偏移复制到了全部 16 页。需要新工厂时**新增**函数，不改写上面几个。
 1. 产出 **DESIGN.md**（骨架见 spec 文档 §9，Layout 章节按 `targetProfiles` 写栅格/边距/触控目标）→
    `npx @google/design.md lint DESIGN.md` 至 0 error。
-2. **连接 penpot mcp**（见下节）。
+2. **连接 penpot mcp**（见下节）。构造队列与已完成页清单**落盘**（如 `build-progress.json`，门禁 G6）。
 3. `scripts/seed_storage.js` 播种（tokens 同步 DESIGN.md）→ `scripts/scaffold_structure.js` 建 16 页骨架。
-4. 按页填充：01 设计基础/02 颜色系统先建（token 可视化）→ 03–12 组件规格板（契约 §4，每板建完立即导出验收；
+4. **【门禁 G2/G3】首板试点再批量**：先建 01 页第一块板 → `storage.auditPage()` 必须无
+   `out_of_bounds` / `header_collision` → 立即导出肉眼确认无整体偏移 → 才允许批量建。
+   批量时**每个板建成即跑单板审计**（只看本板 finding），不要把同一偏移复制到 100+ 板。
+   按页填充：01 设计基础/02 颜色系统先建（token 可视化）→ 03–12 组件规格板（契约 §4；
    12 页按各所选档位分别建布局网格板）→ 13 组件索引（+ `component-map.json`）→ 14 Demo：
    对**每个所选档位**分别产出该档基准宽的六板（Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单），
    全部用库组件实例组装。
-5. 注册库组件（母版在 `AI Component Masters`）→ 对齐/描边/去裁剪审查 → 逐页导出 PNG 按自检清单验收
-   （14 页逐档位逐板验收）。
+5. 注册库组件（母版在 `AI Component Masters`，**标签必须是母版板的子元素**，否则注册出空壳组件）。
+6. **【门禁 G4】逐页收尾，顺序固定**：`cleanOrphans()` → `alignPage()` → `vAlignPage()` → `fixInner()` → `unclip()`；
+   记录修复日志 `[位置, 内容, 轴, 偏移]` 人工复核，再按 `engines.md` §1 还原刻意非居中的元素。
+7. **复算 + 验收【门禁 G5】**：`auditPage()` 全页复算至 `CLEAN`（剩余项须逐条人工确认为刻意不居中）→
+   逐板导出 PNG（或逐页 contact sheet）按自检清单验收（14 页逐档位逐板验收）。
+   **未导出过的板不得表述为"已验证"**。
 
 ## 启动前检查：确认 Penpot / MCP 是否已就绪（必做，先探测再动作）
 
@@ -116,6 +131,8 @@ license: MIT
 - 客户端配 `.mcp.json`；自签证书跑一次 `assets/penpot-server/scripts/trust-ca.{sh,ps1}`（自动写 `NODE_EXTRA_CA_CERTS`）并**重启客户端**；CA 每栈目录独立，换目录需重跑。
 - 验证：4 工具（execute_code / export_shape / high_level_overview / penpot_api_info）→ `penpot_api_info` → `high_level_overview` → execute_code 冒烟。
 - execute_code 纪律：切页异步要防御式校验；storage 易失每批播种；每调用 ≤8 图元/≤10 文本；崩溃损伤查 100×100。完整坑表见 `references/mcp-automation.md` 与 `references/api-pitfalls.md`。
+- **写属性前必须核对 `penpot_api_info`，写入后必须 readback**：不存在的属性名（如文本对齐写成 `horizontalAlign`，正确是 `align`）在 `try/catch` 下**静默失败**，代码"看起来跑了"而效果为零。见 `api-pitfalls.md` §12。
+- **导出随机失败**（`waiting until "networkidle"` 超时）是 exporter 的老毛病，不是网络问题：把容器内 `/opt/penpot/exporter/app.js` 的 `networkidle` 改成 `load` 并重启 exporter 即根治。见 `api-pitfalls.md` §12.3。
 
 ## 工作流 2：Design → Code（按所选技术栈分走）
 
