@@ -1,6 +1,6 @@
 # Why: Caddy terminates HTTPS at `penpot.local` and forwards to the in-namespace
 # Penpot frontend nginx. The previous compose exposed the frontend on
-# 127.0.0.1:9001 over plain HTTP — but Penpot 2.17's bundle calls
+# 127.0.0.1:9001 over plain HTTP — but Penpot 2.18's bundle calls
 # `allowRunFromHttpSchema` and other secure-context APIs that fail in a
 # non-HTTPS origin. Going straight to HTTPS removes that constraint and also
 # gives the Orca webview a proper secure context when it loads the URL.

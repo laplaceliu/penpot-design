@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Why: canonical entrypoint. Brings the stack up detached, waits for the Caddy
 # HTTPS probe to land, and prints the URLs the rest of the team needs. The
-# probe is HTTPS (not the old plain HTTP on 9001) because Penpot 2.17's
+# probe is HTTPS (not the old plain HTTP on 9001) because Penpot 2.18's
 # `allowRunFromHttpSchema` check and other secure-context APIs require a secure
 # origin.
 

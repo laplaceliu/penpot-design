@@ -23,7 +23,7 @@ source "$(cd -- "$(dirname -- "$_lib_src")" >/dev/null 2>&1 && pwd -P)/lib.sh"
 
 # Why: keep this in sync with compose.yaml — both default to the same value, and
 # both accept PENPOT_IMAGE_TAG so a version bump is a one-line change (in .env).
-TAG="${PENPOT_IMAGE_TAG:-2.17}"
+TAG="${PENPOT_IMAGE_TAG:-2.18}"
 
 images=(
   "postgres:15-alpine"

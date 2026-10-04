@@ -1,5 +1,5 @@
 # up.ps1 - bring the stack up and wait for Caddy HTTPS to be ready (Win/Docker).
-# Mirrors up.sh. The probe is HTTPS because Penpot 2.17 requires a secure origin.
+# Mirrors up.sh. The probe is HTTPS because Penpot 2.18 requires a secure origin.
 
 . "$PSScriptRoot\lib.ps1"
 Detect-Compose

@@ -1,4 +1,4 @@
-# Why: production-style single-host deployment for the Penpot 2.17 design platform.
+# Why: production-style single-host deployment for the Penpot 2.18 design platform.
 # Borrows shapes from the official `penpotapp/penpot` docker-compose at
 # https://github.com/penpot/penpot/blob/main/docker/images/docker-compose.yaml
 # Retargeted at a long-lived external data dir so multiple orca installs can
@@ -13,7 +13,7 @@
 
 # Why: x-* keys are Docker Compose's anchor namespace; each `x-` here is merged
 # into the right service block via the `<<: [*name, ...]` shorthand. We use the
-# 2.16+/2.17-recommended flat env vars (PENPOT_DATABASE_URI etc.) instead of the
+# 2.16+/2.18-recommended flat env vars (PENPOT_DATABASE_URI etc.) instead of the
 # older `-c key=value` flag form so this file tracks the upstream self-hosting
 # guide.
 x-flags: &penpot-flags
@@ -50,12 +50,12 @@ volumes:
 
 services:
   penpot-frontend:
-    # The official image is nginx + the Penpot SPA bundle. In Penpot 2.17 the
+    # The official image is nginx + the Penpot SPA bundle. In Penpot 2.18 the
     # bundled nginx config depends on a `penpot-mcp` upstream at the same
     # network — see that service below.
-    image: "penpotapp/frontend:${PENPOT_IMAGE_TAG:-2.17}"
+    image: "penpotapp/frontend:${PENPOT_IMAGE_TAG:-2.18}"
     restart: unless-stopped
-    # Why: 9001 is no longer published to the host. Penpot 2.17's SPA bundle
+    # Why: 9001 is no longer published to the host. Penpot 2.18's SPA bundle
     # calls `allowRunFromHttpSchema` and other secure-context APIs that fail in
     # a non-HTTPS origin, so we now serve the frontend through Caddy on 443.
     # Caddy terminates TLS and proxies to `penpot-frontend:8080` inside the
@@ -78,7 +78,7 @@ services:
       - penpot
 
   penpot-backend:
-    image: "penpotapp/backend:${PENPOT_IMAGE_TAG:-2.17}"
+    image: "penpotapp/backend:${PENPOT_IMAGE_TAG:-2.18}"
     restart: unless-stopped
     volumes:
       - penpot_assets:/opt/data/assets
@@ -118,7 +118,7 @@ services:
   penpot-exporter:
     # Why: PDF / SVG / fonts rasterization. Stateless from the user's point of
     # view but still needs the same secret key + redis instance.
-    image: "penpotapp/exporter:${PENPOT_IMAGE_TAG:-2.17}"
+    image: "penpotapp/exporter:${PENPOT_IMAGE_TAG:-2.18}"
     restart: unless-stopped
     depends_on:
       penpot-valkey:
@@ -130,14 +130,15 @@ services:
       - penpot
 
   penpot-mcp:
-    # Why: Penpot 2.17 frontend nginx.conf proxies `/api/mcp/*` (and the plugin
-    # `/manifest.json`) at a service literally named `penpot-mcp` on the same
-    # docker network. The server is shipped as `penpotapp/mcp:2.17`; we just
+    # Why: Penpot 2.18 frontend nginx.conf proxies `/mcp/ws`, `/mcp/stream` and
+    # `/mcp/sse` (plus the plugin `/plugins/mcp/manifest.json`) at a service
+    # literally named `penpot-mcp` on the same
+    # docker network. The server is shipped as `penpotapp/mcp:2.18`; we just
     # need a hostname to resolve to. Disabling REMOTE_MODE puts it in
     # single-tenant self-hosted mode which is what we want — the alternative
     # binds the MCP server to a public registration endpoint that we
     # don't want to expose.
-    image: "penpotapp/mcp:${PENPOT_IMAGE_TAG:-2.17}"
+    image: "penpotapp/mcp:${PENPOT_IMAGE_TAG:-2.18}"
     restart: unless-stopped
     depends_on:
       penpot-valkey:

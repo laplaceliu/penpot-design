@@ -9,7 +9,7 @@
 Detect-Compose
 Require-ComposeFile
 
-$tag = if ($env:PENPOT_IMAGE_TAG) { $env:PENPOT_IMAGE_TAG } else { '2.17' }
+$tag = if ($env:PENPOT_IMAGE_TAG) { $env:PENPOT_IMAGE_TAG } else { '2.18' }
 
 $images = @(
   'postgres:15-alpine',
