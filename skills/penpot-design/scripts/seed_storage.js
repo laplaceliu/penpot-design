@@ -1,9 +1,11 @@
 // seed_storage.js —— Penpot execute_code 播种引擎
 // 用法：整份粘贴进 execute_code 执行一次；每批业务命令前探测 storage.mkText，缺失则重跑本脚本。
-// 约定：字面量函数入 storage；tokens 表 storage.T 为单一真源（值同步自 DESIGN.md）。
+// 约定：字面量函数入 storage。
+// ⚠️ 重要：storage.T 只是 **JS 侧的色值镜像**（供绘图函数取色），**它不会创建任何 Penpot design token**。
+//    真正的 token 录入走 scripts/token_engine.js 的 storage.TK.seed(...)，见 references/design-tokens.md。
 
 return (function () {
-  // ---- tokens（按 DESIGN.md 填充/替换）----
+  // ---- storage.T：仅 JS 侧色值镜像（按 DESIGN.md 填充/替换）；不创建 Penpot token ----
   storage.T = storage.T || {
     primary: '#2563EB', primaryHover: '#1D4ED8', primaryActive: '#1E40AF', primaryDisabled: '#93C5FD',
     onPrimary: '#FFFFFF', secondary: '#64748B', neutral: '#F8FAFC', surface: '#FFFFFF',

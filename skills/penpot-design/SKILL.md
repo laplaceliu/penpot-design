@@ -1,7 +1,7 @@
 ---
 name: penpot-design
-description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」「指定/选择技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口与任意 GUI 技术栈，运行时会询问目标宽度档位与目标栈（design→code 前，防默认 React）并在 DESIGN.md 与构建/验收中据此外约束。"
-version: 1.4.0
+description: "Code to Design + Design to Code 双向设计系统工作流，外加 Penpot MCP 自动化实战库。两种入口（给 URL 或给一组图片，或给既有 React/UI 库源码复刻）产出 DESIGN.md 与 Penpot 固定结构设计系统（16 页页面/板/元素契约），通过 execute_code 批量构建组件/变体/大屏/典型页面、批量修复对齐/描边/裁剪/flex 压塌/中文乱码、注册库组件、导出验收；指导连接 penpot mcp 并提供开箱即用的部署栈；从 Penpot 设计文件输出 Qt4/5/6 与 React/Vue 代码（分框架指南，强调图片与图标资源引用、按组件索引分层实现），PIL 像素级验证，目标 pixel-perfect。当用户提到「根据网址/图片生成设计系统」「生成 Penpot 设计系统」「用 Penpot MCP 创建页面/构建组件或大屏」「复刻 UI 库/设计系统」「批量修复选中元素的对齐/样式/渲染问题/中文乱码」「注册库组件」「录入/校验 Penpot design tokens（17 种 TokenType / set 激活 / token 引用 / themes）」「design to code」「设计稿转 Qt/React/Vue 代码」「像素级还原」「选择/指定目标宽度（Web/Pad/Mobile）」「生成/复刻手机或平板 UI」「指定/选择技术栈（Qt/Web/LVGL/imgui/MAUI/Flutter…）」时使用；支持 Web 宽屏 / 平板 Pad / 手机 Mobile 三档视口与任意 GUI 技术栈，运行时会询问目标宽度档位与目标栈（design→code 前，防默认 React）并在 DESIGN.md 与构建/验收中据此外约束。"
+version: 1.5.0
 license: MIT
 ---
 
@@ -61,6 +61,7 @@ license: MIT
 | `references/mcp-automation.md` | **execute_code 实战手册**：会话纪律、布局三方案、陷阱速查、变体/组件、复刻 UI 库、验收纪律 |
 | `references/api-pitfalls.md` | execute_code API 陷阱详解（坐标/Path/描边/裁剪/文本/变体/沙箱/崩溃/导出/布局） |
 | `references/positioning-audit.md` | **定位审计**：四个定位失效签名（越界/文本居中残差/尺寸退化/页头碰撞）、根因链、预防门禁 G1–G7、标准作业顺序 |
+| `references/design-tokens.md` | **Design Tokens 权威用法**（本机实测）：17 种 TokenType、值格式、默认应用属性、active/themes/优先级、6 个应用坑、解绑细则、文档与实现的 9 处差异 |
 | `references/engines.md` | 引擎与配方：修复引擎机理、组件工厂模板、页面组装模式、崩溃重建清单（代码在 scripts/） |
 | `references/design-to-code-generic.md` | **通用出码纪律**（所有栈共用：分层/token/资源/五态/整数像素/验收） |
 | `references/stack-profiles.md` | **技术栈档位**：平台族分类、运行时询问（仅 design→code 前）、未知栈处理 |
@@ -69,7 +70,8 @@ license: MIT
 | `references/stacks/web.md` | Web 前端适配器（React/Vue/Angular/Svelte…） |
 | `references/viewport-profiles.md` | **视口档位**：web/pad/mobile 三档定义、运行时询问、对 DESIGN.md 与 12/14 页与验收的影响 |
 | `references/verification.md` | PIL 像素级验证全流程与根因速查 |
-| `scripts/seed_storage.js` | execute_code 播种引擎（tokens + 工厂函数） |
+| `scripts/seed_storage.js` | execute_code 播种引擎（**`storage.T` 只是 JS 侧色值镜像，不创建 Penpot token** + 工厂函数） |
+| `scripts/token_engine.js` | **Design Tokens 引擎**：`TK.seed`（建集+录 token，自动 `active:true`）/ `TK.apply`（应用+回读校验，捕获静默失败）/ `TK.audit`（未激活/引用断链体检）/ `TK.unbindFill` |
 | `scripts/repair_engines.js` | 修复引擎（alignPage / vAlignPage / fixInner / unclip / cleanOrphans） |
 | `scripts/fix_layout.js` | flex 压塌批量修复引擎（absRow + fixCol，两轮收敛） |
 | `scripts/audit_layout.js` | **定位审计引擎**（只读）：`auditPage` / `auditAll`，**十类签名**（越界/居中残差/尺寸退化/页头碰撞/根级游离/兄弟板重叠/文本重叠/字体/**畸形文本**/**对齐未生效**）+ 判定 `CLEAN`/`NEEDS_REPAIR` |
@@ -89,13 +91,18 @@ license: MIT
    目标宽度（web/pad/mobile，可多选），结果写入 DESIGN.md `targetProfiles`，作为后续硬约束。
 0.5 **【门禁 G1】读并原样粘贴 canonical 脚本**：`scripts/seed_storage.js`（`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`）
    + `scripts/repair_engines.js`（`alignPage`/`vAlignPage`/`fixInner`/`unclip`/`cleanOrphans`）
-   + `scripts/audit_layout.js`（`auditPage`）。
+   + `scripts/audit_layout.js`（`auditPage`）+ `scripts/token_engine.js`（`TK.*`）。
    **禁止自造坐标/文本 helper**——事故复盘见 `references/positioning-audit.md`：临时自造 `mkAbsBoard`/文本盒
    把同一个系统性偏移复制到了全部 16 页。需要新工厂时**新增**函数，不改写上面几个。
 1. 产出 **DESIGN.md**（骨架见 spec 文档 §9，Layout 章节按 `targetProfiles` 写栅格/边距/触控目标）→
    `npx @google/design.md lint DESIGN.md` 至 0 error。
 2. **连接 penpot mcp**（见下节）。构造队列与已完成页清单**落盘**（如 `build-progress.json`，门禁 G6）。
-3. `scripts/seed_storage.js` 播种（tokens 同步 DESIGN.md）→ `scripts/scaffold_structure.js` 建 16 页骨架。
+3. `scripts/seed_storage.js` 播种工厂函数 → `scripts/scaffold_structure.js` 建 16 页骨架。
+   **并立即录入 Design Tokens【门禁 G9】**：粘贴 `scripts/token_engine.js` → `storage.TK.seed(spec)`
+   （spec 按 `references/design-tokens.md` §8 的映射从 DESIGN.md 各章节生成 17 种 TokenType）→
+   `storage.TK.assert()` 必须 PASS（无未激活 set、无引用断链）。
+   ⚠️ 两条必知：`addSet()` 默认 **`active:false`**，未激活 set 里的 token **绑定会成功但值不生效（静默失败）**；
+   `seed_storage.js` 的 `storage.T` 只是 JS 侧色值镜像，**不创建任何 Penpot token**。详见 `references/design-tokens.md`。
 4. **【门禁 G2/G3】首板试点再批量**：先建 01 页第一块板 → `storage.auditPage()` 必须无
    `out_of_bounds` / `header_collision` → 立即导出肉眼确认无整体偏移 → 才允许批量建。
    批量时**每个板建成即跑单板审计**（只看本板 finding），不要把同一偏移复制到 100+ 板。
@@ -109,6 +116,9 @@ license: MIT
 7. **复算 + 验收【门禁 G5】**：`auditPage()` 全页复算至 `CLEAN`（剩余项须逐条人工确认为刻意不居中）→
    逐板导出 PNG（或逐页 contact sheet）按自检清单验收（14 页逐档位逐板验收）。
    **未导出过的板不得表述为"已验证"**。
+   另跑 `storage.TK.audit()`，且在**至少一个真实形状**上做过
+   `await storage.TK.apply(tokenName, [shape])` 并确认返回 `ok:true` ——
+   **「没报错」不等于「生效了」**：错误的 set 激活状态或不适用的形状都会静默 no-op，唯一判据是 readback。
 
 ## 启动前检查：确认 Penpot / MCP 是否已就绪（必做，先探测再动作）
 

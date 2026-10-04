@@ -7,6 +7,7 @@
 | `scripts/seed_storage.js` | tokens `storage.T`、`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg` | 每会话先跑；storage 丢失后重播种 |
 | `scripts/repair_engines.js` | `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | 跑一次种入 storage，逐页调用 |
 | `scripts/fix_layout.js` | flex 压塌修复（getDesignSize + absRow + fixCol，两轮收敛） | 在目标页直接执行 |
+| `scripts/token_engine.js` | Design Tokens（`TK.seed` 建集+录 token 自动 active / `TK.apply` 应用+回读校验 / `TK.audit`·`TK.assert` 体检 / `TK.unbindFill`） | 建骨架后立即录入；验收前复跑体检 |
 | `scripts/audit_layout.js` | 定位审计（`auditPage`/`auditAll`，五类签名 + 字体直方图，只读） | 每板建成即跑；收尾后复算 |
 | `scripts/fix_geometry.js` | 几何修补（列偏移/板高/根高/右溢出，四引擎，全支持 dry-run） | 审计出清单后逐页修 |
 | `scripts/scaffold_structure.js` | 固定 16 页骨架 | code-to-design 第一步 |

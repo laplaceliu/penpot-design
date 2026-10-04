@@ -6,7 +6,17 @@
 
 - 文件名：`<系统名>-<风格关键词>.penpot`（如 `蓝色-科技风-发光.penpot`）
 - 版本特性：components/v2、variants/v1、design-tokens/v1、layout/grid
-- tokens 全部录入 `penpot.library.local.tokens`（addSet + addToken；type: `color` / `borderRadius` / `dimension`）
+- tokens 全部录入 `penpot.library.local.tokens`，用 `scripts/token_engine.js`（**不要手写 addSet/addToken**）。
+  **TokenType 共 17 种**（`color` / `borderRadius` / `dimension` / `fontFamilies` / `fontSizes` / `fontWeights` /
+  `letterSpacing` / `number` / `opacity` / `rotation` / `shadow` / `sizing` / `spacing` / `borderWidth` /
+  `textCase` / `textDecoration` / `typography`），按 DESIGN.md 章节映射录入。
+  **set 怎么切**：**默认只建 1 个 set**（`<系统名> · Core`，内部按 type 自动分组，一个 set 可装全部 17 类）。
+  **禁止按类型拆 set**（Color/Radius/Spacing 各一个 = 类别错误：这三类永远同时激活，拆开只把 1 次开关变成 N 次）。
+  仅当有主题（暗色/密度/品牌）时才加**覆盖层**，且**基础层必须排在前面**（`sets` 顺序即优先级，后者胜）。
+  **三条铁律**：① `addSet()` 默认 `active:false`，**未激活 set 的 token 绑定会「成功但不生效」**，建集必须显式激活；
+  ② 应用后**必须 readback `shape.tokens`**，不适用形状会静默 no-op；
+  ③ 同一 set 内 token 名按 `.` 视为路径，**叶子和父节点互斥**（有 `t.color` 就不能有 `t.color.x`）。
+  详见 `references/design-tokens.md`。
 - 含 CJK 文本一律 Noto Sans SC（Penpot 无字体栈回退）
 - 组件名分隔符一律 `·`（**禁止 `/`**，赋值静默失败）：`Button·Primary·Default`
 - 坐标走 8px 栅格；构建期直接放最终坐标，永不移动已建好的板
@@ -123,7 +133,8 @@ Button（880 × N，表面底，rounded.md）
 - [ ] 16 页齐全（15 可选）且命名/顺序正确
 - [ ] 每页唯一 PageRoot，Header/Footer 就位，clipContent=false
 - [ ] 组件规格板符合 §4 契约，变体命名 `组件·属性·属性`
-- [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值
+- [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值；**`storage.TK.audit().ok === true`**
+      （所有 set `active:true` + 所有 token `resolvedValueString` 非空，即无失效/断链）
 - [ ] 组件全部注册为库组件（母版在 AI Component Masters），13 索引页信息完整
 - [ ] 14 Demo 各所选档位的屏幕板全部由库组件实例组装（每档六板：Dashboard/Landing/Login/List/Detail/Settings）
 - [ ] 每页 `export_shape` 导出 PNG 验收通过（无 100×100 退化、无裁剪、无偏移）
