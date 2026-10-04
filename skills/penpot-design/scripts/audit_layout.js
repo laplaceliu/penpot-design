@@ -98,7 +98,11 @@ return (function () {
                 // 只有「文本框宽接近宿主宽」时才认为本意是居中（按钮/胶囊）。
                 // 刻意内缩的（带尾部图标的 chip、左对齐的选项行）归为 info，不算缺陷。
                 const close = c.width >= hr.w * 0.72;
-                add(m <= 8 && close ? 'text_centre_residue' : 'text_centre_info', c, node, 'host "' + host.name + '" dx=' + dx.toFixed(1) + ' dy=' + dy.toFixed(1) + (close ? '' : ' inset'));
+                // stale-center 指纹：文本左上角恰好落在宿主中心（|t.x−hcx|≤2 或 |t.y−hcy|≤2）
+                // —— 用创建瞬间 1×1 瞬态宽高算居中的算术后果。刻意内缩文本只会落在
+                // host.x+padding，不会贴住中心点；命中指纹的一律按缺陷处理，交给 fixStaleCenter。
+                const stale = (Math.abs(cr.x - (hr.x + hr.w / 2)) <= 2 || Math.abs(cr.y - (hr.y + hr.h / 2)) <= 2) && m > 8;
+                add((m <= 8 && close) || stale ? 'text_centre_residue' : 'text_centre_info', c, node, 'host "' + host.name + '" dx=' + dx.toFixed(1) + ' dy=' + dy.toFixed(1) + (stale ? ' stale-center' : (close ? '' : ' inset')));
               }
             }
           }

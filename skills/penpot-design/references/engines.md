@@ -5,7 +5,7 @@
 | 脚本 | 内容 | 用法 |
 |---|---|---|
 | `scripts/seed_storage.js` | tokens `storage.T`、`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg` | 每会话先跑；storage 丢失后重播种 |
-| `scripts/repair_engines.js` | `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | 跑一次种入 storage，逐页调用 |
+| `scripts/repair_engines.js` | `fixStaleCenter` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | 跑一次种入 storage，逐页调用 |
 | `scripts/fix_layout.js` | flex 压塌修复（getDesignSize + absRow + fixCol，两轮收敛） | 在目标页直接执行 |
 | `scripts/token_engine.js` | Design Tokens（`TK.seed` 建集+录 token 自动 active / `TK.apply` 应用+回读校验 / `TK.audit`·`TK.assert` 体检 / `TK.unbindFill`） | 建骨架后立即录入；验收前复跑体检 |
 | `scripts/audit_layout.js` | 定位审计（`auditPage`/`auditAll`，五类签名 + 字体直方图，只读） | 每板建成即跑；收尾后复算 |
@@ -14,7 +14,7 @@
 
 > **顺序铁律**：`seed_storage.js`（G1）→ 建板（每板 `audit_layout.js` 单板审计，G3）→
 > **阶段一几何**：`fix_geometry.js` 的 `fixGeometryAll({apply:false})` 出清单 → 复核 → `{apply:true}`
-> → **阶段二对齐**：`repair_engines.js` 收尾（`cleanOrphans → alignPage → vAlignPage → fixInner → unclip`，G4）→
+> → **阶段二对齐**：`repair_engines.js` 收尾（`cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip`，G4）→
 > `audit_layout.js` 复算至 `CLEAN`（G5）。
 >
 > **两阶段不可合并、且不必都跑**：实测 121 条越界全部由几何引擎解决，`vAlignPage` 命中 0；
@@ -39,6 +39,10 @@ return { page: pg, ...r, remaining: q.length };
   - 误伤恢复：记录修复日志 → 对刻意非居中的元素按已知设计坐标还原（如 Number Field ＋ at y=−2 / － at y=22；Progress 标签 y=0）。
 - **fixInner**：全文件描边批修（闭合形状→`inner`，路径→`center`；机理见 api-pitfalls.md §3）。
 - **unclip**：全文件 `clipContent=false`（修复辉光被裁不可见；机理见 api-pitfalls.md §4）。
+- **fixStaleCenter**：修 **stale-center** 居中大偏移（>6px，指纹判定）——文本**左上角**恰好落在宿主中心
+  （`|t.x−hcx|≤2` 或 `|t.y−hcy|≤2`，按轴独立），是「创建瞬间用 1×1 瞬态宽高算 `(w−1)/2` 居中」的算术后果。
+  刻意左对齐文本只落在 `host.x+padding`，不会贴住中心点 → 指纹判定零误伤；只动命中轴坐标，不碰层级/样式。
+  **必须排在 alignPage 之前**（分工：>6px 大偏移归本引擎，≤6px 微差归 alignPage 吸附）。
 - **cleanOrphans**：清根级孤儿文本（历史崩溃残留，会污染遍历）。
 
 修复日志返回 `[{位置, 内容, 轴, 偏移}]`，**先审计复核再进下一页**。

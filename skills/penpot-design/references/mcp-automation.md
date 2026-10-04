@@ -57,7 +57,7 @@ storage.absMount = (parent, child, worldX, worldY) => {
 | 沙箱作用域 | penpotUtils/storage 非真全局；`new Function` 序列化的函数体内访问不到 → 持久引擎必须以字面量函数定义存入 storage |
 | children 代理 | 每次访问 `shape.children` 生成新代理，`indexOf` 按引用比较全 -1 → 先 `Array.from(children)` 单次快照再 filter/indexOf |
 | 组件名 | 不允许 `/`（赋值静默失败），用 `·` 分隔，如 `Button·Primary·Default` |
-| 文本定位 | 创建瞬间的文本宽高不可信（可能 1×1）。**渲染后再按实际 width/height 居中**，否则偏移数像素到数十像素 |
+| 文本定位 | 创建瞬间的文本宽高不可信（可能 1×1）。**渲染后再按实际 width/height 居中**（`await storage.ct(...)`，内部 sleep 120ms 实测；或 `storage.centerIn(t, host)`），否则偏移数像素到数十像素。**指纹**：错位文本左上角恰好落在宿主中心（`(w−1)/2` 的算术后果）；修复引擎 `storage.fixStaleCenter()`，审计标 `stale-center`（positioning-audit.md S2） |
 | 坐标系混用 | `child.x/y` 与 `board.x/y` 是世界坐标；`parentX/parentY` 是父内相对。包含判断/吸附计算全程统一世界坐标。换算：`new parentX = worldX - parent.x` |
 | **移动 board = 壳动内容不动** | 对含 `absolute` 子元素的板赋值 x/y，子元素保持世界坐标不跟随 → 板内容散架。**构建时直接放最终坐标，永不移动已建好的板**；必须批量移动时逐元素补偿 `dy` |
 | **resize 板与子元素** | 板 resize **不影响 absolute 子元素**（安全扩容画框）。但含非 absolute flex 子元素的板 resize 会触发引擎把子元素 `fix` sizing 压回内容大小（压塌）——修复后勿再 resize |

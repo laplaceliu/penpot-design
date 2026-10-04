@@ -97,6 +97,13 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
 ## 5. 文本
 
 - `Text.letterSpacing` 只接受**数字字符串**（px）。`t.fontSize = String(size)`。传 `'0.02em'`/`'2%'` 报错。
+- **创建瞬间的 `t.width/t.height` 不可信**（可能 1×1 瞬态值）：`penpot.createText()` 返回后立即量宽高算居中，
+  会把错误偏移烤进坐标——`(w−1)/2` 的算术后果是**文本左上角恰好落在宿主中心点**（stale-center 指纹，
+  实测 37×15 标签在 110×32 药丸里右偏 18.5px、下偏 7.5px，16 页系统性复制）。
+  - 预防：居中一律**渲染后实测**——`await storage.ct(...)`（canonical，内部 `sleep(120)`）或
+    `storage.centerIn(t, host)`（文本已渲染时同步版）。**不要**在工厂里同步读 `t.width` 算偏移。
+  - 事后修复：`storage.fixStaleCenter()`（指纹判定、按轴独立、零误伤），审计以 `text_centre_residue stale-center` 标出。
+    详见 `positioning-audit.md` S2 与 `engines.md` §1。
 - 阴影颜色必须对象格式 `{color, opacity}`；传字符串 hex 被**静默转为黑色**（渲染 3D 阴影消失的根因）。半透明填充用 `fillOpacity` 字段（不要 rgba 嵌套 color 对象）。
 - **CJK 字体回退是系统性问题**：Penpot **没有** CSS 字体栈按字符回退——`font.applyToText(text, variant)` 整段生效。Nunito 等拉丁字体只含拉丁字形，中文渲染为乱码（用户报告"字体渲染不对"的最常见根因）。
   - 预防：mkText 创建时按内容分流 `const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str); const font = cjk ? noto : latin;`

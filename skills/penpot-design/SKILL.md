@@ -88,11 +88,11 @@ Token 的 set/theme 机制细节见 `references/design-tokens.md` §5。
 | `references/viewport-profiles.md` | **视口档位**：web/pad/mobile 三档定义、运行时询问、对 DESIGN.md 与 12/14 页与验收的影响 |
 | `references/color-schemes.md` | **配色模式**：启动时询问（与视口档位同批）、「分节表面极性 vs 可切换主题」的区别、答案落库位置、两套配色的产物映射（token set/theme、01/02/14 页变化）与对比度验收 |
 | `references/verification.md` | PIL 像素级验证全流程与根因速查 |
-| `scripts/seed_storage.js` | execute_code 播种引擎（**`storage.T` 只是 JS 侧色值镜像，不创建 Penpot token** + 工厂函数） |
+| `scripts/seed_storage.js` | execute_code 播种引擎（**`storage.T` 只是 JS 侧色值镜像，不创建 Penpot token** + 工厂函数；`ct()` 为 **async、渲染后实测居中**，调用须 `await`） |
 | `scripts/token_engine.js` | **Design Tokens 引擎**：`TK.seed`（建集+录 token，自动 `active:true`）/ `TK.apply`（应用+回读校验，捕获静默失败）/ `TK.audit`（未激活/引用断链体检）/ `TK.unbindFill` |
-| `scripts/repair_engines.js` | 修复引擎（alignPage / vAlignPage / fixInner / unclip / cleanOrphans） |
+| `scripts/repair_engines.js` | 修复引擎（**fixStaleCenter** / alignPage / vAlignPage / fixInner / unclip / cleanOrphans） |
 | `scripts/fix_layout.js` | flex 压塌批量修复引擎（absRow + fixCol，两轮收敛） |
-| `scripts/audit_layout.js` | **定位审计引擎**（只读）：`auditPage` / `auditAll`，**十类签名**（越界/居中残差/尺寸退化/页头碰撞/根级游离/兄弟板重叠/文本重叠/字体/**畸形文本**/**对齐未生效**）+ 判定 `CLEAN`/`NEEDS_REPAIR` |
+| `scripts/audit_layout.js` | **定位审计引擎**（只读）：`auditPage` / `auditAll`，**十类签名**（越界/居中残差（含 **stale-center 指纹**）/尺寸退化/页头碰撞/根级游离/兄弟板重叠/文本重叠/字体/**畸形文本**/**对齐未生效**）+ 判定 `CLEAN`/`NEEDS_REPAIR` |
 | `scripts/fix_geometry.js` | **几何修补引擎**（全部支持 dry-run）：`fixColumnOffset` / `fitBoardHeight` / `fixOverflowRight` / **`reflowRows`** / `fitRootHeight` / `fixGeometryAll` / `moveSubtree` |
 | `scripts/scaffold_structure.js` | 固定 16 页骨架批量构建脚本 |
 | `scripts/pixel_diff.py` | PIL 像素比对工具（热图 + JSON 指标） |
@@ -135,7 +135,8 @@ Token 的 set/theme 机制细节见 `references/design-tokens.md` §5。
    对**每个所选档位**分别产出该档基准宽的六板（Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单），
    全部用库组件实例组装。
 5. 注册库组件（母版在 `AI Component Masters`，**标签必须是母版板的子元素**，否则注册出空壳组件）。
-6. **【门禁 G4】逐页收尾，顺序固定**：`cleanOrphans()` → `alignPage()` → `vAlignPage()` → `fixInner()` → `unclip()`；
+6. **【门禁 G4】逐页收尾，顺序固定**：`cleanOrphans()` → `fixStaleCenter()` → `alignPage()` → `vAlignPage()` → `fixInner()` → `unclip()`；
+   （`fixStaleCenter` 修「用创建瞬间瞬态宽高算居中」烤进坐标的大偏移，必须排在 `alignPage` 前；文本居中一律 `await storage.ct(...)` 或 `storage.centerIn(t, host)`，见 positioning-audit.md S2）
    记录修复日志 `[位置, 内容, 轴, 偏移]` 人工复核，再按 `engines.md` §1 还原刻意非居中的元素。
 7. **复算 + 验收【门禁 G5】**：`auditPage()` 全页复算至 `CLEAN`（剩余项须逐条人工确认为刻意不居中）→
    逐板导出 PNG（或逐页 contact sheet）按自检清单验收（14 页逐档位逐板验收）。

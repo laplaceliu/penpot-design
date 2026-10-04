@@ -157,5 +157,51 @@ return (function () {
     return n;
   };
 
-  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans'] };
+  // ---- fixStaleCenter：stale-center 指纹精准修复（仅修「陈旧瞬态宽高」烤进坐标的居中错位）----
+  // 指纹：文本**左上角**恰好落在宿主中心点（|t.x−hcx|≤2 或 |t.y−hcy|≤2），但文本真实中心
+  //   与宿主中心偏差 >0.5 —— 这是「用创建瞬间 1×1 瞬态宽高算 (w−1)/2」的算术后果；
+  //   刻意左对齐/内缩的文本只会落在 host.x+padding（12/16/18/24…），绝不会贴住中心点，
+  //   因此按此指纹修复**零误伤**。按轴独立判定与修复（可能只偏一个轴）。
+  // 与 alignPage 的分工：alignPage 吸附 ≤6px 的微差；本引擎专治 6px 以上、指纹命中的大偏移。
+  // 引入缺陷兜底（G8）：只移动命中指纹的文本坐标，不改层级/样式；盲居中类误伤由指纹条件排除。
+  storage.fixStaleCenter = (root) => {
+    root = root || rootOf();
+    const log = [];
+    const walk = (node) => {
+      const kids = kidsOf(node); if (!kids) return;
+      const hosts = kids.filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 16 && h.height >= 16);
+      for (const c of kids) {
+        try {
+          const isFlow = c.layoutChild && c.layoutChild.absolute === false;
+          if (c.type === 'text' && !isFlow) {
+            let host = null, ha = Infinity;
+            const tcx = c.x + c.width / 2, tcy = c.y + c.height / 2;
+            for (const h of hosts) {
+              if (tcx >= h.x - 2 && tcx <= h.x + h.width + 2 && tcy >= h.y - 2 && tcy <= h.y + h.height + 2) {
+                const a = h.width * h.height; if (a < ha) { ha = a; host = h; }
+              }
+            }
+            if (host && c.width <= host.width && c.height <= host.height) {
+              const hcx = host.x + host.width / 2, hcy = host.y + host.height / 2;
+              const nx = hcx - c.width / 2, ny = hcy - c.height / 2;
+              const sx = Math.abs(c.x - hcx) <= 2 && Math.abs(c.x - nx) > 0.5;
+              const sy = Math.abs(c.y - hcy) <= 2 && Math.abs(c.y - ny) > 0.5;
+              if (sx || sy) {
+                const ox = c.x - nx, oy = c.y - ny;
+                try { if (sx) c.parentX = nx - c.parent.x; if (sy) c.parentY = ny - c.parent.y; }
+                catch (e) { if (sx) c.x = nx; if (sy) c.y = ny; }
+                log.push([host.name, String(c.characters).slice(0, 8), sx ? (sy ? 'xy' : 'x') : 'y',
+                          (sx ? ox : oy).toFixed(1)]);
+              }
+            }
+          }
+        } catch (e) {}
+        walk(c);
+      }
+    };
+    walk(root);
+    return { fixes: log.length, log: log.slice(0, 40) };
+  };
+
+  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter'] };
 })();

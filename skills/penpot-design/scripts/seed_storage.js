@@ -57,11 +57,26 @@ return (function () {
     return t;
   };
 
-  // ---- 板内居中助手（绝对定位容器；文本创建后 width 已就绪时用）----
-  storage.ct = function (b, str, opts) {
+  // ---- 板内居中助手（绝对定位容器）----
+  // ⚠️ 铁律：createText() 创建瞬间的 t.width/t.height 是 1px 量级瞬态值（见 mcp-automation「文本定位」）。
+  //    用瞬态宽高算居中会把错误偏移烤进坐标（文本左上角恰好落在宿主中心 = stale-center 指纹）。
+  //    因此 ct() 必须**渲染后再实测居中**（async，内部 sleep 120ms）。调用方一律 `await storage.ct(...)`。
+  storage.sleep = storage.sleep || function (ms) { return new Promise((r) => setTimeout(r, ms)); };
+  storage.ct = async function (b, str, opts) {
     opts = opts || {};
     const t = storage.mkText(str, 0, 0, opts.size, opts.color, opts.weight);
+    await storage.sleep(120);                       // 等文本渲染出真实 width/height
     storage.absMount(b, t, b.x + (b.width - t.width) / 2, b.y + (b.height - t.height) / 2);
+    return t;
+  };
+
+  // ---- 宿主内精确居中（文本已渲染出真实宽高时用；同步）----
+  // host 可以是 rect/ellipse/board。只动坐标，不改层级；刻意左对齐的文本不要套这个。
+  storage.centerIn = function (t, host) {
+    const nx = host.x + (host.width - t.width) / 2;
+    const ny = host.y + (host.height - t.height) / 2;
+    try { t.parentX = nx - t.parent.x; t.parentY = ny - t.parent.y; }
+    catch (e) { t.x = nx; t.y = ny; }
     return t;
   };
 
@@ -88,5 +103,5 @@ return (function () {
   };
 
   return { seeded: true, tokens: Object.keys(T).length,
-           fns: ['mkAbsBoard', 'absMount', 'mkText', 'mkRect', 'mkChip', 'pg'] };
+           fns: ['mkAbsBoard', 'absMount', 'mkText', 'mkRect', 'mkChip', 'pg', 'ct(async)', 'centerIn', 'sleep'] };
 })();

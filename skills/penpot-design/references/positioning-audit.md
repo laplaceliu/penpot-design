@@ -67,12 +67,21 @@ MCP 连接中途断开（`penpot.local:443` connect timeout），构建队列与
 ### S2 `text_centre_residue` / `text_centre_info` —— 文本在宿主里没居中
 
 - **含义**：文本世界中心落在某个小宿主（rect/ellipse，边长 ≥24、面积 ≤20000）内，但与宿主中心偏差 > 0.5px。
-- **两级判定（关键，否则误报成灾）**：
+- **三级判定（关键，否则误报成灾）**：
   - `text_centre_residue` = 偏差 **≤8px 且文本框宽 ≥ 宿主宽 ×0.72** → **本意就是居中**（按钮/胶囊标签），是缺陷。
+  - `text_centre_residue`（**stale-center 指纹**）= 偏差 >8px，但**文本左上角恰好落在宿主中心点**
+    （`|t.x−hcx|≤2` 或 `|t.y−hcy|≤2`，按轴独立）→ 见下，是缺陷，`detail` 带 `stale-center` 标记。
   - `text_centre_info` = 其余情况（偏大、或文本框明显窄于宿主）→ **刻意内缩**（带尾部 × 的 chip、左对齐的下拉选项行），**不算缺陷**。
-- **成因**：用固定文本框 + `verticalAlign/horizontalAlign` 居中，而不是"实测宽高 + 居中放置"。
-- **修复**：偏差 5–15px → `storage.vAlignPage()`；≤6px → `storage.alignPage()`（宿主吸附，容差 6px / 大宿主 3px）。
-- **注意**：`alignPage` 只修"本来就想居中"的元素；刻意非居中的会留在清单里——这是**预期行为**。
+- **成因 A（≤8px 残差）**：用固定文本盒 + `verticalAlign/horizontalAlign` 居中，而不是"实测宽高 + 居中放置"。
+- **成因 B（stale-center 大偏移）**：**在 `createText()` 创建瞬间就读 `t.width/t.height` 算居中**。
+  创建瞬间宽高是 1px 量级瞬态值（`mcp-automation.md` 陷阱表「文本定位」），`(w−1)/2` 的算术后果是
+  **文本左上角恰好落在宿主中心**——这就是指纹的来历。实测案例：110×32 药丸里的 37×15 标签右偏 18.5px、
+  下偏 7.5px（= `(37−1)/2`、`(15−1)/2`），16 页系统性复制。
+  **注意：刻意左对齐的文本只会落在 `host.x+padding`（12/16/18/24…），绝不会贴住中心点（±2px），
+  因此指纹判定零误伤**；但**按轴独立**——左对齐字段占位符可能只命中 Y 轴指纹（垂直不居中），只修 Y。
+- **修复**：偏差 5–15px → `storage.vAlignPage()`；≤6px → `storage.alignPage()`（宿主吸附，容差 6px / 大宿主 3px）；
+  **>6px 且命中 stale-center 指纹 → `storage.fixStaleCenter()`**（只动命中轴的坐标，不碰层级/样式）。
+- **注意**：`alignPage`/`fixStaleCenter` 只修指纹命中的元素；刻意非居中的会留在清单里——这是**预期行为**。
 
 ### S3 `crash_100x100` / `degenerate_size` —— 尺寸退化
 
@@ -231,8 +240,11 @@ S1/S4 在第一个板上就会暴露，避免把同一个偏移复制到 120 个
 ### G4 【门禁】收尾必跑对齐引擎，顺序固定
 
 ```
-cleanOrphans() → alignPage() → vAlignPage() → fixInner() → unclip()
+cleanOrphans() → fixStaleCenter() → alignPage() → vAlignPage() → fixInner() → unclip()
 ```
+
+`fixStaleCenter` 必须排在 `alignPage` **之前**：它修的是 >6px 的 stale-center 大偏移（指纹判定），
+修完后残余微差才归 `alignPage` 的 ≤6px 吸附管；反过来跑则大偏移永远修不到。
 
 每页一次；**必须记录返回的修复日志**（`[位置, 内容, 轴, 偏移]`）并人工复核，再做误伤还原。
 `vAlignPage` 的已知误伤面（刻意非居中：步进钮 ＋/－、Progress 顶标签）按 `engines.md` §1 的已知坐标还原。
@@ -284,7 +296,7 @@ cleanOrphans() → alignPage() → vAlignPage() → fixInner() → unclip()
 2   批量建板：每板建成即跑单板审计（只看本板 finding）                                   ← G3
 3   阶段一「几何」：逐页 fixGeometryAll({apply:false}) 出清单 → 复核 → {apply:true}
     （内部顺序已固定：fixColumnOffset → fitBoardHeight → fixOverflowRight → reflowRows → fitRootHeight）
-4   阶段二「对齐」：cleanOrphans → alignPage → vAlignPage → fixInner → unclip              ← G4
+4   阶段二「对齐」：cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip ← G4
 5   复算：auditPage() 必须 CLEAN，且**必须包含 S7 重叠 / S8 文本重叠**两项
     （剩余项须逐条人工确认为刻意内缩 = text_centre_info）
 6   验收：逐页导出（大板需重试），记录 per-board 是否真的导出过                             ← G5
