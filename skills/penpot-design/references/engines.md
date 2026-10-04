@@ -43,6 +43,15 @@ return { page: pg, ...r, remaining: q.length };
   （`|t.x−hcx|≤2` 或 `|t.y−hcy|≤2`，按轴独立），是「创建瞬间用 1×1 瞬态宽高算 `(w−1)/2` 居中」的算术后果。
   刻意左对齐文本只落在 `host.x+padding`，不会贴住中心点 → 指纹判定零误伤；只动命中轴坐标，不碰层级/样式。
   **必须排在 alignPage 之前**（分工：>6px 大偏移归本引擎，≤6px 微差归 alignPage 吸附）。
+- **groupAssemblies**：装配成组（装配归属契约 `penpot-structure.md` §4.1）。同父级内「宿主（rect/ellipse/board ≥24）
+  + 中心落在其内、最小宿主就是它」的兄弟图元 → 成组，组名=宿主名。
+  由内而外（面积升序）→ 嵌套组（按钮组进导航条）；幂等（同组/组件内跳过，按 `.id` 比较父子）；
+  **内置补偿式成组**（`penpot.group` 的破坏性副作用见 api-pitfalls §6.1：捕获 min parentXY → group →
+  `absolute=true` → 复位 → readback 校验），保证成员世界坐标零位移。
+  复用装配升级组件：`createComponent([group])` → 页面用 `comp.instance()`。
+- **fixZOrder**：组内前后顺序修复（z 语义：`parentIndex` 越大越靠前）。`penpot.group` 会把底板排到标签上面
+  （标签被盖住）→ 组内按面积降序 `setParentIndex(i)`（大底在下、文字在上），实例内部跳过。
+  `groupAssemblies` 已内置同逻辑（含组层槽保持）；旧组批修用本引擎。验证以整板导出为准（小形状组导出有缓存假象）。
 - **cleanOrphans**：清根级孤儿文本（历史崩溃残留，会污染遍历）。
 
 修复日志返回 `[{位置, 内容, 轴, 偏移}]`，**先审计复核再进下一页**。

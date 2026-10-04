@@ -203,5 +203,104 @@ return (function () {
     return { fixes: log.length, log: log.slice(0, 40) };
   };
 
-  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter'] };
+  // ---- groupAssemblies：装配成组（装配归属契约：penpot-structure.md §4）----
+  // 同父级内「宿主（rect/ellipse ≥24）+ 中心落在宿主内、且最小宿主就是它」的兄弟图元
+  // → penpot.group([host, ...members]) 成组，组名 = 宿主名。禁止散件同级堆叠。
+  // 由内而外（面积升序）处理，天然支持嵌套：内层先成组，外层把内层组当普通成员收编
+  // （按钮组进导航条）；板是分区容器，不做装配宿主；流式子图元跳过（归 flex 管）。
+  // 幂等：已在同一 group/组件内的装配不重复成组；只动层级，不动坐标/样式。
+  // 升级路径：单次装配=group；要复用/进 13 索引 → `createComponent([group])` 升级为组件，
+  // 页面一律 `comp.instance()`（注册纪律见 penpot-structure.md §4）。
+  storage.groupAssemblies = (root) => {
+    root = root || rootOf();
+    const log = [];
+    const isFlow = (s) => !!(s.layoutChild && s.layoutChild.absolute === false);
+    const walk = (node) => {
+      if (node.isComponentInstance && node.isComponentInstance()) return;  // 实例内部是锁定副本，不动
+      const kids0 = kidsOf(node); if (!kids0) return;
+      for (const c of kids0.slice()) if (c.type === 'board' || c.type === 'group') walk(c);  // 先内层
+      const kids = kidsOf(node); if (!kids) return;
+      const byArea = kids
+        .filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 24 && h.height >= 24 && !isFlow(h))
+        .sort((a, b) => a.width * a.height - b.width * b.height);
+      const taken = new Set();      // 已被收编的成员
+      const live = kids.slice();    // 成员代行者列表（成组后由组顶替）
+      for (const h of byArea) {
+        try {
+          if (taken.has(h.id)) continue;   // 已作为成员进了内层组
+          const members0 = live.filter((s) => s !== h && !taken.has(s.id) && !isFlow(s) &&
+            s.x + s.width / 2 >= h.x && s.x + s.width / 2 <= h.x + h.width &&
+            s.y + s.height / 2 >= h.y && s.y + s.height / 2 <= h.y + h.height);
+          const members = members0.filter((s) => {
+            const scx = s.x + s.width / 2, scy = s.y + s.height / 2;
+            let smallest = h, sa = h.width * h.height;
+            for (const h2 of byArea) {
+              if (h2 === h || taken.has(h2.id)) continue;   // 已收编的内层宿主让位给其组
+              if (scx >= h2.x && scx <= h2.x + h2.width && scy >= h2.y && scy <= h2.y + h2.height && h2.width * h2.height < sa) { smallest = h2; sa = h2.width * h2.height; }
+            }
+            return smallest === h;
+          });
+          if (!members.length) continue;
+          // ⚠️ parent 每次访问生成新代理，`===` 恒 false（api-pitfalls children 代理坑）——必须按 id 比较
+          const pid = h.parent ? h.parent.id : null;
+          if (pid && (h.parent.type === 'group' || (h.parent.isComponentRoot && h.parent.isComponentRoot())) &&
+              members.every((m) => m.parent && m.parent.id === pid)) continue;
+          // ⚠️ penpot.group 有破坏性副作用（api-pitfalls §6.1）：组落 flex 流位 + 成员偏移 −minParentXY。
+          // 补偿式成组：先捕获 bbox 的 min parentXY，成组后逃出流（absolute）并复位，readback 校验。
+          const all = [h].concat(members);
+          const minPX = Math.min.apply(null, all.map((s) => s.parentX));
+          const minPY = Math.min.apply(null, all.map((s) => s.parentY));
+          const maxPI = Math.max.apply(null, all.map((s) => s.parentIndex || 0));  // z：组占顶层成员的层槽
+          const g = penpot.group(all);
+          if (g) {
+            try { g.name = h.name; } catch (e) {}
+            try { g.layoutChild.absolute = true; } catch (e) {}
+            // z 修复：penpot.group 会打乱成员前后序（实测标签被底板盖住）→ 组内面积降序重排
+            try {
+              const inner = Array.from(g.children).sort((a, b) => (b.width * b.height) - (a.width * a.height));
+              for (let zi = 0; zi < inner.length; zi++) inner[zi].setParentIndex(zi);
+            } catch (e) {}
+            try { g.setParentIndex(maxPI); } catch (e) {}
+            try { g.parentX = minPX; g.parentY = minPY; } catch (e) {}
+            // readback 校验（写入可能静默失败）；失败按世界坐标重试一次
+            if (Math.abs(g.parentX - minPX) > 1 || Math.abs(g.parentY - minPY) > 1) {
+              try { g.x = node.x + minPX; g.y = node.y + minPY; } catch (e) {}
+            }
+            members.forEach((m) => taken.add(m.id));
+            taken.add(h.id);
+            live.push(g);   // 组顶替成员，供外层宿主收编（嵌套）
+            log.push([g.name, members.length + 1]);
+          }
+        } catch (e) {}
+      }
+    };
+    walk(root);
+    return { groups: log.length, log: log.slice(0, 40) };
+  };
+
+  // ---- fixZOrder：组内前后顺序修复（z 语义：parentIndex 越大越靠前，0=最底）----
+  // penpot.group 对成员 z 序不透明（实测会把底板排到标签上面 → 标签被盖住）。
+  // 规则：组内按**面积降序**重排（大底板在下、文字/图标在上），setParentIndex(i) 逐个落位。
+  // 与 groupAssemblies 配套：每轮成组后跑一次；export 小形状组可能命中导出缓存假象，
+  // 验证 z 序请导出**整板**（api-pitfalls §6.1）。
+  storage.fixZOrder = (root) => {
+    root = root || rootOf();
+    let fixed = 0;
+    const walk = (node) => {
+      if (node.isComponentInstance && node.isComponentInstance()) return;
+      let kids; try { kids = kidsOf(node); } catch (e) { return; }
+      if (!kids) return;
+      if (node.type === 'group' && kids.length > 1) {
+        const target = kids.slice().sort((a, b) => (b.width * b.height) - (a.width * a.height));
+        for (let i = 0; i < target.length; i++) {
+          try { if (target[i].parentIndex !== i) { target[i].setParentIndex(i); fixed++; } } catch (e) {}
+        }
+      }
+      kids.forEach((c) => { if (c.type === 'group' || c.type === 'board') walk(c); });
+    };
+    walk(root);
+    return fixed;
+  };
+
+  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder'] };
 })();

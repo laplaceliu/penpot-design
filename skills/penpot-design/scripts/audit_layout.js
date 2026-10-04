@@ -112,6 +112,41 @@ return (function () {
     };
     walkB(head);
 
+    // S11 装配散件：宿主（rect/ellipse ≥24）与「中心落在其内、最小宿主就是它」的兄弟图元
+    // 构成一个装配，但未收进同一 group/组件 —— 违反装配归属契约（penpot-structure.md §4：
+    // 成套图元必须成组（group）或成组件（component），禁止散件同级堆叠）。
+    // 修复引擎：storage.groupAssemblies()。板是分区容器不作装配宿主；刻意散件（纯装饰单件）不受此约束。
+    const walkD = (node) => {
+      if (node.isComponentInstance && node.isComponentInstance()) return;  // 实例内部合规（主实例约束）
+      const kids = kidsOf(node); if (!kids) return;
+      const cand = kids.filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 24 && h.height >= 24);
+      for (const h of cand) {
+        try {
+          const hr = R(h);
+          const members = kids.filter((s) => {
+            if (s === h) return false;
+            const sr = R(s); const scx = sr.x + sr.w / 2, scy = sr.y + sr.h / 2;
+            if (scx < hr.x || scx > hr.r || scy < hr.y || scy > hr.b) return false;
+            let smallest = h, sa = hr.w * hr.h;
+            for (const h2 of cand) {
+              if (h2 === h) continue;
+              const r2 = R(h2);
+              if (scx >= r2.x && scx <= r2.r && scy >= r2.y && scy <= r2.b && r2.w * r2.h < sa) { smallest = h2; sa = r2.w * r2.h; }
+            }
+            return smallest === h;
+          });
+          if (members.length) {
+            // ⚠️ parent 是代理，`===` 恒 false——按 id 比较（api-pitfalls children 代理坑）
+            const p = h.parent;
+            const ok = p && (p.type === 'group' || (p.isComponentRoot && p.isComponentRoot())) && members.every((m) => m.parent && m.parent.id === p.id);
+            if (!ok) add('loose_assembly', h, node, '"' + h.name + '" + ' + members.length + ' shape(s) not grouped (groupAssemblies)');
+          }
+        } catch (e) {}
+      }
+      for (const c of kids) { if (rec(c)) walkD(c); }
+    };
+    walkD(head);
+
     // S5 根级游离形状：PageRoot 之外的顶层图元（注册组件期间易产生绑定实例残留）
     Array.from(root.children).forEach((c) => { if (c !== head) add('root_stray', c, root, 'top-level shape outside PageRoot'); });
 

@@ -120,6 +120,26 @@ Button（880 × N，表面底，rounded.md）
 - 注册一律用 `AI Component Masters` 母版板的形状执行 `createComponent([shape])`；`comp.remove()` 连主实例一起删，绝不在展示板形状上注册/重注册。
 - 变体容器用 `penpotUtils.createVariantContainer`（输入必须是已注册主实例）；reparent 后重置 `parentX/parentY`。
 
+### 4.1 装配归属契约（group / component / board）—— 成套图元禁止散件同级堆叠
+
+**每一个"视觉组件"的组成图元（底板+标签+图标+子件…）必须收进且只收进一种容器**：
+
+| 归属 | 判定 | 做法 | 命名 |
+|---|---|---|---|
+| **组件 component** | **复用**：列入 13 组件索引、或 14 Demo 中 ≥2 处出现 | 装配先成组 → `penpot.library.local.createComponent([group])` 注册进 `AI Component Masters`；页面/示例里**一律 `comp.instance()`**，禁止复制散件 | `A·B·C`（禁 `/`） |
+| **组 group** | **单次使用**的成套图元：变体矩阵单元格、Anatomy 示意、KPI 卡、swatch 三件套、按钮/字段/标签示例 | `penpot.group([host, ...members])` 就地成组（同父级内），组名 = 宿主名/组件名·变体 | 同组件名约定 |
+| **板 board** | 页面分区 / 规格板 / 屏幕板 / 浮层容器（方案 C） | `mkAbsBoard`，不做装配宿主（不和标签成组） | 见 §4 |
+
+- **不确定 group 还是 component → 先 group**；要升级时 `createComponent([group])` 整组注册，子元素保持收拢，零返工。
+- **允许散件的只有**：纯装饰单件（分割线、grid 列、独立 caption）与组/组件**内部**的子图元。
+- **无标签成套图元**（滑轨+滑块、单选环+圆点）审计无法从文本配对识别，**手工成组**（组名取主件名）。
+- 层级铁律：标签必须与底板**同父级**（同进组）；注册后标签成为组件内部子元素——否则注册出空壳组件（§4 注册纪律）。
+- **前后顺序（z-order）**：`parentIndex` 越大越靠前（0=最底）。成组/成组件后必须保持——
+  组内**面积降序**（大底板在下、标签/图标在上），组本身占**顶层成员的层槽**，实例替换占**原组的层槽**。
+  `penpot.group` 会打乱成员 z 序（标签被底板盖住）；修复引擎 `fixZOrder()`（`groupAssemblies` 已内置）。
+- 机器强制：审计签名 `loose_assembly`（S11）检出散件装配；修复引擎 `storage.groupAssemblies()`
+  （由内而外、最小宿主归属、嵌套组、幂等、**z 序保持**）；门禁 G10。
+
 ## 5. 坐标与栅格规范
 
 | 项 | 值 |
@@ -151,6 +171,8 @@ Button（880 × N，表面底，rounded.md）
 - [ ] 16 页齐全（15 可选）且命名/顺序正确
 - [ ] 每页唯一 PageRoot，Header/Footer 就位，clipContent=false
 - [ ] 组件规格板符合 §4 契约，变体命名 `组件·属性·属性`
+- [ ] **装配归属合规（§4.1）**：成套图元全部成组或成组件，无散件同级堆叠（审计 `loose_assembly` = 0）；
+      复用组件页面里用的是 `comp.instance()` 而非复制散件
 - [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值；**`storage.TK.audit().ok === true`**
       （所有 set `active:true` + 所有 token `resolvedValueString` 非空，即无失效/断链）
 - [ ] 组件全部注册为库组件（母版在 AI Component Masters），13 索引页信息完整

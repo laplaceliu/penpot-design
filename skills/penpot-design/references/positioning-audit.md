@@ -166,6 +166,19 @@ MCP 连接中途断开（`penpot.local:443` connect timeout），构建队列与
   错名赋值在 `try/catch` 下**静默失败**，代码"看起来跑了"。详见 `api-pitfalls.md` §12.1。
 - **判定**：**写入后立刻 readback**——`if (t.align !== want) throw`。
   readback 为 `undefined` ⇒ 属性名错；读回旧值 ⇒ 取值/类型非法。
+
+### S11 `loose_assembly` —— 装配散件（成套图元未收进 group/component）
+
+- **含义**：同父级下，宿主（rect/ellipse/board ≥24）与「中心落在其内、最小宿主就是它」的兄弟图元
+  构成一个装配（底板+标签/图标/子件），但它们没有收进同一个 **group** 或 **组件**——散件同级堆叠。
+- **成因**：构建时逐件 `absMount` 进板，从不收拢；后果是**选择/移动/复用全面退化**：
+  拖动底板标签被撇下、组件注册出空壳、design-to-code 无法把装配映射成一个组件。
+- **契约**（`penpot-structure.md` §4.1）：复用装配 → **component**（`createComponent([group])`，
+  页面用 `comp.instance()`）；单次成套 → **group**（`penpot.group([host, ...members])`）；
+  纯装饰单件可散件。无标签成套图元（滑轨+滑块）审计识别不了，手工成组。
+- **修复**：`storage.groupAssemblies()`（由内而外按面积升序、最小宿主归属、嵌套组、幂等、只动层级不动坐标）。
+  已合规的装配（同组/组件内）不报；修后复算 `loose_assembly = 0`。
+- **注意**：`groupAssemblies` 之后新增图元若直接散挂，签名会再次报出——**每轮 G4 链末尾都跑一次**。
 - **注意**：审计脚本里读对齐要写成 `s.align`；若历史代码写成 `s.horizontalAlign || s.align`，
   **取的是后者**（前者恒为 undefined），所以审计结果是可信的——但写入端必须用对名字。
 - **修复范围要克制**：不要用"盒宽匹配底座矩形"这类宽判据全文件刷——实测它会误伤
@@ -288,6 +301,20 @@ cleanOrphans() → fixStaleCenter() → alignPage() → vAlignPage() → fixInne
   本系统出过一次真实的交付事故：报了「14/16 页 CLEAN」，但用户打开 Demo 页仍看到大量错位 ——
   因为当时检查项里没有"重叠"这一维。
 
+### G10 【门禁】装配必须成组（group）或成组件（component），禁止散件同级堆叠
+
+契约全文见 `penpot-structure.md` §4.1，三句话版本：
+
+1. **成套图元（底板+标签+图标+子件）必须收进一种容器**：复用/进 13 索引 → **component**
+   （`createComponent([group])`，页面一律 `comp.instance()`）；单次使用 → **group**（`penpot.group([host, ...members])`）。
+2. **机器强制**：审计签名 `loose_assembly`（S11）查散件装配；修复引擎 `groupAssemblies()` 收编；
+   每页 G4 链末尾必跑（幂等），复算 `loose_assembly = 0` 才算该页通过。
+3. **不确定先 group**：`createComponent([group])` 可整组升级为组件，零返工；反向（散件→组件）则要重建。
+
+**引入缺陷与兜底（G8 登记）**：`groupAssemblies` 只改变层级（同父级收进新 group），不动坐标/样式；
+可能的误伤是「把刻意叠放的两件收进一组」——由最小宿主归属 + 嵌套语义排除，误组可用 `penpot.ungroup(g)` 还原
+（组名=宿主名，日志可查）。后续 `alignPage`/`fixStaleCenter` 都按树遍历，穿过 group 边界照常工作。
+
 ## 四、标准作业顺序（替换掉"凭感觉建完再导出"）
 
 ```
@@ -297,6 +324,8 @@ cleanOrphans() → fixStaleCenter() → alignPage() → vAlignPage() → fixInne
 3   阶段一「几何」：逐页 fixGeometryAll({apply:false}) 出清单 → 复核 → {apply:true}
     （内部顺序已固定：fixColumnOffset → fitBoardHeight → fixOverflowRight → reflowRows → fitRootHeight）
 4   阶段二「对齐」：cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip ← G4
+    → groupAssemblies（装配成组，幂等；loose_assembly=0）                                 ← G10
+    → fixZOrder（组内前后序：大底在下标签在上；组占顶层成员层槽）                         ← G10
 5   复算：auditPage() 必须 CLEAN，且**必须包含 S7 重叠 / S8 文本重叠**两项
     （剩余项须逐条人工确认为刻意内缩 = text_centre_info）
 6   验收：逐页导出（大板需重试），记录 per-board 是否真的导出过                             ← G5

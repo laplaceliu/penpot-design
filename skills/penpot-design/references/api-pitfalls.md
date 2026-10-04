@@ -129,6 +129,37 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
 - 组件对象无 `makeInstance`，无法脚本化生成实例。
 - 组件板要收编进页头板（`head.appendChild(compBoard)`，同页 reparent 世界坐标不变），否则导出头板时组件缺失。判定头板用 `root.children.find(c => c.type === 'board')`（root 里可能混有孤儿文本，别用 children[0]）。
 
+### 6.1 group 语义与装配归属（契约：penpot-structure.md §4.1）
+
+- **API**：`penpot.group(shapes)` 就地成组（同父级内，**无 parent 参数**），返回 `Group`；`penpot.ungroup(g)` 解组。
+- **⚠️ `penpot.group` 有破坏性副作用（实测，必须补偿）**：成组后
+  1. 新组的 `layoutChild.absolute` 为 **false**（组成为 flex 流子元素）→ flex 父板把组**流式重排**到列首堆叠；
+  2. 成员整体平移：组被放到父原点，成员相对布局保留但**绝对位置偏移 −(成员 bbox 的 minParentXY)**；
+  3. 父板若是 hug，流子元素计入后**板尺寸被撑大**。
+  `penpot.ungroup(g)` **不还原坐标**（成员按组内相对坐标落回，越修越乱）——group/ungroup 往返不可用于回滚！
+  **补偿式成组（canonical，零位移）**：
+  ```js
+  const minPX = Math.min(...shapes.map(s => s.parentX)), minPY = Math.min(...shapes.map(s => s.parentY));
+  const g = penpot.group(shapes);
+  g.layoutChild.absolute = true;          // 逃出 flex 流
+  g.parentX = minPX; g.parentY = minPY;   // 恢复 bbox 原位（写后必须 readback 校验）
+  ```
+  修复引擎 `groupAssemblies()` 已内置此补偿；裸调 `penpot.group` 后必须做同样的三步。
+- **⚠️ 成组会打乱前后顺序（z-order）**：`parentIndex` **越大越靠前（0=最底）**，`bringToFront()` 落到最后一个 index；
+  `penpot.group` 对成员 z 序不透明——实测会把**底板排到标签上面**（标签被盖住，导出纯色块）。
+  成组后必须修 z：组内按**面积降序** `setParentIndex(i)`（大底在下、文字/图标在上），
+  组本身 `setParentIndex(顶层成员原 parentIndex)` 保住层槽；实例替换同理（`inst.setParentIndex(原组 index)`）。
+  验证注意：**小形状组的 export 可能命中导出缓存假象**（看起来没文字），以**整板导出**为准。
+  批修引擎 `storage.fixZOrder()`（groupAssemblies 已内置同逻辑）。
+- **组与板的差别**：对含 absolute 子元素的**板**赋 x/y 是"壳动内容不动"（子元素世界坐标不跟随）；
+  **组不同——移动组壳会带动子元素**（组是边界包装器），所以装配收组后整体拖动/复用是安全的。
+- **归属三级**：复用装配 → component（`createComponent([group])`，页面 `comp.instance()`）；
+  单次成套 → group；分区容器 → board。**成套图元禁止散件同级堆叠**（审计签名 `loose_assembly`，
+  修复 `groupAssemblies()`，门禁 G10）。
+- **组名** = 宿主名 / `组件名·变体`；组件名禁 `/`（赋值静默失败）。
+- **嵌套是常态**：按钮组收进导航条组——由内而外逐层 `penpot.group`；`createComponent` 可以吃嵌套组。
+- **注册顺序**：先 group 收拢 → 再 `createComponent([group])`；散件直接注册会得到残缺组件。
+
 ## 7. 沙箱与代理
 
 - execute_code 沙箱注入的 `penpotUtils` / `storage` **不是真全局**：`new Function` / `eval` 序列化的函数体内访问不到（报 "reading 'xxx' of undefined"）。闭包字面量函数可跨调用存活（存 storage）。

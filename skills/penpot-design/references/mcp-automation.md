@@ -55,7 +55,7 @@ storage.absMount = (parent, child, worldX, worldY) => {
 | 板裁剪属性 | 是 `clipContent`（不是 clipsContent）。发光元素所在板必须 `clipContent = false`，否则辉光被裁不可见 |
 | 移动组件主实例子元素 | `penpotUtils.setParentXY` 会失败；用 `child.parentX/parentY` **直接赋值**（普通形状+主实例处处可用） |
 | 沙箱作用域 | penpotUtils/storage 非真全局；`new Function` 序列化的函数体内访问不到 → 持久引擎必须以字面量函数定义存入 storage |
-| children 代理 | 每次访问 `shape.children` 生成新代理，`indexOf` 按引用比较全 -1 → 先 `Array.from(children)` 单次快照再 filter/indexOf |
+| children/parent 代理 | 每次访问 `shape.children`/`shape.parent` 生成新代理，**引用比较（`===`/`indexOf`）恒 false/-1** → `Array.from(children)` 单次快照；**父子/同组判定一律按 `.id` 比较**（`m.parent.id === p.id`）。实战教训：装配归属的幂等判定用 `===` 会被骗成永不合规、重复嵌套成组 |
 | 组件名 | 不允许 `/`（赋值静默失败），用 `·` 分隔，如 `Button·Primary·Default` |
 | 文本定位 | 创建瞬间的文本宽高不可信（可能 1×1）。**渲染后再按实际 width/height 居中**（`await storage.ct(...)`，内部 sleep 120ms 实测；或 `storage.centerIn(t, host)`），否则偏移数像素到数十像素。**指纹**：错位文本左上角恰好落在宿主中心（`(w−1)/2` 的算术后果）；修复引擎 `storage.fixStaleCenter()`，审计标 `stale-center`（positioning-audit.md S2） |
 | 坐标系混用 | `child.x/y` 与 `board.x/y` 是世界坐标；`parentX/parentY` 是父内相对。包含判断/吸附计算全程统一世界坐标。换算：`new parentX = worldX - parent.x` |
@@ -63,8 +63,12 @@ storage.absMount = (parent, child, worldX, worldY) => {
 | **resize 板与子元素** | 板 resize **不影响 absolute 子元素**（安全扩容画框）。但含非 absolute flex 子元素的板 resize 会触发引擎把子元素 `fix` sizing 压回内容大小（压塌）——修复后勿再 resize |
 | **CJK 字体回退** | Penpot 无 CSS 字体栈回退：`applyToText` 整段生效，Nunito 等拉丁字体的中文渲染为乱码。**mkText 按 `/[\u3000-\u9fff\uff00-\uffef]/` 自动选 Noto Sans SC**；存量文本扫描 `characters` 批修（`Text.fontWeight` 可直接读当前字重，同字重替换） |
 | **Emoji 渲染** | Penpot 将 emoji 渲染为像素风图形（导出 PNG 同样）——对游戏风/像素风设计反而合适，可直接当图标占位 |
+| **装配归属** | 成套图元（底板+标签+图标）**禁止散件同级堆叠**：复用 → component（`createComponent([group])`，页面用 `comp.instance()`），单次 → **group**。**⚠️ `penpot.group` 有破坏性副作用**（组落 flex 流位、成员偏移 −minParentXY、板被撑大；`ungroup` 不还原坐标）——必须**补偿式成组**（捕获 min parentXY → group → `absolute=true` → 复位 → readback），canonical 实现在 `groupAssemblies()`。组名=宿主名，组件名禁 `/` 用 `·`。契约 `penpot-structure.md` §4.1，审计 `loose_assembly` |
 
 ## 4. 变体容器（Variant）
+
+**先成组再注册**：多图元装配先 `penpot.group([host, ...members])` 收拢（装配归属契约 `penpot-structure.md` §4.1），
+再 `createComponent([group])` 整组注册——子元素保持收拢，组件语义完整；散件直接注册会得到只含单件的残缺组件。
 
 `penpotUtils.createVariantContainer(items)` 要求输入是**已注册库组件的主实例**，直接传 shape 会报 "ShapeProxy invalid"：
 
