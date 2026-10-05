@@ -1,53 +1,53 @@
-# 适配器：Dear ImGui（立即模式 GUI）
+# Adapter: Dear ImGui (immediate-mode GUI)
 
-通用纪律见 `references/design-to-code-generic.md`（token 只引变量、分层、资源零外链、五态、整数像素、验收流程）。
-本文件只写 ImGui 特有部分；总原则与视口档位约束同 generic §0。适合工具 / HUD / 调试面板 / 引擎内 UI。
+The generic discipline is in `references/design-to-code-generic.md` (tokens only reference variables, layering, zero external asset links, five states, integer pixels, acceptance flow).
+This file covers only ImGui-specific parts; the general principles and viewport-tier constraints are the same as generic §0. Suited to tools / HUD / debug panels / in-engine UI.
 
-## 1. 概况（范式 / 平台与语言 / 布局模型 / 样式机制）
+## 1. Overview (paradigm / platform & language / layout model / styling mechanism)
 
-- **范式**：immediate mode——每帧重新调用 widget 代码生成绘制，无持久对象树（状态在你自己的应用侧）。
-- **平台与语言**：C++（含各语言绑定）；后端任意（SDL / GLFW + OpenGL / Vulkan / DirectX / Metal）。
-- **布局模型**：立即式流式布局——`Begin/End` 窗口、`SameLine`、`Columns`、`SetNextWindowPos/Size`、`Indent`、内容区约束；**无 flexbox / 无 CSS 重排**，顺序即布局。
-- **样式机制**：`ImGuiStyle` 结构体（`Style.Colors[ImGuiCol_*]`、`FrameRounding`、`FramePadding`、`ItemSpacing` 等），`PushStyleVar` / `PushStyleColor` 临时覆盖；自定义绘制走 `ImDrawList`（`AddRect`、`AddText`）。无 CSS。
+- **Paradigm**: immediate mode — each frame re-invokes the widget code to generate drawing, no persistent object tree (state lives on your application side).
+- **Platform & language**: C++ (with bindings for various languages); any backend (SDL / GLFW + OpenGL / Vulkan / DirectX / Metal).
+- **Layout model**: immediate-mode streaming layout — `Begin/End` windows, `SameLine`, `Columns`, `SetNextWindowPos/Size`, `Indent`, content-area constraints; **no flexbox / no CSS reflow**, order is layout.
+- **Styling mechanism**: `ImGuiStyle` struct (`Style.Colors[ImGuiCol_*]`, `FrameRounding`, `FramePadding`, `ItemSpacing`, etc.), `PushStyleVar` / `PushStyleColor` for temporary overrides; custom drawing via `ImDrawList` (`AddRect`, `AddText`). No CSS.
 
-## 2. Token 映射
+## 2. Token mapping
 
-- DESIGN.md tokens → **C++ 常量 / 主题结构体**（如 `const ImVec4 kPrimary = ImGui::ColorConvertHexToFloat4("1A1C1E");`、`const float kRadiusMd = 8.f;`、`const ImVec2 kPadBtn = {16,8};`）。
-- 颜色：`Style.Colors[ImGuiCol_Button/ButtonHovered/ButtonActive/Text/...]`；圆角：`Style.FrameRounding` / `GrabRounding`；间距：`Style.ItemSpacing` / `FramePadding`。
-- **禁止散落魔法数字**：集中到主题初始化函数统一设置 `ImGui::GetStyle()`。
+- DESIGN.md tokens → **C++ constants / theme struct** (e.g. `const ImVec4 kPrimary = ImGui::ColorConvertHexToFloat4("1A1C1E");`, `const float kRadiusMd = 8.f;`, `const ImVec2 kPadBtn = {16,8};`).
+- Colors: `Style.Colors[ImGuiCol_Button/ButtonHovered/ButtonActive/Text/...]`; radius: `Style.FrameRounding` / `GrabRounding`; spacing: `Style.ItemSpacing` / `FramePadding`.
+- **No scattered magic numbers**: centralized into a theme-init function that uniformly sets `ImGui::GetStyle()`.
 
-## 3. 资源系统
+## 3. Asset system
 
-- **图片**：后端加载纹理（如 `stb_image` → GL 纹理 id），用 `Image(user_texture_id, size)` 绘制；由你管理纹理生命周期，ImGui 不提供资源管线。
-- **导出尺寸 = 标注 × 倍率**：图标/图片按目标分辨率预生成；纯色块/圆角/阴影用 `ImDrawList` 绘制或 `AddImageRounded`，不导位图。
-- **字体**：`ImFontAtlas::AddFontFromFileTTF` 加载；CJK 需显式加字形区间（`AddFontFromFileTTF(..., glyph_ranges_cjk)`），否则中文缺字。
+- **Images**: backend loads textures (e.g. `stb_image` → GL texture id), drawn with `Image(user_texture_id, size)`; you manage the texture lifecycle, ImGui provides no asset pipeline.
+- **Export size = annotation × multiplier**: icons/images pre-generated at target resolution; solid blocks/radii/shadows drawn with `ImDrawList` or `AddImageRounded`, no exported bitmaps.
+- **Fonts**: `ImFontAtlas::AddFontFromFileTTF` loads; CJK needs explicit glyph-range inclusion (`AddFontFromFileTTF(..., glyph_ranges_cjk)`), otherwise Chinese characters are missing.
 
-## 4. 状态模型
+## 4. State model
 
-- ImGui 本身无持久组件状态；**五态 = 你的应用状态 + 即时查询**：Hover 用 `IsItemHovered()`、Active/Pressed 用 `IsItemActive()`/`IsMouseDown`、Focused 用 `IsItemFocused()`、Disabled 用 `BeginDisabled()`。颜色按这些状态在每帧绘制时切换，取自 DESIGN.md 变体键。
+- ImGui itself has no persistent component state; **five states = your application state + immediate query**: Hover via `IsItemHovered()`, Active/Pressed via `IsItemActive()`/`IsMouseDown`, Focused via `IsItemFocused()`, Disabled via `BeginDisabled()`. Colors switch per these states during each frame's drawing, taken from DESIGN.md variant keys.
 
 ## 5. High-DPI
 
-- `io.DisplaySize` + `io.DisplayFramebufferScale`；字体缩放用 `io.FontGlobalScale` 或加载 @2x 字体；后端负责实际 DPR。
+- `io.DisplaySize` + `io.DisplayFramebufferScale`; font scaling via `io.FontGlobalScale` or loading @2x fonts; the backend handles actual DPR.
 
-## 6. 验收手段
+## 6. Acceptance means
 
-- 渲染到帧缓冲后存 PNG（后端截图 / `glReadPixels` / 软件渲染 dump）；再用 `references/verification.md` + `scripts/pixel_diff.py` 比对（DPR=1、禁动画、窗口 = 该档基准宽）。
-- 立即模式需固定帧（停在同一交互状态）再截图，避免画面随输入跳动。
+- After rendering to the framebuffer, save PNG (backend screenshot / `glReadPixels` / software-render dump); then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width).
+- Immediate mode needs a fixed frame (frozen at the same interaction state) before screenshotting, to avoid the picture jumping with input.
 
-## 7. 已知坑
+## 7. Known pitfalls
 
-- **无持久 widget 树 / 无自动重排**：布局完全靠调用顺序与 `SameLine/Columns`，复杂表单易错位；封装成可复用「组件函数」保持一致性。
-- **不适合完整 App 皮肤**：ImGui 主打工具/调试/HUD；做产品级多页 UI 需自行抽象布局与状态。
-- **CJK 与文本宽度**：必须加载含 CJK 字形区间的字体；`CalcTextSize` 用于手动对齐。
-- 绘制层级由**调用顺序**决定（后调用在上层），注意 z-order。
+- **No persistent widget tree / no auto reflow**: layout entirely depends on call order and `SameLine/Columns`; complex forms easily misalign; wrap into reusable "component functions" to keep consistency.
+- **Not suited to full app skins**: ImGui targets tools/debug/HUD; product-grade multi-page UI needs self-abstracted layout and state.
+- **CJK and text width**: must load a font that includes CJK glyph ranges; `CalcTextSize` for manual alignment.
+- Draw order determined by **call order** (later calls on top), mind the z-order.
 
-## 8. pixel-perfect 纪律（ImGui 特有）
+## 8. pixel-perfect discipline (ImGui-specific)
 
-1. **整数像素**：`ItemSpacing` / `FramePadding` / 尺寸取设计整数值；不写 12.5。
-2. **坐标对齐**：`SetNextWindowPos/Size`、`SameLine` 偏移与解剖板核对；1px 偏移即 bug。
-3. **状态完备**：每帧按 Hover/Active/Focused/Disabled 切换绘制颜色，逐一取自 DESIGN.md 变体键。
-4. **字体**：加载字体字重/字号/行高与 F2 一致；CJK 区间齐全。
-5. **截图验证**：固定帧后 dump PNG，窗口 = 该档基准宽，DPR=1。
-6. **资源零外链**：纹理/字体由你加载并在内存管理，不依赖运行时相对路径文件。
-7. **响应式 / 档位**：`targetProfiles` 多档时用 `SetNextWindowSizeConstraints` + 重排实现 pad/mobile 单列，触控 ≥44px；逐档截图比对。
+1. **Integer pixels**: `ItemSpacing` / `FramePadding` / size take integer design values; never 12.5.
+2. **Coordinate alignment**: `SetNextWindowPos/Size`, `SameLine` offset checked against the anatomy board; a 1px offset is a bug.
+3. **State completeness**: each frame switches draw color by Hover/Active/Focused/Disabled, taken one-by-one from DESIGN.md variant keys.
+4. **Font**: loaded font weight/size/line-height consistent with F2; complete CJK ranges.
+5. **Screenshot verification**: after fixing the frame, dump PNG, window = that tier's baseline width, DPR=1.
+6. **Zero external asset links**: textures/fonts are loaded by you and managed in memory, no runtime relative-path file dependence.
+7. **Responsive / tiers**: when `targetProfiles` has multiple tiers, use `SetNextWindowSizeConstraints` + reflow to implement pad/mobile single-column, touch ≥44px; screenshot each tier and compare.

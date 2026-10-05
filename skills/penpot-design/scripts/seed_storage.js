@@ -1,11 +1,11 @@
-// seed_storage.js —— Penpot execute_code 播种引擎
-// 用法：整份粘贴进 execute_code 执行一次；每批业务命令前探测 storage.mkText，缺失则重跑本脚本。
-// 约定：字面量函数入 storage。
-// ⚠️ 重要：storage.T 只是 **JS 侧的色值镜像**（供绘图函数取色），**它不会创建任何 Penpot design token**。
-//    真正的 token 录入走 scripts/token_engine.js 的 storage.TK.seed(...)，见 references/design-tokens.md。
+// seed_storage.js —— Penpot execute_code seeding engine
+// Usage: paste the whole file into execute_code and run once; before each batch of business commands probe storage.mkText, and re-run this script if missing.
+// Convention: literal functions go into storage.
+// ⚠️ Important: storage.T is only a **JS-side color mirror** (for drawing functions to pick colors); it does NOT create any Penpot design token.
+//     Real token entry goes through scripts/token_engine.js's storage.TK.seed(...); see references/design-tokens.md.
 
 return (function () {
-  // ---- storage.T：仅 JS 侧色值镜像（按 DESIGN.md 填充/替换）；不创建 Penpot token ----
+  // ---- storage.T: JS-side color mirror only (fill/replace per DESIGN.md); does not create Penpot tokens ----
   storage.T = storage.T || {
     primary: '#2563EB', primaryHover: '#1D4ED8', primaryActive: '#1E40AF', primaryDisabled: '#93C5FD',
     onPrimary: '#FFFFFF', secondary: '#64748B', neutral: '#F8FAFC', surface: '#FFFFFF',
@@ -14,10 +14,10 @@ return (function () {
   };
   const T = storage.T;
 
-  // ---- 页面工具 ----
+  // ---- page helper ----
   storage.pg = function (name) { return penpotUtils.getPageByName(name); };
 
-  // ---- 板工厂：方案 C（flex 容器 + 全员 absolute + 世界坐标）----
+  // ---- board factory: approach C (flex container + all absolute + world coordinates) ----
   storage.mkAbsBoard = function (name, x, y, w, h, fill, radius) {
     const b = penpot.createBoard();
     b.name = name; b.x = x; b.y = y; b.resize(w, h);
@@ -29,7 +29,7 @@ return (function () {
     return b;
   };
 
-  // ---- 挂载：先 appendChild 再 absolute，再写世界坐标 ----
+  // ---- mount: appendChild first, then absolute, then write world coordinates ----
   storage.absMount = function (parent, child, worldX, worldY) {
     parent.appendChild(child);
     child.layoutChild.absolute = true;
@@ -37,19 +37,19 @@ return (function () {
     return child;
   };
 
-  // ---- 文本工厂：CJK 自动选 Noto Sans SC（Penpot 无 CSS 字体栈回退，applyToText 整段生效）----
-  // 第 6 参 fontRole：'display' 走 display 字体（按 DESIGN.md 替换 _display），其余走正文体。
-  // 铁律：**这个参数必须从一开始就在**。中途才给 mkText 加字体选项，会让前后批次的
-  // display 文字字体不一致，而这类不一致几何审计查不出来（只得靠 auditPage().fonts 直方图）。
+  // ---- text factory: CJK auto-selects Noto Sans SC (Penpot has no CSS font-stack fallback, applyToText applies to the whole paragraph) ----
+  // 6th param fontRole: 'display' uses the display font (replace _display per DESIGN.md), others use the body font.
+  // Iron rule: **this parameter must be present from the very start**. Adding a font option to mkText halfway through
+  // would make the display font inconsistent between early and late batches, and this kind of inconsistency can't be caught by the geometry audit (only via auditPage().fonts histogram).
   const _noto = penpot.fonts.findByName('Noto Sans SC');
   const _latin = penpot.fonts.findByName('Nunito');
-  const _display = penpot.fonts.findByName('Anton');   // ← 按 DESIGN.md 的 display 字体替换
+  const _display = penpot.fonts.findByName('Anton');   // ← replace with the display font from DESIGN.md
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
   storage.mkText = function (str, x, y, size, color, weight, fontRole) {
     const t = penpot.createText(str);
     t.x = x; t.y = y;
     const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str);
-    // CJK 优先：display 字体通常无中文字形，中文一律回落 Noto
+    // CJK first: display fonts usually have no CJK glyphs, Chinese always falls back to Noto
     const font = cjk ? _noto : (fontRole === 'display' && _display ? _display : _latin);
     try { font.applyToText(t, _variant(font, weight || 400)); } catch (e) {}
     if (size) { try { t.fontSize = String(size); } catch (e) {} }
@@ -57,21 +57,21 @@ return (function () {
     return t;
   };
 
-  // ---- 板内居中助手（绝对定位容器）----
-  // ⚠️ 铁律：createText() 创建瞬间的 t.width/t.height 是 1px 量级瞬态值（见 mcp-automation「文本定位」）。
-  //    用瞬态宽高算居中会把错误偏移烤进坐标（文本左上角恰好落在宿主中心 = stale-center 指纹）。
-  //    因此 ct() 必须**渲染后再实测居中**（async，内部 sleep 120ms）。调用方一律 `await storage.ct(...)`。
+  // ---- in-board centering helper (absolute-positioned container) ----
+  // ⚠️ Iron rule: t.width/t.height at the createText() creation instant are ~1px transient values (see mcp-automation "Text positioning").
+  //    Using transient width/height to compute centering bakes the wrong offset into coordinates (text top-left landing exactly on host center = stale-center fingerprint).
+  //    So ct() must center by **measuring after rendering** (async, internally sleeps 120ms). Callers always `await storage.ct(...)`.
   storage.sleep = storage.sleep || function (ms) { return new Promise((r) => setTimeout(r, ms)); };
   storage.ct = async function (b, str, opts) {
     opts = opts || {};
     const t = storage.mkText(str, 0, 0, opts.size, opts.color, opts.weight);
-    await storage.sleep(120);                       // 等文本渲染出真实 width/height
+    await storage.sleep(120);                       // wait for the text to render real width/height
     storage.absMount(b, t, b.x + (b.width - t.width) / 2, b.y + (b.height - t.height) / 2);
     return t;
   };
 
-  // ---- 宿主内精确居中（文本已渲染出真实宽高时用；同步）----
-  // host 可以是 rect/ellipse/board。只动坐标，不改层级；刻意左对齐的文本不要套这个。
+  // ---- precise centering inside host (use when text has rendered real width/height; synchronous) ----
+  // host can be rect/ellipse/board. Only moves coordinates, doesn't change z-order; don't apply to deliberately left-aligned text.
   storage.centerIn = function (t, host) {
     const nx = host.x + (host.width - t.width) / 2;
     const ny = host.y + (host.height - t.height) / 2;
@@ -80,7 +80,7 @@ return (function () {
     return t;
   };
 
-  // ---- 矩形工厂 ----
+  // ---- rectangle factory ----
   storage.mkRect = function (name, x, y, w, h, fill, radius, stroke, strokeW) {
     const r = penpot.createRectangle();
     r.name = name; r.x = x; r.y = y; r.resize(w, h);
@@ -88,12 +88,12 @@ return (function () {
     r.fills = fill ? [{ fillColor: fill, fillOpacity: 1 }] : [];
     if (stroke) {
       r.strokes = [{ strokeColor: stroke, strokeOpacity: 1, strokeWidth: strokeW || 1 }];
-      try { r.strokeAlignment = 'inner'; } catch (e) {}   // 闭合形状一律 inner
+      try { r.strokeAlignment = 'inner'; } catch (e) {}   // closed shapes always inner
     }
     return r;
   };
 
-  // ---- token chip（页头 token 条）----
+  // ---- token chip (page-header token bar) ----
   storage.mkChip = function (parent, x, y, label, color) {
     const box = storage.mkAbsBoard('chip-' + label, x, y, 96, 28, color || T.border, 14);
     storage.absMount(parent, box, x, y);

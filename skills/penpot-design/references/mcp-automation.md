@@ -1,28 +1,28 @@
-# Penpot MCP 自动化实战手册（execute_code）
+# Penpot MCP automation handbook (execute_code)
 
-> 迁移自 penpot-mcp-automation 技能（已并入 penpot-design）。沉淀自多轮完整实战（93 组件 + 变体 + 1920×1080 大屏（web 档位）、33 组件 + 库组件 + Dashboard/Landing/Login/List/Detail/Settings 六典型页面）。**现支持 web / pad / mobile 三档视口**（见 `references/viewport-profiles.md`），Demo 与 12 布局网格按所选档位分别构建，任务开头用 `ask_followup_question` 确认目标宽度。
-> 详细机理与代码：api-pitfalls.md（陷阱详解）/ engines.md（机理与配方）/ scripts/*.js（种子与引擎代码）。
+> Migrated from the penpot-mcp-automation skill (merged into penpot-design). Hardened through multiple complete runs (93 components + variants + 1920×1080 widescreen (web tier), 33 components + library components + Dashboard/Landing/Login/List/Detail/Settings six typical pages). **Now supports web / pad / mobile three viewport tiers** (see `references/viewport-profiles.md`); Demo and page-12 layout grids are built per selected tier, and the task start uses `ask_followup_question` to confirm the target width.
+> Detailed mechanics and code: api-pitfalls.md (pitfall details) / engines.md (mechanics and recipes) / scripts/*.js (seed and engine code).
 
-通过 `penpot` MCP 的 `execute_code` 工具操作 Penpot 文件。所有代码在该工具的沙箱中执行，30 秒超时。
+Operate Penpot files via the `execute_code` tool of the `penpot` MCP. All code runs in that tool's sandbox, with a 30-second timeout.
 
-## 1. 会话纪律（每次调用必须遵守）
+## 1. Session discipline (must obey every call)
 
-1. **切页是异步的**：`penpot.openPage(pageObj)` 后在同一调用内创建/修改形状会命中旧页。两种可靠模式：
-   - 分步：本调用只切页并返回 `{switching:true}`，下一调用再操作；
-   - 队列 runner：`if (penpot.currentPage.name !== q[0]) { penpot.openPage(storage.pg(q[0])); return {wait:true}; }` → `const pg = q.shift(); 操作; if (q.length) penpot.openPage(...)`。**注意 runner 尾部会预切下一页，探测/修复前必须先核对 `penpot.currentPage.name`**。
-   - **每条命令开头防御式验证**：`openPage(pg); await sleep(400); if (penpot.currentPage.name !== '目标页') return {err: currentPage.name};`——不匹配立即 return，绝不在错误的页上执行 remove/创建。
-2. **页对象**：`openPage` 只接受 Page 对象或 UUID。助手 `storage.pg = n => penpotUtils.getPageByName(n)`。
-3. **storage 易失**：插件重连/浏览器崩溃后全丢。每批前探测 `storage.T / storage.mkText / storage.absMount`，缺失则重播种（种子模板：`scripts/seed_storage.js`，按项目主题扩展）。
-4. **批量大小**：每调用 ≤8 个图元或 ≤10 个文本，超出会 30s 超时。超时的调用可能已部分生效——重试前先探测残留，避免重复创建。**超时被杀时 openPage 可能未提交**：下一条命令会落在旧页上执行——先切页+验证再操作（教训：曾在 Foundations 页被误执行"全部 remove"，整页清空）。
-5. **崩溃损伤模式**：画布崩溃（大量辉光 blur + 大文件 + 频繁切页是诱因；症状还有 MCP 报 "No plugin instance connected"）时，**崩溃前最后一批创建**的 board/rect/ellipse 退化为默认 100×100（text 不受影响；位置/填充/层级保留）。检测：非文本图元尺寸恰为 100×100。修复=按设计规格重新 resize，**含头板**（头板退化时导出全黑）。禁用 WebGL 可显著稳定；轻度卡死 sleep 60~120s 可自愈。
-6. **返回值**：只返回原始值（数字/字符串/平铺数组）。返回函数或复杂对象会 structuredClone 失败（如 shape 的 makeMask）。
-7. **跨页操作**：修改/删除非激活页对象报 "Cannot modify a page that is not currently active" → 先激活所属页。
+1. **Page switching is asynchronous**: after `penpot.openPage(pageObj)`, creating/modifying shapes in the same call may hit the old page. Two reliable patterns:
+   - Step-wise: this call only switches page and returns `{switching:true}`, the next call does the work;
+   - Queue runner: `if (penpot.currentPage.name !== q[0]) { penpot.openPage(storage.pg(q[0])); return {wait:true}; }` → `const pg = q.shift(); work; if (q.length) penpot.openPage(...)`. **Note the runner pre-switches the next page at its tail; before probing/repairing you must verify `penpot.currentPage.name`**.
+   - **Defensive verification at the start of every command**: `openPage(pg); await sleep(400); if (penpot.currentPage.name !== 'target page') return {err: currentPage.name};` — return immediately on mismatch, never run remove/create on the wrong page.
+2. **Page object**: `openPage` only accepts a Page object or UUID. Helper `storage.pg = n => penpotUtils.getPageByName(n)`.
+3. **Storage is volatile**: lost after plugin reconnect / browser crash. Before each batch probe `storage.T / storage.mkText / storage.absMount`; if missing, re-seed (seed template: `scripts/seed_storage.js`, extend per project theme).
+4. **Batch size**: each call ≤8 primitives or ≤10 text; exceeding triggers the 30s timeout. A timed-out call may have partially taken effect — before retrying, probe residue to avoid duplicate creation. **When killed by timeout, openPage may not have committed**: the next command may land on the old page — switch page + verify before operating (lesson: once on the Foundations page a "remove all" was wrongly executed, wiping the whole page).
+5. **Crash-damage pattern**: canvas crash (lots of glow blur + large files + frequent page switching are triggers; a symptom is also MCP reporting "No plugin instance connected") degrades the **last batch created before the crash** of board/rect/ellipse to default 100×100 (text unaffected; position/fill/z-order preserved). Detection: non-text primitive size exactly 100×100. Fix = resize per design spec, **including the header board** (header-board degradation makes the export all black). Disabling WebGL significantly stabilizes; mild freeze self-heals after sleep 60~120s.
+6. **Return values**: only return raw values (number/string/flat array). Returning a function or complex object fails structuredClone (e.g. shape's makeMask).
+7. **Cross-page operations**: modifying/deleting a non-active page object reports "Cannot modify a page that is not currently active" → activate its owning page first.
 
-## 2. 构建新板：布局方案决策
+## 2. Building a new board: layout-approach decision
 
-三种方案按序尝试，渲染异常时降级：**A 裸板+世界坐标 appendChild**（最简单，部分环境导出整体偏移）→ **B flex 自动布局**（需引擎排版，嵌套子板被 hug 压塌）→ **C flex 容器 + 全员 absolute + 世界坐标**（推荐兜底，33 组件 + 3 整页 0 失败）。三方案构建/渲染行为与实测结论详表见 api-pitfalls.md §10。
+Try the three approaches in order, degrade when rendering is abnormal: **A bare board + world-coordinate appendChild** (simplest, but some environments export with a whole-page offset) → **B flex auto-layout** (needs engine layout, nested sub-boards get hug-collapsed) → **C flex container + all absolute + world coordinates** (recommended fallback, 33 components + 3 full pages 0 failures). The three approaches' build/render behavior and tested conclusions are in the detailed table in api-pitfalls.md §10.
 
-方案 C 标准写法（`mkAbsBoard`/`absMount` 完整引擎见 `scripts/seed_storage.js`）：
+Approach C standard writing (`mkAbsBoard`/`absMount` full engine in `scripts/seed_storage.js`):
 
 ```js
 storage.mkAbsBoard = (name, x, y, w, h, fill, radius) => {
@@ -37,90 +37,90 @@ storage.mkAbsBoard = (name, x, y, w, h, fill, radius) => {
 };
 storage.absMount = (parent, child, worldX, worldY) => {
   parent.appendChild(child);
-  child.layoutChild.absolute = true;   // ★ 必须在 appendChild 之后设置
-  child.x = worldX; child.y = worldY;  // absolute 模式下 x/y 即世界坐标
+  child.layoutChild.absolute = true;   // ★ must be set AFTER appendChild
+  child.x = worldX; child.y = worldY;  // in absolute mode x/y are world coordinates
 };
 ```
 
-**诊断方法**：readback 坐标正确但导出整体错位 → 方案 A 失效，换方案 C 重建该板（重建比修补快）。导出按钮/卡片被压成文字大小 → 方案 B 的 hug 压塌，全员 `layoutChild.absolute = true` 后按设计尺寸重排。
+**Diagnosis**: readback coordinates correct but export whole-page offset → approach A failed, rebuild that board with approach C (rebuilding is faster than patching). Export buttons/cards squashed to text size → approach B's hug collapse, after all `layoutChild.absolute = true` re-layout by design size.
 
-## 3. 核心陷阱速查表（详细机理与代码见 api-pitfalls.md）
+## 3. Core pitfall quick-reference table (detailed mechanics and code in api-pitfalls.md)
 
-| 陷阱 | 正确做法 |
+| Pitfall | Correct approach |
 |---|---|
-| Path 没有 `setPathData` 方法 | 用 `path.d` 属性赋值；d 的读写均为**世界坐标**，写入后自动适配包围盒 |
-| SVG arc `A` 命令不渲染（新 Path 默认 `d="M0,0L100,100"` 对角线） | 弧线转三次贝塞尔：kappa=4/3·tan(θ/4)，每段 ≤90° |
-| `appendChild` 保留世界坐标 | 子元素先放最终世界坐标再 append；或 append 后 `penpotUtils.setParentXY(child, relX, relY)`。先设相对值再 append → 子元素落在页面原点 |
-| 描边对齐属性名 | 是 `strokeAlignment`（'center'/'inner'/'outer'），不存在 strokeWidthAlignment，赋值静默丢弃留 null。**闭合形状一律 'inner'**（center 外溢半线宽，贴父板边缘被裁 → 圆角双线/粗细不均）；开放路径（弧线/折线）用 'center' |
-| 板裁剪属性 | 是 `clipContent`（不是 clipsContent）。发光元素所在板必须 `clipContent = false`，否则辉光被裁不可见 |
-| 移动组件主实例子元素 | `penpotUtils.setParentXY` 会失败；用 `child.parentX/parentY` **直接赋值**（普通形状+主实例处处可用） |
-| 沙箱作用域 | penpotUtils/storage 非真全局；`new Function` 序列化的函数体内访问不到 → 持久引擎必须以字面量函数定义存入 storage |
-| children/parent 代理 | 每次访问 `shape.children`/`shape.parent` 生成新代理，**引用比较（`===`/`indexOf`）恒 false/-1** → `Array.from(children)` 单次快照；**父子/同组判定一律按 `.id` 比较**（`m.parent.id === p.id`）。实战教训：装配归属的幂等判定用 `===` 会被骗成永不合规、重复嵌套成组 |
-| 组件名 | 不允许 `/`（赋值静默失败），用 `·` 分隔，如 `Button·Primary·Default` |
-| 文本定位 | 创建瞬间的文本宽高不可信（可能 1×1）。**渲染后再按实际 width/height 居中**（`await storage.ct(...)`，内部 sleep 120ms 实测；或 `storage.centerIn(t, host)`），否则偏移数像素到数十像素。**指纹**：错位文本左上角恰好落在宿主中心（`(w−1)/2` 的算术后果）；修复引擎 `storage.fixStaleCenter()`，审计标 `stale-center`（positioning-audit.md S2） |
-| 坐标系混用 | `child.x/y` 与 `board.x/y` 是世界坐标；`parentX/parentY` 是父内相对。包含判断/吸附计算全程统一世界坐标。换算：`new parentX = worldX - parent.x` |
-| **移动 board = 壳动内容不动** | 对含 `absolute` 子元素的板赋值 x/y，子元素保持世界坐标不跟随 → 板内容散架。**构建时直接放最终坐标，永不移动已建好的板**；必须批量移动时逐元素补偿 `dy` |
-| **resize 板与子元素** | 板 resize **不影响 absolute 子元素**（安全扩容画框）。但含非 absolute flex 子元素的板 resize 会触发引擎把子元素 `fix` sizing 压回内容大小（压塌）——修复后勿再 resize |
-| **CJK 字体回退** | Penpot 无 CSS 字体栈回退：`applyToText` 整段生效，Nunito 等拉丁字体的中文渲染为乱码。**mkText 按 `/[\u3000-\u9fff\uff00-\uffef]/` 自动选 Noto Sans SC**；存量文本扫描 `characters` 批修（`Text.fontWeight` 可直接读当前字重，同字重替换） |
-| **Emoji 渲染** | Penpot 将 emoji 渲染为像素风图形（导出 PNG 同样）——对游戏风/像素风设计反而合适，可直接当图标占位 |
-| **装配归属** | 成套图元（底板+标签+图标）**禁止散件同级堆叠**：复用 → component（`createComponent([group])`，页面用 `comp.instance()`），单次 → **group**。**⚠️ `penpot.group` 有破坏性副作用**（组落 flex 流位、成员偏移 −minParentXY、板被撑大；`ungroup` 不还原坐标）——必须**补偿式成组**（捕获 min parentXY → group → `absolute=true` → 复位 → readback），canonical 实现在 `groupAssemblies()`。组名=宿主名，组件名禁 `/` 用 `·`。契约 `penpot-structure.md` §4.1，审计 `loose_assembly` |
+| Path has no `setPathData` method | Assign via the `path.d` property; reading/writing `d` are both **world coordinates**, auto-adapts the bounding box after writing |
+| SVG arc `A` command doesn't render (new Path defaults to `d="M0,0L100,100"` diagonal) | Arc → cubic bezier: kappa=4/3·tan(θ/4), each segment ≤90° |
+| `appendChild` preserves world coordinates | Place child at final world coordinates first, then append; or after append use `penpotUtils.setParentXY(child, relX, relY)`. Setting relative values first then append → child lands at page origin |
+| Stroke-alignment property name | It's `strokeAlignment` ('center'/'inner'/'outer'), there is no strokeWidthAlignment, assigning silently drops it to null. **Closed shapes always 'inner'** (center overflows half the stroke width, clipped when touching the parent board edge → double rounded lines / uneven thickness); open paths (arc/polyline) use 'center' |
+| Board clip property | It's `clipContent` (not clipsContent). The board hosting glow elements must have `clipContent = false`, otherwise the glow is clipped invisible |
+| Moving a component's main-instance child element | `penpotUtils.setParentXY` fails; directly assign `child.parentX/parentY` (works everywhere for normal shapes + main instances) |
+| Sandbox scope | penpotUtils/storage are not true globals; a function body serialized by `new Function` can't access them → persistent engines must be stored in `storage` as literal function definitions |
+| children/parent proxy | Each access to `shape.children`/`shape.parent` generates a new proxy, **reference comparison (`===`/`indexOf`) is always false/-1** → `Array.from(children)` single snapshot; **parent/child and same-group judgments compare by `.id`** (`m.parent.id === p.id`). Practical lesson: assembly-ownership idempotent judgment using `===` gets fooled into "never compliant", repeatedly nesting into groups |
+| Component name | `/` is not allowed (assigning silently fails), use `·` separator, e.g. `Button·Primary·Default` |
+| Text positioning | Width/height at the creation instant is unreliable (may be 1×1). **Center by actual width/height after rendering** (`await storage.ct(...)`, internally sleeps 120ms tested; or `storage.centerIn(t, host)`), otherwise offset by a few to tens of pixels. **Fingerprint**: the misaligned text's top-left corner lands exactly on the host center (arithmetic consequence of `(w−1)/2`); repair engine `storage.fixStaleCenter()`, audit mark `stale-center` (positioning-audit.md S2) |
+| Coordinate-system mixing | `child.x/y` and `board.x/y` are world coordinates; `parentX/parentY` are parent-relative. Containment judgment / snap computation use world coordinates throughout. Conversion: `new parentX = worldX - parent.x` |
+| **Moving a board = shell moves, content doesn't** | Assigning x/y to a board with `absolute` children, the children keep world coordinates and don't follow → board content falls apart. **Place final coordinates directly at build time, never move an already-built board**; when bulk-moving is unavoidable, compensate `dy` element by element |
+| **Resizing a board and children** | Board resize **doesn't affect absolute children** (safe to expand the frame). But a board with non-absolute flex children, when resized, triggers the engine to `fix` sizing back to content size (collapse) — don't resize again after fixing |
+| **CJK font fallback** | Penpot has no CSS font-stack fallback: `applyToText` applies to the whole paragraph, Chinese in Latin fonts like Nunito renders as garbage. **mkText auto-selects Noto Sans SC by `/[\u3000-\u9fff\uff00-\uffef]/`**; scan existing text `characters` for batch fix (`Text.fontWeight` can read the current weight directly, replace at same weight) |
+| **Emoji rendering** | Penpot renders emoji as pixel-style graphics (same in exported PNG) — actually suitable for game/pixel-style design, can be used directly as icon placeholders |
+| **Assembly ownership** | A complete primitive set (base plate + label + icon) **must not be loose same-level stacking**: reuse → component (`createComponent([group])`, pages use `comp.instance()`), single-use → **group**. **⚠️ `penpot.group` has destructive side effects** (group drops into flex flow position, members shift −minParentXY, board gets inflated; `ungroup` doesn't restore coordinates) — must use **compensatory grouping** (capture min parentXY → group → `absolute=true` → reset → readback), canonical implementation in `groupAssemblies()`. Group name = host name, component name forbids `/` use `·`. Contract `penpot-structure.md` §4.1, audit `loose_assembly` |
 
-## 4. 变体容器（Variant）
+## 4. Variant containers (Variant)
 
-**先成组再注册**：多图元装配先 `penpot.group([host, ...members])` 收拢（装配归属契约 `penpot-structure.md` §4.1），
-再 `createComponent([group])` 整组注册——子元素保持收拢，组件语义完整；散件直接注册会得到只含单件的残缺组件。
+**Group first, then register**: a multi-primitive assembly first `penpot.group([host, ...members])` to collect (assembly-ownership contract `penpot-structure.md` §4.1),
+then `createComponent([group])` registers the whole group — child elements stay collected, component semantics complete; registering loose primitives directly yields a defective component containing only a single piece.
 
-`penpotUtils.createVariantContainer(items)` 要求输入是**已注册库组件的主实例**，直接传 shape 会报 "ShapeProxy invalid"：
+`penpotUtils.createVariantContainer(items)` requires the input to be **a registered library component's main instance**, passing a plain shape reports "ShapeProxy invalid":
 
 ```js
-const comp = penpot.library.local.createComponent([realShape]);  // 注册，原形状变主实例
-comp.name = 'Button·Primary·Default';                              // 不允许 '/'
-// 收集全部后：
+const comp = penpot.library.local.createComponent([realShape]);  // register, the original shape becomes the main instance
+comp.name = 'Button·Primary·Default';                              // '/' not allowed
+// after collecting all:
 const container = penpotUtils.createVariantContainer(
   comps.map(c => ({ shape: c.mainInstance(), properties: { Type: t, State: s } }))
 );
 ```
 
-reparent 后实例内部子元素会偏移（如 +30,30）→ 按设计相对坐标重置 `parentX/parentY`。组件展示板要 appendChild 进页头板（同页 reparent 世界坐标不变），否则导出头板时组件缺失。
+After reparent, the instance's internal child elements shift (e.g. +30,30) → reset `parentX/parentY` by the design relative coordinates. The component showcase board must be appendChild'd into the page header board (same-page reparent keeps world coordinates unchanged), otherwise the component is missing when exporting the header board.
 
-**★删除组件连带掏空展示板**：`createComponent([shape])` 后原形状就地变主实例；**`comp.remove()` 会连主实例一起删**。批量去重/重注册时若用展示板里的形状注册，展示板会被掏空（实测 6 个展示板被清空）。铁律：**注册一律用专用母版板（如 'AI Component Masters'）里的形状**；误删后按配方重建展示板。
+**★ Deleting a component empties the showcase board**: after `createComponent([shape])` the original shape in-place becomes the main instance; **`comp.remove()` deletes the main instance along with it**. During batch de-dup/re-registration, if you register with a shape from the showcase board, the showcase board gets hollowed out (tested: 6 showcase boards emptied). Iron rule: **always register with shapes from a dedicated masters board (e.g. 'AI Component Masters')**; after accidental deletion rebuild the showcase board per recipe.
 
-## 5. 复刻既有 UI 库（React 组件库 → Penpot）
+## 5. Recreating an existing UI library (React component library → Penpot)
 
-1. **先读源码全文再动手**：`.tsx` + `.module.less` 每个组件都要读。凭文档一句话印象画会漏关键结构（教训：Title 文档只写"燕子尾丝带"，源码实为五层结构——clip-path 鱼尾燕尾/折角 border 三角/rotateX(3deg) 正面/内阴影/文字层，默认绿 `#27d039` 而非主题色，em 单位随字号缩放）。
-2. **提取 tokens**：CSS 变量 → storage.T（颜色/圆角/间距/阴影色），同步录入 `penpot.library.local.tokens`（addSet + addToken，type: 'color'/'borderRadius'/'dimension'）。
-3. **字体决策**：读 less 的 font-family 栈 → `penpot.fonts.findByName` 探测可用性 → mkText 按 CJK 正则自动分流。
-4. **构建顺序**：Foundations 页（色板/字阶/间距圆角阴影）→ Components 页（按组件分板）→ 注册库组件 → 典型页面组装（Dashboard/Landing/Login/List/Detail/Settings 直接复用组件配方坐标）。
-5. **每个板构建完立即导出验收**，不要攒到最后——布局问题越早发现重建成本越低。
+1. **Read the full source before acting**: each component's `.tsx` + `.module.less` must be read. Drawing from a one-line doc impression misses key structure (lesson: the Title doc only says "swallowtail ribbon", the source is actually a five-layer structure — clip-path fishtail swallowtail / folded-corner border triangle / rotateX(3deg) front / inner shadow / text layer, default green `#27d039` not the theme color, em units scale with font size).
+2. **Extract tokens**: CSS variables → storage.T (color/radius/spacing/shadow color), synced into `penpot.library.local.tokens` (addSet + addToken, type: 'color'/'borderRadius'/'dimension').
+3. **Font decision**: read less's font-family stack → `penpot.fonts.findByName` to probe availability → mkText auto-routes by CJK regex.
+4. **Build order**: Foundations page (palette/type scale/spacing radius shadow) → Components page (board per component) → register library components → assemble typical pages (Dashboard/Landing/Login/List/Detail/Settings reusing component recipe coordinates).
+5. **Export and accept immediately after each board is built**, don't pile up to the end — layout problems found earlier cost less to rebuild.
 
-## 6. 审查与修复引擎（机理见 engines.md §1，代码：scripts/repair_engines.js、scripts/fix_layout.js）
+## 6. Review and repair engines (mechanics in engines.md §1, code: scripts/repair_engines.js, scripts/fix_layout.js)
 
-- **alignPage**：文本吸附"包含其世界中心的最小宿主"（rect/ellipse，24≤边长，面积≤20000）中心；页级直接文本跳过；Breadcrumbs 流式重排；Tabs 按列居中。
-- **vAlignPage**：小板（≤70px 高）内单行直接子文本垂直居中，带**垂直堆叠守卫**（同板 x 重叠≥50% 的多行文本=刻意堆叠，跳过——防误伤步进钮、顶对齐标签）。
-- **fixInner**：全文件描边批修（闭合→inner，路径→center）。
-- **unclip**：全文件 `clipContent=false`。
-- **gridSnap**：日历/表格网格吸附（colCx/rowCy 推算期望位）。
+- **alignPage**: text snaps to "the smallest host (rect/ellipse, 24≤side, area≤20000) containing its world center" center; page-level direct text skipped; Breadcrumbs flow reflow; Tabs centered by column.
+- **vAlignPage**: vertical centering of single-line direct-child text inside small boards (≤70px tall), with **vertical-stacking guard** (multi-line text with same-board x overlap≥50% = deliberate stacking, skip — prevents false-hurt on stepper buttons, top-aligned labels).
+- **fixInner**: whole-file stroke batch fix (closed→inner, paths→center).
+- **unclip**: whole-file `clipContent=false`.
+- **gridSnap**: calendar/table grid snapping (colCx/rowCy to derive expected positions).
 
-通用模式：引擎以**字面量函数**存 `storage`，队列存 `storage.xxxQueue`，逐页 runner 执行；修复日志返回 `[{位置, 内容, 轴, 偏移}]` 供人工复核。
+Common pattern: engines stored in `storage` as **literal functions**, queue stored in `storage.xxxQueue`, page-by-page runner execution; repair log returns `[{position, content, axis, offset}]` for manual review.
 
-## 7. 验收纪律
+## 7. Acceptance discipline
 
-- `export_shape({shapeId, format:'png'})` 只能导出**当前激活页**上的形状；导出前确认 `penpot.currentPage` 就是形状所在页（切页后 sleep 500ms+）；大板（3000px+ 整页）可能超时（重试 2~3 次即可）；偶发陈旧缓存黑图/旧内容（重试即愈）。
-- **板重建后 id 会变**：旧 id 导出报 "Cannot read properties of null"——重新收集 `board.id` 再导出。
-- **编辑器渲染 ≠ 导出渲染**：null strokeAlignment 双线、clipContent 裁辉光等缺陷只在编辑器可见。用户报"编辑器看到 X"时，必须用编辑器渲染机制诊断（裁剪/对齐/描边语义），不能只看导出图。
-- **导出可能捕捉布局过渡态**：数据 readback 全对但渲染错乱——等待 1s+ 重新导出再判断，不要立即改代码。
-- 修复后导出给用户，并请用户在编辑器中放大复核。
-- 程序化审计优先：以标准网格/宿主推算期望位置，逐项比对并返回偏移清单，再批量修复——比肉眼截图可靠。
+- `export_shape({shapeId, format:'png'})` can only export shapes on the **currently active page**; before exporting confirm `penpot.currentPage` is the shape's page (sleep 500ms+ after switching); large boards (3000px+ full page) may time out (retry 2~3 times); occasional stale cache black image / old content (retrying heals it).
+- **Board ids change after rebuild**: exporting an old id reports "Cannot read properties of null" — re-collect `board.id` before exporting.
+- **Editor rendering ≠ export rendering**: defects like null strokeAlignment double lines, clipContent clipping glow are only visible in the editor. When the user says "I see X in the editor", you must diagnose with the editor rendering mechanism (clip/alignment/stroke semantics), not just look at the exported image.
+- **Export may capture layout transition states**: data readback all correct but rendering garbled — wait 1s+ and re-export before judging, don't immediately change code.
+- After fixing, export to the user, and ask the user to zoom in the editor to review.
+- Programmatic audit is preferred: derive expected positions from the standard grid / host, compare item by item and return an offset list, then batch-fix — more reliable than eyeballing screenshots.
 
-## 8. 构建设计系统（主题配方）
+## 8. Building a design system (theme recipe)
 
-主题配方从 DESIGN.md 推导，按需沉淀到项目私有文档（不入 SKILL）。通用构成：
+The theme recipe is derived from DESIGN.md, and can be deposited into project-private docs as needed (not into SKILL). Common composition:
 
-- **tokens**：色彩/字体/圆角/间距/阴影/特效（如发光）规范，与 DESIGN.md 严格一致。
-- **种子与工厂**：种子模板（`scripts/seed_storage.js`）+ 主题化工厂函数（mkText/mkRect/卡片构造器等，命名空间挂 `storage`）。
-- **布局坐标**：组件页构建顺序、整页/大屏分区坐标表（视觉规格速查表）。
-- **典型页面**：Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单等页面组装配方（engines.md §4 模式 + 主题坐标）。
+- **tokens**: color/font/radius/spacing/shadow/effect (e.g. glow) spec, strictly consistent with DESIGN.md.
+- **seeds and factories**: seed template (`scripts/seed_storage.js`) + themed factory functions (mkText/mkRect/card constructor etc., namespace on `storage`).
+- **layout coordinates**: component-page build order, full-page / widescreen partition coordinate table (visual-spec quick reference).
+- **typical pages**: Dashboard/Landing/Login/List admin/Detail/Settings form and other page assembly recipes (engines.md §4 pattern + theme coordinates).
 
-经验：先定 tokens → 播种 → 组件页按规格板逐页构建+导出验收 → 最后组装整页；复杂装饰（丝带/徽标/多层阴影）单独封装构造器，避免坐标散落。
+Experience: set tokens first → seed → build component pages board by board per spec + export accept → finally assemble full pages; complex decorations (ribbon/badge/multi-layer shadow) encapsulated as separate constructors, avoid scattered coordinates.
 
-布局方案决策与实测行为表见 api-pitfalls.md §10；absMount 引擎见 `scripts/seed_storage.js`；压塌修复引擎见 `scripts/fix_layout.js`。
+Layout-approach decision and tested behavior table are in api-pitfalls.md §10; the absMount engine is in `scripts/seed_storage.js`; the collapse-repair engine is in `scripts/fix_layout.js`.

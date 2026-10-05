@@ -1,54 +1,54 @@
-# Penpot MCP execute_code API 陷阱详解
+# Penpot MCP execute_code API pitfalls (detailed)
 
-每条均为实战踩坑验证（93 组件设计系统构建 + 多轮修复）。按主题组织，含机理与修复代码。
+Each item is a battle-tested pitfall (93-component design-system build + multiple repair rounds). Organized by topic, with mechanics and fix code.
 
-## 1. 坐标系
+## 1. Coordinate system
 
-- `child.x / child.y`：**世界坐标**（画布绝对）。`board.x / board.y` 也是世界坐标。
-- `child.parentX / child.parentY`：**父内相对坐标**。
-- 换算：`parentX = worldX - parent.x`；反向 `worldX = parent.x + parentX`。
-- 包含判断、宿主吸附、网格推算必须**全程统一世界坐标**。混用 parentX 会产生跨层级假包含（例：把页级标题误吸进 Modal 组件中心）。
-- 修复后的正确写法：`c.parentX = nx - c.parent.x`（nx 为期望世界 x）。
+- `child.x / child.y`: **world coordinates** (absolute on canvas). `board.x / board.y` are also world coordinates.
+- `child.parentX / child.parentY`: **parent-relative coordinates**.
+- Conversion: `parentX = worldX - parent.x`; reverse `worldX = parent.x + parentX`.
+- Containment judgment, host snapping, grid derivation must **use world coordinates throughout**. Mixing parentX produces cross-level false containment (e.g. dragging a page-level title into a Modal component's center).
+- Correct post-fix writing: `c.parentX = nx - c.parent.x` (nx = expected world x).
 
-### appendChild 世界坐标规则
+### appendChild world-coordinate rule
 
-`appendChild` **保留世界坐标**。两种正确顺序：
+`appendChild` **preserves world coordinates**. Two correct orders:
 
 ```js
-// (a) 先放最终世界坐标，再 append
+// (a) place final world coordinates first, then append
 child.x = finalWorldX; child.y = finalWorldY;
 parent.appendChild(child);
 
-// (b) 先 append，再设相对坐标
+// (b) append first, then set relative coordinates
 parent.appendChild(child);
-penpotUtils.setParentXY(child, relX, relY);   // 注意：对组件主实例子元素会失败，见 §5
-child.parentX = relX; child.parentY = relY;   // 直接赋值兜底
+penpotUtils.setParentXY(child, relX, relY);   // note: fails for component main-instance children, see §5
+child.parentX = relX; child.parentY = relY;   // direct assignment fallback
 ```
 
-错误顺序（先设"相对意图值"再 append 到非原点父板）→ 子元素落在页面原点。
-批量修复（幂等、顺序无关）：对每个非根父级的子元素 `setParentXY(child, child.x, child.y)`（相对:=当前世界）；**变体容器的直接子级要跳过**。
+Wrong order (set "relative intent values" first then append to a non-origin parent board) → child lands at the page origin.
+Batch fix (idempotent, order-independent): for each child of a non-root parent `setParentXY(child, child.x, child.y)` (relative := current world); **skip the direct children of variant containers**.
 
-### 移动机制优先级
+### Move-mechanism priority
 
 ```js
 const move = (s, px, py) => {
-  try { s.parentX = px; s.parentY = py; return true; } catch(e1) {}   // 首选：处处可用
-  try { s.x = px; s.y = py; return true; } catch(e2) {}               // 兜底：世界坐标
+  try { s.parentX = px; s.parentY = py; return true; } catch(e1) {}   // preferred: works everywhere
+  try { s.x = px; s.y = py; return true; } catch(e2) {}               // fallback: world coordinates
   return false;
 };
 ```
 
-`penpotUtils.setParentXY` 存在且对普通形状可用，但对**组件主实例的子元素**会抛错。
+`penpotUtils.setParentXY` exists and works for normal shapes, but **throws for component main-instance child elements**.
 
-## 2. Path 与贝塞尔
+## 2. Path and bezier
 
-- Path 对象**没有 `setPathData` 方法**（调用静默失败于 try/catch 中）。唯一入口：`path.d` 属性。
-- `path.d` 的 getter/setter 均为**世界坐标**；写入后 width/height 自动适配包围盒（d 不随对象移动而改变——移动改的是 x/y）。
-- 新建 `penpot.createPath()` 默认 `d = "M0,0L100,100"`（对角线）——导出图上出现莫名对角线就是有路径没被赋值。
-- SVG arc `A` 命令**不渲染**（静默忽略）。弧线必须转三次贝塞尔：
+- Path objects have **no `setPathData` method** (calling silently fails inside try/catch). The only entry is the `path.d` property.
+- The getter/setter of `path.d` are both **world coordinates**; after writing, width/height auto-adapt the bounding box (d doesn't change when the object moves — moving changes x/y).
+- A newly created `penpot.createPath()` defaults to `d = "M0,0L100,100"` (diagonal) — a mysterious diagonal appearing in the export means a path wasn't assigned.
+- SVG arc `A` command **doesn't render** (silently ignored). Arcs must be converted to cubic bezier:
 
 ```js
-// 圆弧 → 三次贝塞尔（每段 ≤90°）。返回世界坐标 d。
+// arc → cubic bezier (each segment ≤90°). Returns world-coordinate d.
 function bez(cx, cy, r, a0deg, a1deg) {
   const segs = Math.max(1, Math.ceil(Math.abs(a1deg - a0deg) / 90));
   const a0 = a0deg * Math.PI / 180;
@@ -69,238 +69,226 @@ function bez(cx, cy, r, a0deg, a1deg) {
 }
 ```
 
-- M/L/C 命令正常。折线 `toD = pts => 'M ' + pts.map(p => p[0]+' '+p[1]).join(' L ')`。
-- 面积图：折线 d 末尾接 `L x_last y_base L x_first y_base Z`。
-- **带箭头气泡（Popover/Tooltip）**：把气泡轮廓+箭头凸起合并为**一条连续路径**（圆角用 kappa 近似，箭头为底边 V 形凸起）。不要用"旋转 45° 的方块贴边"当箭头——z 序在面板上方会显 ✕ 交叉线，在下方会被面板底边描边横穿。
+- M/L/C commands work normally. Polyline `toD = pts => 'M ' + pts.map(p => p[0]+' '+p[1]).join(' L ')`.
+- Area chart: append `L x_last y_base L x_first y_base Z` at the end of the polyline d.
+- **Bubble with arrow (Popover/Tooltip)**: merge the bubble outline + arrow bump into **one continuous path** (rounded corners via kappa approximation, arrow as a V-shaped bump on the base edge). Don't use "rotate a 45° square against the edge" as the arrow — at a panel's top the z-order shows an ✕ crossing line, at the bottom it gets crossed by the panel's base-edge stroke.
 
-## 3. 描边 strokeAlignment
+## 3. Stroke strokeAlignment
 
-- 属性名是 `strokes[i].strokeAlignment`，取值 `'center' | 'inner' | 'outer'`。**不存在** `strokeWidthAlignment`——赋值被静默丢弃，属性留 `null`。
-- `null` 的行为：导出渲染器 ≈ center；**编辑器画布渲染器对圆角会画双线**。
-- `center`：线宽向内外各溢半。形状**贴父板边缘**时外半被板裁剪 → 直边只剩内半、圆角弧内收处保留全宽 → "圆角两条线宽/粗细不均"。
-- `inner`：线完全画在形状内部，永不裁剪、不被相邻元素盖住。inner 的圆角接缝只在极端值（r60 + w10）出现；设计规格 w1-2 / r≤20 干净。
-- **结论：闭合形状（rect/ellipse/board）一律显式 `'inner'`；开放路径（弧线/折线，stroke 即线条本身）用 `'center'`**（inner 对开放路径语义不适用，且路径四周留白无裁剪风险）。
-- 验证法：建放大对照板（r60、w10，四种对齐并排），导出肉眼比对 + 全页统计 `strokes.some(st => !st.strokeAlignment)`。
-- 批量修复：
+- The property name is `strokes[i].strokeAlignment`, values `'center' | 'inner' | 'outer'`. There is **no** `strokeWidthAlignment` — assigning it is silently dropped, leaving the property `null`.
+- `null` behavior: the export renderer ≈ center; **the editor canvas renderer draws double lines on rounded corners**.
+- `center`: stroke width overflows half inside and out. When a shape **touches the parent board edge**, the outer half is clipped by the board → straight edges keep only the inner half, rounded-arc inner parts keep full width → "double-line width at rounded corners / uneven thickness".
+- `inner`: stroke fully drawn inside the shape, never clipped, never covered by neighbors. inner's rounded-corner seam only appears at extreme values (r60 + w10); design spec w1-2 / r≤20 is clean.
+- **Conclusion: closed shapes (rect/ellipse/board) always explicitly `'inner'`; open paths (arc/polyline, where stroke is the line itself) use `'center'`** (inner is semantically inapplicable to open paths, and there's no clip risk around open paths).
+- Verification: build an enlarged contrast board (r60, w10, four alignments side by side), export and eyeball + count all-page `strokes.some(st => !st.strokeAlignment)`.
+- Batch fix:
 
 ```js
 c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want }));
 ```
 
-## 4. 裁剪 clipContent
+## 4. Clip clipContent
 
-- 属性名是 board 的 **`clipContent`**（不是 clipsContent——读到 undefined 先怀疑属性名）。默认 `true`。
-- 机理：drop-shadow 向形状外辐射（blur+spread）。形状贴父板边缘（如按钮帽与其实例板同尺寸）时辉光全部被裁 → 编辑器里发光不可见，把元素拖出容器才显形。
-- 修复：发光元素所在板全部 `clipContent = false`。安全性：辉光半径（blur 20 + spread 1 ≈ 21px）需小于组件间距（38-40px），否则相邻辉光互相污染。
-- 全文件批修：walk 所有 `type==='board' && clipContent===true` → false。
+- The property name is the board's **`clipContent`** (not clipsContent — if you read undefined, suspect the property name first). Default `true`.
+- Mechanism: drop-shadow radiates outside the shape (blur+spread). When a shape touches the parent board edge (e.g. button cap same size as its instance board), the glow is entirely clipped → glow invisible in the editor, only shows when you drag the element out of the container.
+- Fix: all boards hosting glow elements `clipContent = false`. Safety: glow radius (blur 20 + spread 1 ≈ 21px) must be smaller than the component gap (38-40px), otherwise adjacent glows pollute each other.
+- Whole-file batch fix: walk all `type==='board' && clipContent===true` → false.
 
-## 5. 文本
+## 5. Text
 
-- `Text.letterSpacing` 只接受**数字字符串**（px）。`t.fontSize = String(size)`。传 `'0.02em'`/`'2%'` 报错。
-- **创建瞬间的 `t.width/t.height` 不可信**（可能 1×1 瞬态值）：`penpot.createText()` 返回后立即量宽高算居中，
-  会把错误偏移烤进坐标——`(w−1)/2` 的算术后果是**文本左上角恰好落在宿主中心点**（stale-center 指纹，
-  实测 37×15 标签在 110×32 药丸里右偏 18.5px、下偏 7.5px，16 页系统性复制）。
-  - 预防：居中一律**渲染后实测**——`await storage.ct(...)`（canonical，内部 `sleep(120)`）或
-    `storage.centerIn(t, host)`（文本已渲染时同步版）。**不要**在工厂里同步读 `t.width` 算偏移。
-  - 事后修复：`storage.fixStaleCenter()`（指纹判定、按轴独立、零误伤），审计以 `text_centre_residue stale-center` 标出。
-    详见 `positioning-audit.md` S2 与 `engines.md` §1。
-- 阴影颜色必须对象格式 `{color, opacity}`；传字符串 hex 被**静默转为黑色**（渲染 3D 阴影消失的根因）。半透明填充用 `fillOpacity` 字段（不要 rgba 嵌套 color 对象）。
-- **CJK 字体回退是系统性问题**：Penpot **没有** CSS 字体栈按字符回退——`font.applyToText(text, variant)` 整段生效。Nunito 等拉丁字体只含拉丁字形，中文渲染为乱码（用户报告"字体渲染不对"的最常见根因）。
-  - 预防：mkText 创建时按内容分流 `const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str); const font = cjk ? noto : latin;`
-  - 存量批修：walk 全部 text，`cjkRe.test(c.characters)` 命中则 `noto.applyToText(c, notoVar(c.fontWeight))`。**`Text.fontWeight` 可直接读**（返回当前字重字符串），同字重替换不破坏排版。实测一次批修 89 处。
-- 中文字形：Noto Sans SC 全字重可用。等宽数字 JetBrains Mono、科技标题 Orbitron 均可用。`penpot.fonts.findByName(name)` + `font.applyToText(text, variant)`，variant 按 fontWeight 匹配。
-- **Emoji 渲染为像素风图形**（编辑器与导出 PNG 一致）：对游戏风/像素风是加分项，可直接当图标占位（Image 相框、app 图标、BackTop 气球）；对严肃商务风慎用。
-- growType：'auto-width'（默认理想）/ 'fixed' / 'auto-height'。固定宽居中文本用 fixed + align。
-- **陈旧测量陷阱**：创建瞬间读 `t.width/t.height` 可能是 1×1（布局未完成）。用它们算居中 → 偏移数像素到数十像素（实测案例：箭头文字偏 13px、状态条偏 45.5px、日历选中数字偏 5.5px）。
-- **居中必须在渲染后做**：`t.parentX = cx - t.width / 2`（此时 width 是渲染实宽）。构建时可先粗放，最后跑一轮对齐引擎统一校正。方案 C（absolute）下同理：`absMount` 里的居中写在文本创建后（此时 width 通常已就绪，但保险起见构建完成后跑一轮校正）。
+- `Text.letterSpacing` only accepts a **numeric string** (px). `t.fontSize = String(size)`. Passing `'0.02em'` / `'2%'` errors.
+- **`t.width/t.height` at the creation instant is unreliable** (may be a 1×1 transient value): reading width/height right after `penpot.createText()` to compute centering bakes the wrong offset into coordinates — the arithmetic consequence of `(w−1)/2` is **the text's top-left corner lands exactly on the host's center** (stale-center fingerprint, tested: a 37×15 label inside a 110×32 pill is shifted +18.5px right, +7.5px down, systematically copied across 16 pages).
+  - Prevention: centering always **measured after rendering** — `await storage.ct(...)` (canonical, internally `sleep(120)`) or `storage.centerIn(t, host)` (synchronous version when the text is already rendered). **Don't** read `t.width` synchronously in the factory to compute offset.
+  - Post-fix: `storage.fixStaleCenter()` (fingerprint judgment, per-axis independent, zero false-hurt), audit marks `text_centre_residue stale-center`. See `positioning-audit.md` S2 and `engines.md` §1.
+- Shadow color must be object format `{color, opacity}`; passing a string hex is **silently converted to black** (root cause of the rendering 3D shadow disappearing). Use the `fillOpacity` field for semi-transparent fills (don't nest rgba inside a color object).
+- **CJK font fallback is a systemic problem**: Penpot has **no** CSS font-stack per-character fallback — `font.applyToText(text, variant)` applies to the whole paragraph. Latin fonts like Nunito only contain Latin glyphs, Chinese renders as garbage (the most common root cause of users reporting "font rendering is wrong").
+  - Prevention: at mkText creation route content `const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str); const font = cjk ? noto : latin;`
+  - Batch fix existing: walk all text, `cjkRe.test(c.characters)` hit → `noto.applyToText(c, notoVar(c.fontWeight))`. **`Text.fontWeight` can be read directly** (returns the current weight string), same-weight replacement doesn't break layout. Tested one batch fix of 89 places.
+- CJK glyphs: Noto Sans SC all weights available. Monospace numerals JetBrains Mono, tech-title Orbitron both available. `penpot.fonts.findByName(name)` + `font.applyToText(text, variant)`, variant matched by fontWeight.
+- **Emoji renders as pixel-style graphics** (consistent in editor and exported PNG): a plus for game/pixel style, can be used directly as icon placeholders (Image frame, app icon, BackTop balloon); use with caution for serious business style.
+- growType: 'auto-width' (default ideal) / 'fixed' / 'auto-height'. Fixed-width centered text uses fixed + align.
+- **Stale-measurement trap**: reading `t.width/t.height` at creation may be 1×1 (layout incomplete). Using them to compute centering → offset a few to tens of pixels (tested: arrow text off by 13px, status bar off by 45.5px, calendar selected number off by 5.5px).
+- **Centering must be done after rendering**: `t.parentX = cx - t.width / 2` (width is now the rendered real width). At build time you can be rough, and run a round of the alignment engine at the end for uniform correction. Same under approach C (absolute): the centering in `absMount` is written right after text creation (width is usually ready then, but to be safe run a correction round after the build is done).
 
-## 6. 变体与组件
+## 6. Variants and components
 
-- `createVariantContainer(items)` 的 items 必须是**已注册库组件的主实例**：`{ shape: comp.mainInstance(), properties: { Prop: value } }`。直接传 ShapeProxy 报 "ShapeProxy invalid"。
-- 注册：`penpot.library.local.createComponent([realShape])`——原形状就地变主实例；**`comp.remove()` 连主实例一起删**。事故链：批量去重时删除重名组件 → 散落在各展示板的主实例被删 → 展示板被掏空（实测 6 个板被清空，用户视角"组件都消失了"）。铁律：
-  1. **注册一律用专用母版板**（'AI Component Masters'）里的形状，母版被注册消耗后重建母版再注册；
-  2. 展示板被掏空后按配方整体重建（板级重建比逐个补形状可靠）；
-  3. 组件名赋值 `comp.name = ...` 后立即 readback 验证——不允许 `/` 时赋值静默失败，readback 还是旧名。
-- 变体容器 reparent 后，**实例内部子元素偏移**（实测 +30,30）→ 按设计相对坐标重置。已知配方：
-  - Button（160×52）：cap(0,0)，text(80−w/2, 26−h/2)
-  - Toggle（76×44）：track(12,8)，dot On(39,11)/Off(15,11)
-  - Checkbox（120×32）：box(0,4)，✓(11−w/2, 15−h/2)，label(32, 15−h/2)
-  - Switch（76×44）：track(12,7)，dot On(37,10)/Off(15,10)
-- 组件对象无 `makeInstance`，无法脚本化生成实例。
-- 组件板要收编进页头板（`head.appendChild(compBoard)`，同页 reparent 世界坐标不变），否则导出头板时组件缺失。判定头板用 `root.children.find(c => c.type === 'board')`（root 里可能混有孤儿文本，别用 children[0]）。
+- `createVariantContainer(items)`'s items must be **a registered library component's main instance**: `{ shape: comp.mainInstance(), properties: { Prop: value } }`. Passing a plain ShapeProxy reports "ShapeProxy invalid".
+- Registration: `penpot.library.local.createComponent([realShape])` — the original shape in-place becomes the main instance; **`comp.remove()` deletes the main instance along with it**. Accident chain: deleting duplicate-name components during batch de-dup → main instances scattered across showcase boards get deleted → showcase boards hollowed out (tested 6 boards emptied, user-view "all components disappeared"). Iron rules:
+  1. **Always register with shapes from a dedicated masters board** ('AI Component Masters'); after the masters are consumed by registration, rebuild the masters then register again;
+  2. After a showcase board is hollowed out, rebuild it as a whole per recipe (board-level rebuild is more reliable than patching shapes one by one);
+  3. After assigning component name `comp.name = ...` immediately readback-verify — when `/` is disallowed the assignment silently fails and readback still shows the old name.
+- After a variant container reparent, **the instance's internal child elements shift** (tested +30,30) → reset by the design relative coordinates. Known recipes:
+  - Button (160×52): cap(0,0), text(80−w/2, 26−h/2)
+  - Toggle (76×44): track(12,8), dot On(39,11)/Off(15,11)
+  - Checkbox (120×32): box(0,4), ✓(11−w/2, 15−h/2), label(32, 15−h/2)
+  - Switch (76×44): track(12,7), dot On(37,10)/Off(15,10)
+- Component objects have no `makeInstance`, instances can't be script-generated.
+- Component boards must be absorbed into the page header board (`head.appendChild(compBoard)`, same-page reparent keeps world coordinates unchanged), otherwise the component is missing when exporting the header board. Identify the header board with `root.children.find(c => c.type === 'board')` (root may mix in orphan text, don't use children[0]).
 
-### 6.1 group 语义与装配归属（契约：penpot-structure.md §4.1）
+### 6.1 group semantics and assembly ownership (contract: penpot-structure.md §4.1)
 
-- **API**：`penpot.group(shapes)` 就地成组（同父级内，**无 parent 参数**），返回 `Group`；`penpot.ungroup(g)` 解组。
-- **⚠️ `penpot.group` 有破坏性副作用（实测，必须补偿）**：成组后
-  1. 新组的 `layoutChild.absolute` 为 **false**（组成为 flex 流子元素）→ flex 父板把组**流式重排**到列首堆叠；
-  2. 成员整体平移：组被放到父原点，成员相对布局保留但**绝对位置偏移 −(成员 bbox 的 minParentXY)**；
-  3. 父板若是 hug，流子元素计入后**板尺寸被撑大**。
-  `penpot.ungroup(g)` **不还原坐标**（成员按组内相对坐标落回，越修越乱）——group/ungroup 往返不可用于回滚！
-  **补偿式成组（canonical，零位移）**：
+- **API**: `penpot.group(shapes)` groups in place (within the same parent level, **no parent parameter**), returns a `Group`; `penpot.ungroup(g)` ungroups.
+- **⚠️ `penpot.group` has destructive side effects (tested, must compensate)**: after grouping
+  1. The new group's `layoutChild.absolute` is **false** (group becomes a flex-flow child) → the flex parent board **flow-reflows** the group to the column top;
+  2. Members shift as a whole: the group is placed at the parent origin, member relative layout is preserved but **absolute position shifts by −(member bbox's minParentXY)**;
+  3. If the parent board is hug, the flow child counts in and **the board size gets inflated**.
+  `penpot.ungroup(g)` **doesn't restore coordinates** (members fall back by in-group relative coords, gets messier) — group/ungroup round-trips can't be used for rollback!
+  **Compensatory grouping (canonical, zero displacement)**:
   ```js
   const minPX = Math.min(...shapes.map(s => s.parentX)), minPY = Math.min(...shapes.map(s => s.parentY));
   const g = penpot.group(shapes);
-  g.layoutChild.absolute = true;          // 逃出 flex 流
-  g.parentX = minPX; g.parentY = minPY;   // 恢复 bbox 原位（写后必须 readback 校验）
+  g.layoutChild.absolute = true;          // escape flex flow
+  g.parentX = minPX; g.parentY = minPY;   // restore bbox original position (must readback-verify after writing)
   ```
-  修复引擎 `groupAssemblies()` 已内置此补偿；裸调 `penpot.group` 后必须做同样的三步。
-- **⚠️ 成组会打乱前后顺序（z-order）**：`parentIndex` **越大越靠前（0=最底）**，`bringToFront()` 落到最后一个 index；
-  `penpot.group` 对成员 z 序不透明——实测会把**底板排到标签上面**（标签被盖住，导出纯色块）。
-  成组后必须修 z：组内按**面积降序** `setParentIndex(i)`（大底在下、文字/图标在上），
-  组本身 `setParentIndex(顶层成员原 parentIndex)` 保住层槽；实例替换同理（`inst.setParentIndex(原组 index)`）。
-  验证注意：**小形状组的 export 可能命中导出缓存假象**（看起来没文字），以**整板导出**为准。
-  批修引擎 `storage.fixZOrder()`（groupAssemblies 已内置同逻辑）。
-- **组与板的差别**：对含 absolute 子元素的**板**赋 x/y 是"壳动内容不动"（子元素世界坐标不跟随）；
-  **组不同——移动组壳会带动子元素**（组是边界包装器），所以装配收组后整体拖动/复用是安全的。
-- **归属三级**：复用装配 → component（`createComponent([group])`，页面 `comp.instance()`）；
-  单次成套 → group；分区容器 → board。**成套图元禁止散件同级堆叠**（审计签名 `loose_assembly`，
-  修复 `groupAssemblies()`，门禁 G10）。
-- **组名** = 宿主名 / `组件名·变体`；组件名禁 `/`（赋值静默失败）。
-- **嵌套是常态**：按钮组收进导航条组——由内而外逐层 `penpot.group`；`createComponent` 可以吃嵌套组。
-- **注册顺序**：先 group 收拢 → 再 `createComponent([group])`；散件直接注册会得到残缺组件。
+  The repair engine `groupAssemblies()` already has this compensation built-in; bare `penpot.group` calls must do the same three steps.
+- **⚠️ Grouping scrambles front/back order (z-order)**: `parentIndex` **larger = more front (0=bottom)**, `bringToFront()` lands at the last index; `penpot.group` is opaque to members' z-order — tested it puts **the base plate above the label** (label covered, export a solid color block).
+  After grouping you must fix z: within the group sort by **descending area** `setParentIndex(i)` (large base at bottom, text/icon on top), the group itself `setParentIndex(top member's original parentIndex)` to keep the layer slot; instance replacement same (``inst.setParentIndex(original group index)`).
+  Verification note: **small-shape group export may hit a cache illusion** (looks like no text), go by **whole-board export**.
+  Batch-fix engine `storage.fixZOrder()` (groupAssemblies already has the same logic built-in).
+- **Difference between group and board**: assigning x/y to a **board** with absolute children is "shell moves, content doesn't" (children world coordinates don't follow); **a group is different — moving the group shell drags the children along** (a group is a bounding wrapper), so dragging/reusing an assembly after grouping is safe.
+- **Three-level ownership**: reusable assembly → component (`createComponent([group])`, pages `comp.instance()`); single-use complete set → group; partition container → board. **Complete primitive sets must not be loose same-level stacking** (audit signature `loose_assembly`, fix `groupAssemblies()`, gate G10).
+- **Group name** = host name / `component name·variant`; component name forbids `/` (assignment silently fails).
+- **Nesting is normal**: a button group collected into a nav-bar group — layer by layer from inside out with `penpot.group`; `createComponent` can take nested groups.
+- **Registration order**: group first to collect → then `createComponent([group])`; registering loose primitives directly yields a defective component.
 
-## 7. 沙箱与代理
+## 7. Sandbox and proxies
 
-- execute_code 沙箱注入的 `penpotUtils` / `storage` **不是真全局**：`new Function` / `eval` 序列化的函数体内访问不到（报 "reading 'xxx' of undefined"）。闭包字面量函数可跨调用存活（存 storage）。
-- 引擎更新不要用字符串替换 + `new Function('return ' + src)()`——会丢作用域；直接整函数字面量重写。
-- `shape.children` 每次访问生成**新代理对象**：`Array.from(children)` 之前做 filter/indexOf 全是 -1。正确：先快照 `const kids = Array.from(node.children)` 再操作。
-- 返回值只含原始值；返回带函数的对象（如 makeMask）structuredClone 失败。
-- `penpotUtils.findShapeById(id)` 全文件有效（跨页）；修改前仍需激活所属页。
+- The `penpotUtils` / `storage` injected by the execute_code sandbox are **not true globals**: a function body serialized by `new Function` / `eval` can't access them (reports "reading 'xxx' of undefined"). Closure literal functions can survive across calls (stored in storage).
+- Don't update engines by string-replacement + `new Function('return ' + src)()` — you lose scope; rewrite the whole function literally.
+- `shape.children` generates a **new proxy object** on each access: doing filter/indexOf before `Array.from(children)` all return -1. Correct: snapshot first `const kids = Array.from(node.children)` then operate.
+- Return values contain only primitive values; returning an object with a function (e.g. makeMask) fails structuredClone.
+- `penpotUtils.findShapeById(id)` is effective across the whole file (cross-page); but you still need to activate the owning page before modifying.
 
-## 8. 崩溃损伤诊断
+## 8. Crash-damage diagnosis
 
-- 症状：某页组件"散架"（板内容溢出）或整页导出全黑（头板 100×100 裁剪一切）。
-- 检测：walk 全页，非文本图元 `Math.round(w)===100 && Math.round(h)===100` 即损伤。
-- 修复：按设计规格 resize（板 + 贴边矩形/圆形子元素）。文本不用动。
-- 预防：控制单调用批量、避免高频切页、大辉光场景建议用户禁用 WebGL。
+- Symptoms: a page's components "fall apart" (board content overflows) or the whole page exports all black (header board 100×100 clips everything).
+- Detection: walk the whole page, non-text primitive `Math.round(w)===100 && Math.round(h)===100` is damage.
+- Fix: resize per design spec (board + edge-touching rect/ellipse children). Text doesn't need touching.
+- Prevention: control batch size per call, avoid high-frequency page switching, disable WebGL in heavy-glow scenarios.
 
-## 9. 导出 export_shape
+## 9. Export export_shape
 
-- 只能导出**当前激活页**上的形状（render URL 绑定当前 page-id）——传了别页的 ID 会渲染出错误内容或空图。
-- 大板（3000px+）可能超时：重试即可（实测 3140px 整页第 3 次成功）。偶发陈旧缓存黑图：重试。
-- **板重建后 id 变化**：`remove` + 重建同名板后旧 id 失效，导出报 "Cannot read properties of null"——重新收集 `board.id`。
-- **布局过渡态**：数据 readback 全对但渲染错乱/按钮塌陷——布局引擎异步重排未完成，等待 1s+ 重新导出再判断。
-- 导出图与编辑器渲染有差异（见 §3/§4）——最终以编辑器为准。
+- Can only export shapes on the **currently active page** (render URL bound to the current page-id) — passing another page's ID renders wrong content or an empty image.
+- Large boards (3000px+) may time out: just retry (tested 3140px full page succeeded on the 3rd try). Occasional stale-cache black image: retry.
+- **Board id changes after rebuild**: after `remove` + rebuild a same-name board the old id is invalid, exporting reports "Cannot read properties of null" — re-collect `board.id`.
+- **Layout transition state**: data readback all correct but rendering garbled / buttons collapsed — the layout engine's async reflow isn't done, wait 1s+ and re-export before judging.
+- Exported images differ from editor rendering (see §3/§4) — ultimately rely on the editor.
 
-## 10. 布局引擎（flex / layoutChild）
+## 10. Layout engine (flex / layoutChild)
 
-### 三种方案的实测行为
+### Tested behavior of the three approaches
 
-| 方案 | 构建 | 渲染 | 实测结论 |
+| Approach | Build | Render | Tested conclusion |
 |---|---|---|---|
-| A. 裸板 + 世界坐标 append | 简单 | 多数环境正常；部分文件/版本导出整体偏移 `-board.y`（readback 正确、渲染错位） | 环境相关，首板导出验收后再批量用 |
-| B. flex 自动布局 | 引擎排版 | 嵌套 board 子元素被强制 hug（160×45 按钮塌成文字大小）；`layoutChild.horizontalSizing='fix'` 声明后仍被异步重置；`minWidth/minHeight` 同样被覆盖；无 `removeFlexLayout()` API | 嵌套板场景不可控 |
-| **C. flex 容器 + 全员 absolute + 世界坐标** | 手动坐标 | 33 组件 + 3 整页（Landing 1440×3140 等）0 渲染失败 | **推荐兜底**；absolute 子元素位置绝对化，彻底绕开 flex 重排 |
+| A. Bare board + world-coordinate append | Simple | Mostly normal; some files/versions export whole-page offset `-board.y` (readback correct, render misaligned) | Environment-dependent, use batch only after first-board export acceptance |
+| B. flex auto-layout | Engine layout | Nested board children force-hugged (160×45 button collapses to text size); `layoutChild.horizontalSizing='fix'` declared but still async-reset; `minWidth/minHeight` also overridden; no `removeFlexLayout()` API | Uncontrollable in nested-board scenarios |
+| **C. flex container + all absolute + world coordinates** | Manual coords | 33 components + 3 full pages (Landing 1440×3140 etc.) 0 rendering failures | **Recommended fallback**; absolute children position-absolute, completely bypasses flex reflow |
 
-### 方案 C 的关键细节
+### Key details of approach C
 
-- `child.layoutChild.absolute = true` **必须在 appendChild 之后**设置（之前设置无效）。
-- absolute 模式下 `child.x/y` 读写均为世界坐标（与普通形状一致）。
-- 容器自身 `horizontalSizing/verticalSizing = 'fixed'` 防引擎改尺寸；`addFlexLayout()` 后 `flex.dir` 必须赋值（只 add 不设 dir 有默认行为差异）。
-- **板 resize 不影响 absolute 子元素**——安全扩容画框（Dashboard 底部组件重叠时下移子元素 + resize 板加高，一步完成）。
-- **移动板（赋 x/y）absolute 子元素不跟随**——构建时直接放最终坐标；确需移动时逐元素补偿（walk 子树按同一 dy 平移）。
-- 诊断口诀：**readback 对、渲染错 → 方案 A 失效换 C；数据对、渲染塌 → flex hug，全员 absolute 重排**。
+- `child.layoutChild.absolute = true` **must be set AFTER appendChild** (setting before is ineffective).
+- In absolute mode `child.x/y` read/write are both world coordinates (same as normal shapes).
+- The container itself `horizontalSizing/verticalSizing = 'fixed'` prevents the engine from changing size; after `addFlexLayout()` `flex.dir` must be assigned (adding without setting dir has default-behavior differences).
+- **Board resize doesn't affect absolute children** — safe to expand the frame (when Dashboard bottom components overlap, shift children down + resize board taller, in one step).
+- **Moving a board (assign x/y), absolute children don't follow** — place final coordinates directly at build time; when moving is truly needed, compensate element by element (walk subtree and translate by the same dy).
+- Diagnostic rule: **readback correct, render wrong → approach A failed, switch to C; data correct, render collapsed → flex hug, all absolute re-layout**.
 
-### 压塌修复引擎
+### Collapse-repair engine
 
-见 `scripts/fix_layout.js`（getDesignSize 按名称恢复设计尺寸 + absRow 手动重排 + fixCol 容器修正，两轮收敛；用法与顺序陷阱见 engines.md §3）。
+See `scripts/fix_layout.js` (getDesignSize restores design size by name + absRow manual re-layout + fixCol container fix, two-round convergence; usage and order trap in engines.md §3).
 
-## 11. openPage 超时落错页（数据安全事故）
+## 11. openPage timeout lands on wrong page (data-safety incident)
 
-execute_code 30s 超时被杀时，调用内的 `penpot.openPage` 可能**未提交**。下一条命令若以"假设已在目标页"开头直接执行 remove/创建，会落在**旧页**上——实测教训：超时后下一条的 `for (c of root.children) c.remove()` 清空了 Foundations 整页。
+When execute_code's 30s timeout kills the call, the `penpot.openPage` inside it may **not have committed**. The next command, if it starts with "assume already on the target page" and directly runs remove/create, lands on the **old page** — tested lesson: after a timeout, the next call's `for (c of root.children) c.remove()` wiped the entire Foundations page.
 
-防御链：
-1. 超时后的第一条命令**只做** `openPage(pg) + sleep(400) + return currentPage.name`；
-2. 页名匹配才执行操作；
-3. 全页 remove 前先 `return` 顶层板清单人工确认（或限定 `name.startsWith('xxx')` 条件删除，绝不裸 remove 全部）。
+Defense chain:
+1. The first command after a timeout **only does** `openPage(pg) + sleep(400) + return currentPage.name`;
+2. Only execute the operation if the page name matches;
+3. Before a whole-page remove, first `return` the top-level board list for manual confirmation (or limit to a `name.startsWith('xxx')` conditional delete, never bare remove all).
 
-## 12. 属性名必须核对 API，写错会静默失败（最贵的一类坑）
+## 12. Property names must be checked against the API; wrong ones silently fail (the most expensive kind of pitfall)
 
-**铁律：给形状写属性前，用 `penpot_api_info`（如 `{"type":"Text"}`）核对属性名；写入后立刻 readback。**
-Penpot 的形状代理对**不存在的属性名不报错**——在 `try/catch` 下就是静默失败，代码"看起来跑了"。
+**Iron rule: before writing a property to a shape, use `penpot_api_info` (e.g. `{"type":"Text"}`) to check the property name; readback immediately after writing.**
+Penpot's shape proxies **don't error on non-existent property names** — under `try/catch` it's a silent failure, the code "looks like it ran".
 
-### 12.1 实例：`align` 不是 `horizontalAlign`
+### 12.1 Case: `align` is not `horizontalAlign`
 
-文本水平对齐的正确属性是 **`align`**（`"center" | "left" | "right" | "mixed" | "justify" | null`）；
-垂直对齐是 `verticalAlign`。**不存在 `horizontalAlign`**。
+The correct property for text horizontal alignment is **`align`** (`"center" | "left" | "right" | "mixed" | "justify" | null`); vertical alignment is `verticalAlign`. There **is no `horizontalAlign`**.
 
 ```js
-t.horizontalAlign = 'center';   // ✗ 静默失败，属性仍是原值
+t.horizontalAlign = 'center';   // ✗ silently fails, property still old value
 t.align = 'center';             // ✓
-// 必须 readback：
-if (t.align !== 'center') throw new Error('align 未生效');   // readback 是唯一判据
+// must readback:
+if (t.align !== 'center') throw new Error('align not effective');   // readback is the only criterion
 ```
 
-实测后果：23 处修复全部未生效，居中/右对齐文本退化为左对齐，导出图上"标签贴左边缘"。
-**诊断口诀：读回 `undefined` ⇒ 属性名错；读回旧值 ⇒ 赋值被拒（类型/取值非法）。**
+Tested consequence: all 23 fixes were ineffective, centered/right-aligned text degraded to left-aligned, export shows "label stuck to left edge".
+**Diagnostic rule: readback `undefined` ⇒ wrong property name; readback old value ⇒ assignment rejected (type/value illegal).**
 
-同类需注意的属性名差异：`strokes[i].strokeAlignment`（不是 `strokeWidthAlignment`）、
-board 的 `clipContent`（不是 `clipsContent`）、椭圆用 `penpot.createEllipse()`。
+Similar property-name differences to watch: `strokes[i].strokeAlignment` (not `strokeWidthAlignment`), board's `clipContent` (not `clipsContent`), ellipse uses `penpot.createEllipse()`.
 
-### 12.2 修正 §10：`layoutChild.absolute = true` **不保证**「移动板子元素不跟随」
+### 12.2 Correction to §10: `layoutChild.absolute = true` does **not** guarantee "moving a board, children don't follow"
 
-§10 曾记「移动板（赋 x/y）absolute 子元素不跟随」。**实测在 Penpot 2.17 上不成立**：
+§10 once said "moving a board (assign x/y), absolute children don't follow". **Tested on Penpot 2.17 this doesn't hold**:
 
-- 某 Demo 板的子元素 `c.layoutChild.absolute` 读回 **`true`**；
-- 把板整体移动 +180px 后，**子元素跟着移动了**（对这些子元素而言 `parentX` 是相对坐标）；
-- 我按"不跟随"多补了一次子树平移 → 子元素总共走了 **+360**，内容整体偏出板 180px。
+- A Demo board's child element `c.layoutChild.absolute` read back **`true`**;
+- After moving the board as a whole +180px, **the child moved along** (for these children `parentX` is relative);
+- I followed "doesn't follow" and added another subtree translation → the child moved a total of **+360**, content shifted 180px out of the board.
 
-**正确做法：不要靠推断，先探测。**
+**Correct approach: don't infer, probe first.**
 
 ```js
-// 移动语义探测：把一块板移 N px，量一个子元素的世界 x 变化
+// move-semantics probe: move a board N px, measure one child's world-x change
 const probeMoveSemantics = (board, child, dx) => {
   const before = child.x;
   try { board.parentX = board.parentX + dx; } catch (e) { board.x = board.x + dx; }
   const after = child.x;
-  try { board.parentX = board.parentX - dx; } catch (e) { board.x = board.x - dx; }   // 还原
+  try { board.parentX = board.parentX - dx; } catch (e) { board.x = board.x - dx; }   // restore
   return { childFollows: Math.abs((after - before) - dx) < 1, childDelta: after - before };
 };
-// childFollows === true  → 只移板，不要补偿子树
-// childFollows === false → 逐元素平移子树（moveSubtree）
+// childFollows === true  → only move the board, don't compensate the subtree
+// childFollows === false → translate the subtree element by element (moveSubtree)
 ```
 
-判定后再选策略：跟随 ⇒ 只动板；不跟随 ⇒ `moveSubtree`（先动子孙再动壳）。
+Choose a strategy after judging: follows ⇒ only move the board; doesn't follow ⇒ `moveSubtree` (move descendants first, then the shell).
 
-### 12.3 exporter 导出随机失败：把 Playwright 的 `networkidle` 改成 `load`
+### 12.3 exporter random export failure: change Playwright's `networkidle` to `load`
 
-**症状**：`page.goto: Timeout 20000ms exceeded ... waiting until "networkidle"`，
-同一页多块板连续失败、别页偶发成功；exporter 容器资源正常（CPU 0%、内存几百 MB）；
-从 exporter 里 `fetch('http://penpot-frontend:8080/')` 返回 **200**（网络没问题）。
+**Symptom**: `page.goto: Timeout 20000ms exceeded ... waiting until "networkidle"`,
+multiple boards on the same page fail in a row, other pages occasionally succeed; the exporter container resources are normal (CPU 0%, memory a few hundred MB);
+`fetch('http://penpot-frontend:8080/')` from inside the exporter returns **200** (network is fine).
 
-**机理**：`render.html` 会保持长连接（实时同步用），`networkidle`（要求 500ms 内无连接）**永不达成** → 必然 20s 超时。
-所以它和板大小、页大小只是弱相关，表现为"时好时坏"。
+**Mechanism**: `render.html` keeps a long connection (for real-time sync), so `networkidle` (requires no connection within 500ms) **never achieved** → inevitably 20s timeout.
+So it's only weakly correlated with board size / page size, appearing as "sometimes works, sometimes doesn't".
 
-**修复**（幂等、可回滚）：
+**Fix** (idempotent, reversible):
 
 ```powershell
-# 容器内 app.js 只有 1 处 networkidle，且必在 wait_until 语境
+# the container's app.js has only 1 occurrence of networkidle, and it's necessarily in a wait_until context
 $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
-# 先备份 /opt/penpot/exporter/app.js -> app.js.orig，再把 "networkidle" 替换为 "load"，最后：
+# first back up /opt/penpot/exporter/app.js -> app.js.orig, then replace "networkidle" with "load", finally:
 & $d restart penpot-server-penpot-exporter-1
 ```
 
-实测：同一块板改前连续 3 次失败，改后**一次成功**。还原：`app.js.orig` 覆盖回去后重启。
-> 提醒：这是容器层补丁，`docker compose up -d --force-recreate` 会重置它；`restart` 保留。
+Tested: the same board failed 3 times in a row before, succeeded once after. Restore: overwrite with `app.js.orig` and restart.
+> Note: this is a container-layer patch; `docker compose up -d --force-recreate` resets it; `restart` preserves it.
 
-## 13. 同一次构建里所有 cell helper 必须同签名
+## 13. All cell helpers in the same build must share one signature
 
-**事故**：同一次构建脚本里并存两套 helper：
+**Incident**: a single build script contained two sets of helpers side by side:
 
 ```js
-R(b, x, y, w, h, fill, radius, stroke)              // 矩形：label 前有 h
-X(b, x, y, w, label, size, color, weight, h, align) // 文本：label 前没有 h
+R(b, x, y, w, h, fill, radius, stroke)              // rect: h before label
+X(b, x, y, w, label, size, color, weight, h, align) // text: no h before label
 ```
 
-把 `X` 当 `R` 用时整串参数错位：`label`←高度、`fontSize`←标签、`h`←字重、颜色全黑。
-一次产生 **23 个畸形文本**（屏上显示垃圾数字、板被撑高 400–570px、顶破行距压住下一行）。
+Calling `X` as `R` shifts the whole argument chain: `label`←height, `fontSize`←label, `h`←weight, colors all black.
+One batch produced **23 malformed texts** (garbage numbers on screen, board inflated 400–570px, breaching the row gap and pressing the next row).
 
-**预防**：① 同段代码内 helper 签名统一；② 或统一改用对象字面量 `{kind:'text', x, y, w, label, size, ...}`
-（本技能 01/02 页用字面量写法，同批零事故）；③ helper 内部**加参数个数/类型断言**，错位立即抛错而不是画歪。
+**Prevention**: ① unify helper signatures within the same code; ② or unify into object literals `{kind:'text', x, y, w, label, size, ...}` (this skill's 01/02 pages use literal writing, zero incidents in the same batch); ③ add **argument count/type assertions** inside the helper, throw immediately on misalignment rather than drawing crooked.
 
-**检测（一击命中）**：扫全体文本，`characters` 为**纯数字**（`/^\d{1,4}$/`）**且 `height ≥ 200`**。
-实测此规则精确命中全部 23 个、零误报。**阈值必须是 200 而不是 36** ——
-正常的数字标签（分页 `1/2/3`、年份 `2026`）盒高只有 **40–44**（住在 40px 胶囊里），
-而畸形文本的盒高是 **400/500/600**（那其实是被错位当作高度的**字重值**），两者差一个数量级。
-可再叠加「`height` 与同级矩形高度不一致」进一步收紧。
+**Detection (one-shot hit)**: scan all text, `characters` is **pure digits** (`/^\d{1,4}$/`) **and `height ≥ 200`**.
+Tested this rule precisely hit all 23, zero false positives. **The threshold must be 200, not 36** —
+normal numeric labels (pagination `1/2/3`, year `2026`) box height is only **40–44** (they live in a 40px capsule),
+while a malformed text's box height is **400/500/600** (that's actually the **weight value** misused as height), the two differ by an order of magnitude.
+You can additionally stack "height inconsistent with same-level rect heights" to tighten further.

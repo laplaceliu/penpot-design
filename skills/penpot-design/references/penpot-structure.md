@@ -1,183 +1,183 @@
-# Penpot 设计系统固定结构（本技能定义的输出契约）
+# Penpot design-system fixed structure (the output contract defined by this skill)
 
-每次 code-to-design 任务**必须**产出同一套固定结构：一个 Penpot 文件 = 16 个编号页面；每页一个根板；组件规格板结构统一。与 DESIGN.md 的关系：DESIGN.md 是 token 与设计依据的**单一事实源**，Penpot 文件是其**可视化实现**，token 名/色值/字阶/圆角/间距刻度一一对应。
+Every code-to-design task **must** produce the same fixed structure: one Penpot file = 16 numbered pages; one root board per page; uniform component spec-board structure. Relationship with DESIGN.md: DESIGN.md is the **single source of truth** for tokens and design rationale, the Penpot file is its **visual implementation**, token names/colors/type-scale/radius/spacing scale correspond 1:1.
 
-## 1. 文件级约定
+## 1. File-level conventions
 
-- 文件名：`<系统名>-<风格关键词>.penpot`（如 `蓝色-科技风-发光.penpot`）
-- 版本特性：components/v2、variants/v1、design-tokens/v1、layout/grid
-- tokens 全部录入 `penpot.library.local.tokens`，用 `scripts/token_engine.js`（**不要手写 addSet/addToken**）。
-  **TokenType 共 17 种**（`color` / `borderRadius` / `dimension` / `fontFamilies` / `fontSizes` / `fontWeights` /
+- File name: `<system>-<style keyword>.penpot` (e.g. `Blue-Tech-Glow.penpot`)
+- Version features: components/v2, variants/v1, design-tokens/v1, layout/grid
+- All tokens recorded into `penpot.library.local.tokens`, using `scripts/token_engine.js` (**do not hand-write addSet/addToken**).
+  **TokenType has 17 kinds** (`color` / `borderRadius` / `dimension` / `fontFamilies` / `fontSizes` / `fontWeights` /
   `letterSpacing` / `number` / `opacity` / `rotation` / `shadow` / `sizing` / `spacing` / `borderWidth` /
-  `textCase` / `textDecoration` / `typography`），按 DESIGN.md 章节映射录入。
-  **set 怎么切**：**默认只建 1 个 set**（`<系统名> · Core`，内部按 type 自动分组，一个 set 可装全部 17 类）。
-  **禁止按类型拆 set**（Color/Radius/Spacing 各一个 = 类别错误：这三类永远同时激活，拆开只把 1 次开关变成 N 次）。
-  仅当有主题（暗色/密度/品牌）时才加**覆盖层**，且**基础层必须排在前面**（`sets` 顺序即优先级，后者胜）。
-  **三条铁律**：① `addSet()` 默认 `active:false`，**未激活 set 的 token 绑定会「成功但不生效」**，建集必须显式激活；
-  ② 应用后**必须 readback `shape.tokens`**，不适用形状会静默 no-op；
-  ③ 同一 set 内 token 名按 `.` 视为路径，**叶子和父节点互斥**（有 `t.color` 就不能有 `t.color.x`）。
-  详见 `references/design-tokens.md`。
-- 含 CJK 文本一律 Noto Sans SC（Penpot 无字体栈回退）
-- 组件名分隔符一律 `·`（**禁止 `/`**，赋值静默失败）：`Button·Primary·Default`
-- 坐标走 8px 栅格；构建期直接放最终坐标，永不移动已建好的板
-- **PageRoot 宽固定 1920 是「规格说明书画布」**（展示组件矩阵 / 规格板），与最终屏幕目标宽度无关。
-  目标屏幕宽度由**视口档位**决定（见 §2.1 与 `references/viewport-profiles.md`），体现在
-  `12 · 布局模式` 各档网格板与 `14 · Demo` 各档屏幕板。设计系统内核（00–13、15）三档共用，只建一次。
+  `textCase` / `textDecoration` / `typography`), recorded per the DESIGN.md section mapping.
+  **How to split sets**: **by default build only 1 set** (`<system> · Core`, internally auto-grouped by type, one set can hold all 17 kinds).
+  **Splitting sets by type is forbidden** (Color/Radius/Spacing each one = a category error: these three are always active together, splitting just turns 1 switch into N).
+  Only when there is a theme (dark/density/brand) do you add an **override layer**, and **the base layer must come first** (`sets` order is priority, later wins).
+  **Three iron rules**: ① `addSet()` defaults to `active:false`, **tokens in an inactive set bind "successfully but don't take effect"**, building a set must explicitly activate it;
+  ② after applying **you must readback `shape.tokens`**, an inapplicable shape silently no-ops;
+  ③ within the same set, token names treat `.` as a path, **leaf and parent nodes are mutually exclusive** (if `t.color` exists, `t.color.x` cannot).
+  See `references/design-tokens.md`.
+- CJK text uniformly uses Noto Sans SC (Penpot has no font-stack fallback)
+- Component-name separator is always `·` (**`/` is forbidden**, assignment silently fails): `Button·Primary·Default`
+- Coordinates follow the 8px grid; place final coordinates directly at build time, never move an already-built board
+- **PageRoot width fixed at 1920 is the "spec-sheet canvas"** (shows component matrix / spec boards), unrelated to the final screen target width.
+  The target screen width is decided by the **viewport tier** (see §2.1 and `references/viewport-profiles.md`), reflected in
+  `12 · Layout modes` per-tier grid boards and `14 · Demo` per-tier screen boards. The design-system core (00–13, 15) is shared across the three tiers, built once.
 
-## 2. 页面总表（16 页，固定编号与顺序）
+## 2. Page master table (16 pages, fixed numbering and order)
 
-分层原则：01–02 基础（token 可视化）→ 03–07 控件（按任务域：输入→选择→集合→展示，一组件只归一页）→ 08–10 模式（导航/浮层/反馈）→ 11–12 场景（可视化/布局）→ 13–15 交付。
+Layering principle: 01–02 basics (token visualization) → 03–07 controls (by task domain: input→select→collection→display, one component normalizes to one page) → 08–10 patterns (navigation/overlay/feedback) → 11–12 scenarios (visualization/layout) → 13–15 delivery.
 
-| # | 页面名 | 必含内容板 |
+| # | Page name | Required content boards |
 |---|--------|-----------|
-| 00 | `00 · 封面` | 系统名大标题、版本+日期、风格关键词条、主色带 6 格、页面目录清单 |
-| 01 | `01 · 设计基础` | F1 色板、F2 字阶、F3 间距与栅格、F4 圆角、F5 阴影/发光、F6 图标、F7 描边与分割线 |
-| 02 | `02 · 颜色系统` | C1 语义色、C2 深浅主题对照、C3 状态色、C4 渐变、C5 WCAG 对比度校验表 |
-| 03 | `03 · 基础控件` | Button（Type×State×Size 矩阵）、IconButton、ButtonGroup、Switch、Checkbox、Radio、Segmented |
-| 04 | `04 · 文本与输入` | Input、Textarea、InputNumber、SearchBox、Slider、Upload、FileTrigger、DropZone、ColorPicker、Form 容器（label/helper/error 三态） |
-| 05 | `05 · 选择器` | Select、AutoComplete、Cascader、TreeSelect、Transfer、DatePicker、TimePicker、DateRangeField、Calendar、RangeCalendar、DateField、TimeField |
-| 06 | `06 · 数据集合` | Table（排序/筛选/展开/固定列）、List、Tree、Descriptions、Statistic、Timeline、Pagination |
-| 07 | `07 · 展示` | Card（≥3 尺寸）、Tag/Chip、Badge、Avatar、Image、Video、FileCard、Carousel、Collapse、Divider |
-| 08 | `08 · 导航` | TopNav、Sidebar/Menu、Tabs、Breadcrumb、Stepper、Dropdown、ContextMenu、CommandMenu、Toolbar、Anchor、BackTop、Keyboard 快捷键表 |
-| 09 | `09 · 浮层` | Modal、Dialog、Drawer、Sheet、Popover、Tooltip、Popconfirm + 定位/遮罩规范板 |
-| 10 | `10 · 反馈与状态` | Toast、Notification、Alert、Result、Skeleton、Progress、Spinner、Empty、ErrorState |
-| 11 | `11 · 数据可视化` | 图例、KPI 卡、折线/柱状/饼图示例、仪表盘部件、图表色彩映射 |
-| 12 | `12 · 布局模式` | 每个所选档位一块布局网格板：web 12 栅格 / pad 8 栅格（窄降 4）/ mobile 4 栅格或单列堆叠；各档 PageHeader、Grid/Space、ScrollArea、响应式断点、Empty/404/Error 整页模板（按档位宽） |
-| 13 | `13 · 组件索引` | 全部库组件实例缩略网格 + 名称 + 所属页坐标（design-to-code 映射表） |
-| 14 | `14 · Demo` | 板阵（全部用库组件实例组装）：对**每个所选档位**分别产出该档基准宽的六板——Dashboard、Landing、Login、List 管理页（搜索+筛选+表格+分页）、Detail 详情页（描述+操作区+Timeline）、Settings 表单页（分组表单+危险操作区）；多档可并排放在 1920 画布内（如 5 块 mobile 375 并排）。原「可选 Mobile 375 应用板」升级为各档必备板 |
-| 15 | `15 · 参考仿写` | 可选：仿写对象对照分析；无对象则省略并在 DESIGN.md `omitted` 声明 |
+| 00 | `00 · Cover` | System name big title, version+date, style keyword tags, primary-color band 6 cells, page table of contents |
+| 01 | `01 · Design Basics` | F1 palette, F2 type scale, F3 spacing & grid, F4 radius, F5 shadow/glow, F6 icons, F7 stroke & dividers |
+| 02 | `02 · Color System` | C1 semantic colors, C2 light/dark theme comparison, C3 state colors, C4 gradients, C5 WCAG contrast check table |
+| 03 | `03 · Basic Controls` | Button (Type×State×Size matrix), IconButton, ButtonGroup, Switch, Checkbox, Radio, Segmented |
+| 04 | `04 · Text & Input` | Input, Textarea, InputNumber, SearchBox, Slider, Upload, FileTrigger, DropZone, ColorPicker, Form container (label/helper/error three states) |
+| 05 | `05 · Selectors` | Select, AutoComplete, Cascader, TreeSelect, Transfer, DatePicker, TimePicker, DateRangeField, Calendar, RangeCalendar, DateField, TimeField |
+| 06 | `06 · Data Collection` | Table (sort/filter/expand/fixed columns), List, Tree, Descriptions, Statistic, Timeline, Pagination |
+| 07 | `07 · Display` | Card (≥3 sizes), Tag/Chip, Badge, Avatar, Image, Video, FileCard, Carousel, Collapse, Divider |
+| 08 | `08 · Navigation` | TopNav, Sidebar/Menu, Tabs, Breadcrumb, Stepper, Dropdown, ContextMenu, CommandMenu, Toolbar, Anchor, BackTop, keyboard shortcut table |
+| 09 | `09 · Overlay` | Modal, Dialog, Drawer, Sheet, Popover, Tooltip, Popconfirm + positioning/mask spec board |
+| 10 | `10 · Feedback & Status` | Toast, Notification, Alert, Result, Skeleton, Progress, Spinner, Empty, ErrorState |
+| 11 | `11 · Data Visualization` | legend, KPI cards, line/bar/pie chart examples, dashboard widgets, chart color mapping |
+| 12 | `12 · Layout Modes` | one layout-grid board per selected tier: web 12 grid / pad 8 grid (drop to 4 when narrow) / mobile 4 grid or single-column stack; per-tier PageHeader, Grid/Space, ScrollArea, responsive breakpoints, Empty/404/Error whole-page templates (by tier width) |
+| 13 | `13 · Component Index` | all library component instance thumbnail grid + name + owning page coordinates (design-to-code mapping table) |
+| 14 | `14 · Demo` | board matrix (all assembled from library component instances): for **each selected tier** produce that tier's baseline-width six boards — Dashboard, Landing, Login, List admin page (search+filter+table+pagination), Detail page (description+action area+Timeline), Settings form page (grouped form+danger zone); multiple tiers can sit side by side within the 1920 canvas (e.g. 5 mobile-375 boards in a row). The original "optional Mobile 375 app board" is upgraded to a mandatory board per tier |
+| 15 | `15 · Reference Imitation` | optional: imitation-target contrast analysis; if no target, omit and declare in DESIGN.md `omitted` |
 
-## 2.1 视口档位（profile）—— 决定 12/14 页形态
+## 2.1 Viewport tier (profile) — decides 12/14 page forms
 
-任务开始前由技能用 `ask_followup_question` 询问用户目标档位（web/pad/mobile，可多选），
-结果写入 DESIGN.md `targetProfiles`。档位定义、基准宽、栅格、触控目标与对产物的完整影响
-见 `references/viewport-profiles.md`。要点：
+Before the task starts the skill uses `ask_followup_question` to ask the user for the target tier (web/pad/mobile, multi-select allowed),
+the result written into DESIGN.md `targetProfiles`. Tier definitions, baseline width, grid, touch targets, and the complete impact on artifacts
+are in `references/viewport-profiles.md`. Key points:
 
-- `web`：基准宽 1440（设计画布 1920），12 栅格，触控目标 ≥36px（鼠标）。
-- `pad`：基准宽 834，8 栅格（窄降 4），触控目标 ≥44px。
-- `mobile`：基准宽 375，4 栅格或单列堆叠，触控目标 ≥44px。
-- 设计系统内核（00–13、15）三档共用，只建一次；仅 `12` 栅格板与 `14` 屏幕板按档位分别建。
-- `14` 页每块屏幕板宽 = 对应档位基准宽，可多块并排置于 1920 画布。
+- `web`: baseline width 1440 (design canvas 1920), 12 grid, touch target ≥36px (mouse).
+- `pad`: baseline width 834, 8 grid (drop to 4 when narrow), touch target ≥44px.
+- `mobile`: baseline width 375, 4 grid or single-column stack, touch target ≥44px.
+- The design-system core (00–13, 15) is shared across the three tiers, built once; only the `12` grid board and `14` screen board are built per tier.
+- Each `14` screen board width = the corresponding tier's baseline width, multiple boards can sit side by side on the 1920 canvas.
 
-## 2.2 配色模式（color schemes）—— 决定 01/02/14 页形态与 token set 结构
+## 2.2 Color mode (color schemes) — decides 01/02/14 page forms and token set structure
 
-与视口档位**同一批** `ask_followup_question` 询问（一次往返问完），结果写入 DESIGN.md `## Colors` 章节正文。
-定义、产物映射与验收见 `references/color-schemes.md`；set/theme 机制见 `references/design-tokens.md` §5。要点：
+Asked in the **same batch** as the viewport tier via `ask_followup_question` (one round-trip), the result written into DESIGN.md `## Colors` section body.
+Definitions, artifact mapping, and acceptance are in `references/color-schemes.md`; set/theme mechanism in `references/design-tokens.md` §5. Key points:
 
-- **先分清两个概念**：多数系统天然有「**分节表面极性**」（同一页内深浅区域交替，如 hero 用 ink、正文用 canvas）——
-  那**不是**主题，不需要 theme。本档位问的是「**可切换**的整页明暗翻转」。
-- 答 `只要浅色` → token 建 **1 个 set**（`<系统名> · Core`），**0 个 theme**（pix 当前即此形态）。
-- 答 `浅色 + 深色两套` → token 建 `· Core`（全部）+ `· Dark`（只放覆盖的同名 token），
-  **Core 必须排在前**（`sets` 顺序即优先级，后者胜）；再建 `Scheme` 组两个 theme
-  （Light = {Core}，Dark = {Core, Dark}），同组互斥由 Penpot 自动保证。
-- 产物影响：
-  - `01 设计基础 F1`：色板**双极性并排**。
-  - `02 颜色系统`：C1/C2/C3/**C5 对比度审计 全部双份**（两张表，dark 不是 light 的取反）。
-  - `03–12`：交互组件至少补 dark 极性的状态组；展示件给极性说明。
-  - `14 Demo`：**板数 = 档位数 × 配色数**（2 档位 × 2 配色 = 24 板）。
-  - `12` 布局模式不受影响（布局与配色正交）。
+- **Distinguish two concepts first**: most systems naturally have "**sectional surface polarity**" (light/dark regions alternating within the same page, e.g. hero uses ink, body uses canvas) —
+  that is **not** a theme, needs no theme. This tier asks about "**switchable** whole-page light/dark flip".
+- Answer `Light only` → tokens build **1 set** (`<system> · Core`), **0 themes** (pix is currently this form).
+- Answer `Light + dark two schemes` → tokens build `· Core` (all) + `· Dark` (only the overriding same-named tokens),
+  **Core must come first** (`sets` order is priority, later wins); then build a `Scheme` group with two themes
+  (Light = {Core}, Dark = {Core, Dark}), mutual exclusion within a group auto-guaranteed by Penpot.
+- Artifact impact:
+  - `01 Design Basics F1`: palette **dual-polarity side by side**.
+  - `02 Color System`: C1/C2/C3/**C5 contrast audit all doubled** (two tables, dark is not the inverse of light).
+  - `03–12`: interactive components at least add a dark-polarity state group; display widgets give polarity notes.
+  - `14 Demo`: **board count = tiers × schemes** (2 tiers × 2 schemes = 24 boards).
+  - `12` layout modes unaffected (layout is orthogonal to color).
 
-## 3. 每页必含元素（页面解剖契约）
+## 3. Per-page required elements (page anatomy contract)
 
-每页（00 可简化）必须有且仅有一个顶层根板，所有元素挂入：
-
-```
-NN-PageRoot（1920 × 可变高，clipContent = false）
-├── NN-Header  页头区 1920×160
-│   ├── 页码 + 中文名 + 英文名（32px 标题，左对齐）
-│   ├── 一句话页面说明（16px，secondary 色）
-│   ├── token chips 条（本页 token 名 + 色块）
-│   └── 版本 + 日期（右上角，label-sm）
-├── <内容区：规格板阵列>
-└── NN-Footer  页脚 1920×80
-    ├── 本页 token 引用清单
-    └── 「← NN-上页名   NN-下页名 →」导航条
-```
-
-硬性规则：
-1. 一切元素挂进 PageRoot（导出页头才不会丢组件）。
-2. `clipContent = false`，发光/阴影不被裁剪。
-3. Header/Footer/内容板坐标固定（§5），禁止自由摆放。
-4. 页头板退化（崩溃损伤 100×100）会导致整页导出全黑——每批构建后核对 Header 尺寸。
-
-## 4. 组件规格板（Spec Board）契约
-
-板名 = 组件英文名（如 `Button`），内部结构固定：
+Every page (00 may be simplified) must have one and only one top-level root board, all elements mounted into it:
 
 ```
-Button（880 × N，表面底，rounded.md）
-├── 标题行：中文名 + 英文名
-├── Anatomy 解剖板：引线标注 padding / gap / 圆角 / 图标位 / 文字位
-├── 变体矩阵（行=State，列=Type 或 Size）
-│   ├── 行：Default / Hover / Pressed / Focused / Disabled（交互件全五态；展示件 Default/Disabled）
-│   ├── 列：Type（Primary/Secondary/Tertiary/Ghost/Danger…）或 Size（S/M/L）
-│   └── 每格 = 变体板 `Button·Primary·Default`，格下 caption：`W×H · padding · {tokens}`
-├── 使用规范条：Do 一行 + Don't 一行（各配 48px 小示意）
-└── 库组件主实例（母版形状放 'AI Component Masters' 母版板）
+NN-PageRoot (1920 × variable height, clipContent = false)
+├── NN-Header   header area 1920×160
+│   ├── page number + Chinese name + English name (32px title, left-aligned)
+│   ├── one-line page description (16px, secondary color)
+│   ├── token chips bar (this page's token names + color blocks)
+│   └── version + date (top-right, label-sm)
+├── <content area: spec-board array>
+└── NN-Footer   footer 1920×80
+    ├── this page's token reference list
+    └── "← NN-prev page name   NN-next page name →" nav bar
 ```
 
-注册纪律（详见 references/mcp-automation.md §4）：
-- 注册一律用 `AI Component Masters` 母版板的形状执行 `createComponent([shape])`；`comp.remove()` 连主实例一起删，绝不在展示板形状上注册/重注册。
-- 变体容器用 `penpotUtils.createVariantContainer`（输入必须是已注册主实例）；reparent 后重置 `parentX/parentY`。
+Hard rules:
+1. All elements mount into PageRoot (otherwise exported header loses components).
+2. `clipContent = false`, glow/shadow not clipped.
+3. Header/Footer/content-board coordinates fixed (§5), free placement forbidden.
+4. Degraded Header board (crash damage 100×100) causes the whole page export to be all black — verify Header size after each build batch.
 
-### 4.1 装配归属契约（group / component / board）—— 成套图元禁止散件同级堆叠
+## 4. Component spec board contract
 
-**每一个"视觉组件"的组成图元（底板+标签+图标+子件…）必须收进且只收进一种容器**：
+Board name = component English name (e.g. `Button`), internal structure fixed:
 
-| 归属 | 判定 | 做法 | 命名 |
+```
+Button (880 × N, surface base, rounded.md)
+├── Title row: Chinese name + English name
+├── Anatomy board: leader lines annotate padding / gap / radius / icon slot / text slot
+├── Variant matrix (rows = State, cols = Type or Size)
+│   ├── rows: Default / Hover / Pressed / Focused / Disabled (interactive full five states; display Default/Disabled)
+│   ├── cols: Type (Primary/Secondary/Tertiary/Ghost/Danger…) or Size (S/M/L)
+│   └── each cell = variant board `Button·Primary·Default`, caption below: `W×H · padding · {tokens}`
+├── Usage rule bar: one Do line + one Don't line (each with a 48px mini illustration)
+└── Library component master instance (master shape in 'AI Component Masters' master board)
+```
+
+Registration discipline (see references/mcp-automation.md §4):
+- Register always with the `AI Component Masters` master board's shape via `createComponent([shape])`; `comp.remove()` deletes the master instance too, never register/re-register on a display-board shape.
+- Variant container via `penpotUtils.createVariantContainer` (input must be a registered master instance); after reparent, reset `parentX/parentY`.
+
+### 4.1 Assembly-ownership contract (group / component / board) — complete primitive sets forbidden from loose same-level stacking
+
+**Every "visual component"'s constituent primitives (base plate + label + icon + sub-parts…) must be collected into and only into one kind of container**:
+
+| Ownership | Judgment | Approach | Naming |
 |---|---|---|---|
-| **组件 component** | **复用**：列入 13 组件索引、或 14 Demo 中 ≥2 处出现 | 装配先成组 → `penpot.library.local.createComponent([group])` 注册进 `AI Component Masters`；页面/示例里**一律 `comp.instance()`**，禁止复制散件 | `A·B·C`（禁 `/`） |
-| **组 group** | **单次使用**的成套图元：变体矩阵单元格、Anatomy 示意、KPI 卡、swatch 三件套、按钮/字段/标签示例 | `penpot.group([host, ...members])` 就地成组（同父级内），组名 = 宿主名/组件名·变体 | 同组件名约定 |
-| **板 board** | 页面分区 / 规格板 / 屏幕板 / 浮层容器（方案 C） | `mkAbsBoard`，不做装配宿主（不和标签成组） | 见 §4 |
+| **component** | **Reused**: listed in the 13 component index, or appears in ≥2 places in 14 Demo | assemble first into a group → `penpot.library.local.createComponent([group])` registers into `AI Component Masters`; in pages/examples **always `comp.instance()`**, never copy loose primitives | `A·B·C` (no `/`) |
+| **group** | **Single-use** primitive set: variant-matrix cells, Anatomy illustration, KPI cards, swatch trio, button/field/label examples | `penpot.group([host, ...members])` groups in place (within the same parent), group name = host name/component name·variant | same component-name convention |
+| **board** | page partition / spec board / screen board / overlay container (option C) | `mkAbsBoard`, not an assembly host (not grouped with label) | see §4 |
 
-- **不确定 group 还是 component → 先 group**；要升级时 `createComponent([group])` 整组注册，子元素保持收拢，零返工。
-- **允许散件的只有**：纯装饰单件（分割线、grid 列、独立 caption）与组/组件**内部**的子图元。
-- **无标签成套图元**（滑轨+滑块、单选环+圆点）审计无法从文本配对识别，**手工成组**（组名取主件名）。
-- 层级铁律：标签必须与底板**同父级**（同进组）；注册后标签成为组件内部子元素——否则注册出空壳组件（§4 注册纪律）。
-- **前后顺序（z-order）**：`parentIndex` 越大越靠前（0=最底）。成组/成组件后必须保持——
-  组内**面积降序**（大底板在下、标签/图标在上），组本身占**顶层成员的层槽**，实例替换占**原组的层槽**。
-  `penpot.group` 会打乱成员 z 序（标签被底板盖住）；修复引擎 `fixZOrder()`（`groupAssemblies` 已内置）。
-- 机器强制：审计签名 `loose_assembly`（S11）检出散件装配；修复引擎 `storage.groupAssemblies()`
-  （由内而外、最小宿主归属、嵌套组、幂等、**z 序保持**）；门禁 G10。
+- **Unsure group or component → group first**; when upgrading, `createComponent([group])` registers the whole group, child elements stay collected, zero rework.
+- **Only loose primitives allowed**: pure decorative singles (divider, grid column, independent caption) and sub-primitives **inside** a group/component.
+- **Label-less primitive sets** (track+thumb, radio ring+dot) cannot be recognized by text-pairing in audit, **group manually** (group name takes the main-part name).
+- Hierarchy iron rule: label must be **same parent** as the base plate (enter the group together); after registration the label becomes an internal child element of the component — otherwise registration yields an empty-shell component (§4 registration discipline).
+- **Front-to-back order (z-order)**: larger `parentIndex` is more front (0 = bottom). After grouping/componentizing it must be kept —
+  within a group **area descending** (large base plate at bottom, label/icon on top), the group itself occupies **the top member's layer slot**, instance replacement occupies **the original group's layer slot**.
+  `penpot.group` scrambles members' z-order (label covered by base plate); repair engine `fixZOrder()` (`groupAssemblies` already built in).
+- Machine enforcement: audit signature `loose_assembly` (S11) detects loose assemblies; repair engine `storage.groupAssemblies()`
+  (inside-out, minimal-host ownership, nested groups, idempotent, **z-order preserving**); gate G10.
 
-## 5. 坐标与栅格规范
+## 5. Coordinates and grid spec
 
-| 项 | 值 |
+| Item | Value |
 |---|---|
-| PageRoot 宽 | 1920 |
-| 内容区 | x ∈ [80, 1840] |
-| 标准规格板 | 560 宽，3 列 x = 80 / 680 / 1280，列间距 40 |
-| 大型规格板 | 880 宽，2 列 x = 80 / 1000 |
-| 板垂直间距 / 板内区块 / 元素 | 48 / 24 / 8–16 |
-| Header / Footer 高 | 160 / 80，内容从 y=240 起 |
-| Demo 屏幕板宽（web） | 1440（landscape）或 1920；置于 14 页 1920 画布 |
-| Demo 屏幕板宽（pad） | 834（portrait）或 1194（landscape） |
-| Demo 屏幕板宽（mobile） | 375（portrait）或 812（landscape）；多块可并排（1920÷375≈5） |
-| 触控目标下限（pad/mobile） | ≥44px（用 token `touchMin`）；web ≥36px |
+| PageRoot width | 1920 |
+| Content area | x ∈ [80, 1840] |
+| Standard spec board | 560 wide, 3 cols x = 80 / 680 / 1280, column gap 40 |
+| Large spec board | 880 wide, 2 cols x = 80 / 1000 |
+| Board vertical gap / in-board blocks / elements | 48 / 24 / 8–16 |
+| Header / Footer height | 160 / 80, content starts from y=240 |
+| Demo screen board width (web) | 1440 (landscape) or 1920; placed on page-14's 1920 canvas |
+| Demo screen board width (pad) | 834 (portrait) or 1194 (landscape) |
+| Demo screen board width (mobile) | 375 (portrait) or 812 (landscape); multiple can sit side by side (1920÷375≈5) |
+| Touch-target floor (pad/mobile) | ≥44px (use token `touchMin`); web ≥36px |
 
-## 6. 与 DESIGN.md 的映射（design-to-code 依据）
+## 6. Mapping with DESIGN.md (design-to-code basis)
 
-| DESIGN.md | Penpot | 代码实现 |
+| DESIGN.md | Penpot | Code implementation |
 |---|---|---|
-| `colors.*` | 01-F1 色板 + tokens 集 | 主题变量（QSS var / CSS custom properties） |
-| `typography.*` | 01-F2 字阶 | 字体 token / TextStyles |
-| `spacing.*` | 01-F3 间距栅格 | 布局常量 |
-| `rounded.*` | 01-F4 圆角 | radius 常量 |
-| `components.<name>` | 03–12 页规格板 + 库组件 | 代码组件（同名映射，见 13 索引页） |
-| Do's and Don'ts | 各规格板使用规范条 | 代码评审检查项 |
+| `colors.*` | 01-F1 palette + tokens set | theme variables (QSS var / CSS custom properties) |
+| `typography.*` | 01-F2 type scale | font tokens / TextStyles |
+| `spacing.*` | 01-F3 spacing grid | layout constants |
+| `rounded.*` | 01-F4 radius | radius constants |
+| `components.<name>` | 03–12 page spec boards + library components | code components (same-name mapping, see 13 index page) |
+| Do's and Don'ts | each spec board's usage rule bar | code-review checklist items |
 
-## 7. 交付自检清单
+## 7. Delivery self-check list
 
-- [ ] 16 页齐全（15 可选）且命名/顺序正确
-- [ ] 每页唯一 PageRoot，Header/Footer 就位，clipContent=false
-- [ ] 组件规格板符合 §4 契约，变体命名 `组件·属性·属性`
-- [ ] **装配归属合规（§4.1）**：成套图元全部成组或成组件，无散件同级堆叠（审计 `loose_assembly` = 0）；
-      复用组件页面里用的是 `comp.instance()` 而非复制散件
-- [ ] 全部 token 录入 library tokens，与 DESIGN.md 同名同值；**`storage.TK.audit().ok === true`**
-      （所有 set `active:true` + 所有 token `resolvedValueString` 非空，即无失效/断链）
-- [ ] 组件全部注册为库组件（母版在 AI Component Masters），13 索引页信息完整
-- [ ] 14 Demo 各所选档位的屏幕板全部由库组件实例组装（每档六板：Dashboard/Landing/Login/List/Detail/Settings）；
-      **配色模式选了「两套」时板数 = 档位数 × 配色数**，且两套都导出验收过
-- [ ] 配色模式已按 DESIGN.md `## Colors` 声明落实：只要浅色 → 1 set / 0 theme；
-      两套 → `· Core` + `· Dark`（Core 在前）+ Scheme 组两个 theme，且 **02 页对比度审计有 light/dark 两张表**
-- [ ] 每页 `export_shape` 导出 PNG 验收通过（无 100×100 退化、无裁剪、无偏移）
+- [ ] 16 pages complete (15 optional) and correctly named/ordered
+- [ ] Each page has a unique PageRoot, Header/Footer in place, clipContent=false
+- [ ] Component spec boards conform to §4 contract, variant naming `Component·Attribute·Attribute`
+- [ ] **Assembly ownership compliant (§4.1)**: all primitive sets grouped or componentized, no loose same-level stacking (audit `loose_assembly` = 0);
+      reused components use `comp.instance()` in pages rather than copied loose primitives
+- [ ] All tokens recorded into library tokens, same name and value as DESIGN.md; **`storage.TK.audit().ok === true`**
+      (all sets `active:true` + all tokens `resolvedValueString` non-empty, i.e. no failures/broken links)
+- [ ] All components registered as library components (masters in AI Component Masters), 13 index page info complete
+- [ ] 14 Demo each selected tier's screen boards all assembled from library component instances (six boards per tier: Dashboard/Landing/Login/List/Detail/Settings);
+      **when color mode is "two schemes", board count = tiers × schemes**, and both schemes exported and accepted
+- [ ] Color mode implemented per DESIGN.md `## Colors` declaration: light only → 1 set / 0 theme;
+      two schemes → `· Core` + `· Dark` (Core first) + Scheme group with two themes, and **page 02 contrast audit has light/dark two tables**
+- [ ] Each page `export_shape` exports PNG acceptance pass (no 100×100 degradation, no clipping, no offset)

@@ -1,8 +1,8 @@
-// audit_layout.js —— 定位审计引擎（只读，不改任何形状）
-// 用法：整份粘贴进 execute_code 执行一次（字面量函数入 storage 跨调用复用）；
-//       然后逐页 storage.auditPage()，或用 auditStart/auditNext 批量跑。
-// 目标：把「元素定位不对」从「靠肉眼在导出图上发现」变成「机器先出清单」。
-// 判定 CLEAN 只代表六类签名未命中，不等于像素级正确——仍需走 verification.md 的 PIL 比对。
+// audit_layout.js —— positioning audit engine (read-only, changes no shapes)
+// Usage: paste the whole file into execute_code and run once (literal functions go into storage for cross-call reuse);
+//       then call storage.auditPage() page by page, or use auditStart/auditNext for batch runs.
+// Goal: turn "wrong element positioning" from "found by eyeballing the export" into "machine emits a list first".
+// CLEAN only means the six signature classes didn't hit, not pixel-perfect correct — still need the PIL comparison in verification.md.
 
 return (function () {
   const headOf = (r) => { try { return Array.from(r.children).find((c) => c.type === 'board'); } catch (e) { return null; } };
@@ -13,7 +13,7 @@ return (function () {
   const alignOf = (s) => { try { return s.horizontalAlign || s.align || 'left'; } catch (e) { return 'left'; } };
   const R = (s) => ({ x: s.x, y: s.y, w: s.width, h: s.height, r: s.x + s.width, b: s.y + s.height });
 
-  // 文本用「视觉矩形」：宽文本框（居中/右对齐留白）会大量假越界，必须按对齐方式估算字面范围
+  // Text uses "visual rect": wide text boxes (centered/right-aligned whitespace) falsely overflow a lot, must estimate the glyph extent by alignment
   storage.visRect = function (c) {
     if (c.type !== 'text') return R(c);
     const f = fsz(c), n = String(c.characters || '').length;
@@ -27,7 +27,7 @@ return (function () {
   storage.auditPage = function (opts) {
     opts = opts || {};
     const headBand = opts.headBand == null ? 96 : opts.headBand;
-    const titleMin = opts.titleMin == null ? 20 : opts.titleMin;   // 规格板标题的字号下限
+    const titleMin = opts.titleMin == null ? 20 : opts.titleMin;   // font-size floor for spec-board titles
     const out = { page: penpot.currentPage.name, boards: 0, shapes: 0, counts: {}, findings: [], errors: [], headerSizes: [], fonts: {} };
     const root = penpot.currentPage.root || penpot.root;
     const head = headOf(root);
@@ -44,8 +44,8 @@ return (function () {
       let hdr = [];
       if (node.type === 'board') {
         out.boards++;
-        // 页头 = 顶部「大字标题」（字号 >= titleMin）。若不设字号门槛，
-        // 演示屏的 18px logo 背景条、PageRoot 的 Header 背景板会全量假报 header_collision。
+        // Page header = top "large title" (font size >= titleMin). Without the font-size floor,
+        // a demo screen's 18px logo background bar and PageRoot's Header background board would all falsely report header_collision.
         if (node !== head) {
           hdr = kids.filter((c) => c.type === 'text' && c.parentY < headBand && fsz(c) >= titleMin).map((c) => ({ s: c, r: storage.visRect(c) }));
           if (hdr.length && out.headerSizes.length < 6) out.headerSizes.push(node.name + ':' + fsz(hdr[0].s));
@@ -56,19 +56,19 @@ return (function () {
           out.shapes++;
           if (c.type === 'text') out.fonts[c.fontFamily] = (out.fonts[c.fontFamily] || 0) + 1;
           const cr = storage.visRect(c);
-          // S1/S2/S3/S4 越界（下界=板高不足，右界=右侧溢出，左界=常量列偏移）
+          // S1/S2/S3/S4 out-of-bounds (bottom = board height insufficient, right = right overflow, left = constant column offset)
           if (cr.x < pb.x - 1.5 || cr.y < pb.y - 1.5 || cr.r > pb.r + 1.5 || cr.b > pb.b + 1.5) {
             add('out_of_bounds', c, node, 'escapes (L' + Math.round(cr.x - pb.x) + ',T' + Math.round(cr.y - pb.y) + ',R' + Math.round(cr.r - pb.r) + ',B' + Math.round(cr.b - pb.b) + ')');
           }
           if (c.type !== 'text' && c.type !== 'path' && Math.round(c.width) === 100 && Math.round(c.height) === 100) add('crash_100x100', c, node);
-          // 1px 发丝线是刻意设计（分隔线/轨道），只报真退化
+          // A 1px hairline is deliberate design (divider/track); only report true degeneration
           if ((c.width <= 1 && c.height <= 1) || (c.type === 'text' && (c.width <= 1 || c.height <= 1))) add('degenerate_size', c, node, 'w=' + Math.round(c.width) + ' h=' + Math.round(c.height));
           if (c.type === 'text') {
-            // S9 畸形文本：helper 参数错位的指纹——纯数字内容 + 异常高的文本框。
-            // 阈值必须用 200 而不是 36：正常的数字标签（分页 1/2/3、年份 2026）盒高只有 40-44，
-            // 而畸形文本的盒高是 400/500/600（那其实是被误当高度的字重值）。
+            // S9 malformed text: fingerprint of helper argument misalignment — numeric-only content + abnormally tall text box.
+            // The threshold must be 200, not 36: normal numeric labels (pagination 1/2/3, year 2026) box height is only 40-44,
+            // while a malformed text's box height is 400/500/600 (that's actually the weight value misused as height).
             if (/^\d{1,4}$/.test(String(c.characters)) && c.height >= 200) add('malformed_text', c, node, 'numeric content, box h=' + Math.round(c.height));
-            // S10 对齐未生效：写入失败会留下 undefined/null
+            // S10 alignment not effective: a failed write leaves undefined/null
             let al = 'x'; try { al = c.align; } catch (e) {}
             if (al === undefined || al === null) add('align_missing', c, node, 'align undefined - property write likely failed');
           }
@@ -95,12 +95,12 @@ return (function () {
             if (host) {
               const hr = R(host); const dx = Math.abs(tcx - (hr.x + hr.w / 2)), dy = Math.abs(tcy - (hr.y + hr.h / 2)), m = Math.max(dx, dy);
               if (m > 0.5) {
-                // 只有「文本框宽接近宿主宽」时才认为本意是居中（按钮/胶囊）。
-                // 刻意内缩的（带尾部图标的 chip、左对齐的选项行）归为 info，不算缺陷。
+                // Only when "the text box width approaches the host width" do we consider centering was intended (button/capsule).
+                // Deliberately inset ones (chip with trailing icon, left-aligned option rows) go to info, not a defect.
                 const close = c.width >= hr.w * 0.72;
-                // stale-center 指纹：文本左上角恰好落在宿主中心（|t.x−hcx|≤2 或 |t.y−hcy|≤2）
-                // —— 用创建瞬间 1×1 瞬态宽高算居中的算术后果。刻意内缩文本只会落在
-                // host.x+padding，不会贴住中心点；命中指纹的一律按缺陷处理，交给 fixStaleCenter。
+                // stale-center fingerprint: the text's top-left corner lands exactly on the host center (|t.x−hcx|≤2 or |t.y−hcy|≤2)
+                // — the arithmetic consequence of computing centering with the 1×1 transient width/height at creation. Deliberately inset text only lands at
+                // host.x+padding, never sticks to the center; hits of the fingerprint are all treated as defects, handed to fixStaleCenter.
                 const stale = (Math.abs(cr.x - (hr.x + hr.w / 2)) <= 2 || Math.abs(cr.y - (hr.y + hr.h / 2)) <= 2) && m > 8;
                 add((m <= 8 && close) || stale ? 'text_centre_residue' : 'text_centre_info', c, node, 'host "' + host.name + '" dx=' + dx.toFixed(1) + ' dy=' + dy.toFixed(1) + (stale ? ' stale-center' : (close ? '' : ' inset')));
               }
@@ -112,12 +112,12 @@ return (function () {
     };
     walkB(head);
 
-    // S11 装配散件：宿主（rect/ellipse ≥24）与「中心落在其内、最小宿主就是它」的兄弟图元
-    // 构成一个装配，但未收进同一 group/组件 —— 违反装配归属契约（penpot-structure.md §4：
-    // 成套图元必须成组（group）或成组件（component），禁止散件同级堆叠）。
-    // 修复引擎：storage.groupAssemblies()。板是分区容器不作装配宿主；刻意散件（纯装饰单件）不受此约束。
+    // S11 loose assembly: a host (rect/ellipse ≥24) and siblings "whose center falls inside it, and the smallest host is it"
+    // form an assembly, but it's not collected into the same group/component — violates the assembly-ownership contract (penpot-structure.md §4:
+    // a complete primitive set must be grouped or componentized, loose same-level stacking is forbidden).
+    // Repair engine: storage.groupAssemblies(). A board is a partition container, not an assembly host; deliberate singles (pure decorative) are exempt.
     const walkD = (node) => {
-      if (node.isComponentInstance && node.isComponentInstance()) return;  // 实例内部合规（主实例约束）
+      if (node.isComponentInstance && node.isComponentInstance()) return;  // instance internals are compliant (main-instance constraint)
       const kids = kidsOf(node); if (!kids) return;
       const cand = kids.filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 24 && h.height >= 24);
       for (const h of cand) {
@@ -136,7 +136,7 @@ return (function () {
             return smallest === h;
           });
           if (members.length) {
-            // ⚠️ parent 是代理，`===` 恒 false——按 id 比较（api-pitfalls children 代理坑）
+            // ⚠️ parent is a proxy, `===` is always false — compare by id (api-pitfalls children proxy pitfall)
             const p = h.parent;
             const ok = p && (p.type === 'group' || (p.isComponentRoot && p.isComponentRoot())) && members.every((m) => m.parent && m.parent.id === p.id);
             if (!ok) add('loose_assembly', h, node, '"' + h.name + '" + ' + members.length + ' shape(s) not grouped (groupAssemblies)');
@@ -147,12 +147,12 @@ return (function () {
     };
     walkD(head);
 
-    // S5 根级游离形状：PageRoot 之外的顶层图元（注册组件期间易产生绑定实例残留）
+    // S5 root-level stray shapes: top-level shapes outside PageRoot (easily produced as bound-instance residue during component registration)
     Array.from(root.children).forEach((c) => { if (c !== head) add('root_stray', c, root, 'top-level shape outside PageRoot'); });
 
-    // S7 兄弟板重叠：顶层板两两相交。
-    // **这是最容易漏的一类**——它由「修复」本身制造：把板长高以便包住内容后，
-    // 若行长超过网格行距，就会压到下一行的板。只查包含性的审计对它是完全盲的。
+    // S7 sibling-board overlap: pairwise intersection of top-level boards.
+    // **This is the easiest class to miss** — it's created by the "fix" itself: after growing a board to wrap its content,
+    // if the row length exceeds the grid row gap, it presses onto the next row's board. An audit that only checks containment is completely blind to it.
     const tops = Array.from(head.children).filter((c) => c.type === 'board' && c !== head);
     for (let i = 0; i < tops.length; i++) {
       for (let j = i + 1; j < tops.length; j++) {
@@ -163,8 +163,8 @@ return (function () {
       }
     }
 
-    // S8 文本互相重叠：两段文本压在一起（几乎必然是错位/重复）。
-    // 只报 text-vs-text：背景垫底、scrim 压面板等都是刻意的，形状重叠噪声太大。
+    // S8 text overlapping each other: two text segments pressed together (almost always misalignment/duplication).
+    // Only report text-vs-text: background backings, scrim over panels, etc. are deliberate, shape overlap is too noisy.
     const walkC = (node) => {
       const kids = kidsOf(node); if (!kids) return;
       for (let i = 0; i < kids.length; i++) {
@@ -179,12 +179,12 @@ return (function () {
     };
     walkC(head);
 
-    // 判据：text_centre_info 是「刻意内缩」的信息项，不构成缺陷
+    // Criterion: text_centre_info is an "deliberate inset" informational item, not a defect
     out.verdict = Object.keys(out.counts).filter((k) => k !== 'text_centre_info').length ? 'NEEDS_REPAIR' : 'CLEAN';
     return out;
   };
 
-  // ---- 批量 runner ----（切页后必须核对 currentPage.name，超时可能落错页）
+  // ---- batch runner ---- (after page switch you must verify currentPage.name; timeout may land on the wrong page)
   storage.auditStart = function (pages) {
     storage.auditQueue = (pages || penpotUtils.getPages().map((p) => p.name)).slice();
     storage.auditReport = {};

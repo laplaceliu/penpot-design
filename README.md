@@ -1,111 +1,110 @@
 # penpot-design
 
-一个符合 [vercel-labs/skills](https://github.com/vercel-labs/skills)（Agent Skills 开放生态）规范的技能包：
-**Code ↔ Design 双向设计系统工作流 + Penpot MCP 自动化实战库**。
+A skill pack conforming to the [vercel-labs/skills](https://github.com/vercel-labs/skills) (Agent Skills open ecosystem) specification:
+**a Code ↔ Design bidirectional design-system workflow + a practical Penpot MCP automation library**.
 
-两个方向共用同一套设计系统契约（DESIGN.md + Penpot 固定结构）：
+Both directions share the same design-system contract (DESIGN.md + the fixed Penpot structure):
 
-- **Code → Design**：给 URL / 一组图片 / 既有 React 组件库源码 → 产出 DESIGN.md + Penpot 设计系统（16 页固定结构）。
-- **Design → Code**：给 Penpot 设计文件 → 按所选技术栈（Qt / Web 前端 / LVGL / imgui / MAUI / Flutter …）输出代码，PIL 像素级验收，目标 pixel-perfect；支持 Web 宽屏 / 平板 / 手机三档视口。
+- **Code → Design**: feed a URL / a set of images / an existing React component-library source tree → produce DESIGN.md + a Penpot design system (16-page fixed structure).
+- **Design → Code**: feed a Penpot design file → emit code for the chosen tech stack (Qt / Web frontend / LVGL / imgui / MAUI / Flutter …), with PIL pixel-level acceptance testing aimed at pixel-perfect results; supports Web widescreen / tablet / phone viewports.
 
-## 安装
+## Installation
 
 ```bash
-# 安装到当前项目（写入 .codebuddy/skills/ 等各 agent 目录）
+# Install into the current project (writes into .codebuddy/skills/ and other agent dirs)
 npx skills add laplaceliu/penpot-design
 
-# 安装到用户全局目录
+# Install into the user-global directory
 npx skills add laplaceliu/penpot-design -g
 
-# 只装这一个技能，并指定 agent（示例：CodeBuddy）
+# Install just this one skill, targeting a specific agent (example: CodeBuddy)
 npx skills add laplaceliu/penpot-design --skill penpot-design -a codebuddy
 
-# 先看仓库里有哪些技能
+# First list the skills available in the repo
 npx skills add laplaceliu/penpot-design --list
 
-# 不安装，直接生成提示词喂给某个 agent
+# Don't install; instead generate the prompt to feed a specific agent
 npx skills use laplaceliu/penpot-design --skill penpot-design --agent claude-code
 ```
 
-也支持本地路径安装（开发调试时）：
+Local-path installation is also supported (for development/debugging):
 
 ```bash
 npx skills add ./
 ```
 
-## 目录结构
+## Directory structure
 
 ```
 .
 └── skills/
-    └── penpot-design/          # 技能根目录：SKILL.md 所在处即技能目录
-        ├── SKILL.md            # 入口：frontmatter（name / description）+ 工作流总纲
-        ├── references/         # 按需加载的参考文档（10 篇）
-        │   ├── design-md-spec.md      # DESIGN.md 规范、lint 规则、骨架模板
-        │   ├── penpot-structure.md    # 16 页固定结构契约
-        │   ├── code-to-design.md      # URL / 图片 / 源码复刻三条入口
-        │   ├── mcp-connection.md      # 连接 Penpot MCP（端点、CA、客户端配置）
-        │   ├── mcp-automation.md      # execute_code 实战手册
-        │   ├── api-pitfalls.md        # Penpot API 陷阱详解
-        │   ├── engines.md             # 修复引擎 / 组件工厂 / 页面配方
-        │   ├── design-to-code-generic.md  # 通用出码纪律（所有栈共用）
-        │   ├── stack-profiles.md      # 技术栈档位：平台族分类 / 运行时询问 / 未知栈处理
-        │   ├── stacks/                # 技术栈适配器注册表
-        │   │   ├── manifest.md        # 栈 → 适配器文档 + 平台族标签
-        │   │   ├── qt.md              # Qt4 / Qt5 / Qt6 适配器
-        │   │   └── web.md             # Web 前端适配器（React/Vue/Angular/Svelte…）
-        │   ├── viewport-profiles.md   # 视口档位：web/pad/mobile 三档
-        │   └── verification.md        # PIL 像素级验证流程
-        ├── scripts/            # 可直接粘贴进 execute_code / 命令行运行的引擎
-        │   ├── seed_storage.js        # 播种引擎（tokens + 工厂函数）
-        │   ├── scaffold_structure.js  # 16 页骨架批量构建
-        │   ├── repair_engines.js      # 对齐 / 去裁剪 / 清孤儿
-        │   ├── fix_layout.js          # flex 压塌批量修复
-        │   └── pixel_diff.py          # PIL 像素比对（热图 + JSON 指标）
+    └── penpot-design/          # Skill root: the directory containing SKILL.md is the skill directory
+        ├── SKILL.md            # Entry point: frontmatter (name / description) + workflow overview
+        ├── references/         # Reference docs loaded on demand (10+ articles)
+        │   ├── design-md-spec.md      # DESIGN.md spec, lint rules, skeleton template
+        │   ├── penpot-structure.md    # 16-page fixed-structure contract
+        │   ├── code-to-design.md      # Three entry points: URL / images / source reuse
+        │   ├── mcp-connection.md      # Connect Penpot MCP (endpoint, CA, client config)
+        │   ├── mcp-automation.md      # execute_code practical handbook
+        │   ├── api-pitfalls.md        # Detailed Penpot API pitfalls
+        │   ├── engines.md             # Repair engine / component factory / page recipes
+        │   ├── design-to-code-generic.md  # Generic codegen discipline (shared across stacks)
+        │   ├── stack-profiles.md      # Stack tiers: platform-family classification / runtime prompts / unknown-stack handling
+        │   ├── stacks/                # Tech-stack adapter registry
+        │   │   ├── manifest.md        # Stack → adapter doc + platform-family tags
+        │   │   ├── qt.md              # Qt4 / Qt5 / Qt6 adapters
+        │   │   └── web.md             # Web frontend adapter (React/Vue/Angular/Svelte…)
+        │   ├── viewport-profiles.md   # Viewport tiers: web/pad/mobile
+        │   └── verification.md        # PIL pixel-level verification flow
+        ├── scripts/            # Engines that can be pasted directly into execute_code / run from the CLI
+        │   ├── seed_storage.js        # Seeding engine (tokens + factory functions)
+        │   ├── scaffold_structure.js  # Batch-build the 16-page skeleton
+        │   ├── repair_engines.js      # Alignment / de-cropping / orphan cleanup
+        │   ├── fix_layout.js          # Batch-flex-collapse repair
+        │   └── pixel_diff.py          # PIL pixel comparison (heatmap + JSON metrics)
         └── assets/
-            └── penpot-server/         # 自带的本地 Penpot 部署栈（路径自解析，可整体搬迁）
-                ├── compose.yaml       # 7 服务：frontend/backend/exporter/mcp/postgres/valkey/caddy
-                ├── caddy/Caddyfile    # https://penpot.local 终止 TLS
-                ├── .env.example       # 复制到 .env 后按需修改
+            └── penpot-server/         # Bundled local Penpot deployment stack (self-resolving paths, fully relocatable)
+                ├── compose.yaml       # 7 services: frontend/backend/exporter/mcp/postgres/valkey/caddy
+                ├── caddy/Caddyfile    # Terminate TLS at https://penpot.local
+                ├── .env.example       # Copy to .env and edit as needed
                 └── scripts/           # prewarm / up / down / status / tail-logs / trust-ca / create-profile
 ```
 
-## 前置条件
+## Prerequisites
 
-按用到的能力按需准备（不必全装）：
+Prepare only what you need for the capabilities you use (no need to install everything):
 
-| 能力 | 依赖 |
+| Capability | Dependency |
 |---|---|
-| 本地 Penpot + MCP（推荐，栈已自带） | Docker Engine + compose 插件；脚本会自动补 `/etc/hosts` |
-| PIL 像素级验收 | Python 3 + `Pillow`（`pip install Pillow`） |
-| DESIGN.md lint / export | Node.js（技能内用 `npx @google/design.md`，无需预装） |
-| 代码输出 | 对应目标技术栈工具链（Qt / Web 前端 / 其它栈依 `references/stacks/manifest.md` 适配器） |
+| Local Penpot + MCP (recommended; stack is bundled) | Docker Engine + compose plugin; scripts auto-patch `/etc/hosts` |
+| PIL pixel-level acceptance | Python 3 + `Pillow` (`pip install Pillow`) |
+| DESIGN.md lint / export | Node.js (the skill uses `npx @google/design.md` internally, no preinstall needed) |
+| Code output | The toolchain for the target stack (Qt / Web frontend / other stacks per `references/stacks/manifest.md` adapters) |
 
-首次跑本地栈：
+First run of the local stack:
 
-> **先确认是否已有部署**：用 `./scripts/status.sh`（或 `curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags` 看是否返回 200）探活；并查工作区 `.mcp.json` 是否已含 `penpot` 条目。若服务已在跑且 MCP 已配好，直接验证即可，**无需重装**。详见技能 `references/mcp-connection.md` §0 启动前检查。
+> **Check whether a deployment already exists first**: probe liveness with `./scripts/status.sh` (or `curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags` to see if it returns 200); also check whether the workspace `.mcp.json` already contains a `penpot` entry. If the service is already running and MCP is configured, just verify — **no reinstall needed**. See skill `references/mcp-connection.md` §0 Pre-start checklist.
 
 ```bash
 cd skills/penpot-design/assets/penpot-server
-cp .env.example .env          # 可选：改镜像 tag / 域名 / secret
-./scripts/prewarm.sh          # 拉镜像，约 5 分钟
-./scripts/up.sh               # 启动并等待 https://penpot.local 就绪
-./scripts/trust-ca.sh         # 装 CA（MCP 客户端必需，装完重启客户端）
-./scripts/create-profile.sh   # 建登录账号（新库是空的，必需）
+cp .env.example .env          # optional: change image tag / domain / secret
+./scripts/prewarm.sh          # pull images, ~5 minutes
+./scripts/up.sh               # start and wait until https://penpot.local is ready
+./scripts/trust-ca.sh         # install CA (required by the MCP client; restart the client afterward)
+./scripts/create-profile.sh   # create a login account (a fresh DB is empty, so this is required)
 ```
 
-> 安全提示：默认凭据（`admin@penpot.local` / `penpot123`）与 `.env.example` 里的
-> `PENPOT_SECRET_KEY=change-me-in-production-please` 都是公开的占位值，仅供本地演示。
-> 暴露到本机之外前请改掉。`.env` 与 `data/` 已被 gitignore。
+> Security note: the default credentials (`admin@penpot.local` / `penpot123`) and the `PENPOT_SECRET_KEY=change-me-in-production-please` in `.env.example` are public placeholder values for local demo only.
+> Change them before exposing the stack beyond your machine. `.env` and `data/` are already gitignored.
 
-## 技能契约要点
+## Skill contract notes
 
-- `SKILL.md` frontmatter 只依赖 `name` + `description` 两个必填字段（均为字符串），
-  与 vercel-labs/skills 的发现 / 安装 / 更新校验兼容；`version`、`license` 为附加元信息。
-- 技能目录内的 `references/` `scripts/` `assets/` 均以 `SKILL.md` 所在目录为基准相对引用，
-  因此整目录被 symlink / copy 到任意 agent 的 skills 目录后路径依然有效。
-- `assets/penpot-server/` 内所有脚本从 `BASH_SOURCE` 反推栈根目录，不含机器相关绝对路径。
+- `SKILL.md` frontmatter depends only on the two required fields `name` + `description` (both strings),
+  compatible with vercel-labs/skills discovery / install / update validation; `version`, `license` are additional metadata.
+- `references/` `scripts/` `assets/` inside the skill directory are all referenced relative to the directory containing `SKILL.md`,
+  so paths stay valid after the whole directory is symlinked / copied into any agent's skills directory.
+- All scripts inside `assets/penpot-server/` derive the stack root from `BASH_SOURCE`, containing no machine-specific absolute paths.
 
 ## License
 
-MIT —— 见 [LICENSE](LICENSE)。
+MIT — see [LICENSE](LICENSE).

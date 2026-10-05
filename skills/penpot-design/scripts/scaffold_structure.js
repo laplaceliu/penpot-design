@@ -1,20 +1,20 @@
-// scaffold_structure.js —— 按 penpot-structure.md 契约创建固定 16 页骨架
-// 用法：先跑 seed_storage.js；再反复执行本脚本（队列 runner 模式，一次建一批），直至返回 {done:true}。
-// 幂等：页已存在则跳过；PageRoot/页头/页脚已存在不重建。
-// 注意：PageRoot 恒为 1920，这是「规格说明书画布」（展示组件矩阵/规格板），与最终屏幕目标宽度无关。
-// 目标屏幕宽度由视口档位（web/pad/mobile）决定，体现在 12 布局网格板与 14 Demo 屏幕板（见 references/viewport-profiles.md）。
+// scaffold_structure.js —— build the fixed 16-page skeleton per the penpot-structure.md contract
+// Usage: run seed_storage.js first; then run this script repeatedly (queue-runner mode, one batch per call) until it returns {done:true}.
+// Idempotent: skip pages that already exist; don't rebuild PageRoot/Header/Footer that already exist.
+// Note: PageRoot is always 1920 — this is the "spec-sheet canvas" (shows component matrices / spec boards), unrelated to the final screen target width.
+// The target screen width is decided by the viewport tier (web/pad/mobile), reflected in the page-12 layout-grid boards and page-14 Demo screen boards (see references/viewport-profiles.md).
 
 var PAGES = [
-  '00 · 封面', '01 · 设计基础', '02 · 颜色系统', '03 · 基础控件', '04 · 文本与输入',
-  '05 · 选择器', '06 · 数据集合', '07 · 展示', '08 · 导航', '09 · 浮层',
-  '10 · 反馈与状态', '11 · 数据可视化', '12 · 布局模式', '13 · 组件索引', '14 · Demo',
-  '15 · 参考仿写'
+  '00 · Cover', '01 · Design Basics', '02 · Color System', '03 · Basic Controls', '04 · Text & Input',
+  '05 · Selectors', '06 · Data Collection', '07 · Display', '08 · Navigation', '09 · Overlay',
+  '10 · Feedback & Status', '11 · Data Visualization', '12 · Layout Modes', '13 · Component Index', '14 · Demo',
+  '15 · Reference Imitation'
 ];
 
 return (function () {
   if (!storage.mkText) return { err: 'run seed_storage.js first' };
 
-  // 阶段 1：建页（每次调用建 ≤6 页，防超时）
+  // Phase 1: create pages (≤6 pages per call, to avoid timeout)
   var missing = [];
   for (var i = 0; i < PAGES.length; i++) {
     if (!penpotUtils.getPageByName(PAGES[i])) missing.push(PAGES[i]);
@@ -25,7 +25,7 @@ return (function () {
     return { createdPages: batch, left: missing.length - batch.length };
   }
 
-  // 阶段 2：逐页建 PageRoot/Header/Footer（一次一页，防切页异步问题）
+  // Phase 2: build PageRoot/Header/Footer page by page (one page per call, to avoid async page-switch issues)
   if (!storage.scaffoldQueue) {
     storage.scaffoldQueue = PAGES.slice();
   }

@@ -1,29 +1,29 @@
-# 适配器：Web 前端（React / Vue / Angular / Svelte …）
+# Adapter: Web frontend (React / Vue / Angular / Svelte …)
 
-通用纪律见 `references/design-to-code-generic.md`。本文件覆盖所有基于 DOM/CSS 的 Web 框架，共用 CSS/Flex 基线，各框架差异见下；总原则与视口档位约束同 generic §0。
+The generic discipline is in `references/design-to-code-generic.md`. This file covers all DOM/CSS-based Web frameworks, sharing a CSS/Flex baseline; framework differences are below; the general principles and viewport-tier constraints are the same as generic §0.
 
-## 1. Token 层（CSS 变量基线）
+## 1. Token layer (CSS variable baseline)
 
-- `npx @google/design.md export --format css-tailwind DESIGN.md > theme.css`（CSS 自定义属性）或 `--format dtcg` → style-dictionary 生成 CSS 变量 + TS 常量；组件样式只准引 `var(--...)`，禁散落 hex。
-- 响应式断点也变量化（见 §4）。
+- `npx @google/design.md export --format css-tailwind DESIGN.md > theme.css` (CSS custom properties) or `--format dtcg` → style-dictionary generates CSS variables + TS constants; component styles may only reference `var(--...)`, no scattered hex.
+- Responsive breakpoints are also variable-ized (see §4).
 
-## 2. 资源系统
+## 2. Asset system
 
-- 图片：摄影/插画/位图进 `src/assets/images/`，import 进模块（打包器 hash/优化）；响应式 @1x/@2x/@3x 用 `srcSet` + `sizes`；`<img>` 必带 `width/height` 防抖动；纯色块/圆角/阴影用 CSS 实现。
-- 图标：SVG 优先，内部 `currentColor` 着色跟 token，禁止单色图标多份导出；命名与 01 F6 一致 `icon-<名称>-<尺寸>.svg`，默认 24px 网格。
-  - React：SVGR（`import { ReactComponent as Icon } from './icons/x.svg'`）或 `<img>`。
-  - Vue：vite-svg-loader 或 svg-sprite（`<use href="#icon-x">`）。
-  - Angular：svg 组件 / inline SVG / svg-sprite。
-  - Svelte：`<svg>` 直接内联或 svg-sprite。
+- Images: photos/illustrations/bitmaps go into `src/assets/images/`, imported into modules (bundler hash/optimize); responsive @1x/@2x/@3x use `srcSet` + `sizes`; `<img>` must carry `width/height` to prevent layout shift; solid blocks/radii/shadows done with CSS.
+- Icons: SVG preferred, internal `currentColor` coloring follows tokens, never export multiple copies of a monochrome icon; naming consistent with 01 F6 `icon-<name>-<size>.svg`, default 24px grid.
+  - React: SVGR (`import { ReactComponent as Icon } from './icons/x.svg'`) or `<img>`.
+  - Vue: vite-svg-loader or svg-sprite (`<use href="#icon-x">`).
+  - Angular: svg component / inline SVG / svg-sprite.
+  - Svelte: `<svg>` directly inlined or svg-sprite.
 
-## 3. 框架差异
+## 3. Framework differences
 
-### React（18+，TypeScript，CSS Modules 或 Tailwind）
+### React (18+, TypeScript, CSS Modules or Tailwind)
 
-- **结构**：函数组件 + props 变体（`variant`, `size`, `state`）；变体样式与 DESIGN.md 变体键一一映射，禁止条件样式里写新色值。
-- **样式**：CSS Modules（`.module.css` 引 `var(--...)`）或 Tailwind（`export --format json-tailwind` 注入 `theme.extend`）；间距/圆角全部走 token scale。
-- **状态**：用 `:hover/:active/:focus-visible/[disabled]` 伪类还原五态；`:focus-visible` 的 focus ring（颜色/宽度/偏移）必须与设计 Focused 一致。
-- **示例（Button 原子）**：
+- **Structure**: function components + props variants (`variant`, `size`, `state`); variant styles map 1:1 to DESIGN.md variant keys, never write new color values inside conditional styles.
+- **Styling**: CSS Modules (`.module.css` referencing `var(--...)`) or Tailwind (`export --format json-tailwind` injected into `theme.extend`); spacing/radii all go through the token scale.
+- **States**: use `:hover/:active/:focus-visible/[disabled]` pseudo-classes to restore the five states; the `:focus-visible` focus ring (color/width/offset) must match the design's Focused state.
+- **Example (Button atom)**:
 
 ```tsx
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -35,7 +35,7 @@ export function Button({ variant = 'primary', size = 'md', className, ...rest }:
 }
 // button.module.css
 .button {
-  height: var(--btn-height-md);            /* 设计标注整数值 */
+  height: var(--btn-height-md);            /* design annotation integer value */
   padding: 0 var(--pad-btn-x);
   border-radius: var(--radius-md);
   font: var(--font-btn);
@@ -46,15 +46,15 @@ export function Button({ variant = 'primary', size = 'md', className, ...rest }:
 .primary:disabled { background: var(--color-primary-disabled); }
 ```
 
-- **图片/图标组件化**：`<Image>` 封装 `srcSet`/`width`/`height`/`alt`；`<Icon name="x" size={24}/>` 统一图标入口（内部 svg sprite 或 SVGR 映射表）。
-- **最佳实践**：Storybook/独立预览页逐组件呈现五态矩阵（对齐规格板）；`prefers-reduced-motion` 尊重；a11y（对比度 AA、focus 可见、语义标签）。
+- **Image/icon componentization**: `<Image>` wraps `srcSet`/`width`/`height`/`alt`; `<Icon name="x" size={24}/>` unifies the icon entry (internal svg sprite or SVGR mapping table).
+- **Best practices**: Storybook/standalone preview page shows the five-state matrix per component (aligned to spec boards); respect `prefers-reduced-motion`; a11y (contrast AA, visible focus, semantic tags).
 
-### Vue（3，`<script setup>` + TypeScript，Scoped SCSS 或 Tailwind）
+### Vue (3, `<script setup>` + TypeScript, Scoped SCSS or Tailwind)
 
-- **结构**：单文件组件，props 定义变体（`variant`/`size`）；`defineProps` + 类名映射同 React 约定；emits 遵循 `update:modelValue` 等惯例。
-- **样式**：`<style scoped>` 引 `var(--...)`；或 Tailwind 同上导出注入 `theme.extend`。
-- **状态**：伪类 + `:disabled`；Vue 特有用 `:class` 绑定计算类（`{ [styles.isPressed]: pressed }`），样式值仍只来自 token。
-- **示例（Button 原子）**：
+- **Structure**: single-file component, props define variants (`variant`/`size`); `defineProps` + class-name mapping same as React convention; emits follow `update:modelValue` etc. conventions.
+- **Styling**: `<style scoped>` references `var(--...)`; or Tailwind injected into `theme.extend` as above.
+- **States**: pseudo-classes + `:disabled`; Vue-specific use `:class` to bind computed classes (`{ [styles.isPressed]: pressed }`), style values still only come from tokens.
+- **Example (Button atom)**:
 
 ```vue
 <script setup lang="ts">
@@ -79,29 +79,29 @@ defineProps<{ variant?: 'primary'|'secondary'|'tertiary'|'ghost'|'danger'; size?
 </style>
 ```
 
-- **图片/图标**：`<img :src="imageUrl" :srcset="imageSrcSet" width height alt>`（`imageUrl` 由 `import img from '@/assets/images/x.png'` 得到）；图标用 `vite-svg-loader` 内联 SVG 组件或 svg-sprite + `<svg><use/></svg>`。
-- **最佳实践**：`<component :is>` 做变体分发；Vue DevTools/预览页呈现五态矩阵；a11y 同 React。
+- **Images/icons**: `<img :src="imageUrl" :srcset="imageSrcSet" width height alt>` (`imageUrl` obtained from `import img from '@/assets/images/x.png'`); icons use `vite-svg-loader` inline SVG component or svg-sprite + `<svg><use/></svg>`.
+- **Best practices**: `<component :is>` for variant dispatch; Vue DevTools/preview page shows the five-state matrix; a11y same as React.
 
-### Angular（standalone components，SCSS / Tailwind）
+### Angular (standalone components, SCSS / Tailwind)
 
-- **结构**：standalone component + 信号 `input()` 定义变体（`variant`/`size`）；变体样式与 DESIGN.md 变体键一一映射。
-- **样式**：`styles`/`styleUrl` 引 `var(--...)`；或 Tailwind 注入 `theme.extend`。
-- **状态**：`:hover/:active/:focus-visible/:disabled` 伪类还原五态；focus ring 同设计。
-- **资源**：`import img from '...'` 进组件；图标用 svg 组件 / inline SVG / svg-sprite。
+- **Structure**: standalone component + signal `input()` defines variants (`variant`/`size`); variant styles map 1:1 to DESIGN.md variant keys.
+- **Styling**: `styles`/`styleUrl` reference `var(--...)`; or Tailwind injected into `theme.extend`.
+- **States**: `:hover/:active/:focus-visible/:disabled` pseudo-classes restore the five states; focus ring matches the design.
+- **Assets**: `import img from '...'` into the component; icons use svg component / inline SVG / svg-sprite.
 
-### Svelte（SvelteKit，scoped CSS / Tailwind）
+### Svelte (SvelteKit, scoped CSS / Tailwind)
 
-- **结构**：`.svelte` 组件 + `export let variant/size`（或 `$props()`）；变体映射同 React 约定。
-- **样式**：`<style>` 引 `var(--...)`；或 Tailwind。
-- **状态**：CSS 伪类 + Svelte 状态；样式值只来自 token。
-- **资源**：`import img from '...'`；图标直接内联 `<svg>` 或 svg-sprite。
+- **Structure**: `.svelte` component + `export let variant/size` (or `$props()`); variant mapping same as React convention.
+- **Styling**: `<style>` references `var(--...)`; or Tailwind.
+- **States**: CSS pseudo-classes + Svelte state; style values only come from tokens.
+- **Assets**: `import img from '...'`; icons directly inlined `<svg>` or svg-sprite.
 
-## 4. pixel-perfect 纪律（Web 特有）
+## 4. pixel-perfect discipline (Web-specific)
 
-1. **整数像素**：间距/尺寸/圆角取设计整数标注；用 token scale，不写 12.5px。
-2. **盒模型统一**：`box-sizing: border-box` 全局声明；边框计入尺寸（描边 inner 语义与 Penpot `strokeAlignment='inner'` 对应）。
-3. **字体**：`@font-face` 自托管（同设计字族），`font-weight/line-height/letter-spacing` 逐项对齐 F2 字阶；禁用合成粗体。
-4. **状态完备**：五态逐一实现，色值取自 DESIGN.md 变体键。
-5. **稳定渲染后再截图比对**：禁动画（`prefers-reduced-motion` 或注入 CSS 冻结 transition）、固定 viewport = **该档基准宽**（web 1440 / pad 834 / mobile 375）、DPR=1。
-6. **资源零外链**：所有图片/图标 import 打包，不依赖运行时相对路径。
-7. **响应式 / 档位**：`targetProfiles` 含多档时，用 CSS 媒体断点（`@media (max-width: 834px)` 等）实现 pad/mobile 布局，触控目标 ≥44px；单一档位可固定该宽不做断点。逐档分别截图与 Penpot 对应板比对。
+1. **Integer pixels**: spacing/size/radius take integer design annotations; use the token scale, never write 12.5px.
+2. **Unified box model**: `box-sizing: border-box` declared globally; borders counted into size (inner stroke semantics correspond to Penpot `strokeAlignment='inner'`).
+3. **Font**: `@font-face` self-hosted (same design font family), `font-weight/line-height/letter-spacing` aligned item-by-item to the F2 type scale; synthetic bold disabled.
+4. **State completeness**: implement the five states one-by-one, color values from DESIGN.md variant keys.
+5. **Screenshot after stable render**: animations off (`prefers-reduced-motion` or inject CSS to freeze transitions), fixed viewport = **that tier's baseline width** (web 1440 / pad 834 / mobile 375), DPR=1.
+6. **Zero external asset links**: all images/icons imported and bundled, no runtime-relative paths.
+7. **Responsive / tiers**: when `targetProfiles` contains multiple tiers, use CSS media breakpoints (`@media (max-width: 834px)` etc.) to implement pad/mobile layouts, touch targets ≥44px; a single tier can fix that width without breakpoints. Screenshot each tier separately and compare against the corresponding Penpot board.

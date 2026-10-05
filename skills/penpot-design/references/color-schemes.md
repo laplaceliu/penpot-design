@@ -1,41 +1,41 @@
-# 配色模式（Color schemes）—— 运行时询问 + 产物映射
+# Color Schemes — runtime prompt + artifact mapping
 
-与「视口档位」`references/viewport-profiles.md` **对等**的第二个启动期档位：同样在写 DESIGN.md 之前
-问一次，同样写入 DESIGN.md 作为后续所有构建与验收的硬约束。
+The second startup-tier **on par with** the "viewport tier" `references/viewport-profiles.md`: also asked once before writing DESIGN.md,
+also written into DESIGN.md as a hard constraint for all subsequent builds and acceptance.
 
-## 0. 先分清：「分节表面极性」≠「可切换配色」
+## 0. First distinguish: "sectional surface polarity" ≠ "switchable color scheme"
 
-**这是最容易答错的地方，必须在提问时就把两个选项描述清楚。**
+**This is the easiest place to answer wrong; you must describe the two options clearly when asking.**
 
-| | **分节表面极性**（多数系统天然就有） | **可切换配色 / 主题**（本档位要问的） |
+| | **Sectional surface polarity** (most systems have it naturally) | **Switchable color scheme / theme** (what this tier asks about) |
 |---|---|---|
-| 表现 | **同一页内**深浅区域交替（如 hero 用 ink、正文用 canvas） | **整页翻转**：背景、文字、描边一起变 |
-| 例子 | pix 系统的 hero/services/footer 是深色，其余是浅色 | 用户点"深色模式"，整个界面变暗 |
-| 是否可选 | 不是选项，是视觉语言的一部分 | 是用户可切换的状态 |
-| 需要 theme 吗 | **不需要** | **需要**（见 `design-tokens.md` §5） |
+| Appearance | **Within the same page** light/dark regions alternate (e.g. hero uses ink, body uses canvas) | **Whole-page flip**: background, text, stroke all change together |
+| Example | pix system's hero/services/footer are dark, the rest light | User clicks "dark mode", the whole interface darkens |
+| Optional? | Not an option, part of the visual language | A user-switchable state |
+| Needs theme? | **No** | **Yes** (see `design-tokens.md` §5) |
 
-> 只做「分节极性」→ **不建 theme**，一个 token set 即可（这正是 pix 当前的状态）。
-> 做「可切换配色」→ 才建第二个 set + theme 组。
+> Only "sectional polarity" → **no theme**, one token set suffices (exactly pix's current state).
+> "Switchable color scheme" → then build a second set + theme group.
 
-## 1. 何时问
+## 1. When to ask
 
-**写 DESIGN.md 之前**，与视口档位问题**放在同一批 `ask_followup_question` 里**（一次往返问完，不要分两轮）。
-用户已明说（如"要有深色模式"）可免问，但仍须落库到 DESIGN.md。
+**Before writing DESIGN.md**, put it in the **same batch of `ask_followup_question`** as the viewport tier (one round-trip, not two).
+If the user has already stated it (e.g. "must have dark mode"), skip the question but still persist it into DESIGN.md.
 
-## 2. 问什么
+## 2. What to ask
 
-- **header**：`配色模式`
-- **question**：是否需要**可切换的**明暗两套配色（整页翻转），而不只是同一页里深浅区域交替？
-- **multiSelect**：否（默认单选）
-- **options**：
-  - `只要浅色（默认）` — 单一配色。token 建 **1 个 set**（`<系统名> · Core`），**不建 theme**。交付物最省。
-  - `浅色 + 深色两套` — 交付可切换的明暗两套。token 建 `· Core` + `· Dark`，并建 Scheme 组两个 theme。
-  - `跟随系统（自动 light/dark）` — 交付物与上一项**完全相同**（两套都得有）；差别只在交互约定，
-    写进 DESIGN.md 的 Colors / Do's and Don'ts 即可。
+- **header**: `Color mode`
+- **question**: Do you need **switchable** light/dark color schemes (whole-page flip), rather than just light/dark regions alternating within the same page?
+- **multiSelect**: no (single-select default)
+- **options**:
+  - `Light only (default)` — single color scheme. Build tokens as **1 set** (`<system> · Core`), **no theme**. Leanest deliverable.
+  - `Light + dark two schemes` — deliver switchable light/dark. Build `· Core` + `· Dark` tokens, plus a Scheme group with two themes.
+  - `Follow system (auto light/dark)` — deliverable **identical** to the previous item (both schemes required); the only difference is the interaction convention,
+    just write it into DESIGN.md's Colors / Do's and Don'ts.
 
-## 3. 答案落在哪
+## 3. Where the answer lands
 
-**DESIGN.md 的 `## Colors` 章节正文**，与 `targetProfiles` 写在 `## Layout` 章节正文是同一机制：
+In the **`## Colors` section body** of DESIGN.md, the same mechanism as `targetProfiles` written into the `## Layout` section body:
 
 ```markdown
 ## Colors
@@ -44,45 +44,45 @@
 not an inversion of `light`.
 ```
 
-- **不要**塞进 frontmatter 当自定义键。实测：自定义顶层键 `colorSchemes:` **不会**触发 lint 告警
-  （0 error / 0 warning），但会被 linter 与 `designmd export` **忽略** —— 即"能过但无效"，
-  所以以正文声明为准（`targetProfiles` 同理）。
-- 选了「两套」时，Colors 章节**必须给出两套色值**，并显式写出**语义角色映射**
-  （同一个 `on-surface` 在 light 下是什么、在 dark 下是什么），不能只给一堆裸色值。
+- **Do not** stuff it into frontmatter as a custom key. Tested: a custom top-level key `colorSchemes:` **will not** trigger a lint warning
+  (0 error / 0 warning), but will be **ignored** by both the linter and `designmd export` — i.e. "passes but ineffective",
+  so the body declaration is authoritative (`targetProfiles` same).
+- When "two schemes" is chosen, the Colors section **must give both schemes' color values**, and explicitly write the **semantic-role mapping**
+  (what the same `on-surface` is under light, what it is under dark); not just a pile of bare color values.
 
-## 4. 产物映射（回答 = 两套时）
+## 4. Artifact mapping (answer = two schemes)
 
-| 位置 | 变化 |
+| Location | Change |
 |---|---|
-| **token 结构** | `sets: [ '<系统名> · Core'(全部), '<系统名> · Dark'(只放要覆盖的同名 token) ]` + `Scheme` 组两个 theme（Light = {Core}，Dark = {Core, Dark}）。**Core 必须排在前**（`sets` 顺序即优先级，后者胜）。用 `TK.ensureTheme` / `TK.activateTheme`。 |
-| **00 封面** | 注明配色模式与两套方案的名称 |
-| **01 设计基础 F1** | 色板板需**双极性**并排（light 一列、dark 一列 + 角色对应关系） |
-| **02 颜色系统** | C1 语义色 / C2 表面配对 / C3 文本层级 / **C5 对比度审计 全部双份**（可并排或上下叠放） |
-| **03–12 组件规格板** | 每个交互组件至少给出 dark 极性的一组状态；展示件至少给极性说明 |
-| **12 布局模式** | 不变（布局与配色正交） |
-| **14 Demo** | 每个档位 × **每套配色**各出六板 → 板数**翻倍**（2 档位 × 2 配色 = 24 板）。可并排但务必标注清楚。 |
-| **DESIGN.md `## Elevation & Depth`** | 需说明「分节极性」与「主题极性」的关系：翻转后 `ink` / `canvas` 的角色如何互换或保持 |
+| **token structure** | `sets: [ '<system> · Core'(all), '<system> · Dark'(only the same-named tokens to override) ]` + `Scheme` group with two themes (Light = {Core}, Dark = {Core, Dark}). **Core must come first** (`sets` order is priority, later wins). Use `TK.ensureTheme` / `TK.activateTheme`. |
+| **00 Cover** | Note the color mode and the two schemes' names |
+| **01 Design basics F1** | The palette board needs **dual polarity** side by side (light column, dark column + role correspondence) |
+| **02 Color system** | C1 semantic colors / C2 surface pairs / C3 text hierarchy / **C5 contrast audit all doubled** (side by side or stacked) |
+| **03–12 component spec boards** | every interactive component gives at least one dark-polarity state set; display widgets at least give polarity notes |
+| **12 Layout modes** | unchanged (layout is orthogonal to color) |
+| **14 Demo** | each tier × **each scheme** produces six boards → board count **doubles** (2 tiers × 2 schemes = 24 boards). Can be side by side but must be clearly labeled. |
+| **DESIGN.md `## Elevation & Depth`** | needs to explain the relationship between "sectional polarity" and "theme polarity": how `ink` / `canvas` roles swap or hold after flipping |
 
-## 5. 验收（强制）
+## 5. Acceptance (mandatory)
 
-- **WCAG 对比度必须对两套分别审计**。dark **不是** light 的取反：
-  简单反色通常会让中间调灰阶失效（`on-surface-muted` 之类最容易不达标）。
-- 02 页的 C5 对比度审计表要有 **light 表 + dark 表**两张。
-- `TK.audit()` 在 theme 模式下会切到 `mode: 'theme-driven'` 判据
-  （未激活 set 属正常态，改判「无同组多激活 + 已激活 set 内 token 全部可解析」）。
-- 导出验收：两套配色各跑一遍，**未导出过的组合不得表述为"已验证"**。
+- **WCAG contrast must be audited separately for both schemes**. dark is **not** the inverse of light:
+  simple inversion usually breaks mid-tone grayscale (`on-surface-muted` and similar are most likely to fail).
+- Page-02's C5 contrast-audit table needs a **light table + dark table**, two of them.
+- `TK.audit()` under theme mode switches to the `mode: 'theme-driven'` criterion
+  (an inactive set is normal; re-judge "no multiple same-group activations + all tokens in the active set resolvable").
+- Export acceptance: run both schemes once each, **combinations never exported must not be described as "verified"**.
 
-## 6. Design → Code 侧
+## 6. Design → Code side
 
-- 两套配色必须走**同一套语义 token**（CSS custom properties / 主题对象 / QSS 调色板），
-  禁止在组件里硬编码第二套色值。
-- 切换机制与持久化（跟随系统 `prefers-color-scheme` / 手动切换 / 是否记忆）写进 DESIGN.md
-  的 Do's and Don'ts，代码据此外实现。
-- 验收：每个档位 × 每套配色分别截图比对（验收组合数 = 档位数 × 配色数）。
+- Both schemes must go through the **same set of semantic tokens** (CSS custom properties / theme object / QSS palette),
+  never hard-code the second scheme's values inside components.
+- The switch mechanism and persistence (follow system `prefers-color-scheme` / manual switch / remember or not) are written into DESIGN.md's
+  Do's and Don'ts; code implements accordingly.
+- Acceptance: each tier × each scheme screenshotted and compared separately (acceptance combination count = tiers × schemes).
 
-## 7. 为什么必须在启动时问
+## 7. Why it must be asked at startup
 
-- 事后加第二套配色的成本远高于开始时决定：**色板要重新推导、02 页对比度审计要重做、
-  组件规格板要补极性、Demo 板数翻倍**。
-- 反过来，一开始就明确了「只要浅色」，就能省掉整套 theme 结构与第二份板 —— 这正是
-  pix 当前 1 个 set / 0 个 theme 的依据。
+- Adding a second scheme afterward costs far more than deciding at the start: **the palette must be re-derived, page-02's contrast audit redone,
+  component spec boards get polarity added, Demo board count doubles**.
+- Conversely, deciding "light only" at the start saves the whole theme structure and the second set of boards — exactly
+  pix's current basis of 1 set / 0 themes.

@@ -1,27 +1,27 @@
-# 引擎与配方（battle-tested）
+# Engines and recipes (battle-tested)
 
-构建与修复引擎代码**全部外置到 `scripts/`**（可独立粘贴执行）；本文只留机理、用法、模板与页面配方。
+Build and repair engine code is **all externalized to `scripts/`** (can be pasted and run independently); this article only keeps the mechanism, usage, templates, and page recipes.
 
-| 脚本 | 内容 | 用法 |
+| Script | Content | Usage |
 |---|---|---|
-| `scripts/seed_storage.js` | tokens `storage.T`、`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg` | 每会话先跑；storage 丢失后重播种 |
-| `scripts/repair_engines.js` | `fixStaleCenter` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | 跑一次种入 storage，逐页调用 |
-| `scripts/fix_layout.js` | flex 压塌修复（getDesignSize + absRow + fixCol，两轮收敛） | 在目标页直接执行 |
-| `scripts/token_engine.js` | Design Tokens（`TK.seed` 建集+录 token 自动 active / `TK.apply` 应用+回读校验 / `TK.audit`·`TK.assert` 体检 / `TK.unbindFill`） | 建骨架后立即录入；验收前复跑体检 |
-| `scripts/audit_layout.js` | 定位审计（`auditPage`/`auditAll`，五类签名 + 字体直方图，只读） | 每板建成即跑；收尾后复算 |
-| `scripts/fix_geometry.js` | 几何修补（列偏移/板高/根高/右溢出，四引擎，全支持 dry-run） | 审计出清单后逐页修 |
-| `scripts/scaffold_structure.js` | 固定 16 页骨架 | code-to-design 第一步 |
+| `scripts/seed_storage.js` | tokens `storage.T`, `mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg` | run first each session; re-seed after storage loss |
+| `scripts/repair_engines.js` | `fixStaleCenter` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | run once to plant into storage, call page by page |
+| `scripts/fix_layout.js` | flex-collapse repair (getDesignSize + absRow + fixCol, two-round convergence) | run directly on the target page |
+| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) | record immediately after building skeleton; re-run health check before acceptance |
+| `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`, five signature classes + font histogram, read-only) | run on each board as built; recompute after finishing |
+| `scripts/fix_geometry.js` | geometry repair (column offset/board height/root height/right overflow, four engines, all support dry-run) | repair page by page after audit lists |
+| `scripts/scaffold_structure.js` | fixed 16-page skeleton | first step of code-to-design |
 
-> **顺序铁律**：`seed_storage.js`（G1）→ 建板（每板 `audit_layout.js` 单板审计，G3）→
-> **阶段一几何**：`fix_geometry.js` 的 `fixGeometryAll({apply:false})` 出清单 → 复核 → `{apply:true}`
-> → **阶段二对齐**：`repair_engines.js` 收尾（`cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip`，G4）→
-> `audit_layout.js` 复算至 `CLEAN`（G5）。
+> **Order iron rule**: `seed_storage.js` (G1) → build boards (each board `audit_layout.js` single-board audit, G3) →
+> **Phase 1 geometry**: `fix_geometry.js`'s `fixGeometryAll({apply:false})` lists → review → `{apply:true}`
+> → **Phase 2 alignment**: `repair_engines.js` finishing (`cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip`, G4) →
+> `audit_layout.js` recompute to `CLEAN` (G5).
 >
-> **两阶段不可合并、且不必都跑**：实测 121 条越界全部由几何引擎解决，`vAlignPage` 命中 0；
-> 先跑对齐引擎会在错误基准上吸附、引入误伤。**先诊断签名，再决定调哪个引擎。**
-> 签名判定与噪声规则见 `references/positioning-audit.md`。
+> **The two phases must not be merged, and needn't both run**: tested 121 out-of-bounds all resolved by the geometry engine, `vAlignPage` hit 0;
+> running the alignment engine first would snap on a wrong baseline and introduce false-hurts. **Diagnose the signature first, then decide which engine.**
+> Signature judgment and noise rules are in `references/positioning-audit.md`.
 
-通用 runner（引擎/修复逐页执行；**尾部预切下一页，探测前必须先核对 `penpot.currentPage.name`**）：
+Generic runner (engines/repairs run page by page; **pre-cut next page at tail, must verify `penpot.currentPage.name` before probing**):
 
 ```js
 const q = storage.xxxQueue;
@@ -32,71 +32,71 @@ if (q.length) penpot.openPage(storage.pg(q[0]));
 return { page: pg, ...r, remaining: q.length };
 ```
 
-## 1. 修复引擎（代码：scripts/repair_engines.js）
+## 1. Repair engines (code: scripts/repair_engines.js)
 
-- **alignPage**：文本吸附"包含其世界中心的最小宿主（rect/ellipse，24≤边长，面积≤20000）"；本应居中（垂直偏差≤6px、大宿主≤3px）则吸附宿主精确中心；页级直接文本跳过；Breadcrumbs 流式重排、Tabs 按 120px 列居中。**全程世界坐标**（混用 parentX 会产生跨层级假包含误吸附）。
-- **vAlignPage**：小板（≤70px 高）单行直接子文本垂直居中（偏差 5–15px 才触发），带**堆叠守卫**（同板 x 重叠≥50% 且 y 相差>4 = 刻意堆叠，跳过）。
-  - 误伤恢复：记录修复日志 → 对刻意非居中的元素按已知设计坐标还原（如 Number Field ＋ at y=−2 / － at y=22；Progress 标签 y=0）。
-- **fixInner**：全文件描边批修（闭合形状→`inner`，路径→`center`；机理见 api-pitfalls.md §3）。
-- **unclip**：全文件 `clipContent=false`（修复辉光被裁不可见；机理见 api-pitfalls.md §4）。
-- **fixStaleCenter**：修 **stale-center** 居中大偏移（>6px，指纹判定）——文本**左上角**恰好落在宿主中心
-  （`|t.x−hcx|≤2` 或 `|t.y−hcy|≤2`，按轴独立），是「创建瞬间用 1×1 瞬态宽高算 `(w−1)/2` 居中」的算术后果。
-  刻意左对齐文本只落在 `host.x+padding`，不会贴住中心点 → 指纹判定零误伤；只动命中轴坐标，不碰层级/样式。
-  **必须排在 alignPage 之前**（分工：>6px 大偏移归本引擎，≤6px 微差归 alignPage 吸附）。
-- **groupAssemblies**：装配成组（装配归属契约 `penpot-structure.md` §4.1）。同父级内「宿主（rect/ellipse/board ≥24）
-  + 中心落在其内、最小宿主就是它」的兄弟图元 → 成组，组名=宿主名。
-  由内而外（面积升序）→ 嵌套组（按钮组进导航条）；幂等（同组/组件内跳过，按 `.id` 比较父子）；
-  **内置补偿式成组**（`penpot.group` 的破坏性副作用见 api-pitfalls §6.1：捕获 min parentXY → group →
-  `absolute=true` → 复位 → readback 校验），保证成员世界坐标零位移。
-  复用装配升级组件：`createComponent([group])` → 页面用 `comp.instance()`。
-- **fixZOrder**：组内前后顺序修复（z 语义：`parentIndex` 越大越靠前）。`penpot.group` 会把底板排到标签上面
-  （标签被盖住）→ 组内按面积降序 `setParentIndex(i)`（大底在下、文字在上），实例内部跳过。
-  `groupAssemblies` 已内置同逻辑（含组层槽保持）；旧组批修用本引擎。验证以整板导出为准（小形状组导出有缓存假象）。
-- **cleanOrphans**：清根级孤儿文本（历史崩溃残留，会污染遍历）。
+- **alignPage**: text snaps to "the smallest host containing its world center (rect/ellipse, 24≤side, area≤20000)"; if it should be centered (vertical deviation≤6px, large host≤3px) snap to the host's exact center; page-level direct text skipped; Breadcrumbs flow reflow, Tabs centered by 120px column. **All in world coordinates** (mixing parentX produces cross-level false-containment mis-snap).
+- **vAlignPage**: small boards (≤70px tall) single-line direct child text vertical centering (only triggers at deviation 5–15px), with **stacking guard** (same-board x overlap≥50% and y diff>4 = deliberate stacking, skip).
+  - False-hurt recovery: record repair log → restore deliberately off-center elements by known design coordinates (e.g. Number Field ＋ at y=−2 / － at y=22; Progress label y=0).
+- **fixInner**: whole-file stroke batch fix (closed shapes→`inner`, paths→`center`; mechanism in api-pitfalls.md §3).
+- **unclip**: whole-file `clipContent=false` (fix glow clipped invisible; mechanism in api-pitfalls.md §4).
+- **fixStaleCenter**: fix **stale-center** centering large offset (>6px, fingerprint judgment) — the text's **top-left corner** lands exactly on the host center
+  (`|t.x−hcx|≤2` or `|t.y−hcy|≤2`, per-axis independent), the arithmetic consequence of "using 1×1 transient width/height at creation to compute `(w−1)/2` centering".
+  Deliberately left-aligned text only lands at `host.x+padding`, never sticks to the center → fingerprint judgment zero false positives; only moves the hit-axis coordinate, touches no hierarchy/style.
+  **Must come before alignPage** (division: >6px large offset belongs to this engine, ≤6px micro-diff belongs to alignPage snap).
+- **groupAssemblies**: assemble into groups (assembly-ownership contract `penpot-structure.md` §4.1). Under the same parent, "host (rect/ellipse/board ≥24)
+  + sibling primitives whose center falls inside it and whose smallest host is it" → into a group, group name = host name.
+  Inside-out (ascending area) → nested groups (button group into nav bar); idempotent (skip within same group/component, compare parent/child by `.id`);
+  **built-in compensation grouping** (`penpot.group`'s destructive side effect see api-pitfalls §6.1: capture min parentXY → group →
+  `absolute=true` → reset → readback verify), guaranteeing members' world coordinates zero displacement.
+  Upgrade reusable assembly to component: `createComponent([group])` → pages use `comp.instance()`.
+- **fixZOrder**: in-group front/back order repair (z semantics: larger `parentIndex` = more front). `penpot.group` puts the base plate above the label
+  (label covered) → within group sort by descending area `setParentIndex(i)` (large base at bottom, text on top), instance internals skipped.
+  `groupAssemblies` already has the same logic built-in (with group layer-slot preservation); use this engine for old-group batch fixes. Verify by whole-board export (small-shape group export has a cache illusion).
+- **cleanOrphans**: clean root-level orphan text (historical crash residue, pollutes traversal).
 
-修复日志返回 `[{位置, 内容, 轴, 偏移}]`，**先审计复核再进下一页**。
+The repair log returns `[{position, content, axis, offset}]`, **audit-review before going to the next page**.
 
-### gridSnap — 网格吸附（模板，未封装）
+### gridSnap — grid snapping (template, not wrapped)
 
-以标准网格推算期望位置，容差外批量吸附。日历示例（列心/行心公式按实际布局参数化）：
+Compute expected positions from the standard grid, batch-snap beyond tolerance. Calendar example (column-center/row-center formulas parameterized by actual layout):
 
 ```js
 const colCx = (c) => 21 + c * 29.14;
 const rowCy = (r) => 119 + r * 31;
 for (const c of kids) {
   if (c.type === 'text' && /^\d{1,2}$/.test(c.characters)) {
-    // 找 (r,col) 使 |中心-格心| 最小；>0.5 则吸附
+    // find (r,col) minimizing |center - grid center|; snap if >0.5
   }
 }
 ```
 
-注意：吸附前先跑一次审计（收集偏移清单返回人工复核），确认期望位置模型正确再批量修——期望模型错了会把全部元素修错（实例：弱化色规则写反把 17–30 整行误伤）。
+Note: run an audit once before snapping (collect the offset list for manual review), confirm the expected-position model is correct before batch fixing — a wrong expectation model would fix all elements wrong (instance: the weak-color rule was written inverted and false-hurt the 17–30 whole row).
 
-### 专用修复模式
+### Dedicated repair patterns
 
-- **弧线路径重建**：删旧 path → `bez()` 生成（api-pitfalls.md §2）→ appendChild（世界坐标 d 无需再定位）。
-- **连续路径箭头气泡**：气泡轮廓 + V 形箭头一条路径，圆角 kappa 近似；文字重新 appendChild 置顶层并按渲染宽高居中。
-- **崩溃损伤修复**：walk 检测 100×100 非文本图元 → 按设计规格 resize（板 + 贴边子元素，头板必须处理）。
-- **跨页删除**：先 `penpot.openPage` 该页（等切换生效），再 remove。
+- **Arc path rebuild**: delete old path → `bez()` generate (api-pitfalls.md §2) → appendChild (world-coordinate d needs no re-positioning).
+- **Continuous path arrow bubble**: bubble outline + V-shaped arrow one path, rounded kappa approximation; text re-appendChild to top layer and centered by render width/height.
+- **Crash-damage repair**: walk detects 100×100 non-text primitives → resize per design spec (board + edge-touching children, header board must be handled).
+- **Cross-page delete**: first `penpot.openPage` that page (wait for switch to take effect), then remove.
 
-## 2. 构建种子与组件工厂
+## 2. Build seeds and component factories
 
-种子与基础工厂以 `scripts/seed_storage.js` 为单一真源（tokens 值同步 DESIGN.md）。方案 C 关键细节与三方案实测行为见 api-pitfalls.md §10。
+Seeds and base factories take `scripts/seed_storage.js` as single source of truth (token values synced with DESIGN.md). Approach C key details and the three approaches' tested behavior are in api-pitfalls.md §10.
 
-组件工厂模板（固定尺寸组件 = 板属性 + 文字层，全走 `absMount`；阴影颜色**必须对象格式** `{color, opacity}`——字符串 hex 静默变黑）。主题参数按 DESIGN.md 替换：
+Component factory template (fixed-size component = board attribute + text layer, all via `absMount`; shadow color **must be object format** `{color, opacity}` — string hex silently turns black). Theme params replaced per DESIGN.md:
 
 ```js
 storage.mkButtonA = (label, x, y, opts = {}) => {
   const h = opts.h || 45, w = opts.w || 160;
   const b = storage.mkAbsBoard('Button / ' + label, x, y, w, h, '#F8F8F0', opts.radius ?? 50);
   const st = opts.type || 'default';
-  if (st === 'primary') {                       // 3D 像素阴影：blur=0 + offsetY=线厚
+  if (st === 'primary') {                       // 3D pixel shadow: blur=0 + offsetY=line thickness
     b.strokes = [{ strokeColor: '#F8F8F0', strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner' }];
     b.shadows = [{ style: 'drop-shadow', offsetX: 0, offsetY: 5, blur: 0, spread: 0, color: { color: '#BDAEA0', opacity: 1 } }];
   } else if (st === 'danger') {
     b.fills = [{ fillColor: '#E05A5A', fillOpacity: 1 }];
     b.shadows = [{ style: 'drop-shadow', offsetX: 0, offsetY: 5, blur: 0, spread: 0, color: { color: '#C94444', opacity: 1 } }];
-  } else {                                      // 软阴影：blur 4 + 低不透明度
+  } else {                                      // soft shadow: blur 4 + low opacity
     b.strokes = [{ strokeColor: '#C4B89E', strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner' }];
     b.shadows = [{ style: 'drop-shadow', offsetX: 0, offsetY: 2, blur: 4, spread: 0, color: { color: '#3D3428', opacity: 0.06 } }];
   }
@@ -106,38 +106,38 @@ storage.mkButtonA = (label, x, y, opts = {}) => {
 };
 ```
 
-3D 像素阴影 vs 软阴影参数对照（Shadow/press 效果通用）：
+3D pixel shadow vs soft shadow parameter comparison (Shadow/press effect generic):
 
-| 效果 | offsetX/Y | blur | spread | color.opacity |
+| Effect | offsetX/Y | blur | spread | color.opacity |
 |---|---|---|---|---|
-| 3D 硬阴影（按下前） | 0, 5 | 0 | 0 | 1（深一档同系色） |
-| 软阴影 | 0, 2 | 4 | 0 | 0.06（黑色） |
-| 卡片浮起 | 0, 3 | 10 | 0 | 0.10（黑色） |
-| 内阴影（输入框/轨道） | style:'inner-shadow', 0, 2 | 4 | 0 | 0.08~0.2 |
-| 焦点环（黄） | 两层：0,3,0,0 深黄 1.0 + 0,0,0,3 亮黄 0.15 | | | |
+| 3D hard shadow (pre-press) | 0, 5 | 0 | 0 | 1 (one darker tone of same family) |
+| soft shadow | 0, 2 | 4 | 0 | 0.06 (black) |
+| card float | 0, 3 | 10 | 0 | 0.10 (black) |
+| inner shadow (input/track) | style:'inner-shadow', 0, 2 | 4 | 0 | 0.08~0.2 |
+| focus ring (yellow) | two layers: 0,3,0,0 dark yellow 1.0 + 0,0,0,3 bright yellow 0.15 | | | |
 
-## 3. flex 压塌批量修复（代码：scripts/fix_layout.js）
+## 3. flex-collapse batch repair (code: scripts/fix_layout.js)
 
-症状：导出图上按钮/卡片被压成文字大小（flex hug）。三步：absolute 化 → 按名称恢复设计尺寸 → 自底向上重排行与容器，两轮收敛。
+Symptom: buttons/cards on the export are squashed to text size (flex hug). Three steps: absolutize → restore design size by name → bottom-up reflow rows and containers, two-round convergence.
 
-- `getDesignSize` 名称映射表是**项目相关的**，粘贴前按目标设计系统组件命名改写。
-- **顺序陷阱**：先 absRow（行定型）后 fixCol（容器修正）；fixCol 跳过 `absolute` 子树——否则把 absolute 元素重新压回内容尺寸（实测教训）。
+- `getDesignSize` name-map is **project-specific**, rewrite per the target design system's component naming before pasting.
+- **Order trap**: first absRow (row sizing) then fixCol (container fix); fixCol skips `absolute` subtrees — otherwise absolute elements get re-squashed back to content size (tested lesson).
 
-## 4. 页面组装模式（Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单）
+## 4. Page assembly patterns (Dashboard/Landing/Login/List admin/Detail/Settings form)
 
-外层整页板（方案 C）+ 分区手工布局。要点：
+Outer whole-page board (approach C) + manually laid-out partitions. Key points:
 
-1. 整页板 1440 宽，y 分区：Navbar(100-180) → Hero(200-660) → Stats(700-820) → Features(880-1490) → Showcase(1520-2180) → FAQ(2210-2660) → CTA(2680-2840) → Footer(2880+)。
-2. 分区标题统一：燕子尾 Path + 圆角胶囊板 + 居中文字（复用 Title 配方）。
-3. Dashboard 双栏：侧栏 240px 固定 + 内容区偏移 x+240；表格斑马纹/hover 行用**全宽色板垫底**（append 顺序控制 z 序，垫底层先 append）。
-4. Login 居中卡 + 装饰椭圆（ellipse 直接 append 页板）。
-5. 页内组件直接按配方坐标重画（脚本无法实例化库组件），保持 tokens 一致即视觉一致。
+1. Whole-page board 1440 wide, y partitions: Navbar(100-180) → Hero(200-660) → Stats(700-820) → Features(880-1490) → Showcase(1520-2180) → FAQ(2210-2660) → CTA(2680-2840) → Footer(2880+).
+2. Partition titles unified: swallowtail Path + rounded capsule board + centered text (reuse Title recipe).
+3. Dashboard two columns: sidebar 240px fixed + content area offset x+240; table zebra/hover rows use **full-width color backing** (append order controls z-order, backing layer appended first).
+4. Login centered card + decorative ellipse (ellipse directly appended to page board).
+5. In-page components directly redrawn by recipe coordinates (scripts can't instantiate library components), keeping tokens consistent = visually consistent.
 
-## 5. 崩溃后重建清单
+## 5. Post-crash rebuild checklist
 
-浏览器/插件崩溃 → storage 全丢。按序重建：
+Browser/plugin crash → storage all lost. Rebuild in order:
 
-1. `scripts/seed_storage.js` 重播种（T/fonts/mkText/mkAbsBoard/absMount/pg）——一条命令探测+补种；
-2. `penpotUtils.getPages()` 盘点页面结构，确认画布损伤（100×100 退化检测见 api-pitfalls.md §8）；
-3. 板 id 全部重新收集（旧 id 失效）；
-4. 用户报告"某组件缺失"时优先怀疑：组件删除连带主实例、超时落错页误删、崩溃退化——按 api-pitfalls.md §6/§11/§8 逐一排查。
+1. `scripts/seed_storage.js` re-seed (T/fonts/mkText/mkAbsBoard/absMount/pg) — one command probes + supplements seeds;
+2. `penpotUtils.getPages()` inventory page structure, confirm canvas damage (100×100 degradation check in api-pitfalls.md §8);
+3. re-collect all board ids (old ids invalid);
+4. when the user reports "some component missing", prioritize suspecting: component deletion taking the main instance along, timeout landing on wrong page causing mis-delete, crash degradation — investigate one by one per api-pitfalls.md §6/§11/§8.

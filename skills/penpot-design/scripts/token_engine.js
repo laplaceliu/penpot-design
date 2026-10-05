@@ -1,18 +1,18 @@
-// token_engine.js —— Penpot Design Tokens 可执行引擎（建集 / 应用 / 体检）
-// 用法：整份粘贴进 execute_code 执行一次（字面量函数入 storage 跨调用复用）。
-// 依据：references/design-tokens.md（全部结论为本机实测，含 5 条铁律与 6 个应用坑）。
+// token_engine.js —— Penpot Design Tokens executable engine (build set / apply / health-check)
+// Usage: paste the whole file into execute_code and run once (literal functions go into storage for cross-call reuse).
+// Basis: references/design-tokens.md (all conclusions are local tests, including 5 iron rules and 6 application pitfalls).
 //
-// 为什么需要它：seed_storage.js 里的 storage.T 只是 JS 侧的颜色镜像，**不创建任何 Penpot token**。
-// 真正录入 library tokens 走本引擎。
+// Why it's needed: storage.T in seed_storage.js is only a JS-side color mirror, **it does NOT create any Penpot token**.
+// Real library-token entry goes through this engine.
 //
-// 三件事的顺序（不可颠倒）：
-//   TK.seed(spec)             建 set + 录 token（无 theme 时自动 active:true）
-//   await TK.apply(...)       应用（自带 readback 校验，静默失败会抛错）
-//   TK.audit() / TK.assert()  体检（未激活 / 引用断裂 / theme 同组多激活）
+// The three steps in order (must not be reversed):
+//   TK.seed(spec)              build set + record token (auto active:true when no theme)
+//   await TK.apply(...)       apply (with readback verification, throws on silent failure)
+//   TK.audit() / TK.assert()  health-check (inactive / broken reference / same-group multi-activation)
 //
-// theme（可选）：TK.ensureTheme(group, name, [setNames]) 建，TK.activateTheme(group, name) 切。
-// ⚠️ 有 theme 时 **不要**直接 set.toggleActive()——直接 toggle 会清空全部 theme 的激活状态；
-//    且此时 set.active 是「激活 theme 的并集」派生值，未激活属于正常态（详见 references/design-tokens.md §5）。
+// theme (optional): TK.ensureTheme(group, name, [setNames]) to build, TK.activateTheme(group, name) to switch.
+// ⚠️ When themes exist, **do not** directly set.toggleActive() — directly toggling clears all themes' activation state;
+//    and then set.active is a derived value of "the union of active themes", being inactive is a normal state (see references/design-tokens.md §5).
 
 return (function () {
   const cat = () => penpot.library.local.tokens;
@@ -21,10 +21,10 @@ return (function () {
   const TK = {};
   storage.TK = TK;
 
-  // ---------- 查询 ----------
+  // ---------- query ----------
   TK.set = (name) => Array.from(cat().sets).find((s) => s.name === name) || null;
 
-  // 按名字找 token：**从后往前找第一个定义它的「激活」set**，与 Penpot 的解析优先级一致
+  // Find token by name: **search from the last set forward for the first "active" set defining it**, consistent with Penpot's resolution priority
   TK.find = function (name) {
     const sets = Array.from(cat().sets);
     for (let i = sets.length - 1; i >= 0; i--) {
@@ -35,10 +35,10 @@ return (function () {
     return null;
   };
 
-  // ---------- 建集 ----------
-  // 铁律 1：addSet 默认 active:false，未激活 = 绑定记上了但值不生效（静默失败）。
-  // ⚠️ 有 theme 时**不能**直接 toggle set：直接 toggle 会清空所有 theme 的激活状态（实测）。
-  //    故 force 默认 = 「当前没有 theme 时才直接激活」；有 theme 时交给 theme 管理。
+  // ---------- build set ----------
+  // Iron rule 1: addSet defaults to active:false; inactive = the binding is recorded but the value doesn't take effect (silent failure).
+  // ⚠️ When themes exist you must **not** directly toggle the set: directly toggling clears all themes' activation state (tested).
+  //    So force defaults to "directly activate only when there's no theme"; when there's a theme, hand it to the theme to manage.
   TK.ensureSet = function (name, active, force) {
     let s = TK.set(name);
     if (!s) s = cat().addSet({ name: name, active: active === false ? false : true });
@@ -49,12 +49,12 @@ return (function () {
     return s;
   };
 
-  // ---------- Themes（「哪些 set 开着」的预设；本身不存 token）----------
+  // ---------- Themes (a preset of "which sets are on"; itself stores no tokens) ----------
   TK.theme = function (group, name) {
     return Array.from(cat().themes).find((t) => t.group === group && t.name === name) || null;
   };
 
-  // 建 theme（幂等）并声明其成员 set；不激活
+  // Build theme (idempotent) and declare its member sets; does not activate
   TK.ensureTheme = function (group, name, setNames) {
     let t = TK.theme(group, name);
     if (!t) t = cat().addTheme({ group: group, name: name });
@@ -65,22 +65,22 @@ return (function () {
     return t;
   };
 
-  // 激活/停用 theme。同 group 互斥由 Penpot 自动处理（激活一个会停掉同组另一个）；
-  // 停用某 theme 会连带停用它的 set，但如果该 set 也被其它**激活中**的 theme 包含，则保持激活。
+  // Activate/deactivate theme. Same-group mutual exclusion is handled automatically by Penpot (activating one stops the other in the group);
+  // deactivating a theme also deactivates its set, but if that set is also contained by another **active** theme, it stays active.
   TK.activateTheme = function (group, name, on) {
     const t = TK.theme(group, name);
-    if (!t) return { err: 'theme 不存在: ' + group + '/' + name };
+    if (!t) return { err: 'theme does not exist: ' + group + '/' + name };
     const want = on === false ? false : true;
     if (t.active !== want) { try { t.toggleActive(); } catch (e) { return { err: String(e).slice(0, 120) }; } }
     return { theme: group + '/' + name, active: t.active, activeSetsNow: TK.activeSets() };
   };
 
-  // 当前实际激活的 set 名单（= 所有激活 theme 的并集；无 theme 时就是各 set 自己的 active）
+  // Currently actually-activated set names (= union of all active themes; with no theme it's each set's own active)
   TK.activeSets = function () {
     return Array.from(cat().sets).filter((s) => s.active).map((s) => s.name);
   };
 
-  // ---------- 录 token（幂等：同值跳过，异值重建） ----------
+  // ---------- record token (idempotent: skip same value, rebuild different value) ----------
   TK.put = function (setName, type, name, value) {
     const s = TK.ensureSet(setName);
     const old = Array.from(s.tokens).find((t) => t.name === name);
@@ -98,10 +98,10 @@ return (function () {
     }
   };
 
-  // ---------- 批量播种 ----------
+  // ---------- batch seeding ----------
   // spec = [{ set:'pix · Core', active:true, tokens:[ ['color','color.primary','#FF471D'], ... ] }]
-  // 注意：set 按「是否一起激活」切，**不是按类型切**——一个 set 可以装下全部 17 类（见 references/design-tokens.md §1.1）
-  // 也接受 { set, tokens: { name: {type, value} } } 写法（再宽松一点）
+  // Note: split sets by "whether to activate together", **not by type** — one set can hold all 17 kinds (see references/design-tokens.md §1.1)
+  // Also accepts the { set, tokens: { name: {type, value} } } writing (a bit looser)
   TK.seed = function (spec) {
     const log = [];
     (spec || []).forEach((grp) => {
@@ -114,12 +114,12 @@ return (function () {
     return { sets: Array.from(cat().sets).map((s) => s.name + (s.active ? '' : '(INACTIVE!)')), log: log };
   };
 
-  // ---------- 应用（带 readback 校验） ----------
-  // 铁律 2/3：省略 properties 用默认属性；`'all'` 不可用；不适用=静默成功，故必须回读。
+  // ---------- apply (with readback verification) ----------
+  // Iron rules 2/3: omit properties to use the default property; 'all' is unavailable; inapplicable = silent success, so you must read back.
   TK.apply = async function (tokenName, shapes, props) {
     const arr = Array.isArray(shapes) ? shapes : [shapes];
     const t = TK.find(tokenName);
-    if (!t) return { ok: false, err: 'token 不存在或所在 set 未激活: ' + tokenName };
+    if (!t) return { ok: false, err: 'token does not exist or its set is inactive: ' + tokenName };
     let apiOk = true, apiErr = null;
     try { props && props.length ? t.applyToShapes(arr, props) : t.applyToShapes(arr); }
     catch (e) { apiOk = false; apiErr = String(e).slice(0, 160); }
@@ -136,13 +136,13 @@ return (function () {
       token: tokenName,
       type: t.type,
       apiOk: apiOk, apiErr: apiErr,
-      note: (apiOk && !allBound) ? 'API 未报错但未记录绑定 → 形状不支持该属性，或 set 未激活' : (allBound ? null : null),
+      note: (apiOk && !allBound) ? 'API reported no error but recorded no binding → shape does not support this property, or the set is inactive' : null,
       shapes: report
     };
   };
 
-  // ---------- 解除绑定 ----------
-  // 没有 removeToken API：直接写属性。**细则：写相同值不解绑，必须先写一个不同的值**。
+  // ---------- unbind ----------
+  // No removeToken API: write the property directly. **Detail: writing the same value does NOT unbind, you must write a different value first**.
   TK.unbindFill = async function (shape) {
     const keep = (() => { try { return shape.fills[0].fillColor; } catch (e) { return null; } })();
     const op = (() => { try { return shape.fills[0].fillOpacity; } catch (e) { return 1; } })();
@@ -164,11 +164,11 @@ return (function () {
     return { shape: shape.name, tokens: JSON.stringify(shape.tokens) };
   };
 
-  // ---------- 体检 ----------
-  // 判定逻辑与是否使用 theme 有关：
-  //   无 theme：set 未激活 = 故障（token 绑定会「成功但不生效」）。
-  //   有 theme：set 是否激活是**派生**的（= 激活 theme 的并集），未激活是正常态，
-  //            此时合格判据改为「无同组多激活 + 当前激活 set 内 token 全部可解析」。
+  // ---------- health-check ----------
+  // The judgment logic depends on whether a theme is used:
+  //   No theme: an inactive set = a fault (token binding would "succeed but not take effect").
+  //   With theme: whether a set is active is **derived** (= union of active themes), being inactive is a normal state,
+  //               and the pass criterion becomes "no same-group multi-activation + all tokens in active sets resolvable".
   TK.audit = function () {
     const sets = Array.from(cat().sets);
     const themes = Array.from(cat().themes);
@@ -178,7 +178,7 @@ return (function () {
       const toks = Array.from(s.tokens);
       if (!s.active) inactiveSets.push(s.name);
       toks.forEach((t) => {
-        // 未激活 set 里的 token 解析为空是**设计如此**，不算断链；只体检激活中的 set
+        // A token in an inactive set resolving empty is **by design**, not a broken link; only health-check active sets
         if (s.active && !t.resolvedValueString) unresolved.push(s.name + ' / ' + t.name + ' (' + t.type + ')');
         dupNames[t.name] = dupNames[t.name] || [];
         dupNames[t.name].push(s.name);
@@ -186,7 +186,7 @@ return (function () {
       return { name: s.name, active: s.active, tokens: toks.length, types: toks.reduce((a, t) => { a[t.type] = (a[t.type] || 0) + 1; return a; }, {}) };
     });
     const conflicts = Object.keys(dupNames).filter((k) => dupNames[k].length > 1).map((k) => k + ' ← ' + dupNames[k].join(', '));
-    // theme 完整性：同一 group 内不得有多个激活
+    // theme integrity: no multiple activations within the same group
     const byGroup = {};
     themes.forEach((t) => { if (t.active) { byGroup[t.group] = byGroup[t.group] || []; byGroup[t.group].push(t.name); } });
     const groupViolations = Object.keys(byGroup).filter((g) => byGroup[g].length > 1).map((g) => g + ': ' + byGroup[g].join(', '));
@@ -195,12 +195,12 @@ return (function () {
 
     const problems = [];
     if (!hasThemes) {
-      if (inactiveSets.length) problems.push('存在未激活 set：其中 token 的绑定会「成功但不生效」');
+      if (inactiveSets.length) problems.push('inactive set(s) exist: tokens bound in them would "succeed but not take effect"');
     } else {
-      if (groupViolations.length) problems.push('同一 group 内存在多个激活 theme');
-      if (!activeThemes.length) problems.push('定义了 theme 但当前没有任何激活 theme → 所有 set 都是关的');
+      if (groupViolations.length) problems.push('multiple active themes within the same group');
+      if (!activeThemes.length) problems.push('themes defined but none currently active → all sets are off');
     }
-    if (unresolved.length) problems.push('激活 set 内存在无法解析的 token：多为引用断链');
+    if (unresolved.length) problems.push('unresolvable token within an active set: usually a broken reference chain');
 
     return {
       ok: problems.length === 0,
@@ -215,14 +215,14 @@ return (function () {
       activeThemes: activeThemes,
       themeGroupViolations: groupViolations,
       problems: problems,
-      hint: problems.length ? problems.join('; ') : (hasThemes ? 'theme 配置正常，当前激活 set：' + activeSetsNow.join(', ') : '全部 token 可解析')
+      hint: problems.length ? problems.join('; ') : (hasThemes ? 'theme config OK, currently active sets: ' + activeSetsNow.join(', ') : 'all tokens resolvable')
     };
   };
 
-  // 便捷：一句话体检并抛错（用于门禁）
+  // Convenience: one-line health-check that throws (used as a gate)
   TK.assert = function () {
     const a = TK.audit();
-    if (!a.ok) throw new Error('token 体检未通过：' + JSON.stringify(a.problems));
+    if (!a.ok) throw new Error('token health check failed: ' + JSON.stringify(a.problems));
     return a;
   };
 

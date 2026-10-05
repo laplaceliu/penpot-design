@@ -1,12 +1,12 @@
-// repair_engines.js —— 审查修复引擎（alignPage / vAlignPage / fixInner / unclip）
-// 用法：整份粘贴进 execute_code 执行一次（字面量函数入 storage 跨调用复用）；
-//       之后逐页调用 storage.alignPage() 等，每次调用前核对 penpot.currentPage.name。
-// 机理、误伤恢复与 gridSnap 模板：references/engines.md；坐标/描边陷阱：references/api-pitfalls.md。
-// 约定：修复日志返回 [位置, 内容, 轴, 偏移] 供人工复核，确认后再进下一页。
+// repair_engines.js —— review and repair engines (alignPage / vAlignPage / fixInner / unclip)
+// Usage: paste the whole file into execute_code and run once (literal functions go into storage for cross-call reuse);
+//       then call storage.alignPage() etc. page by page, verifying penpot.currentPage.name before each call.
+// Mechanics, false-hurt recovery, and the gridSnap template: references/engines.md; coordinate/stroke pitfalls: references/api-pitfalls.md.
+// Convention: the repair log returns [position, content, axis, offset] for manual review, then proceed to the next page.
 
 return (function () {
   const rootOf = () => penpot.currentPage.root || penpot.root;
-  const headOf = (root) => root.children.find(c => c.type === 'board');  // 别用 children[0]（可能有孤儿文本）
+  const headOf = (root) => root.children.find(c => c.type === 'board');  // don't use children[0] (may have orphan text)
   const kidsOf = (n) => { try { const k = n.children; return Array.isArray(k) ? k : null; } catch (e) { return null; } };
   const move = (s, px, py) => {
     try { s.parentX = px; s.parentY = py; return true; } catch (e1) {}
@@ -14,10 +14,10 @@ return (function () {
     return false;
   };
 
-  // ---- alignPage V4：宿主吸附对齐 ----
-  // 文本找"包含其世界中心的最小宿主"（rect/ellipse，24≤边长，面积≤20000），本应居中
-  // （垂直偏差≤6px、大宿主≤3px）则吸附宿主精确中心；页级直接文本跳过；
-  // Breadcrumbs 流式重排；Tabs 按 120px 列居中。全程世界坐标（混用 parentX 会产生跨层级假包含）。
+  // ---- alignPage V4: host-snap alignment ----
+  // Text finds "the smallest host containing its world center" (rect/ellipse, 24≤side, area≤20000); if it should be centered
+  // (vertical deviation≤6px, large host≤3px) snap to the host's exact center; page-level direct text skipped;
+  // Breadcrumbs flow reflow; Tabs centered by 120px column. All in world coordinates (mixing parentX produces cross-level false containment).
   storage.alignPage = () => {
     const root = rootOf();
     const head = headOf(root);
@@ -40,7 +40,7 @@ return (function () {
       for (const c of kids) {
         try {
           if (c.type === 'text' && c.parent !== head) {
-            const tcx = c.x + c.width / 2, tcy = c.y + c.height / 2;   // 世界坐标
+            const tcx = c.x + c.width / 2, tcy = c.y + c.height / 2;   // world coordinates
             let host = null, ha = Infinity;
             for (const h of hosts) {
               if (tcx >= h.x && tcx <= h.x + h.width && tcy >= h.y && tcy <= h.y + h.height) {
@@ -63,13 +63,13 @@ return (function () {
       }
     }
     walk(head);
-    // Breadcrumbs 流式重排（x 累加实际渲染宽度 + 12 间距）
+    // Breadcrumbs flow reflow (x accumulates actual rendered width + 12 gap)
     for (const bc of head.children.filter(s => s.name === 'Breadcrumbs')) {
       const kids = bc.children.slice().sort((a, b) => a.parentX - b.parentX);
       let x = 0; const cy = bc.height / 2;
       for (const k of kids) { move(k, x, cy - k.height / 2); x += k.width + 12; }
     }
-    // Tabs 按列居中（列宽 120）
+    // Tabs centered by column (column width 120)
     for (const tb of head.children.filter(s => s.name === 'Tabs')) {
       const labels = tb.children.filter(c => c.type === 'text').sort((a, b) => a.parentX - b.parentX);
       labels.forEach((t, i) => move(t, i * 120 + (120 - t.width) / 2, (tb.height - t.height) / 2));
@@ -77,9 +77,9 @@ return (function () {
     return { fixes: log.length, errors: errors.slice(0, 5) };
   };
 
-  // ---- vAlignPage：小板文本垂直居中（带堆叠守卫） ----
-  // 小板（≤70px 高）内单行直接子文本垂直居中（偏差 5–15px 才触发）。
-  // 堆叠守卫：同板 x 重叠≥50% 且 y 相差>4 的多行文本 = 刻意堆叠（步进钮＋/－、Progress 顶标签），跳过。
+  // ---- vAlignPage: small-board text vertical centering (with stacking guard) ----
+  // Small boards (≤70px tall) single-line direct-child text vertical centering (only triggers at deviation 5–15px).
+  // Stacking guard: multi-line text with same-board x overlap≥50% and y diff>4 = deliberate stacking (stepper +/−, Progress top label), skip.
   storage.vAlignPage = () => {
     const root = rootOf();
     const head = headOf(root);
@@ -109,7 +109,7 @@ return (function () {
     return { fixes: log.length, sample: log.slice(0, 12) };
   };
 
-  // ---- fixInner：描边批修（闭合形状→inner，路径→center） ----
+  // ---- fixInner: stroke batch fix (closed shapes→inner, paths→center) ----
   storage.fixInner = () => {
     const root = rootOf();
     let closed = 0, open = 0;
@@ -132,7 +132,7 @@ return (function () {
     return { closed, open };
   };
 
-  // ---- unclip：解除板裁剪（修复辉光不可见） ----
+  // ---- unclip: release board clipping (fix glow invisible) ----
   storage.unclip = () => {
     const root = rootOf();
     let n = 0;
@@ -149,7 +149,7 @@ return (function () {
     return n;
   };
 
-  // ---- 清理根级孤儿文本（历史崩溃残留，会污染遍历） ----
+  // ---- clean root-level orphan text (historical crash residue, pollutes traversal) ----
   storage.cleanOrphans = () => {
     const root = rootOf();
     let n = 0;
@@ -157,13 +157,13 @@ return (function () {
     return n;
   };
 
-  // ---- fixStaleCenter：stale-center 指纹精准修复（仅修「陈旧瞬态宽高」烤进坐标的居中错位）----
-  // 指纹：文本**左上角**恰好落在宿主中心点（|t.x−hcx|≤2 或 |t.y−hcy|≤2），但文本真实中心
-  //   与宿主中心偏差 >0.5 —— 这是「用创建瞬间 1×1 瞬态宽高算 (w−1)/2」的算术后果；
-  //   刻意左对齐/内缩的文本只会落在 host.x+padding（12/16/18/24…），绝不会贴住中心点，
-  //   因此按此指纹修复**零误伤**。按轴独立判定与修复（可能只偏一个轴）。
-  // 与 alignPage 的分工：alignPage 吸附 ≤6px 的微差；本引擎专治 6px 以上、指纹命中的大偏移。
-  // 引入缺陷兜底（G8）：只移动命中指纹的文本坐标，不改层级/样式；盲居中类误伤由指纹条件排除。
+  // ---- fixStaleCenter: stale-center fingerprint precise fix (only fixes centering offset baked by "stale transient width/height") ----
+  // Fingerprint: the text's **top-left corner** lands exactly on the host center (|t.x−hcx|≤2 or |t.y−hcy|≤2), but the text's real center
+  //    deviates from the host center by >0.5 — the arithmetic consequence of "computing (w−1)/2 with the 1×1 transient width/height at creation";
+  //    deliberately left-aligned/inset text only lands at host.x+padding (12/16/18/24…), never sticks to the center,
+  //    so fixing by this fingerprint is **zero false-hurt**. Per-axis independent judgment and fix (may only be off on one axis).
+  // Division of labor with alignPage: alignPage snaps ≤6px micro-diff; this engine specializes in >6px, fingerprint-hit large offsets.
+  // Defect-introduction fallback (G8): only moves the text coordinates that hit the fingerprint, doesn't change z-order/style; blind-centering false-hurts are excluded by the fingerprint condition.
   storage.fixStaleCenter = (root) => {
     root = root || rootOf();
     const log = [];
@@ -203,31 +203,31 @@ return (function () {
     return { fixes: log.length, log: log.slice(0, 40) };
   };
 
-  // ---- groupAssemblies：装配成组（装配归属契约：penpot-structure.md §4）----
-  // 同父级内「宿主（rect/ellipse ≥24）+ 中心落在宿主内、且最小宿主就是它」的兄弟图元
-  // → penpot.group([host, ...members]) 成组，组名 = 宿主名。禁止散件同级堆叠。
-  // 由内而外（面积升序）处理，天然支持嵌套：内层先成组，外层把内层组当普通成员收编
-  // （按钮组进导航条）；板是分区容器，不做装配宿主；流式子图元跳过（归 flex 管）。
-  // 幂等：已在同一 group/组件内的装配不重复成组；只动层级，不动坐标/样式。
-  // 升级路径：单次装配=group；要复用/进 13 索引 → `createComponent([group])` 升级为组件，
-  // 页面一律 `comp.instance()`（注册纪律见 penpot-structure.md §4）。
+  // ---- groupAssemblies: assemble into groups (assembly-ownership contract: penpot-structure.md §4) ----
+  // Same-parent "host (rect/ellipse ≥24) + siblings whose center falls inside it, and the smallest host is it"
+  // → penpot.group([host, ...members]) to group, group name = host name. Loose same-level stacking forbidden.
+  // Inside-out (ascending area) processing, natively supports nesting: inner groups first, outer group absorbs inner groups as normal members
+  // (button group into nav bar); a board is a partition container, not an assembly host; flow child primitives skipped (left to flex).
+  // Idempotent: assemblies already in the same group/component aren't re-grouped; only changes hierarchy, not coordinates/style.
+  // Upgrade path: single-use assembly = group; to reuse / enter the 13 index → `createComponent([group])` upgrades to a component,
+  // pages always `comp.instance()` (registration discipline see penpot-structure.md §4).
   storage.groupAssemblies = (root) => {
     root = root || rootOf();
     const log = [];
     const isFlow = (s) => !!(s.layoutChild && s.layoutChild.absolute === false);
     const walk = (node) => {
-      if (node.isComponentInstance && node.isComponentInstance()) return;  // 实例内部是锁定副本，不动
+      if (node.isComponentInstance && node.isComponentInstance()) return;  // instance internals are locked copies, don't touch
       const kids0 = kidsOf(node); if (!kids0) return;
-      for (const c of kids0.slice()) if (c.type === 'board' || c.type === 'group') walk(c);  // 先内层
+      for (const c of kids0.slice()) if (c.type === 'board' || c.type === 'group') walk(c);  // inner first
       const kids = kidsOf(node); if (!kids) return;
       const byArea = kids
         .filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 24 && h.height >= 24 && !isFlow(h))
-        .sort((a, b) => a.width * a.height - b.width * b.height);
-      const taken = new Set();      // 已被收编的成员
-      const live = kids.slice();    // 成员代行者列表（成组后由组顶替）
+        .sort((a, b) => a.width * b.height - b.width * b.height);
+      const taken = new Set();      // members already absorbed
+      const live = kids.slice();    // member stand-in list (replaced by group after grouping)
       for (const h of byArea) {
         try {
-          if (taken.has(h.id)) continue;   // 已作为成员进了内层组
+          if (taken.has(h.id)) continue;   // already a member of an inner group
           const members0 = live.filter((s) => s !== h && !taken.has(s.id) && !isFlow(s) &&
             s.x + s.width / 2 >= h.x && s.x + s.width / 2 <= h.x + h.width &&
             s.y + s.height / 2 >= h.y && s.y + s.height / 2 <= h.y + h.height);
@@ -235,40 +235,40 @@ return (function () {
             const scx = s.x + s.width / 2, scy = s.y + s.height / 2;
             let smallest = h, sa = h.width * h.height;
             for (const h2 of byArea) {
-              if (h2 === h || taken.has(h2.id)) continue;   // 已收编的内层宿主让位给其组
+              if (h2 === h || taken.has(h2.id)) continue;   // absorbed inner hosts yield to their group
               if (scx >= h2.x && scx <= h2.x + h2.width && scy >= h2.y && scy <= h2.y + h2.height && h2.width * h2.height < sa) { smallest = h2; sa = h2.width * h2.height; }
             }
             return smallest === h;
           });
           if (!members.length) continue;
-          // ⚠️ parent 每次访问生成新代理，`===` 恒 false（api-pitfalls children 代理坑）——必须按 id 比较
+          // ⚠️ parent generates a new proxy on each access, `===` is always false (api-pitfalls children proxy pitfall) — must compare by id
           const pid = h.parent ? h.parent.id : null;
           if (pid && (h.parent.type === 'group' || (h.parent.isComponentRoot && h.parent.isComponentRoot())) &&
               members.every((m) => m.parent && m.parent.id === pid)) continue;
-          // ⚠️ penpot.group 有破坏性副作用（api-pitfalls §6.1）：组落 flex 流位 + 成员偏移 −minParentXY。
-          // 补偿式成组：先捕获 bbox 的 min parentXY，成组后逃出流（absolute）并复位，readback 校验。
+          // ⚠️ penpot.group has destructive side effects (api-pitfalls §6.1): group drops into flex flow position + members shift −minParentXY.
+          // Compensatory grouping: first capture the bbox's min parentXY, escape the flow (absolute) after grouping and reset, readback-verify.
           const all = [h].concat(members);
           const minPX = Math.min.apply(null, all.map((s) => s.parentX));
           const minPY = Math.min.apply(null, all.map((s) => s.parentY));
-          const maxPI = Math.max.apply(null, all.map((s) => s.parentIndex || 0));  // z：组占顶层成员的层槽
+          const maxPI = Math.max.apply(null, all.map((s) => s.parentIndex || 0));  // z: group takes the top member's layer slot
           const g = penpot.group(all);
           if (g) {
             try { g.name = h.name; } catch (e) {}
             try { g.layoutChild.absolute = true; } catch (e) {}
-            // z 修复：penpot.group 会打乱成员前后序（实测标签被底板盖住）→ 组内面积降序重排
+            // z fix: penpot.group scrambles member front/back order (tested: label covered by base plate) → re-sort within group by descending area
             try {
               const inner = Array.from(g.children).sort((a, b) => (b.width * b.height) - (a.width * a.height));
               for (let zi = 0; zi < inner.length; zi++) inner[zi].setParentIndex(zi);
             } catch (e) {}
             try { g.setParentIndex(maxPI); } catch (e) {}
             try { g.parentX = minPX; g.parentY = minPY; } catch (e) {}
-            // readback 校验（写入可能静默失败）；失败按世界坐标重试一次
+            // readback-verify (write may silently fail); if failed, retry once in world coordinates
             if (Math.abs(g.parentX - minPX) > 1 || Math.abs(g.parentY - minPY) > 1) {
               try { g.x = node.x + minPX; g.y = node.y + minPY; } catch (e) {}
             }
             members.forEach((m) => taken.add(m.id));
             taken.add(h.id);
-            live.push(g);   // 组顶替成员，供外层宿主收编（嵌套）
+            live.push(g);   // group replaces members, for outer host to absorb (nesting)
             log.push([g.name, members.length + 1]);
           }
         } catch (e) {}
@@ -278,11 +278,11 @@ return (function () {
     return { groups: log.length, log: log.slice(0, 40) };
   };
 
-  // ---- fixZOrder：组内前后顺序修复（z 语义：parentIndex 越大越靠前，0=最底）----
-  // penpot.group 对成员 z 序不透明（实测会把底板排到标签上面 → 标签被盖住）。
-  // 规则：组内按**面积降序**重排（大底板在下、文字/图标在上），setParentIndex(i) 逐个落位。
-  // 与 groupAssemblies 配套：每轮成组后跑一次；export 小形状组可能命中导出缓存假象，
-  // 验证 z 序请导出**整板**（api-pitfalls §6.1）。
+  // ---- fixZOrder: within-group front/back order fix (z semantics: larger parentIndex = more front, 0=bottom) ----
+  // penpot.group is opaque to member z-order (tested: base plate ranked above label → label covered).
+  // Rule: within group re-sort by **descending area** (large base at bottom, text/icon on top), setParentIndex(i) one by one.
+  // Pairs with groupAssemblies: run once after each grouping; small-shape group export may hit a cache illusion,
+  // verify z-order by exporting the **whole board** (api-pitfalls §6.1).
   storage.fixZOrder = (root) => {
     root = root || rootOf();
     let fixed = 0;

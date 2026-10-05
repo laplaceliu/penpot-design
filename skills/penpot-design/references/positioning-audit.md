@@ -1,375 +1,372 @@
-# 定位审计：如何在第一次就做对，以及出错后如何主动发现
+# Positioning Audit: how to get it right the first time, and how to actively find errors afterward
 
-本文是一份事故复盘 + 预防契约。事故背景：一次 16 页设计系统构建，用户交付验收时报告
-「**每一页中都有元素定位不对**」。根因不是某一页写错了坐标，而是**整套坐标/文本 helper 被临时自造**，
-绕开了本技能已有的 canonical 引擎，于是同一个系统性偏移被复制到了全部 16 页。
+This article is an incident post-mortem + prevention contract. Incident background: in one 16-page design-system build, the user reported at delivery/acceptance that "**every page has mispositioned elements**". The root cause was not a wrong coordinate on one page, but that the **whole coordinate/text helper set was improvised on the spot**,
+bypassing this skill's existing canonical engines, so the same systematic offset was copied into all 16 pages.
 
-## 一、根因链（按贡献度排序）
+## I. Root-cause chain (ordered by contribution)
 
-### R1 自造 helper，绕开 canonical 引擎（决定性）
+### R1 Improvised helper, bypassing the canonical engine (decisive)
 
-`scripts/seed_storage.js` 已提供 `mkAbsBoard` / `absMount` / `mkText` / `mkRect` / `ct` / `mkChip`；
-`scripts/repair_engines.js` 已提供 `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans`。
-本次构建**没有读这两个脚本**，改为现场写了一套自己的 helper，造成三处偏离：
+`scripts/seed_storage.js` already provides `mkAbsBoard` / `absMount` / `mkText` / `mkRect` / `ct` / `mkChip`;
+`scripts/repair_engines.js` already provides `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans`.
+This build **did not read these two scripts**, and instead wrote its own helper set on site, causing three deviations:
 
-| 偏离点 | canonical | 事故中的做法 | 后果 |
+| Deviation | Canonical | The incident's approach | Consequence |
 |---|---|---|---|
-| 板工厂 | `addFlexLayout()` + `flex.dir='column'` + `horizontalSizing/verticalSizing='fixed'`（方案 C） | 裸板 + 世界坐标 append（方案 A） | 方案 A 的已知失效模式是**导出整体偏移 `-board.y`（readback 正确、渲染错位）**，与本事故症状一致 |
-| 文本定位 | 实测 `t.width/t.height` → `absMount(parent, t, cx−w/2, cy−h/2)` | 自造 `boxLabel`：`growType='fixed'` + `resize(w,h)` + `verticalAlign='center'` | `verticalAlign` 不是本技能依赖过的机制；残差正是 `vAlignPage` 的触发域（5–15px），全 16 页复制 |
-| 标签归属 | 文本 append 进**容器板本身**（`absMount(b, t, …)`） | 大量文本 append 进**父板**（与容器板同级） | 标签与容器解耦：组件注册后是空壳；reparent/移动容器时标签被撇下 |
+| Board factory | `addFlexLayout()` + `flex.dir='column'` + `horizontalSizing/verticalSizing='fixed'` (approach C) | bare board + world-coordinate append (approach A) | the known failure mode of approach A is **whole-page offset `-board.y`** (readback correct, render misaligned), matching this incident's symptom |
+| Text positioning | tested `t.width/t.height` → `absMount(parent, t, cx−w/2, cy−h/2)` | improvised `boxLabel`: `growType='fixed'` + `resize(w,h)` + `verticalAlign='center'` | `verticalAlign` is not a mechanism this skill relied on; the residual is exactly `vAlignPage`'s trigger domain (5–15px), copied across all 16 pages |
+| Label ownership | text appended into the **container board itself** (`absMount(b, t, …)`) | lots of text appended into the **parent board** (same level as the container board) | label decoupled from container: component registration yields an empty shell; when reparenting/moving the container the label is left behind |
 
-**结论：`mkAbsBoard`/`absMount`/`mkText` 与 `alignPage`/`vAlignPage` 是"必须原样使用"的契约件，不是参考实现。**
+**Conclusion: `mkAbsBoard`/`absMount`/`mkText` and `alignPage`/`vAlignPage` are "use as-is" contract parts, not reference implementations.**
 
-### R2 只跑了「描边/去裁剪」，漏跑「对齐」
+### R2 Only ran "stroke/de-clip", missed "alignment"
 
-SKILL 工作流步骤 5 写的是「**对齐**/描边/去裁剪审查」。本次用手写脚本跑了 `fixInner` 等价物 + 去裁剪，
-**`alignPage` / `vAlignPage` 一次都没跑**，于是 R1 留下的残差从未被校正。
+SKILL workflow step 5 says "**alignment**/stroke/de-clip review". This build used a hand-written script for a `fixInner` equivalent + de-clip,
+**`alignPage` / `vAlignPage` were never run once**, so the residual left by R1 was never corrected.
 
-### R3 验收抽样，未全覆盖
+### R3 Acceptance sampling, not full coverage
 
-全部 ~120 个板只导出了 4 个做验收就宣布完成。**没导出过的板，正是错误存活的地方**。
+All ~120 boards only exported 4 for acceptance before declaring done. **The boards never exported are exactly where errors survive.**
 
-### R4 进度只活在 `storage` 与上下文里
+### R4 Progress only lived in `storage` and context
 
-MCP 连接中途断开（`penpot.local:443` connect timeout），构建队列与进度无法续跑，也无人能接手复核。
+The MCP connection dropped midway (`penpot.local:443` connect timeout), so the build queue and progress couldn't resume, and no one could take over for review.
 
-## 二、四个典型签名：怎么"主动发现"
+## II. Four typical signatures: how to "actively find"
 
-肉眼看导出图只能发现"感觉歪了"。下面是可机器判定的四个签名，对应 `scripts/audit_layout.js` 的四类 finding。
+Eyeballing the export can only find "looks crooked". Below are four machine-decidable signatures, mapping to the four finding classes of `scripts/audit_layout.js`.
 
-### S1 `out_of_bounds` —— 子元素跑出父板
+### S1 `out_of_bounds` — child element runs outside the parent board
 
-- **含义**：子元素矩形未被父板矩形包含（容差 1.5px）。
-- **最典型成因**：方案 A 失效，整体偏移 `-board.y`（板 y=240 时内容整体上移 240px，跑到板外甚至页原点）。
-`detail` 里的四元组 `(L,T,R,B)` 分别给出相对父板四边的越界量，**按哪一边越界即可判定签名**：
+- **Meaning**: the child rect is not contained by the parent rect (tolerance 1.5px).
+- **Most typical cause**: approach A failure, whole-page offset `-board.y` (when board y=240 the content shifts up 240px overall, running outside the board or even to the page origin). The quadruple `(L,T,R,B)` in `detail` gives the overflow on each of the parent's four sides, **judge the signature by which side overflows**:
 
-| 越界方向 | 签名 | 修法 |
+| Overflow direction | Signature | Fix |
 |---|---|---|
-| **L 负值、且同页多板同值** | 常量列偏移（复制粘贴左列坐标填右列板） | `fixColumnOffset` 整块平移 |
-| **T/B 负值、且 ≈ `-board.y`** | 方案 A 失效（整体偏移 `-board.y`） | 换方案 C 重建，**不要逐元素挪** |
-| B 负值、每板值不同（几十 px） | 板高不足 | `fitBoardHeight` |
-| B 负值、且形状是 PageRoot 的直接子板 | PageRoot 高度不足 | `fitRootHeight` |
-| R 负值、形状是右对齐文本 | 右侧溢出（文本框超宽） | `fixOverflowRight` |
+| **L negative, and multiple boards on the same page share the value** | constant column offset (copy-paste left-column coords into right-column board) | `fixColumnOffset` shift the whole block |
+| **T/B negative, and ≈ `-board.y`** | approach A failure (whole-page offset `-board.y`) | rebuild with approach C, **don't move element by element** |
+| B negative, value differs per board (tens of px) | board height insufficient | `fitBoardHeight` |
+| B negative, and shape is a direct child board of PageRoot | PageRoot height insufficient | `fitRootHeight` |
+| R negative, shape is right-aligned text | right-side overflow (text box too wide) | `fixOverflowRight` |
 
-> **`fitBoardHeight` 的 maxGrow 护栏（关键，务必开启）**
-> 这个引擎有个危险特性：**它能"把放错的子元素吞进板里"，从而把错位合法化**。
-> 板真的需要长大时，幅度通常是几十 px；**一旦需要长高几百 px，那必是某个子元素被放错位置**，
-> 正确修法是挪那个子元素，而不是把板撑大——撑大之后审计看到"子元素就在板内"，反而给出假阴性。
-> 所以引擎内置 `maxGrow`（默认 160px）：超限则**拒绝长高**并放进 `suspect` 清单，附上
-> `deepestChild`（最深的那个子元素及其 y），直接指出嫌疑对象。
-> 实测教训：某 Demo 页两个 Settings 板被撑到 **1336px / 1290px**（行距仅 960px），
-> 比其内容应有高度多出约 500px —— 这就是"被吞进去的错位子元素"的指纹。
+> **`fitBoardHeight`'s maxGrow guardrail (critical, must enable)**
+> This engine has a dangerous trait: **it can "swallow misplaced child elements into the board", thereby legitimizing the misalignment**.
+> When the board really needs to grow, the amount is usually tens of px; **once it needs to grow hundreds of px, that must be a child element misplaced**,
+> the correct fix is to move that child, not to inflate the board — after inflating, the audit sees "the child is inside the board" and gives a false negative instead.
+> So the engine has a built-in `maxGrow` (default 160px): beyond it, it **refuses to grow** and puts it into the `suspect` list, attaching
+> the `deepestChild` (the deepest child and its y), directly pointing at the suspect.
+> Tested lesson: two Settings boards on one Demo page were inflated to **1336px / 1290px** (row gap only 960px),
+> about 500px more than their content's proper height — this is the fingerprint of "misplaced child element swallowed in".
 
-- **判据（区分 L 偏移与方案 A）**：L 偏移是 **X 轴常量**，且常量 = `board.x − originX`（本例 920 = 1000 − 80）；
-  方案 A 失效是 **Y 轴**且常量 = `-board.y`。**先看轴，再看是否同值。**
-- **伴随特征**：readback（`child.x/y` 读回）**全对**，只有渲染/导出错位。**readback 对 ≠ 定位对。**
+- **Criterion (distinguish L offset from approach A)**: the L offset is a **constant on the X axis**, and the constant = `board.x − originX` (here 920 = 1000 − 80);
+  approach A failure is on the **Y axis** and the constant = `-board.y`. **Look at the axis first, then whether the value is shared.**
+- **Accompanying trait**: readback (`child.x/y` read back) is **all correct**, only render/export is misaligned. **Readback-correct ≠ positioned-correct.**
 
-### S2 `text_centre_residue` / `text_centre_info` —— 文本在宿主里没居中
+### S2 `text_centre_residue` / `text_centre_info` — text not centered in its host
 
-- **含义**：文本世界中心落在某个小宿主（rect/ellipse，边长 ≥24、面积 ≤20000）内，但与宿主中心偏差 > 0.5px。
-- **三级判定（关键，否则误报成灾）**：
-  - `text_centre_residue` = 偏差 **≤8px 且文本框宽 ≥ 宿主宽 ×0.72** → **本意就是居中**（按钮/胶囊标签），是缺陷。
-  - `text_centre_residue`（**stale-center 指纹**）= 偏差 >8px，但**文本左上角恰好落在宿主中心点**
-    （`|t.x−hcx|≤2` 或 `|t.y−hcy|≤2`，按轴独立）→ 见下，是缺陷，`detail` 带 `stale-center` 标记。
-  - `text_centre_info` = 其余情况（偏大、或文本框明显窄于宿主）→ **刻意内缩**（带尾部 × 的 chip、左对齐的下拉选项行），**不算缺陷**。
-- **成因 A（≤8px 残差）**：用固定文本盒 + `verticalAlign/horizontalAlign` 居中，而不是"实测宽高 + 居中放置"。
-- **成因 B（stale-center 大偏移）**：**在 `createText()` 创建瞬间就读 `t.width/t.height` 算居中**。
-  创建瞬间宽高是 1px 量级瞬态值（`mcp-automation.md` 陷阱表「文本定位」），`(w−1)/2` 的算术后果是
-  **文本左上角恰好落在宿主中心**——这就是指纹的来历。实测案例：110×32 药丸里的 37×15 标签右偏 18.5px、
-  下偏 7.5px（= `(37−1)/2`、`(15−1)/2`），16 页系统性复制。
-  **注意：刻意左对齐的文本只会落在 `host.x+padding`（12/16/18/24…），绝不会贴住中心点（±2px），
-  因此指纹判定零误伤**；但**按轴独立**——左对齐字段占位符可能只命中 Y 轴指纹（垂直不居中），只修 Y。
-- **修复**：偏差 5–15px → `storage.vAlignPage()`；≤6px → `storage.alignPage()`（宿主吸附，容差 6px / 大宿主 3px）；
-  **>6px 且命中 stale-center 指纹 → `storage.fixStaleCenter()`**（只动命中轴的坐标，不碰层级/样式）。
-- **注意**：`alignPage`/`fixStaleCenter` 只修指纹命中的元素；刻意非居中的会留在清单里——这是**预期行为**。
+- **Meaning**: a text's world center falls inside some small host (rect/ellipse, side ≥24, area ≤20000), but deviates from the host center by > 0.5px.
+- **Three-level judgment (critical, otherwise false positives run wild)**:
+  - `text_centre_residue` = deviation **≤8px and text-box width ≥ host width ×0.72** → **the intent was centering** (button/capsule label), a defect.
+  - `text_centre_residue` (**stale-center fingerprint**) = deviation >8px, but the **text's top-left corner lands exactly on the host's center**
+    (`|t.x−hcx|≤2` or `|t.y−hcy|≤2`, per-axis independent) → see below, a defect, `detail` carries the `stale-center` mark.
+  - `text_centre_info` = other cases (larger, or text box clearly narrower than host) → **deliberate inset** (tail × chip, left-aligned dropdown option rows), **not a defect**.
+- **Cause A (≤8px residual)**: used a fixed text box + `verticalAlign/horizontalAlign` for centering, rather than "measure actual width/height + center placement".
+- **Cause B (stale-center large offset)**: **reading `t.width/t.height` at the `createText()` creation instant to compute centering**.
+  At creation the width/height are ~1px transient values (mcp-automation.md pitfall table "text positioning"), the arithmetic consequence of `(w−1)/2` is
+  **the text's top-left corner lands exactly on the host center** — that's the origin of the fingerprint. Tested case: 37×15 label right-shifted 18.5px, down-shifted 7.5px (= `(37−1)/2`, `(15−1)/2`) inside a 110×32 pill, copied systematically across 16 pages.
+  **Note: deliberately left-aligned text only lands at `host.x+padding` (12/16/18/24…), never sticks to the center (±2px),
+  so the fingerprint judgment has zero false positives**; but it's **per-axis independent** — a left-aligned field placeholder may only hit the Y-axis fingerprint (vertically off-center), fix only Y.
+- **Fix**: deviation 5–15px → `storage.vAlignPage()`; ≤6px → `storage.alignPage()` (host-snap, tolerance 6px / 3px for large hosts);
+  **>6px and matching the stale-center fingerprint → `storage.fixStaleCenter()`** (only moves the coordinate of the hit axis, touches no hierarchy/style).
+- **Note**: `alignPage`/`fixStaleCenter` only fix elements matching the fingerprint; deliberately off-center ones stay in the list — this is **expected behavior**.
 
-### S3 `crash_100x100` / `degenerate_size` —— 尺寸退化
+### S3 `crash_100x100` / `degenerate_size` — size degradation
 
-- `crash_100x100`：非文本图元恰好 100×100 = 崩溃损伤（api-pitfalls §8）。
-- `degenerate_size`：**只有** `w≤1 且 h≤1`、或**文本**宽/高 ≤1 才算。
-  **1px 高的发丝线（分隔线、进度轨道）是刻意设计，不是退化**——早期版本用「宽或高 ≤1」判定，在本系统里误报了 85 条。
+- `crash_100x100`: a non-text primitive exactly 100×100 = crash damage (api-pitfalls §8).
+- `degenerate_size`: only **`w≤1 and h≤1`**, or **text** width/height ≤1 counts.
+  **A 1px-tall hairline (divider, progress track) is deliberate design, not degradation** — an early version judging by "width or height ≤1" false-reported 85 in this system.
 
-### S4 `header_collision` —— 正文压到页头
+### S4 `header_collision` — body pressing onto the page header
 
-- **含义**：板上 `rect/ellipse` 与页头**标题文本**重叠 >60%。
-- **判定门槛（关键）**：页头 = 顶部 `parentY < 96` 且**字号 ≥20px** 的文本。
-  若不设字号门槛，两类背景板会全量假报（本系统实测 31 条里 28 条是假的）：
-  - PageRoot 自带的 `NN-Header` 背景板（它本来就该盖在标题下）
-  - 演示屏 1440/375 的导航条背景 rect（logo 是 15–18px）
-- **成因**：规格板正文起始 y 未让开页头脚手架。**新板首板必查这一条**。
+- **Meaning**: a `rect/ellipse` on a board overlaps the page-header **title text** by >60%.
+- **Threshold (critical)**: header = top `parentY < 96` and **font size ≥20px** text.
+  Without the font-size threshold, two kinds of background boards would all false-report (of 31 tested here, 28 were false):
+  - PageRoot's own `NN-Header` background board (it's supposed to sit under the title)
+  - the nav-bar background rect of a 1440/375 demo screen (logo is 15–18px)
+- **Cause**: the spec-board body's start y didn't yield to the header scaffold. **The first board of a new board must check this.**
 
-### S5 `root_stray` —— PageRoot 之外的顶层游离图元
+### S5 `root_stray` — top-level stray primitives outside PageRoot
 
-- **含义**：`page.root` 的直接子元素里，除 `NN-PageRoot` 之外的形状。
-- **成因**：注册库组件 / 建变体容器期间产生的**绑定实例残留**（本例：page 01 的 `Badge·New`、
-  page 03 的 `Button` 各一个 0 子元素的游离实例）。`createVariantContainer` 还会把容器放在**页根**而非 PageRoot 内。
-- **处置**：先 `isMainComponent()` / `component` 判明身份——**绑定实例可安全 remove**（不影响库），
-  主实例要连同组件一起考虑。本例两个都是 0 子元素的绑定实例，直接删。
+- **Meaning**: among `page.root`'s direct children, shapes other than `NN-PageRoot`.
+- **Cause**: **bound-instance residue** produced during library-component registration / variant-container building (here: page 01's `Badge·New`,
+  page 03's `Button`, each a 0-child stray instance). `createVariantContainer` also places the container at the **page root** rather than inside PageRoot.
+- **Handling**: first use `isMainComponent()` / `component` to identify — **a bound instance can be safely removed** (doesn't affect the library),
+  a main instance must be considered together with the component. Both here were 0-child bound instances, deleted directly.
 
-### S6 字体一致性 —— 同页/同类文字用了非预期字体
+### S6 Font consistency — unexpected font used for same-page/same-class text
 
-- **含义**：`auditPage()` 返回的 `fonts` 直方图里出现了非预期字体，或**应该用 display 字体的标题却是正文体**。
-- **成因**：**分批构建时 helper 的签名演进不同步**。本例 page 01 是早期批次建的，
-  当时的 `mkText` 还没有 `font` 参数，于是「Type Scale Display」这一板的 display 样例全部回落 Inter；
-  而后期批次（Cover / Landing）显式传了 `font:'display'`，正确渲染成 Anton。
-- **检测**：`auditPage().fonts` 给出字体直方图；对每页抽查「display 级字号（≥56px）的文字是否为 display 字体」。
-- **修复**：`penpot.fonts.findByName('Anton')` → `anton.applyToText(t, anton.variants.find(v => v.fontWeight==='400'))`。
-  本例 4 处修正；部分形状会抛 `Value not valid`，需 try/catch 逐个处理。
-- **预防**：canonical `mkText` 必须**一开始就带 font 角色参数**（见 `scripts/seed_storage.js` 的 `opts.font`），
-  不要在建到一半时才加——中途改 helper 会让前后批次产生不一致，而这类不一致**不会触发几何审计**，只能靠字体直方图发现。
+- **Meaning**: `auditPage()`'s returned `fonts` histogram shows an unexpected font, or **a title that should use the display font is in body font**.
+- **Cause**: **helper signature drift across batched builds was out of sync**. Here page 01 was built in an early batch,
+  at which point `mkText` had no `font` parameter yet, so the display samples on the "Type Scale Display" board all fell back to Inter;
+  later batches (Cover / Landing) explicitly passed `font:'display'` and rendered correctly as Anton.
+- **Detection**: `auditPage().fonts` gives the font histogram; spot-check per page whether "display-level size (≥56px) text is a display font".
+- **Fix**: `penpot.fonts.findByName('Anton')` → `anton.applyToText(t, anton.variants.find(v => v.fontWeight==='400'))`.
+  Here 4 corrections; some shapes throw `Value not valid`, handle one by one with try/catch.
+- **Prevention**: the canonical `mkText` must **carry the font-role parameter from the start** (see `scripts/seed_storage.js`'s `opts.font`),
+  don't add it halfway through — changing the helper mid-build makes early/late batches inconsistent, and this kind of inconsistency **won't trigger the geometry audit**, only discoverable via the font histogram.
 
-### S7 `board_overlap` —— 兄弟板互相压住
+### S7 `board_overlap` — sibling boards pressing on each other
 
-- **含义**：同一个 PageRoot 下的两个顶层板矩形相交（相交面积 >1px）。
-- **为什么最阴**：它**是"修复"制造出来的**。流程是
-  「审计发现板高不足 → `fitBoardHeight` 把板长高 → 行长超过固定行距 → 压到下一行的板」。
-  只查「包含性」的审计对此**完全盲**：长高后的板当然包含了自己的内容，页角色也一切正常。
-- **判定**：先看 `detail` 里的重叠宽高；再看是不是**同列**（x 相同）的相邻板 ——
-  同列相邻板重叠 = 行距被顶破，这是典型形态。
-- **修复**：`reflowRows`（按实际板高重新排行距）。**不要**改板高去迁就网格 ——
-  板高由内容决定；要迁就网格的是**行距**。
-- **实现要点**：移动板不会带走 `layoutChild.absolute` 的子元素（api-pitfalls §10），
-  必须 `moveSubtree` 逐元素按同一 (dx,dy) 平移世界坐标，否则会出现「板动了、内容没动」的二次错位。
-- **顺序铁律**：`fitBoardHeight` → `reflowRows` → `fitRootHeight`。
-  行距重排必须用**长高后的真实高度**，根板收高必须用**重排后的真实底边**。反过来做就要跑两轮。
+- **Meaning**: two top-level board rects under the same PageRoot intersect (intersection area >1px).
+- **Why it's the sneakiest**: it **is "created" by a fix**. The flow is
+  "audit finds board height insufficient → `fitBoardHeight` grows the board → row length exceeds the fixed row gap → presses onto the next row's board".
+  An audit that only checks "containment" is **completely blind** to this: the grown board naturally contains its own content, and the page role is all normal.
+- **Judgment**: first look at the overlap width/height in `detail`; then see if it's **same-column** (same x) adjacent boards —
+  same-column adjacent board overlap = the row gap was breached, the typical form.
+- **Fix**: `reflowRows` (re-row the gap by actual board height). **Don't** change board height to fit the grid —
+  board height is decided by content; what should fit the grid is the **row gap**.
+- **Implementation note**: moving a board won't carry `layoutChild.absolute`'s child elements (api-pitfalls §10),
+  you must `moveSubtree` and translate each element's world coordinates by the same (dx,dy), otherwise you get a secondary misalignment of "board moved, content didn't".
+- **Order iron rule**: `fitBoardHeight` → `reflowRows` → `fitRootHeight`.
+  Row re-flow must use the **real height after growing**, the root-board shrink must use the **real bottom after reflow**. Reverse order means running two rounds.
 
-### S8 `text_overlap` —— 两段文本压在一起
+### S8 `text_overlap` — two text segments pressing together
 
-- **含义**：同一父级下两段文本的可视矩形重叠 >60%。几乎必然意味着错位、重复或残留。
-- **为什么只查 text-vs-text**：形状重叠噪声太大——scrim 压面板、色板垫底、背景条托标题都是刻意的。
-  文本互相重叠则极少是设计意图。
+- **Meaning**: two text segments under the same parent have overlapping visual rects by >60%. Almost certainly means misalignment, duplication, or residue.
+- **Why only text-vs-text**: shape overlap is too noisy — scrim over panel, palette backing, background bar under title are all deliberate.
+  Text overlapping each other is rarely design intent.
 
-### S9 `malformed_text` —— helper 参数错位留下的畸形文本
+### S9 `malformed_text` — malformed text left by helper-argument misalignment
 
-- **形态**：`characters` 是**纯数字**（`/^\d{1,4}$/`）**且 `height ≥ 200`**。
-  > 阈值取 200，不是 36。实测教训：用 36 会把**正常的数字标签**全误报——
-  > 分页 `1/2/3`、年份 `2026` 这些盒高只有 **40–44**（它们就住在 40px 高的胶囊里）；
-  > 而真正畸形的盒高是 **400 / 500 / 600**（那其实是被错位当作高度的**字重值**）。两者量级差一个数量级。
-  > 若还要更严，可叠加「`height` 与同级矩形高度不一致」。
-- **成因**：同一次构建里两个 helper 签名不同（`R(b,x,y,w,h,fill,…)` vs `X(b,x,y,w,label,…)`），
-  把文本 helper 当矩形 helper 调用 → 整串参数错位：`label`←高度、`fontSize`←标签、`h`←字重、颜色全黑。
-  详见 `api-pitfalls.md` §13。
-- **为什么危害大**：它同时制造**两种**可见故障——屏上出现垃圾数字，且这些畸形文本的 `h`（400/500/600）
-  把 `fitBoardHeight` 抬高数百 px，**顶破行距压住下一行板**。所以"板莫名其妙高了几百 px"时，
-  第一件事就是扫 S9；这类板的高度异常不是布局问题，是内容问题。
-- **检测精度**：实测精确命中 23/23，零误报（真实 KPI 数值 `120` 的高度只有 44，远低于 36 阈值之上的异常区间；
-  可再叠加「`height` 与同级矩形不一致」收紧）。
-- **修复**：把参数按错位关系逆推还原即可，**不必重建**：
-  `characters` = 本应的高度；`fontSize` = 本应的标签（仅数字型存活）；
-  `fill` 无效说明本应字号落进了 `fills`；`h` = 本应字重。配合「同级同 x/w 矩形的高度」可反查本应高度。
-  ⚠️ 还原后**必须重新设 `align`**（见 S10），且写入后 readback 验证。
+- **Form**: `characters` is **pure digits** (`/^\d{1,4}$/`) **and `height ≥ 200`**.
+  > Threshold is 200, not 36. Tested lesson: using 36 would false-report **all normal numeric labels** —
+  > pagination `1/2/3`, year `2026` boxes are only **40–44** tall (they live in 40px-tall capsules);
+  > while truly malformed boxes are **400 / 500 / 600** tall (that's the font-weight value misused as height). The two differ by an order of magnitude.
+  > To be stricter, add "height inconsistent with same-level rect heights".
+- **Cause**: two helper signatures differ in the same build (`R(b,x,y,w,h,fill,…)` vs `X(b,x,y,w,label,…)`),
+  calling the text helper as the rect helper → the whole argument chain misaligns: `label`←height, `fontSize`←label, `h`←weight, color all black.
+  See `api-pitfalls.md` §13.
+- **Why it's harmful**: it simultaneously creates **two** visible faults — garbage numbers appear on screen, and these malformed texts' `h` (400/500/600)
+  raise `fitBoardHeight` by hundreds of px, **breaching the row gap and pressing onto the next row's board**. So when "a board is mysteriously a few hundred px taller",
+  the first thing is to scan S9; this board's height anomaly is a content problem, not a layout problem.
+- **Detection precision**: tested exact hit 23/23, zero false positives (real KPI value `120` height is only 44, far below the anomaly zone above the 36 threshold;
+  can add "height inconsistent with same-level rect" to tighten).
+- **Fix**: reverse-derive and restore the arguments by the misalignment relation, **no rebuild needed**:
+  `characters` = the intended height; `fontSize` = the intended label (only numeric survives);
+  invalid `fill` means the intended font size fell into `fills`; `h` = the intended weight. Combined with "same-level same-x/w rect height" you can reverse-look-up the intended height.
+  ⚠️ After restoring, **must re-set `align`** (see S10), and verify via readback after writing.
 
-### S10 `align_not_applied` —— 对齐属性写入静默失败
+### S10 `align_not_applied` — alignment property write silently fails
 
-- **含义**：代码里给文本设了居中/右对齐，但渲染出来是左对齐（标签贴住容器左边缘）。
-- **成因**：属性名写错。文本水平对齐是 **`align`**，**不存在 `horizontalAlign`**；
-  错名赋值在 `try/catch` 下**静默失败**，代码"看起来跑了"。详见 `api-pitfalls.md` §12.1。
-- **判定**：**写入后立刻 readback**——`if (t.align !== want) throw`。
-  readback 为 `undefined` ⇒ 属性名错；读回旧值 ⇒ 取值/类型非法。
+- **Meaning**: the code set centering/right-alignment on text, but it renders left-aligned (label stuck to the container's left edge).
+- **Cause**: wrong property name. Text horizontal alignment is **`align`**, **there is no `horizontalAlign`**;
+  assigning under a wrong name in `try/catch` **silently fails**, the code "looks like it ran". See `api-pitfalls.md` §12.1.
+- **Judgment**: **readback immediately after writing** — `if (t.align !== want) throw`.
+  readback `undefined` ⇒ wrong property name; read-back old value ⇒ illegal value/type.
 
-### S11 `loose_assembly` —— 装配散件（成套图元未收进 group/component）
+### S11 `loose_assembly` — loose assembly (a complete primitive set not collected into a group/component)
 
-- **含义**：同父级下，宿主（rect/ellipse/board ≥24）与「中心落在其内、最小宿主就是它」的兄弟图元
-  构成一个装配（底板+标签/图标/子件），但它们没有收进同一个 **group** 或 **组件**——散件同级堆叠。
-- **成因**：构建时逐件 `absMount` 进板，从不收拢；后果是**选择/移动/复用全面退化**：
-  拖动底板标签被撇下、组件注册出空壳、design-to-code 无法把装配映射成一个组件。
-- **契约**（`penpot-structure.md` §4.1）：复用装配 → **component**（`createComponent([group])`，
-  页面用 `comp.instance()`）；单次成套 → **group**（`penpot.group([host, ...members])`）；
-  纯装饰单件可散件。无标签成套图元（滑轨+滑块）审计识别不了，手工成组。
-- **修复**：`storage.groupAssemblies()`（由内而外按面积升序、最小宿主归属、嵌套组、幂等、只动层级不动坐标）。
-  已合规的装配（同组/组件内）不报；修后复算 `loose_assembly = 0`。
-- **注意**：`groupAssemblies` 之后新增图元若直接散挂，签名会再次报出——**每轮 G4 链末尾都跑一次**。
-- **注意**：审计脚本里读对齐要写成 `s.align`；若历史代码写成 `s.horizontalAlign || s.align`，
-  **取的是后者**（前者恒为 undefined），所以审计结果是可信的——但写入端必须用对名字。
-- **修复范围要克制**：不要用"盒宽匹配底座矩形"这类宽判据全文件刷——实测它会误伤
-  「卡片里放着一块与文本盒同宽的媒体矩形」这类结构（一次误伤 9 处）。
-  收紧为**盒宽 + 盒高都与底座矩形一致**（完整叠加）才判为居中，实测该判据零误报。
+- **Meaning**: under the same parent, a host (rect/ellipse/board ≥24) and sibling primitives whose "center falls inside it, and the smallest host is it"
+  form an assembly (base plate + label/icon/sub-part), but they aren't collected into the same **group** or **component** — loose same-level stacking.
+- **Cause**: building by `absMount`-ing each piece into the board without ever collecting; consequence is **select/move/reuse all degrade**:
+  dragging the base plate leaves the label behind, component registration yields an empty shell, design-to-code can't map an assembly to one component.
+- **Contract** (`penpot-structure.md` §4.1): reusable assembly → **component** (`createComponent([group])`,
+  pages use `comp.instance()`); single-use complete set → **group** (`penpot.group([host, ...members])`);
+  pure decorative singles can be loose. Label-less complete sets (track+thumb) can't be identified by the audit, group manually.
+- **Fix**: `storage.groupAssemblies()` (inside-out by ascending area, minimal-host ownership, nested groups, idempotent, only touches hierarchy not coordinates).
+  Already-compliant assemblies (within a group/component) aren't reported; after fixing, recompute `loose_assembly = 0`.
+- **Note**: after `groupAssemblies`, newly added primitives if hung loose directly will report again — **run once at the end of each G4 chain**.
+- **Note**: in the audit script, read alignment as `s.align`; if legacy code wrote `s.horizontalAlign || s.align`,
+  **it takes the latter** (the former is always undefined), so the audit result is trustworthy — but the write side must use the correct name.
+- **Keep the fix scope restrained**: don't use loose criteria like "box width matches the base rect" to sweep the whole file — tested it false-hurt
+  structures like "a media rect inside a card as wide as the text box" (one false-hurt of 9).
+  Tighten to **box width + box height both matching the base rect** (full stacking) to judge centered, tested zero false positives.
 
-## 二·补、元教训：审计必须覆盖「修复动作的输出空间」
+## II·supplement, meta-lesson: audit must cover "the output space of the fix action"
 
-这一条比任何单个签名都重要，是两次事故的共同点：
+This is more important than any single signature; it's the common point of two incidents:
 
-> **每一轮修复都会把缺陷空间"搬"到别处。审计的覆盖面必须包含修复动作可能产生的输出，
-> 否则"修好了"只是"把错误挪到了我看不见的地方"。**
+> **Each round of fixing "moves" the defect space elsewhere. The audit's coverage must include the output the fix action may produce,
+> otherwise "fixed" just means "moved the error to where I can't see it".**
 
-对照实例：
+Comparison examples:
 
-| 轮次 | 修的动作 | 新缺陷 | 当时的审计能否发现 |
+| Round | Fix action | New defect | Could the audit then find it |
 |---|---|---|---|
-| 第一轮 | `fitBoardHeight` 把板长高 | 行长顶破行距、压到下一行板 | ❌ 只查包含性 → 报 CLEAN，用户却看到大量错位 |
-| 第一轮 | `fixOverflowRight` 左移文本 | 可能与左侧元素相撞 | ❌ 无重叠检查 |
-| 第一轮 | `fixColumnOffset` 平移整块内容 | 目标位置可能已占用 | ❌ 无重叠检查 |
-| 第二轮 | `createVariantContainer` 重挂母版 | 标签被撇在板外（S5） | ❌ 当时无 root_stray 检查 |
-| 第三轮 | 中途给 `mkText` 加字体参数 | 前后批次字体不一致（S6） | ❌ 几何审计原理上查不出 |
-| **建板第一天** | 两列版式：W 列 `x=80 w=1440`（→1520），M 列 `x=1400` | **两列重叠 120px（每一屏都叠）** | ❌ 从无重叠检查；且这**不是修复引入的，是"原生"错误** |
-| 第二轮 | `R`/`X` 两个 helper 签名混用 | 23 个畸形文本（S9）+ 板被撑高 400–570px 顶破行距 | ❌ 当时无 S9、无 S7 |
-| 第四轮 | 手工修复时把属性写成 `horizontalAlign` | 23 处对齐修复全部未生效（S10） | ❌ 不 readback 就发现不了 |
+| Round 1 | `fitBoardHeight` grows the board | row length breaches row gap, presses next row's board | ❌ only checked containment → reported CLEAN, yet user saw lots of misalignment |
+| Round 1 | `fixOverflowRight` shifts text left | may collide with left-side elements | ❌ no overlap check |
+| Round 1 | `fixColumnOffset` shifts whole block | target position may be occupied | ❌ no overlap check |
+| Round 2 | `createVariantContainer` re-hangs master | label left outside board (S5) | ❌ no root_stray check then |
+| Round 3 | mid-way added font param to `mkText` | early/late batch font inconsistency (S6) | ❌ geometry audit can't detect in principle |
+| **Board day one** | two-column layout: W col `x=80 w=1440` (→1520), M col `x=1400` | **two columns overlap 120px (every screen overlaps)** | ❌ no overlap check ever; and this **isn't fix-introduced, it's "native" error** |
+| Round 2 | `R`/`X` two helper signatures mixed | 23 malformed texts (S9) + board inflated 400–570px breaching row gap | ❌ no S9, no S7 then |
+| Round 4 | manual fix wrote property as `horizontalAlign` | 23 alignment fixes all ineffective (S10) | ❌ undiscovered without readback |
 
-> **注意"原生错误"这一行**：不是所有错位都来自修复动作。
-> 两列版式的重叠从建板第一天就存在，前面的每一轮审计都报它 CLEAN。
-> 所以审计维度不全时，**"一直 CLEAN"不等于"一直正确"**，只等于"这个维度一直没被检查过"。
+> **Note the "native error" row**: not all misalignment comes from fix actions.
+> The two-column overlap existed from board day one, and every prior round's audit reported it CLEAN.
+> So when audit dimensions are incomplete, **"always CLEAN" ≠ "always correct"**, only "this dimension was never checked".
 
-**落地规则**：
-1. **改完必查"相邻关系"**：任何「移动 / 长高 / 重挂」的修复，都要跑一次 S7 + S8。
-2. **每个修复引擎都要在 SKILL 里写明"它会引入哪类缺陷、由哪个检查兜底"**，否则就是给下一轮埋雷。
-3. **审计的判定维度要正交**：包含（in）／重叠（overlap）／尺寸（size）／字体（font）／结构（stray）。
-   只有"包含"是不够的——本系统两次事故里，用户的观感问题一次来自**包含**，一次来自**重叠**。
-4. **不要过早宣布 CLEAN**：`verdict: CLEAN` 只代表"当前这套检查没命中"。
-   交付话术必须是「**按 N 项检查通过**」，而不是「没有问题」。
+**Landing rules**:
+1. **After changes, always check "adjacency"**: any fix that "moves / grows / re-hangs" must run S7 + S8 once.
+2. **Every repair engine must state in SKILL "what defect it introduces, who covers it"**, otherwise it's a landmine for the next round.
+3. **Audit judgment dimensions must be orthogonal**: containment (in) / overlap / size / font / structure (stray).
+   Containment alone is insufficient — in this system's two incidents, the user's perception problem came once from **containment**, once from **overlap**.
+4. **Don't declare CLEAN too early**: `verdict: CLEAN` only means "current checks didn't hit".
+   The delivery wording must be "**passed N checks**", not "no problems".
 
-### 判定规则的两次迭代（务必用修正后的规则）
+### Two iterations of the judgment rules (must use the corrected rules)
 
-| 检查 | 第一版（噪声大） | 修正版（可用） |
+| Check | Version 1 (noisy) | Corrected (usable) |
 |---|---|---|
-| 包含性 | 用形状外框 | **文本用视觉矩形**（按对齐估算字宽），否则宽文本框假越界 |
-| 退化尺寸 | 宽或高 ≤1 | `1×1` 或文本 ≤1；**排除 1px 发丝线** |
-| 页头碰撞 | 高 ≥16 的顶部文本 | 顶部**字号 ≥20** 的文本；排除背景板 |
-| 居中残差 | 偏差 >0.5 全报 | ≤8px **且** 文本框宽 ≥ 宿主×0.72 才报，其余转 `info` |
+| Containment | use shape outer frame | **text uses visual rect** (estimate text width by alignment), otherwise wide text boxes false-overflow |
+| Degenerate size | width or height ≤1 | `1×1` or text ≤1; **exclude 1px hairlines** |
+| Header collision | top text ≥16 | top **font size ≥20** text; exclude background boards |
+| Center residual | deviation >0.5 all reported | only report ≤8px **and** text-box width ≥ host×0.72; others become `info` |
 
-## 三、预防契约（写进流程的硬门禁）
+## III. Prevention contract (hard gates written into the flow)
 
-### G1 【门禁】动手前必须读 canonical 脚本，禁止自造坐标/文本 helper
+### G1 [Gate] Before acting, must read the canonical scripts; no improvising coordinate/text helpers
 
-`code-to-design` 和 `design-to-code` 的**第 0.5 步**（在播种之前）：
+The **step 0.5** of `code-to-design` and `design-to-code` (before seeding):
 
-1. 读 `scripts/seed_storage.js`，**原样粘贴执行**；需要新工厂时**新增**函数，不改写 `mkAbsBoard`/`absMount`/`mkText`。
-2. 读 `scripts/repair_engines.js`，原样粘贴执行，作为收尾必跑项。
-3. 若确需自定义文本盒（如固定尺寸字段），**必须**在构建后由 `audit_layout.js` 的 S2 检查兜底，
-   不允许"设了 `verticalAlign` 就当居中完成"。
+1. Read `scripts/seed_storage.js`, **paste and execute as-is**; when a new factory is needed, **add** a function, don't rewrite `mkAbsBoard`/`absMount`/`mkText`.
+2. Read `scripts/repair_engines.js`, paste and execute as-is, as a mandatory end-of-run item.
+3. If a custom text box is truly needed (e.g. fixed-size field), it **must** be covered by `audit_layout.js`'s S2 check after building,
+   not allowed to "set `verticalAlign` and call centering done".
 
-> 判据：任何一次构建的 execute_code 里出现自己写的 `mkAbsBoard` / `absMount` / 文本盒函数体，即为违规。
+> Criterion: any build's execute_code that contains a self-written `mkAbsBoard` / `absMount` / text-box function body is a violation.
 
-### G2 【门禁】方案 C 是默认，方案 A 必须先过首板导出
+### G2 [Gate] Approach C is default; approach A must pass first-board export first
 
-裸板 + 世界坐标（方案 A）在部分文件/版本上会整体偏移 `-board.y`。
-**只有在对本环境跑过"首板建成 → 立即导出 → 肉眼确认无偏移"之后**，才允许批量用方案 A；
-否则一律 `addFlexLayout()` + `flex.dir` + sizing fixed（方案 C）。
+Bare board + world coordinates (approach A) will whole-page offset `-board.y` on some files/versions.
+**Only after running "first board built → immediately export → eyeball confirm no offset" on this environment** may you batch with approach A;
+otherwise always `addFlexLayout()` + `flex.dir` + sizing fixed (approach C).
 
-### G3 【门禁】每建完一个板，立刻跑单板审计
+### G3 [Gate] After building each board, immediately run the single-board audit
 
-不要等整页建完。**每个板建成后立即 `storage.auditPage()` 并只看新板那几条 finding**。
-S1/S4 在第一个板上就会暴露，避免把同一个偏移复制到 120 个板。
+Don't wait for the whole page. **Immediately after each board is built, `storage.auditPage()` and only look at the new board's findings**.
+S1/S4 surface on the very first board, avoiding copying the same offset into 120 boards.
 
-### G4 【门禁】收尾必跑对齐引擎，顺序固定
+### G4 [Gate] End-of-run must run the alignment engine, fixed order
 
 ```
 cleanOrphans() → fixStaleCenter() → alignPage() → vAlignPage() → fixInner() → unclip()
 ```
 
-`fixStaleCenter` 必须排在 `alignPage` **之前**：它修的是 >6px 的 stale-center 大偏移（指纹判定），
-修完后残余微差才归 `alignPage` 的 ≤6px 吸附管；反过来跑则大偏移永远修不到。
+`fixStaleCenter` must come **before** `alignPage`: it fixes the >6px stale-center large offset (fingerprint judgment),
+after which the residual micro-difference goes to `alignPage`'s ≤6px snap; reverse order means the large offset never gets fixed.
 
-每页一次；**必须记录返回的修复日志**（`[位置, 内容, 轴, 偏移]`）并人工复核，再做误伤还原。
-`vAlignPage` 的已知误伤面（刻意非居中：步进钮 ＋/－、Progress 顶标签）按 `engines.md` §1 的已知坐标还原。
+Once per page; **must record the returned repair log** (`[position, content, axis, offset]`) and review manually, then restore false-hurts.
+`vAlignPage`'s known false-hurt surface (deliberate off-center: stepper +/−, Progress top label) restored per the known coordinates in `engines.md` §1.
 
-### G5 【门禁】验收必须全覆盖，禁止抽样宣布完成
+### G5 [Gate] Acceptance must be full coverage; no sampling-announced completion
 
-- 每个板**至少导出一次**；页数多时按页做 contact sheet（整页一图）先过一眼，再对可疑板单独导出。
-- 交付话术纪律：**未导出过的板不得表述为"已验证"**。未验证就写"未验证"。
+- Each board **exported at least once**; when many pages, do a contact sheet per page (whole page one image) for a first pass, then export suspicious boards individually.
+- Delivery-wording discipline: **boards never exported must not be described as "verified"**. Write "unverified" if not verified.
 
-### G6 会话可续跑：进度落盘
+### G6 Session resumable: persist progress
 
-连接是易失的（本次 `penpot.local:443` connect timeout 中断）。
-- 构建开始前先探测端点在不在（`assets/penpot-server/scripts/status.*`）；
-- **构建队列 + 已完成页清单写入工作区文件**（如 `build-progress.json`），不要只放 `storage`；
-- 断了重连后按文件续跑，并用 `audit_layout.js` 复算已建页，确认没有半成品页。
+Connections are volatile (this time `penpot.local:443` connect timeout interrupted).
+- Before building, probe whether the endpoint is up (`assets/penpot-server/scripts/status.*`);
+- **Write the build queue + completed-page list into a workspace file** (e.g. `build-progress.json`), don't only keep it in `storage`;
+- After reconnect, resume by file, and use `audit_layout.js` to recompute built pages, confirming no half-built pages.
 
-### G7 代理必须放行 `penpot.local`
+### G7 Proxy must allow `penpot.local`
 
-本机配了 HTTP/SOCKS 代理（`http://localhost:8118` / `socks5://localhost:30000`）时，
-`penpot.local` 会被送去代理解析而超时。把 `penpot.local`、`localhost`、`*.local` 加入 `NO_PROXY`，
-或对 MCP 客户端进程禁用代理。
+When the local HTTP/SOCKS proxy is configured (`http://localhost:8118` / `socks5://localhost:30000`),
+`penpot.local` gets sent to the proxy for resolution and times out. Add `penpot.local`, `localhost`, `*.local` to `NO_PROXY`,
+or disable the proxy for the MCP client process.
 
-### G8 【门禁】审计维度必须正交；每个修复引擎必须写明"它引入什么缺陷、由谁兜底"
+### G8 [Gate] Audit dimensions must be orthogonal; each repair engine must state "what defect it introduces, who covers it"
 
-这是两次事故最贵的教训：**审计只覆盖一个维度时，修复会把缺陷搬到那个维度的盲区里。**
+This is the costliest lesson of the two incidents: **when the audit covers only one dimension, the fix moves the defect into that dimension's blind spot.**
 
-- **维度清单（缺一不可）**：包含（in）／重叠（overlap）／尺寸（size）／字体（font）／结构（stray）。
-- **修复动作 → 可能引入的缺陷 → 兜底检查** 必须成对登记：
+- **Dimension list (none dispensable)**: containment (in) / overlap / size / font / structure (stray).
+- **Fix action → possible defect introduced → covering check** must be registered in pairs:
 
-| 修复动作 | 可能引入 | 兜底检查 |
+| Fix action | Possible defect introduced | Covering check |
 |---|---|---|
-| `fixColumnOffset` 平移整块内容 | 目标位置已占用 → 相撞 | S7 + S8 |
-| `fitBoardHeight` 把板长高 | 行长顶破行距 → 压住下一行板；**或吞掉错位子元素使其合法化** | S7 + `maxGrow` 护栏 |
-| `reflowRows` 重排行距 | 子树漏平移 → 板动了内容没动 | S1 包含性复算 |
-| `createVariantContainer` 重挂母版 | 标签被撇在容器外 | S5 `root_stray` |
-| 中途给 helper 加参数 | 前后批次不一致 | S6 字体直方图 |
+| `fixColumnOffset` shifts whole block | target occupied → collision | S7 + S8 |
+| `fitBoardHeight` grows board | row length breaches row gap → presses next row's board; **or swallows misplaced child to legitimize it** | S7 + `maxGrow` guardrail |
+| `reflowRows` re-rows gap | subtree misses translation → board moved but content didn't | S1 containment recompute |
+| `createVariantContainer` re-hangs master | label left outside container | S5 `root_stray` |
+| mid-way add param to helper | early/late batch inconsistency | S6 font histogram |
 
-- **修复后必须重跑"相邻关系"检查（S7/S8）**，不能只复算包含性。
-- **交付话术纪律**：`verdict: CLEAN` 只代表"这套检查没命中"。对外表述用
-  「**已按 N 项检查通过（列出检查项）**」，而不是「没有问题」。
-  本系统出过一次真实的交付事故：报了「14/16 页 CLEAN」，但用户打开 Demo 页仍看到大量错位 ——
-  因为当时检查项里没有"重叠"这一维。
+- **After fixing, must rerun "adjacency" checks (S7/S8)**, not just recompute containment.
+- **Delivery-wording discipline**: `verdict: CLEAN` only means "this set of checks didn't hit". Phrase externally as
+  "**passed N checks (list them)**", not "no problems".
+  This system had one real delivery incident: reported "14/16 pages CLEAN", but the user still saw lots of misalignment on the Demo page —
+  because the check set then had no "overlap" dimension.
 
-### G10 【门禁】装配必须成组（group）或成组件（component），禁止散件同级堆叠
+### G10 [Gate] Assembly must be grouped (group) or componentized (component); no loose same-level stacking
 
-契约全文见 `penpot-structure.md` §4.1，三句话版本：
+Full contract in `penpot-structure.md` §4.1, three-sentence version:
 
-1. **成套图元（底板+标签+图标+子件）必须收进一种容器**：复用/进 13 索引 → **component**
-   （`createComponent([group])`，页面一律 `comp.instance()`）；单次使用 → **group**（`penpot.group([host, ...members])`）。
-2. **机器强制**：审计签名 `loose_assembly`（S11）查散件装配；修复引擎 `groupAssemblies()` 收编；
-   每页 G4 链末尾必跑（幂等），复算 `loose_assembly = 0` 才算该页通过。
-3. **不确定先 group**：`createComponent([group])` 可整组升级为组件，零返工；反向（散件→组件）则要重建。
+1. **A complete primitive set (base plate + label + icon + sub-part) must be collected into one kind of container**: reuse / into the 13 index → **component**
+   (`createComponent([group])`, pages always `comp.instance()`); single use → **group** (`penpot.group([host, ...members])`).
+2. **Machine enforcement**: audit signature `loose_assembly` (S11) checks loose assemblies; repair engine `groupAssemblies()` absorbs them;
+   run at the end of each page's G4 chain (idempotent), recompute `loose_assembly = 0` to pass the page.
+3. **Unsure → group first**: `createComponent([group])` can upgrade the whole group to a component, zero rework; reverse (loose → component) needs rebuild.
 
-**引入缺陷与兜底（G8 登记）**：`groupAssemblies` 只改变层级（同父级收进新 group），不动坐标/样式；
-可能的误伤是「把刻意叠放的两件收进一组」——由最小宿主归属 + 嵌套语义排除，误组可用 `penpot.ungroup(g)` 还原
-（组名=宿主名，日志可查）。后续 `alignPage`/`fixStaleCenter` 都按树遍历，穿过 group 边界照常工作。
+**Introduced defects and coverage (G8 registration)**: `groupAssemblies` only changes hierarchy (collect into a new group within the same parent), no coordinate/style change;
+possible false-hurt is "collecting two deliberately-stacked pieces into a group" — excluded by minimal-host ownership + nesting semantics; a wrong group can be restored with `penpot.ungroup(g)`
+(group name = host name, log checkable). Subsequent `alignPage`/`fixStaleCenter` all traverse the tree, working across group boundaries as usual.
 
-## 四、标准作业顺序（替换掉"凭感觉建完再导出"）
+## IV. Standard operation order (replacing "build by feel then export")
 
 ```
-0.5 读并粘贴 seed_storage.js + repair_engines.js + audit_layout.js + fix_geometry.js   ← G1
-1   首板（页 01 第一块）建成 → auditPage() → 通过 → 直接导出肉眼确认                      ← G2/G3
-2   批量建板：每板建成即跑单板审计（只看本板 finding）                                   ← G3
-3   阶段一「几何」：逐页 fixGeometryAll({apply:false}) 出清单 → 复核 → {apply:true}
-    （内部顺序已固定：fixColumnOffset → fitBoardHeight → fixOverflowRight → reflowRows → fitRootHeight）
-4   阶段二「对齐」：cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip ← G4
-    → groupAssemblies（装配成组，幂等；loose_assembly=0）                                 ← G10
-    → fixZOrder（组内前后序：大底在下标签在上；组占顶层成员层槽）                         ← G10
-5   复算：auditPage() 必须 CLEAN，且**必须包含 S7 重叠 / S8 文本重叠**两项
-    （剩余项须逐条人工确认为刻意内缩 = text_centre_info）
-6   验收：逐页导出（大板需重试），记录 per-board 是否真的导出过                             ← G5
-7   进度与清单落盘                                                                        ← G6
+0.5  Read and paste seed_storage.js + repair_engines.js + audit_layout.js + fix_geometry.js   ← G1
+1    First board (page 01 first block) built → auditPage() → pass → directly export eyeball confirm                      ← G2/G3
+2    Batch build: each board built immediately runs single-board audit (only this board's findings)                                   ← G3
+3    Phase 1 "geometry": per page fixGeometryAll({apply:false}) → list → review → {apply:true}
+     (internal order fixed: fixColumnOffset → fitBoardHeight → fixOverflowRight → reflowRows → fitRootHeight)
+4    Phase 2 "alignment": cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip ← G4
+     → groupAssemblies (assemble into groups, idempotent; loose_assembly=0)                                 ← G10
+     → fixZOrder (in-group front/back: big base at bottom label on top; group occupies top-member layer slot) ← G10
+5    Recompute: auditPage() must be CLEAN, and **must include S7 overlap / S8 text overlap** two items
+     (remaining items must each be manually confirmed as deliberate inset = text_centre_info)
+6    Acceptance: export per page (large boards need retry), record per-board whether actually exported                             ← G5
+7    Persist progress and list                                                                        ← G6
 ```
 
-### 两阶段修复为什么分开（第二次事故的实测数据）
+### Why split the two repair phases (tested data from the second incident)
 
-一次 16 页系统的实测分布：`out_of_bounds` 121、`header_collision` 31、`degenerate_size` 85、`text_centre_residue` 29。
-按签名拆分后：
+One 16-page system's tested distribution: `out_of_bounds` 121, `header_collision` 31, `degenerate_size` 85, `text_centre_residue` 29.
+After splitting by signature:
 
-| 阶段 | 引擎 | 实际命中 | 修后 |
+| Phase | Engine | Actual hits | After fix |
 |---|---|---|---|
-| 几何 | `fixColumnOffset` | 6 个右列板、**77 个子元素**、dx 恒为 +920 | 页 01/02 立刻 CLEAN |
-| 几何 | `fitBoardHeight` | 16 个板长高 4–140px | 页 03/04/06/07/10/12/13/15 CLEAN |
-| 几何 | `fitRootHeight` | 6 个 PageRoot 长高 | 页 05/09/11/14 CLEAN |
-| 几何 | `fixOverflowRight` | 3 个右对齐文本框左移 84px | 页 11 CLEAN |
-| — | 清理 `root_stray` | 2 个游离绑定实例 | 页 01/03 CLEAN |
-| 阶段二 | `alignPage`/`vAlignPage` | **未跑**（命中域为 0） | — |
-| **回归** | **`fitBoardHeight` 长高的板顶破行距** | **Demo 页仍大量错位** | ❌ 当时审计无重叠检查 → 漏报 |
+| Geometry | `fixColumnOffset` | 6 right-column boards, **77 child elements**, dx always +920 | pages 01/02 immediately CLEAN |
+| Geometry | `fitBoardHeight` | 16 boards grew 4–140px | pages 03/04/06/07/10/12/13/15 CLEAN |
+| Geometry | `fitRootHeight` | 6 PageRoots grew | pages 05/09/11/14 CLEAN |
+| Geometry | `fixOverflowRight` | 3 right-aligned text boxes shifted left 84px | page 11 CLEAN |
+| — | clean `root_stray` | 2 stray bound instances | pages 01/03 CLEAN |
+| Phase 2 | `alignPage`/`vAlignPage` | **not run** (trigger domain 0) | — |
+| **Regression** | **`fitBoardHeight` grown boards breach row gap** | **Demo page still lots of misalignment** | ❌ no overlap check then → missed |
 
-**当时报出「14/16 页 CLEAN」，但 Demo 页（14）用户仍看到大量错位 —— 这个 CLEAN 是假阴性。**
-原因是 `fitBoardHeight` 把 6 个 Demo 板长高后越过了 960px 的固定行距，压到了下一行的板；
-而审计当时只有「包含性」维度，对「重叠」完全盲。补上 S7 后才发现。
+**It then reported "14/16 pages CLEAN", but the Demo page (14) still showed lots of misalignment to the user — this CLEAN was a false negative.**
+The reason: `fitBoardHeight` grew 6 Demo boards past the 960px fixed row gap, pressing onto the next row's boards;
+while the audit then only had the "containment" dimension, completely blind to "overlap". Found only after adding S7.
 
-三条结论：
-1. **先修几何，再看要不要跑对齐引擎**。这次 121 条越界全部由几何引擎解决，
-   若一上来就跑 `alignPage`/`vAlignPage`，既修不掉越界，还会在错误的基准上吸附、引入新的误伤。
-2. **`vAlignPage` 不是必需品**。它的触发域（5–15px、小板单行文本）在本次事故里命中数为 0；
-   真正的病灶是「内容整块贴错原点」。**先诊断签名，再决定用哪个引擎**，不要按清单盲跑。
-3. **几何修复的收尾必须是「重排行距 + 收根高」**，且顺序为
-   `fitBoardHeight → reflowRows → fitRootHeight`。只做长高不做重排，等于把缺陷从
-   「内容溢出板底」搬成「板压住邻板」——**两者用户都看得见，而后者审计更容易漏**。
+Three conclusions:
+1. **Fix geometry first, then see whether to run the alignment engine**. This time all 121 out-of-bounds were resolved by the geometry engine;
+   if you ran `alignPage`/`vAlignPage` upfront, you'd fix no out-of-bounds and would snap on a wrong baseline, introducing new false-hurts.
+2. **`vAlignPage` is not essential**. Its trigger domain (5–15px, small-board single-line text) hit 0 in this incident;
+   the real lesion was "content block misplaced to the origin". **Diagnose the signature first, then decide which engine**, don't run blind by checklist.
+3. **Geometry repair must end with "re-row gap + shrink root height"**, and the order is
+   `fitBoardHeight → reflowRows → fitRootHeight`. Doing only the grow without the re-flow equals moving the defect from
+   "content overflows board bottom" to "board presses neighbor" — **both visible to the user, and the latter is easier to miss in audit**.
 
-### 验收：导出超时是"页面级"的
+### Acceptance: export timeout is "page-level"
 
-同一页上多块板连续导出失败（本例 page 01，PageRoot 高 2960px，`page.goto: Timeout 20000ms exceeded`，
-卡在 `waiting until "networkidle"`），而同文件其它页正常 → 属已知的「大板导出超时」，**按页分批 + 重试**。
-若**所有页**都超时且 exporter 日志显示 `networkidle` 超时，即使 `penpot-frontend:8080` 可达（实测 200），
-也先 `docker restart penpot-server-penpot-exporter-1` —— 这是 exporter 侧状态卡死，重启即恢复。
+Multiple boards on the same page failing export in a row (here page 01, PageRoot height 2960px, `page.goto: Timeout 20000ms exceeded`,
+stuck at `waiting until "networkidle"`), while other pages in the same file are normal → this is the known "large-board export timeout", **batch by page + retry**.
+If **all pages** time out and the exporter log shows `networkidle` timeout, even though `penpot-frontend:8080` is reachable (tested 200),
+first `docker restart penpot-server-penpot-exporter-1` — this is an exporter-side state lockup, restart recovers it.
 
-## 五、审计输出的解读纪律
+## V. Audit output interpretation discipline
 
-- `verdict: CLEAN` 只代表**四类签名未命中**，不等于像素级正确；仍须走 `verification.md` 的 PIL 比对。
-- `text_centre_residue_*` 命中量大且集中在同一类宿主（如全是 52px 高的字段）时，
-  那是**helper 的系统性缺陷**，应改 helper 重跑，**不要**指望 `vAlignPage` 逐个救。
-- 审计只读。**先出清单人工复核，再进修复**——期望模型写错会把全部元素改错（`engines.md` §1 gridSnap 教训）。
+- `verdict: CLEAN` only means **four signature classes didn't hit**, not pixel-level correct; still must run the PIL comparison in `verification.md`.
+- When `text_centre_residue_*` hits a lot and concentrates on the same host class (e.g. all 52px-tall fields),
+  that's a **systematic helper defect**, should change the helper and rerun, **don't** expect `vAlignPage` to rescue one by one.
+- The audit is read-only. **First produce the list for manual review, then go to repair** — a wrong expectation model would change all elements wrong (`engines.md` §1 gridSnap lesson).

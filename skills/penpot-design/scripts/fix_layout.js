@@ -1,13 +1,13 @@
-// fix_layout.js —— flex 压塌批量修复（getDesignSize + absRow + fixCol，两轮收敛）
-// 症状：导出图上按钮/卡片被压成文字大小（flex hug 强制收缩）。
-// 用法：整份粘贴进 execute_code 执行（在目标页直接跑，或存 storage 后逐页调用）。
-// 机理与方案决策：references/api-pitfalls.md §10；构建引擎 mkAbsBoard/absMount：scripts/seed_storage.js。
-// 顺序陷阱：先 absRow（行定型）后 fixCol（容器修正）；fixCol 跳过 absolute 子树——
-//           否则会把 absolute 元素重新压回内容尺寸（实测教训）。
+// fix_layout.js —— flex-collapse batch repair (getDesignSize + absRow + fixCol, two-round convergence)
+// Symptom: buttons/cards on the export squashed to text size (flex hug force-shrinks).
+// Usage: paste the whole file into execute_code and run (directly on the target page, or store in storage and call page by page).
+// Mechanics and approach decision: references/api-pitfalls.md §10; build engines mkAbsBoard/absMount: scripts/seed_storage.js.
+// Order trap: absRow (row sizing) first, then fixCol (container fix); fixCol skips absolute subtrees —
+// otherwise it re-squashes absolute elements back to content size (tested lesson).
 
 return (function () {
-  // 按名称恢复设计尺寸；null = 容器，不设固定尺寸。
-  // ★ 按目标设计系统的组件命名规则改写本表。
+  // Restore design size by name; null = container, no fixed size set.
+  // ★ Rewrite this table per the target design system's component naming rules.
   const getDesignSize = (b) => {
     const n = b.name || '';
     if (n.startsWith('Button /')) return n.includes('Small 32') ? [120, 32] : n.includes('Large 48') ? [180, 48] : [160, 45];
@@ -19,8 +19,8 @@ return (function () {
     return null;
   };
 
-  const absRow = (row) => {                    // 行内全员 absolute + 水平排位
-    for (const c of row.children) if (c.type === 'board' && c.flex && c.flex.dir === 'row') absRow(c); // 先深后浅
+  const absRow = (row) => {                    // all children absolute + horizontal placement within the row
+    for (const c of row.children) if (c.type === 'board' && c.flex && c.flex.dir === 'row') absRow(c); // depth-first
     const gap = row.flex.columnGap || 0, padH = row.flex.horizontalPadding || 0, padV = row.flex.verticalPadding || 0;
     const kids = [...row.children];
     let maxH = 0;
@@ -37,7 +37,7 @@ return (function () {
       c.y = row.y + Math.max(0, Math.round((rowH - c.height) / 2));
       cx += c.width + gap;
     }
-    row.resize(Math.ceil(cx - gap + padH), rowH);   // 行定型（含 absolute 子元素，安全）
+    row.resize(Math.ceil(cx - gap + padH), rowH);   // row sizing (includes absolute children, safe)
   };
 
   const collectRows = (b, out) => {
@@ -49,7 +49,7 @@ return (function () {
     }
   };
 
-  const fixCol = (board, isRoot) => {           // 只修 column 容器；跳过已定型的行与 absolute 子树
+  const fixCol = (board, isRoot) => {           // only fix column containers; skip already-sized rows and absolute subtrees
     if (!board.flex) return;
     if (board.flex.dir === 'row') return;
     for (const c of board.children || []) {
@@ -70,9 +70,9 @@ return (function () {
     if (Math.abs(board.width - newW) > 2 || Math.abs(board.height - newH) > 2) board.resize(newW, newH);
   };
 
-  // 入口：当前页每根 ds 前缀板；两轮收敛
+  // Entry: every 'DS-'-prefixed board on the current page; two-round convergence
   const root = penpot.currentPage.root || penpot.root;
-  const boards = root.children.filter(c => c.type === 'board' && c.name.startsWith('DS-'));  // ★ 前缀=设计系统名，按实际命名替换
+  const boards = root.children.filter(c => c.type === 'board' && c.name.startsWith('DS-'));  // ★ prefix = design system name, replace per actual naming
   for (let round = 0; round < 2; round++) {
     for (const rb of boards) {
       const rows = []; collectRows(rb, rows);
@@ -81,7 +81,7 @@ return (function () {
     }
   }
   let y = 100;
-  for (const b of boards) { b.x = 100; b.y = y; y += b.height + 60; }  // 垂直堆叠
+  for (const b of boards) { b.x = 100; b.y = y; y += b.height + 60; }  // vertical stack
 
   return { fixed: boards.length, page: penpot.currentPage.name };
 })();

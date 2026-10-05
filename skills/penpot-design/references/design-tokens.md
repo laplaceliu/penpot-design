@@ -1,82 +1,81 @@
-# Penpot Design Tokens —— 权威用法（本机实测，非文档转述）
+# Penpot Design Tokens — authoritative usage (tested locally, not transcribed from docs)
 
-> **本文所有结论均为在真实 Penpot 文件上用 `execute_code` 实测得到**，凡与官方文档/high-level overview 冲突处，均以本文为准并标注 `[文档有误]`。
-> 官方三篇参考文章（design-tokens / what-are-design-tokens / design-tokens-with-penpot）年代较早，**只用来看概念，不要照抄 API**。
+> **All conclusions here were obtained by testing on a real Penpot file with `execute_code`**. Where they conflict with official docs / high-level overview, this article wins and is marked `[docs wrong]`.
+> The three official reference articles (design-tokens / what-are-design-tokens / design-tokens-with-penpot) are old; **use them only for concepts, don't copy the API**.
 >
-> 配套可执行引擎：`scripts/token_engine.js`（粘贴即用，含建集/校验/应用/审计）。
+> Companion executable engine: `scripts/token_engine.js` (paste and use, includes set build / verify / apply / audit).
 
-## 0. 六条铁律（先记这个，其余都是细节）
+## 0. Six iron rules (learn these first; the rest are details)
 
-1. **`addSet()` 默认 `active: false`；未激活的 set 会造成「静默失败」**——绑定记上了、值不生效、不报错。
-   建集必须显式激活：`tokens.addSet({name, active: true})` 或建后 `set.toggleActive()`。
-   **这是本技能踩过的头号坑**：曾交付的文件里 3 个 set 全部未激活，38 个 token 全是死的。
-2. **应用是异步的**，且**只有当目标形状真能承载该属性时才生效**。
-   `applyToShapes()` 对不适用的形状**返回成功但不记录任何东西** → **必须 readback `shape.tokens` 验证**，"没报错"不等于"应用了"。
-3. **`properties` 参数尽量省略**。省略 = 用该类型的默认属性（见 §3 表）；
-   显式传 `['all']` **在本版本必然报错** `[文档有误]`；传错属性名也报错（如字体族要传 `fontFamily` 而不是文档写的 `fontFamilies`）。
-4. **token 按「名字」应用，不按 id**。同名 token 存在于多个激活 set 时，**`sets` 数组里靠后的胜出**；
-   停用某个 set 会改变已解析的值。所以 set 顺序 = 优先级，要把「基础层」放前面、「主题层」放后面。
-5. **`resolvedValue` 只有在 set 激活后才非 null**。校验 token 是否可用，看 `resolvedValue`/`resolvedValueString` 是否为空。
-6. **set 按「要不要一起激活」切，绝不按类型切**。`type` 是 token 自身的属性，UI 在**每个 set 内部**
-   自动按类型分组（`tokensByType`），一个 set 能装下全部 17 类。按 `Color`/`Radius`/`Spacing` 拆 set 是
-   类别错误：这三类永远同时激活，拆开只会把 1 次开关变成 N 次。详见 §1.1。
+1. **`addSet()` defaults to `active: false`; an inactive set causes "silent failure"** — the binding is recorded, the value doesn't take effect, no error thrown.
+   Building a set must explicitly activate it: `tokens.addSet({name, active: true})` or `set.toggleActive()` after building.
+   **This is the #1 pitfall this skill hit**: a delivered file once had 3 sets all inactive, 38 tokens all dead.
+2. **Applying is async**, and **only takes effect when the target shape can actually carry that property**.
+   `applyToShapes()` on an inapplicable shape **returns success but records nothing** → **you must readback `shape.tokens` to verify**; "no error" ≠ "applied".
+3. **Omit the `properties` parameter as much as possible**. Omitting = use the type's default property (see §3 table);
+   explicitly passing `['all']` **always errors in this version** `[docs wrong]`; passing a wrong property name also errors (e.g. font family must be `fontFamily`, not the doc's `fontFamilies`).
+4. **Tokens are applied by "name", not by id**. When the same-named token exists in multiple active sets, **the later one in the `sets` array wins**;
+   deactivating a set changes the resolved value. So set order = priority; put the "base layer" first and the "theme layer" last.
+5. **`resolvedValue` is only non-null after the set is activated**. To check if a token is usable, look at whether `resolvedValue`/`resolvedValueString` is empty.
+6. **Split sets by "whether to activate together", never by type**. `type` is the token's own attribute; the UI automatically groups by type **inside each set** (`tokensByType`), one set can hold all 17 kinds. Splitting by `Color`/`Radius`/`Spacing` is
+   a category error: these three are always active together, splitting just turns 1 switch into N. See §1.1.
 
-## 1. 对象模型
+## 1. Object model
 
 ```
-penpot.library.local.tokens            // TokenCatalog（注意：不在 penpot.library.tokens）
-├── sets: TokenSet[]                   // 数组顺序 = 优先级（后者胜）
-├── themes: TokenTheme[]               // 扁平数组；分组靠 group 属性
-├── addSet({name, active?}): TokenSet  // active 省略时为 false ⚠️
+penpot.library.local.tokens            // TokenCatalog (note: NOT penpot.library.tokens)
+├── sets: TokenSet[]                   // array order = priority (later wins)
+├── themes: TokenTheme[]               // flat array; grouping via the group attribute
+├── addSet({name, active?}): TokenSet  // active omitted = false ⚠️
 ├── addTheme({group, name}): TokenTheme
 ├── getSetById(id) / getThemeById(id)
 ```
 
-| 对象 | 成员 |
+| Object | Members |
 |---|---|
 | `TokenSet` | `id` `name` `active` `tokens: Token[]` `tokensByType: [string, Token[]][]` `toggleActive()` `getTokenById(id)` `addToken({type,name,value})` `duplicate()` `remove()` |
-| `Token`（各具体类型） | `id` `name` `description`(可写) `type` `value` `resolvedValue` `resolvedValueString` `duplicate()` `remove()` `applyToShapes(shapes, props?)` `applyToSelected(props?)` |
+| `Token` (each concrete type) | `id` `name` `description`(writable) `type` `value` `resolvedValue` `resolvedValueString` `duplicate()` `remove()` `applyToShapes(shapes, props?)` `applyToSelected(props?)` |
 | `TokenTheme` | `id` `group` `name` `active` `toggleActive()` `activeSets: TokenSet[]` `addSet(set\|id)` `removeSet(...)` `duplicate()` `remove()` |
 
-**没有 `penpot.tokens`，也没有 `penpotUtils.tokens`** —— 入口只有 `penpot.library.local.tokens`。
+**There is no `penpot.tokens`, nor `penpotUtils.tokens`** — the only entry is `penpot.library.local.tokens`.
 
-### 1.1 Set 到底该怎么切（建模规则）—— 不要按类型切
+### 1.1 How to actually split sets (modeling rule) — don't split by type
 
-**先记住一件事：`SET` 不是「类型分区」，`type` 是 token 自身的属性。**
+**Remember one thing: a `SET` is not a "type partition"; `type` is the token's own attribute.**
 
-实测（本机）：
+Tested locally:
 
-- **一个 set 可以同时容纳全部 17 种类型**（实测：往单个 set 里加 17 类 token，全部成功）；
-  UI 上的 `Color / Border Radius / Dimensions / …` 分类**是每个 set 内部按 `type` 自动分组**的，
-  由 `set.tokensByType: [type, Token[]][]` 提供 —— **不需要为此建 set**。
-- **`toggleActive()` 的粒度就是 set**：一次切换影响该 set 内**全部** token（实测 17 个一起变）。
-- **`theme.addSet()` 也只接受 set**，不能按类型激活。
+- **One set can hold all 17 types at once** (tested: adding 17 kinds of tokens into a single set, all succeeded);
+  the UI's `Color / Border Radius / Dimensions / …` classification is **auto-grouped by `type` inside each set**,
+  provided by `set.tokensByType: [type, Token[]][]` — **no need to build a set for this**.
+- **The granularity of `toggleActive()` is the set**: one toggle affects **all** tokens in that set (tested 17 changing together).
+- **`theme.addSet()` also only accepts sets**, can't activate by type.
 
-所以 **set = 激活 / 主题层（同时开、同时关的一组 token）**，切分依据是「**要不要一起激活**」，
-而不是「**是什么类型**」。
+So **set = activation / theme layer (a group of tokens switched on/off together)**, the split basis is "**whether to activate together**",
+not "**what type it is**".
 
-| 切法 | 评价 |
+| Split way | Verdict |
 |---|---|
-| 按类型切（`Color` / `Radius` / `Spacing` 各一个 set） | ❌ **类别错误**。语义上这三类永远同时激活，拆开只是把 1 次开关变成 N 次；做主题时要在每个 set 里各放一份覆盖值，极易漏改 |
-| 按主题/层切（`Core` / `Dark` / `Density-Compact`） | ✅ **正确**。与 `active` + 优先级（后者胜）机制天然吻合 |
+| Split by type (`Color` / `Radius` / `Spacing` each one set) | ❌ **Category error**. Semantically these three are always active together, splitting just turns 1 switch into N; doing themes means placing an override copy in each set, very easy to miss an edit |
+| Split by theme/layer (`Core` / `Dark` / `Density-Compact`) | ✅ **Correct**. Naturally fits the `active` + priority (later wins) mechanism |
 
-**推荐的两条落地形态：**
+**Two recommended landing forms:**
 
-1. **无主题（最常见）** → **一个 set 装完**（如 `pix · Core`，内部按类型自动分组，UI 上一样清晰）。
-2. **有主题（暗色 / 密度 / 品牌）** → **基础层在前 + 覆盖层在后**：
+1. **No theme (most common)** → **one set holds everything** (e.g. `pix · Core`, internally auto-grouped by type, just as clear in the UI).
+2. **Has theme (dark / density / brand)** → **base layer first + override layer after**:
    ```
-   sets: [ 'pix · Core'(基础全部 38 个), 'pix · Dark'(只放要覆盖的 color，同名) ]
+   sets: [ 'pix · Core'(all base 38), 'pix · Dark'(only the color overrides, same name) ]
    ```
-   基础层必须排在前（`sets` 顺序即优先级，**后面的胜出**，见 §5）；
-   用 `theme.addSet(core); theme.addSet(dark); theme.toggleActive()` 做成预设。
+   The base layer must come first (`sets` order is priority, **later wins**, see §5);
+   use `theme.addSet(core); theme.addSet(dark); theme.toggleActive()` to make a preset.
 
-**另一条实测约束（影响命名方案）**：同一 set 内 token 名**全局唯一，且按 `.` 视为路径**——
-`t.color` 存在时报错 `A token already exists at the path: t.color or at a prefix thereof`，
-即**不能同时存在 `t.color` 与 `t.color.x`**（叶子和父节点互斥）。
-所以命名要统一前缀方案（`color.primary` / `radius.md` / `spacing.xxs` 这种**同级前缀**是安全的），
-**不要**用「`md` 下面挂 `md.lg`」这类会与既有 token 撞路径的名字。
+**Another tested constraint (affects the naming scheme)**: within the same set, token names are **globally unique, and `.` is treated as a path** —
+when `t.color` exists it errors `A token already exists at the path: t.color or at a prefix thereof`,
+i.e. **you cannot simultaneously have `t.color` and `t.color.x`** (leaf and parent nodes are mutually exclusive).
+So the naming should use a unified prefix scheme (`color.primary` / `radius.md` / `spacing.xxs` such **same-level prefixes** are safe),
+**don't** use names like "`md` with `md.lg` underneath" that collide paths with existing tokens.
 
-## 2. 十七种 TokenType（UI 上的 17 个分类，与 API 一一对应）
+## 2. The seventeen TokenTypes (the 17 UI categories, 1:1 with the API)
 
 ```
 borderRadius · shadow · color · dimension · fontFamilies · fontSizes · fontWeights ·
@@ -84,251 +83,251 @@ letterSpacing · number · opacity · rotation · sizing · spacing · borderWid
 textCase · textDecoration · typography
 ```
 
-> `[文档有误]` high-level overview 的 TokenType 列表**漏了 `number` / `rotation` / `sizing`**，
-> 只有 14 个；实际是 **17 个**。写代码时以本表为准。
+> `[docs wrong]` high-level overview's TokenType list **misses `number` / `rotation` / `sizing`**,
+> only 14; actually there are **17**. When writing code, use this table as the source of truth.
 
-## 3. 值格式 / 默认应用属性 / 适用形状（实测矩阵）
+## 3. Value format / default applied property / applicable shapes (tested matrix)
 
-| type | UI 名 | 传入 `value` | 存储后 `value` | **省略 props 时的默认属性** | 文本 | 图元 |
+| type | UI name | `value` passed | stored `value` | **default property when props omitted** | text | shape |
 |---|---|---|---|---|---|---|
 | `color` | Color | `'#FF471D'` | `'#FF471D'` | `fill` | ✅ | ✅ |
-| `borderRadius` | Border Radius | `'8'` | `'8'` | `borderRadiusTopLeft` +`TopRight` +`BottomRight` +`BottomLeft`（**4 个键**） | ❌ | ✅ |
+| `borderRadius` | Border Radius | `'8'` | `'8'` | `borderRadiusTopLeft` +`TopRight` +`BottomRight` +`BottomLeft` (**4 keys**) | ❌ | ✅ |
 | `dimension` | Dimensions | `'16'` | `'16'` | `width` **+ `height`** | ✅ | ✅ |
-| `fontFamilies` | Font Family | `'Inter'` | **`['Inter']`**（自动转数组） | **`fontFamily`**（单数！） | ✅ | ❌ |
+| `fontFamilies` | Font Family | `'Inter'` | **`['Inter']`** (auto to array) | **`fontFamily`** (singular!) | ✅ | ❌ |
 | `fontSizes` | Font Size | `'16'` | `'16'` | `fontSize` | ✅ | ❌ |
 | `fontWeights` | Font Weight | `'600'` | `'600'` | `fontWeight` | ✅ | ❌ |
 | `letterSpacing` | Letter Spacing | `'0.02'` | `'0.02'` | `letterSpacing` | ✅ | ❌ |
 | `number` | Number | `'42'` | `'42'` | `rotation` | ✅ | ✅ |
 | `opacity` | Opacity | `'0.6'` | `'0.6'` | `opacity` | ✅ | ✅ |
 | `rotation` | Rotation | `'45'` | `'45'` | `rotation` | ✅ | ✅ |
-| `shadow` | Shadow | 对象（见下） | **数组**（见下） | `shadow` | ✅ | ✅ |
+| `shadow` | Shadow | object (see below) | **array** (see below) | `shadow` | ✅ | ✅ |
 | `sizing` | Sizing | `'240'` | `'240'` | `width` **+ `height`** | ✅ | ✅ |
-| `spacing` | Spacing | `'24'` | `'24'` | **无默认属性（no-op）** | ❌ | ❌ |
+| `spacing` | Spacing | `'24'` | `'24'` | **no default property (no-op)** | ❌ | ❌ |
 | `borderWidth` | Stroke Width | `'1'` | `'1'` | `strokeWidth` | ✅ | ✅ |
 | `textCase` | Text Case | `'uppercase'` | `'uppercase'` | `textCase` | ✅ | ❌ |
 | `textDecoration` | Text Decoration | `'underline'` | `'underline'` | `textDecoration` | ✅ | ❌ |
-| `typography` | Typography | 组合对象（见下） | 组合对象 | `typography` | ✅ | ❌ |
+| `typography` | Typography | composite object (see below) | composite object | `typography` | ✅ | ❌ |
 
-「文本/图元」列 = 该类型能否作用到该形状；❌ 表示应用会**静默 no-op**（返回成功、`tokens` 为空）。
+The "text/shape" columns = whether this type can apply to that shape; ❌ means applying **silently no-ops** (returns success, `tokens` empty).
 
-### 3.1 shadow 的值形状
+### 3.1 shadow value shape
 
-传入单个对象即可，存储时**自动包成数组**，且 `inset` 被强转为**布尔**：
+Just pass a single object; on storage it's **auto-wrapped into an array**, and `inset` is coerced to a **boolean**:
 
 ```js
 set.addToken({ type: 'shadow', name: 'elevation.md', value: {
   color: '#1C1D20', inset: 'false', offsetX: '0', offsetY: '4', spread: '0', blur: '12'
 }});
-// 读回 value: [{ offsetX:'0', offsetY:'4', blur:'12', spread:'0', color:'#1C1D20', inset:false }]
+// readback value: [{ offsetX:'0', offsetY:'4', blur:'12', spread:'0', color:'#1C1D20', inset:false }]
 ```
 
-### 3.2 typography 的值形状（**注意键名会被重命名**）
+### 3.2 typography value shape (note keys get renamed)
 
 ```js
 set.addToken({ type: 'typography', name: 'type.body', value: {
   letterSpacing: '0', fontFamilies: 'Inter', fontSizes: '16',
   fontWeight: '400', lineHeight: '1.5', textCase: 'none', textDecoration: 'none'
 }});
-// 读回 value: { fontFamily:['Inter'], fontSize:'16', fontWeight:'400',
+// readback value: { fontFamily:['Inter'], fontSize:'16', fontWeight:'400',
 //               letterSpacing:'0', lineHeight:'1.5', textCase:'none', textDecoration:'none' }
 //                        ↑ fontFamilies→fontFamily      ↑ fontSizes→fontSize
 ```
 
-- **`lineHeight` 没有独立 token 类型**，只作为 Typography 的组成部分存在。
-- 组合值里的每一项都可以写成**引用**（见 §4），如 `fontSizes: '{fontSize.md}'`；
-  但注意重命名后要引用对应类型的 token。
+- **`lineHeight` has no standalone token type**, exists only as part of Typography.
+- Each item in the composite value can be written as a **reference** (see §4), e.g. `fontSizes: '{fontSize.md}'`;
+  but note that after renaming you must reference the token of the corresponding type.
 
-### 3.3 数值一律存成字符串
+### 3.3 Numeric values are all stored as strings
 
 `spacing` / `dimension` / `borderRadius` / `borderWidth` / `sizing` / `number` / `opacity` / `rotation`
-**存储形态都是字符串**（`'16'`、`'0.6'`），但**也接受 JS number 输入**，会被强制转成字符串。
-写代码时统一传字符串，避免读回时类型不一致。
+**all stored as strings** (`'16'`, `'0.6'`), but **also accept JS number input**, coerced to string.
+When writing code, uniformly pass strings to avoid type inconsistency on readback.
 
-## 4. 引用（token → token）
+## 4. References (token → token)
 
-`value` 写 `'{set层级之外的token名}'`（**只写 token 名，不带 set 名**）即成为引用：
+Write `'{token name outside the set level}'` in `value` (**only the token name, no set name**) and it becomes a reference:
 
 ```js
 set.addToken({ type: 'color', name: 'color.link', value: '{color.primary}' });
 // value: '{color.primary}'   resolvedValue: '#FF471D'   resolvedValueString: '#FF471D'
 ```
 
-- 引用**跨 set 解析**（本 set 或任何激活 set 里的同名 token 均可被引用）。
-- 未激活时 `resolvedValue` 仍是 `null` —— 引用链只在激活状态下解析。
+- References **resolve across sets** (the same-named token in this set or any active set can be referenced).
+- When inactive, `resolvedValue` is still `null` — the reference chain only resolves in the activated state.
 
-## 5. 激活 / set 与 theme 的区别 / 优先级
+## 5. Activation / set vs theme difference / priority
 
-### 5.1 Set 与 Theme 的本质区别
+### 5.1 Essential difference between Set and Theme
 
 | | **TokenSet** | **TokenTheme** |
 |---|---|---|
-| 是什么 | **token 的容器**（真正的数据） | **「哪些 set 应该开着」的预设**（只是一组引用） |
-| 存 token 吗 | **存**（`tokens` / `tokensByType`） | **不存**，只有 `activeSets`（引用其他 set） |
-| 必需吗 | **必需**，没有 set 就无处放 token | **可选**，纯 UI 便利 |
-| 能否单独开关 | 能（`set.toggleActive()`），**但会清空所有 theme 的激活状态** | 能（`theme.toggleActive()`），连带切换其 `activeSets` |
-| 互斥性 | 不互斥，可任意多开 | **同 `group` 内互斥**（激活一个自动停用同组另一个）；**不同 group 可同时激活** |
-| 命名唯一域 | **是**（set 内 name 唯一，且 `.` 是路径） | 不是 |
-| 影响优先级吗 | **是**（`sets` 数组顺序） | 否，只决定"谁开着" |
+| What it is | **token container** (the actual data) | a preset of "which sets should be on" (just a set of references) |
+| Stores tokens? | **Yes** (`tokens` / `tokensByType`) | **No**, only `activeSets` (references other sets) |
+| Required? | **Required**, without a set there's nowhere for tokens | **Optional**, pure UI convenience |
+| Can toggle alone? | Yes (`set.toggleActive()`), **but clears all themes' activation state** | Yes (`theme.toggleActive()`), switches its `activeSets` together |
+| Mutually exclusive? | Not exclusive, any number can be on | **mutually exclusive within the same `group`** (activating one auto-stops the other in the group); **different groups can be active simultaneously** |
+| Naming unique domain | **Yes** (name unique within set, and `.` is a path) | No |
+| Affects priority? | **Yes** (`sets` array order) | No, only decides "who's on" |
 
-**一句话：set 是"数据"，theme 是"开关组合"。**
+**In one sentence: a set is "data", a theme is a "switch combination".**
 
-### 5.2 核心规则（实测，比官方文档更明确）
+### 5.2 Core rules (tested, clearer than official docs)
 
-> **`set.active` 是「所有已激活 theme 的并集」的派生值 —— 某 set 处于激活，当且仅当至少有一个激活的 theme 包含它。**
+> **`set.active` is a derived value of "the union of all activated themes" — a set is active if and only if at least one activated theme contains it.**
 
-实测逐步核对（3 个 set，2 个 group）：
+Tested step-by-step (3 sets, 2 groups):
 
-| 步骤 | 观测到的 set 状态 | 观测到的 theme 状态 |
+| Step | Observed set state | Observed theme state |
 |---|---|---|
-| 初始 | 全 off | 全未激活（`activeSets` 仍显示**声明成员**，与激活状态无关） |
-| 激活 `Density/compact` | `dense=ON` | compact=ACTIVE |
-| 激活 `Scheme/dark`（含 base+dark） | `base=ON dark=ON`，**`dense` 保持 ON** | dark 与 compact **同时 ACTIVE** |
-| 激活 `Scheme/light`（同组） | `base=ON`，**`dark` 变 off**，`dense` 保持 ON | dark **被自动停用**，light=ACTIVE |
-| 直接 `base.toggleActive()` | `base=off`，`dense` 保持 ON | **三个 theme 全部被清空** |
+| Initial | all off | all inactive (`activeSets` still shows **declared members**, unrelated to activation state) |
+| Activate `Density/compact` | `dense=ON` | compact=ACTIVE |
+| Activate `Scheme/dark` (contains base+dark) | `base=ON dark=ON`, **`dense` stays ON** | dark and compact **both ACTIVE** |
+| Activate `Scheme/light` (same group) | `base=ON`, **`dark` turns off**, `dense` stays ON | dark **auto-stopped**, light=ACTIVE |
+| Directly `base.toggleActive()` | `base=off`, `dense` stays ON | **all three themes cleared** |
 
-三条推论：
+Three corollaries:
 
-1. **激活 theme 不会关掉 theme 之外的 set**（`dense` 一直没被关）——但**停用 theme 会关掉它的 set**（步骤 3 的 `dark`）。
-   所以精确表述是「并集」而不是「只增不减」。
-2. **同组互斥是自动的**，不需要手写停用逻辑 —— 这就是 theme 存在的最大价值：用 axis 表达"只能选一个"的约束。
-3. **直接 toggle set 会清空所有 theme** —— 一旦这么做，就进入了"手动自定义"状态，theme 的 `active` 全部变 false。
+1. **Activating a theme doesn't turn off sets outside the theme** (`dense` was never turned off) — but **stopping a theme turns off its set** (step 3's `dark`).
+   So the precise phrasing is "union" rather than "only-add-never-subtract".
+2. **Same-group mutual exclusion is automatic**, no need to hand-write stop logic — this is the biggest value of themes: using an axis to express the "can only pick one" constraint.
+3. **Directly toggling a set clears all themes** — once you do this, you enter a "manual custom" state, all themes' `active` become false.
 
-### 5.3 优先级（与 theme 无关）
+### 5.3 Priority (unrelated to theme)
 
-两个**激活** set 定义同名 token → **`sets` 数组中靠后的那个胜出**；停用它则回退到靠前者。
-theme 只决定"谁开着"，**不改变 `sets` 的顺序**。
+Two **activated** sets defining the same-named token → **the later one in the `sets` array wins**; deactivating it falls back to the earlier one.
+A theme only decides "who's on", **doesn't change the `sets` order**.
 
-所以约定：**基础层放前、主题覆盖层放后**：
+So the convention: **base layer first, theme override layer after**:
 
 ```
-sets: [ 'pix · Core'(全部基础 token), 'pix · Dark'(只放要覆盖的同名 token) ]
+sets: [ 'pix · Core'(all base tokens), 'pix · Dark'(only the same-named tokens to override) ]
 
 ensureTheme('Scheme', 'Light', ['pix · Core'])
-ensureTheme('Scheme', 'Dark',  ['pix · Core', 'pix · Dark'])   // Dark 在后 → 激活时覆盖 Core
-activateTheme('Scheme', 'Dark')                                 // → color.primary 解析为覆盖值
+ensureTheme('Scheme', 'Dark',  ['pix · Core', 'pix · Dark'])   // Dark after → overrides Core when activated
+activateTheme('Scheme', 'Dark')                                 // → color.primary resolves to the override value
 ```
 
-### 5.4 API 与引擎
+### 5.4 API and engine
 
 ```js
-// 原生
-const t = tokens.addTheme({ group: 'Scheme', name: 'Dark' });  // 默认 active:false
-t.addSet(coreSet); t.addSet(darkSet);                          // 接受 TokenSet 或 id
-t.toggleActive();                                              // 激活（同组另一个会被自动停用）
+// native
+const t = tokens.addTheme({ group: 'Scheme', name: 'Dark' });  // default active:false
+t.addSet(coreSet); t.addSet(darkSet);                          // accepts TokenSet or id
+t.toggleActive();                                              // activate (the other in same group auto-stops)
 
-// 引擎（推荐，已封装上述规则）
+// engine (recommended, wraps the above rules)
 TK.ensureTheme('Scheme', 'Dark', ['pix · Core', 'pix · Dark']);
-TK.activateTheme('Scheme', 'Dark');     // 返回 { active, activeSetsNow }
-TK.activeSets();                        // 当前实际激活的 set 名单
+TK.activateTheme('Scheme', 'Dark');     // returns { active, activeSetsNow }
+TK.activeSets();                        // current actually-activated set names
 ```
 
-> ⚠️ **有 theme 时不要直接 `set.toggleActive()`** —— 会清空全部 theme。
-> `TK.ensureSet()` 已自带保护：检测到存在 theme 时默认不再直接 toggle（可用第三个参数 `force` 强制）。
-> `TK.audit()` 也会自动切换判据：无 theme → 未激活 set 算故障；有 theme → 未激活属正常态，
-> 改判「无同组多激活 + 已激活 set 内 token 全部可解析」。
+> ⚠️ **When themes exist, don't directly `set.toggleActive()`** — it clears all themes.
+> `TK.ensureSet()` already has built-in protection: when a theme is detected it defaults to not toggling directly (use the third param `force` to force).
+> `TK.audit()` also auto-switches its criterion: no theme → inactive set counts as a fault; with theme → inactive is a normal state,
+> re-judged to "no same-group multi-activation + all tokens in activated sets resolvable".
 
-## 6. 应用 token
+## 6. Applying tokens
 
 ```js
-token.applyToShapes([shapeA, shapeB]);          // ✅ 省略 properties → 用默认属性
-token.applyToShapes([shape], ['fill']);         // ✅ 显式指定（属性名要写对）
-shape.applyToken(token, ['strokeColor']);       // ✅ 等价写法
-token.applyToSelected(['fontSize']);            // 作用于当前选中
-await nap(500);                                 // ⏳ 异步，读回前必须等待
+token.applyToShapes([shapeA, shapeB]);          // ✅ omit properties → use default property
+token.applyToShapes([shape], ['fill']);         // ✅ explicit (property name must be correct)
+shape.applyToken(token, ['strokeColor']);       // ✅ equivalent
+token.applyToSelected(['fontSize']);            // acts on current selection
+await nap(500);                                 // ⏳ async, must wait before readback
 ```
 
-**六个必须知道的坑：**
+**Six must-know pitfalls:**
 
-1. **省略 `properties`**。实测传 `['all']` 一律报
-   `Value not valid: Field 1 is invalid: should be a set of strings` —— `[文档有误]`，本版本 `'all'` 不可用。
-2. **字体族的属性名是 `fontFamily`（单数）**，而 `TokenFontFamiliesProps` 文档写的是 `"fontFamilies"`。
-   传 `['fontFamilies']` → 报同样的 `should be a set of strings`；传 `['fontFamily']` → 成功。`[文档有误]`
-3. **不适用 = 静默成功**。给矩形应用 `fontSizes` 返回 OK，但 `rect.tokens` 仍是 `{}`。
-   **判据只有 readback**：
+1. **Omit `properties`**. Tested passing `['all']` always errors
+   `Value not valid: Field 1 is invalid: should be a set of strings` — `[docs wrong]`, `'all'` is unavailable in this version.
+2. **The font-family property name is `fontFamily` (singular)**, while the `TokenFontFamiliesProps` doc says `"fontFamilies"`.
+   Passing `['fontFamilies']` → same `should be a set of strings` error; passing `['fontFamily']` → success. `[docs wrong]`
+3. **Inapplicable = silent success**. Applying `fontSizes` to a rectangle returns OK, but `rect.tokens` is still `{}`.
+   **The only criterion is readback**:
    ```js
    token.applyToShapes([sh]);
    await nap(500);
-   if (!sh.tokens || !Object.keys(sh.tokens).length) throw new Error('token 未生效：检查 set 是否 active / 形状是否支持该属性');
+   if (!sh.tokens || !Object.keys(sh.tokens).length) throw new Error('token not effective: check set active / shape supports the property');
    ```
-4. **typography 会覆盖单项绑定**。先应用 `fontSize`+`fontWeight`+…，再应用 `typography`，
-   则 `shape.tokens` 只剩 `{typography:'…'}`，单项绑定丢失。二者**不要混用**。
-5. **`dimension` 与 `sizing` 默认同时设宽和高**（不是只设一个）；只想设宽就显式传 `['width']`。
-6. **`spacing` 没有默认属性**，省略 props 等于什么都没做。要作用于 flex 容器，需显式指定：
+4. **typography overwrites single bindings**. Apply `fontSize`+`fontWeight`+… first, then apply `typography`,
+   and `shape.tokens` only has `{typography:'…'}` left, the single bindings are lost. **Don't mix the two.**
+5. **`dimension` and `sizing` set width and height together by default** (not just one); if you only want width, explicitly pass `['width']`.
+6. **`spacing` has no default property**, omitting props does nothing. To act on a flex container, specify explicitly:
    ```js
    spacingToken.applyToShapes([flexBoard], ['rowGap', 'columnGap']);
-   // 也可 'paddingLeft' / 'marginTop' / 'layoutItemMinW' …（见 TokenSpacingProps）
+   // also 'paddingLeft' / 'marginTop' / 'layoutItemMinW' … (see TokenSpacingProps)
    ```
 
-`shape.tokens` 是 `{ 属性名: token名字 }` 的映射（注意**没有** `x`/`y`/`height` 之外的坑；
-`fontFamilies` 在这里同样以 **`fontFamily`** 出现）。
+`shape.tokens` is a map of `{ property name: token name }` (note there is **no** trap beyond `x`/`y`/`height`;
+`fontFamilies` here also appears as **`fontFamily`**).
 
-## 7. 解除绑定
+## 7. Unbinding
 
-**没有 removeToken API** —— 直接写形状属性即可解绑：
+**There is no removeToken API** — just write the shape property directly to unbind:
 
 ```js
-shape.fills = [{ fillColor: '#FF471D', fillOpacity: 1 }];   // tokens.fill 随之清空
+shape.fills = [{ fillColor: '#FF471D', fillOpacity: 1 }];   // tokens.fill clears accordingly
 ```
 
-**关键细则（实测）**：写**相同的值**属于 no-op，**绑定不会被清除**；
-必须写入一个**不同的值**才会解绑。所以「先记录原值、再写回原值」**无法**用来解绑，
-需要中间写一个临时值：
+**Key detail (tested)**: writing the **same value** is a no-op, **the binding is NOT cleared**;
+you must write a **different value** to unbind. So "record the original value first, then write it back" **cannot** be used to unbind,
+you need to write a temporary value in between:
 
 ```js
 const keep = shape.fills[0].fillColor;
-shape.fills = [{ fillColor: '#000001', fillOpacity: 1 }];  // 不同的值 → 解绑
-shape.fills = [{ fillColor: keep,      fillOpacity: 1 }];  // 再写回真值
+shape.fills = [{ fillColor: '#000001', fillOpacity: 1 }];  // different value → unbind
+shape.fills = [{ fillColor: keep,      fillOpacity: 1 }];  // write the true value back
 ```
 
-## 8. 与 DESIGN.md 章节的映射
+## 8. Mapping with DESIGN.md sections
 
-| DESIGN.md 章节 | 应录入的 token 类型 |
+| DESIGN.md section | token types to record |
 |---|---|
 | Colors | `color` |
-| Typography | `typography`（主）+ `fontFamilies` / `fontSizes` / `fontWeights` / `letterSpacing`（供引用与单独应用）+ `textCase` / `textDecoration`（按需） |
+| Typography | `typography` (main) + `fontFamilies` / `fontSizes` / `fontWeights` / `letterSpacing` (for references and separate application) + `textCase` / `textDecoration` (as needed) |
 | Layout | `spacing` / `dimension` / `sizing` |
 | Elevation & Depth | `shadow` / `opacity` |
 | Shapes | `borderRadius` / `borderWidth` |
-| （其他） | `number` / `rotation`（用于角标、旋转装饰等） |
+| (other) | `number` / `rotation` (for badges, rotation decorations, etc.) |
 
-**可选的机械化桥梁**：`design.md` CLI 能把 DESIGN.md 导出成 W3C Design Tokens（DTCG）与 Tailwind 主题：
+**Optional mechanical bridge**: the `design.md` CLI can export DESIGN.md into W3C Design Tokens (DTCG) and a Tailwind theme:
 
 ```bash
-npx @google/design.md export --format dtcg DESIGN.md > tokens.json   # 机器可读，可作为 TK.seed 的 spec 来源
+npx @google/design.md export --format dtcg DESIGN.md > tokens.json   # machine-readable, can serve as TK.seed's spec source
 ```
 
-用它可以避免手抄数值；但 **DTCG 的类型名与 Penpot 的 17 种 TokenType 并不一一对应**
-（如 DTCG 无 `sizing`/`rotation`，Penpot 无 `duration`/`cubicBezier`），仍需一层显式映射。
+Using it avoids hand-copying values; but **DTCG type names don't map 1:1 to Penpot's 17 TokenTypes**
+(e.g. DTCG has no `sizing`/`rotation`, Penpot has no `duration`/`cubicBezier`), still needs an explicit mapping layer.
 
-## 9. 验收配方【门禁 G9】（必须跑）
+## 9. Acceptance recipe [Gate G9] (must run)
 
-粘贴 `scripts/token_engine.js` 后：
+After pasting `scripts/token_engine.js`:
 
 ```js
-return storage.TK.audit();    // 全量体检
-storage.TK.assert();          // 不合格直接抛错，可直接当门禁用
-// 端到端：至少在 1 个真实形状上应用并回读
-await storage.TK.apply('color.primary', [someRealShape]);   // 必须返回 ok:true
+return storage.TK.audit();    // full health check
+storage.TK.assert();          // throws directly on failure, can be used as a gate
+// end-to-end: apply and readback on at least 1 real shape
+await storage.TK.apply('color.primary', [someRealShape]);   // must return ok:true
 ```
 
-体检项（任一不过即为不合格）：
+Health-check items (any failure = not qualified):
 
-1. 每个 set 的 `active === true`（**未激活 = 全部 token 失效**）；
-2. 每个 token 的 `resolvedValueString` 非空（引用链断裂会在这里暴露）；
-3. set 顺序符合「基础在前、覆盖在后」；
-4. name 与 DESIGN.md 一一对应、无重名跨 set 冲突（除非是有意的主题覆盖）；
-5. `themes` 若存在，其 `activeSets` 与 `active` 状态符合预期。
+1. Each set's `active === true` (**inactive = all tokens dead**);
+2. Each token's `resolvedValueString` is non-empty (broken reference chain surfaces here);
+3. Set order follows "base first, override after";
+4. name maps 1:1 to DESIGN.md, no cross-set name conflict (unless intentional theme override);
+5. If `themes` exist, their `activeSets` and `active` states match expectations.
 
-## 10. 文档与实现的差异清单（照文档写会踩雷）
+## 10. Doc-vs-implementation discrepancy list (following docs will trip you up)
 
-| 项 | 文档说 | 实测 |
+| Item | Docs say | Tested |
 |---|---|---|
-| TokenType 数量 | 14（列了 14 个） | **17**（多 `number` / `rotation` / `sizing`） |
-| `addSet` 默认 | 未说明 | **`active: false`**（静默失败之源） |
-| `properties: ['all']` | 是合法 TokenProperty | **报错，不可用** |
-| 字体族属性名 | `fontFamilies` | 传入须用 **`fontFamily`**；`shape.tokens` 键也是 `fontFamily` |
-| `spacing` 默认属性 | 未说明 | **无**（省略 props = no-op） |
-| `dimension`/`sizing` 默认 | 未说明 | 同时作用 `width` 与 `height` |
-| token 入口 | `penpot.library.local.tokens` | ✅ 一致（但**不存在** `penpot.tokens`） |
-| 应用同步性 | 说明是异步 | ✅ 一致（实测需 ~500ms 才稳定） |
-| 解绑方式 | 「直接设属性即可」 | ✅ 但**写相同值不解绑** |
+| TokenType count | 14 (listed 14) | **17** (extra `number` / `rotation` / `sizing`) |
+| `addSet` default | not stated | **`active: false`** (source of silent failure) |
+| `properties: ['all']` | a valid TokenProperty | **errors, unavailable** |
+| font family property name | `fontFamilies` | must pass **`fontFamily`**; `shape.tokens` key is also `fontFamily` |
+| `spacing` default property | not stated | **none** (omitting props = no-op) |
+| `dimension`/`sizing` default | not stated | acts on both `width` and `height` |
+| token entry | `penpot.library.local.tokens` | ✅ consistent (but `penpot.tokens` **does not exist**) |
+| apply sync | stated async | ✅ consistent (tested ~500ms to stabilize) |
+| unbind method | "just set the property directly" | ✅ but **writing the same value doesn't unbind** |

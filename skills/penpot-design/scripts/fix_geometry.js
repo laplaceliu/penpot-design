@@ -1,8 +1,8 @@
-// fix_geometry.js —— 几何修补引擎（四类签名，全部支持 dry-run）
-// 用法：整份粘贴进 execute_code 执行一次（字面量函数入 storage 跨调用复用）；
-//       然后逐页调用 storage.fixColumnOffset / fitBoardHeight / fitRootHeight / fixOverflowRight。
-// 纪律：**先 {apply:false} 出清单人工复核，确认后再 {apply:true}**；每类修完立刻跑 audit_layout.js 复算。
-// 机理与四类签名的判定见 references/positioning-audit.md。
+// fix_geometry.js —— geometry repair engine (four signature classes, all support dry-run)
+// Usage: paste the whole file into execute_code and run once (literal functions go into storage for cross-call reuse);
+//       then call storage.fixColumnOffset / fitBoardHeight / fitRootHeight / fixOverflowRight page by page.
+// Discipline: **first {apply:false} to produce a list for manual review, then {apply:true} after confirming**; after each class, immediately re-run audit_layout.js to recompute.
+// Mechanics and the four-signature judgments: references/positioning-audit.md.
 
 return (function () {
   const headOf = (r) => { try { return Array.from(r.children).find((c) => c.type === 'board'); } catch (e) { return null; } };
@@ -12,7 +12,7 @@ return (function () {
   const fsz = (s) => { const v = parseFloat(s.fontSize); return isFinite(v) ? v : 14; };
   const alignOf = (s) => { try { return s.horizontalAlign || s.align || 'left'; } catch (e) { return 'left'; } };
 
-  // 与 audit_layout.js 同源的「文本视觉矩形」：宽文本框会假越界，必须按对齐方式估算实际字面范围
+  // "Text visual rect" from the same source as audit_layout.js: wide text boxes falsely overflow, must estimate the actual glyph extent by alignment
   storage.visRect = function (c) {
     if (c.type !== 'text') return { x: c.x, y: c.y, w: c.width, h: c.height, r: c.x + c.width, b: c.y + c.height };
     const f = fsz(c), n = String(c.characters || '').length;
@@ -23,14 +23,14 @@ return (function () {
     return { x: vx, y: vy, w: est, h: vh, r: vx + est, b: vy + vh };
   };
 
-  // 移动：优先 parentX/parentY（处处可用），兜底世界坐标 x/y
+  // Move: prefer parentX/parentY (works everywhere), fall back to world coordinates x/y
   const moveX = (s, wx) => { try { s.parentX = wx - s.parent.x; return true; } catch (e1) {} try { s.x = wx; return true; } catch (e2) {} return false; };
 
-  // ---- S1 常量列偏移 ----
-  // 症状：右列板的内容用了左列板的绝对 x，整块内容跑到板左侧（甚至压在邻板上）。
-  // 判据：板内存在 x < board.x - 2 的直接子元素。
-  // 平移量：dx = board.x - originX（originX = 内容撰写时使用的原点，默认 80）。
-  // 注意与方案 A 失效区分：本签名是 **X 轴常量**偏移；方案 A 失效是 **Y 轴 -board.y** 偏移。
+  // ---- S1 constant column offset ----
+  // Symptom: a right-column board's content used the left-column board's absolute x, the whole content runs to the board's left (even onto a neighbor board).
+  // Criterion: a direct child with x < board.x - 2 exists inside the board.
+  // Shift amount: dx = board.x - originX (originX = the origin used when writing the content, default 80).
+  // Distinguish from approach A failure: this signature is an **X-axis constant** offset; approach A failure is a **Y-axis -board.y** offset.
   storage.fixColumnOffset = function (opts) {
     opts = opts || {};
     const originX = opts.originX == null ? 80 : opts.originX;
@@ -50,17 +50,17 @@ return (function () {
     return { apply: apply, boards: log.length, totalChildren: log.reduce((a, b) => a + b.displaced, 0), plan: log };
   };
 
-  // ---- S2 板高不足（内容溢出板底） ----
-  // pad 默认 0：**组件母版（Button/Input/Toggle…）必须恰好等于内容尺寸**，
-  // 给板统一加内边距会把母版撑大、破坏组件（实测教训：pad=40 会把 Button 60→100）。
-  // 安全性：板 resize 不影响 absolute 子元素。
+  // ---- S2 board height insufficient (content overflows board bottom) ----
+  // Default pad 0: **component masters (Button/Input/Toggle…) must equal their content size exactly**,
+  // adding uniform padding to boards would inflate the masters and break components (tested lesson: pad=40 grows Button 60→100).
+  // Safety: board resize doesn't affect absolute children.
   storage.fitBoardHeight = function (opts) {
     opts = opts || {};
     const pad = opts.pad == null ? 0 : opts.pad;
     const minGrow = opts.minGrow == null ? 2 : opts.minGrow;
-    // maxGrow 护栏（默认 160）：本引擎有个危险特性——**它能把「放错的子元素」吞进板里，从而把错位合法化**。
-    // 板只需长大几十 px 才是"内容真的溢出"；一旦需要长高几百 px，那必是子元素被放错位置，
-    // 正确修法是挪子元素，而不是把板撑大（撑大后审计看到"子元素在板内"就通过了 = 假阴性）。
+    // maxGrow guardrail (default 160): this engine has a dangerous trait — **it can swallow a "misplaced child" into the board, legitimizing the misalignment**.
+    // A board only needs to grow tens of px to be "real content overflow"; once it needs to grow hundreds of px, that must be a child misplaced,
+    // the correct fix is to move the child, not inflate the board (after inflating, the audit sees "the child is inside the board" and passes = false negative).
     const maxGrow = opts.maxGrow == null ? 160 : opts.maxGrow;
     const apply = !!opts.apply;
     const root = penpot.currentPage.root || penpot.root;
@@ -68,7 +68,7 @@ return (function () {
     const log = [], suspect = [];
     const walk = (node) => {
       const kids = kidsOf(node); if (!kids) return;
-      kids.forEach((k) => { if (rec(k)) walk(k); });      // 先深层后父层（子板变高会影响父板 maxB）
+      kids.forEach((k) => { if (rec(k)) walk(k); });      // depth-first then parent (a child board growing affects the parent board maxB)
       if (node.type === 'board' && node !== head) {
         let maxB = -Infinity, worst = null;
         kids.forEach((k) => { const b = k.y + k.height; if (isFinite(b) && b > maxB) { maxB = b; worst = k; } });
@@ -84,11 +84,11 @@ return (function () {
         }
       }
     };
-    walk(head); walk(head);                                // 两轮收敛
+    walk(head); walk(head);                                // two-round convergence
     return { apply: apply, boards: log.length, plan: log, suspect: suspect, refused: suspect.length };
   };
 
-  // ---- S3 PageRoot 高度不足 ----
+  // ---- S3 PageRoot height insufficient ----
   storage.fitRootHeight = function (opts) {
     opts = opts || {};
     const pad = opts.pad == null ? 80 : opts.pad;
@@ -102,8 +102,8 @@ return (function () {
     return { apply: apply, grew: false, h: Math.round(head.height) };
   };
 
-  // ---- S4 右侧溢出（右对齐文本框超宽等） ----
-  // 判据：子元素「视觉矩形」右边超出板右 +1px → 左移到板右内侧 inset 处。
+  // ---- S4 right-side overflow (right-aligned text box too wide, etc.) ----
+  // Criterion: a child's "visual rect" right edge exceeds the board right +1px → shift left to inside the board right minus inset.
   storage.fixOverflowRight = function (opts) {
     opts = opts || {};
     const inset = opts.inset == null ? 24 : opts.inset;
@@ -130,18 +130,18 @@ return (function () {
     return { apply: apply, count: log.length, plan: log };
   };
 
-  // ---- S7 行重叠修复：按实际板高重排行距 ----
-  // 为什么必须要它：`fitBoardHeight` 把板长高以包住内容后，若行长超过**固定行距**，
-  // 板就会压到下一行——这是「修复动作自己制造的新缺陷」，且只查包含性的审计看不出来。
-  // 为什么不直接改板高：板高由内容决定，不能迁就网格；**要迁就的是行距**。
-  // 关键实现：移动板**不会**带走 absolute 子元素（api-pitfalls §10），必须整体平移子树。
+  // ---- S7 row-overlap repair: re-row the gaps by actual board height ----
+  // Why it's necessary: after fitBoardHeight grows a board to wrap its content, if the row length exceeds the **fixed row gap**,
+  // the board presses onto the next row — this is a "fix action creating a new defect itself", invisible to an audit that only checks containment.
+  // Why not just change board height: board height is decided by content, can't yield to the grid; **what must yield is the row gap**.
+  // Key implementation: moving a board **does NOT** carry absolute children (api-pitfalls §10), the subtree must be translated as a whole.
   const moveToWorld = (s, wx, wy) => {
     try { s.parentX = wx - s.parent.x; s.parentY = wy - s.parent.y; return true; } catch (e1) {}
     try { s.x = wx; s.y = wy; return true; } catch (e2) {}
     return false;
   };
   const moveSubtree = (s, dx, dy) => {
-    (kidsOf(s) || []).forEach((k) => moveSubtree(k, dx, dy));   // 先动子孙（absolute → 世界坐标），再动壳
+    (kidsOf(s) || []).forEach((k) => moveSubtree(k, dx, dy));   // move descendants first (absolute → world coordinates), then the shell
     moveToWorld(s, s.x + dx, s.y + dy);
   };
   storage.moveSubtree = moveSubtree;
@@ -164,7 +164,7 @@ return (function () {
     let maxBottom = -Infinity, overlapsBefore = 0;
     cols.forEach((col) => {
       col.items.sort((a, b) => a.y - b.y);
-      // 统计修复前的重叠，便于判断是否真的有病
+      // count overlaps before repair, to judge whether there's truly a problem
       for (let i = 0; i + 1 < col.items.length; i++) {
         if (col.items[i].y + col.items[i].height > col.items[i + 1].y + 1) overlapsBefore++;
       }
@@ -180,9 +180,9 @@ return (function () {
     return { apply: apply, cols: cols.length, overlapsBefore: overlapsBefore, moved: log.length, plan: log, suggestedRootH: Math.ceil(maxBottom + 80 - head.y) };
   };
 
-  // ---- 一次跑完（顺序有讲究：横向归位 → 纵向长高 → 右侧收边 → 重排行距 → 最后收根板） ----
-  // 注意 reflowRows 必须在 fitBoardHeight **之后**（重排依据的是长高后的真实高度），
-  // fitRootHeight 又必须在 reflowRows **之后**（根高依据的是重排后的真实底边）。
+  // ---- run all at once (order matters: horizontal reposition → vertical grow → right edge trim → re-row gaps → finally shrink root board) ----
+  // Note reflowRows must come **after** fitBoardHeight (re-row uses the post-grow real heights),
+  // and fitRootHeight must come **after** reflowRows (root height uses the post-reflow real bottom).
   storage.fixGeometryAll = function (apply) {
     const a = !!apply;
     return {

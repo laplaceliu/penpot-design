@@ -1,51 +1,51 @@
-# 适配器：.NET MAUI（Multi-platform App UI）
+# Adapter: .NET MAUI (Multi-platform App UI)
 
-通用纪律见 `references/design-to-code-generic.md`（token 只引变量、分层、资源零外链、五态、整数像素、验收流程）。
-本文件只写 MAUI 特有部分；总原则与视口档位约束同 generic §0。跨平台（Android / iOS / Windows / macOS）。
+The generic discipline is in `references/design-to-code-generic.md` (tokens only reference variables, layering, zero external asset links, five states, integer pixels, acceptance flow).
+This file covers only MAUI-specific parts; the general principles and viewport-tier constraints are the same as generic §0. Cross-platform (Android / iOS / Windows / macOS).
 
-## 1. 概况（范式 / 平台与语言 / 布局模型 / 样式机制）
+## 1. Overview (paradigm / platform & language / layout model / styling mechanism)
 
-- **范式**：retained XAML / C#（声明式 UI 树 + 代码后置）。
-- **平台与语言**：C# + XAML；.NET（单项目多目标）。
-- **布局模型**：`Grid`、`StackLayout`（`Vertical`/`Horizontal`）、`FlexLayout`、`AbsoluteLayout`、`Grid` 列行约束；约束式（基于 DPS 密度无关单位）。
-- **样式机制**：XAML `Style` + `ResourceDictionary`（`Setter` 设 `BackgroundColor`/`CornerRadius`/`FontSize`…）；`VisualStateManager`（VSM）管理状态；无原始 CSS（可用少量 CSS 但通过 `Style` 映射）。
+- **Paradigm**: retained XAML / C# (declarative UI tree + code-behind).
+- **Platform & language**: C# + XAML; .NET (single project, multiple targets).
+- **Layout model**: `Grid`, `StackLayout` (`Vertical`/`Horizontal`), `FlexLayout`, `AbsoluteLayout`, Grid row/column constraints; constraint-based (on DPS density-independent units).
+- **Styling mechanism**: XAML `Style` + `ResourceDictionary` (`Setter` sets `BackgroundColor`/`CornerRadius`/`FontSize`…); `VisualStateManager` (VSM) manages states; no raw CSS (a little CSS is possible but mapped through `Style`).
 
-## 2. Token 映射
+## 2. Token mapping
 
-- DESIGN.md tokens → **ResourceDictionary 资源**（`<Color x:Key="Primary">#1A1C1E</Color>`、`<CornerRadius x:Key="RadiusMd">8</CornerRadius>`、`<Thickness x:Key="PadBtnX">16,0</Thickness>`），`StaticResource` 引用。
-- 主题切换用 `App.Current.Resources` 或 `DynamicResource`；颜色/字阶集中定义，组件只引资源，**禁散落 hex/px**。
+- DESIGN.md tokens → **ResourceDictionary resources** (`<Color x:Key="Primary">#1A1C1E</Color>`, `<CornerRadius x:Key="RadiusMd">8</CornerRadius>`, `<Thickness x:Key="PadBtnX">16,0</Thickness>`), referenced via `StaticResource`.
+- Theme switching via `App.Current.Resources` or `DynamicResource`; colors/type scale defined centrally, components only reference resources, **no scattered hex/px**.
 
-## 3. 资源系统
+## 3. Asset system
 
-- **图片**：MauiImage（csproj 里 `<MauiImage Include="..." />`），按 `@1x/@2x/@3x` 自动选；或 `EmbeddedResource`。代码用 `ImageSource.FromFile` / `Image` 控件。
-- **字体**：`EmbeddedResource` + `ExportFont`；导出尺寸 = 标注 × 倍率（MauiImage 处理）。
-- **图标**：字体图标（`FontImageSource`）或 SVG（MAUI 支持 `Image` 直接 SVG）；纯色块/圆角/阴影用 XAML（`Border`/`Shadow`/`CornerRadius`）绘制，不导位图。
+- **Images**: MauiImage (in csproj `<MauiImage Include="..." />`), auto-selected by `@1x/@2x/@3x`; or `EmbeddedResource`. Code uses `ImageSource.FromFile` / `Image` control.
+- **Fonts**: `EmbeddedResource` + `ExportFont`; export size = annotation × multiplier (handled by MauiImage).
+- **Icons**: font icons (`FontImageSource`) or SVG (MAUI supports `Image` directly with SVG); solid blocks/radii/shadows drawn with XAML (`Border`/`Shadow`/`CornerRadius`), no exported bitmaps.
 
-## 4. 状态模型
+## 4. State model
 
-- 五态映射到 **VisualStateManager**：`Normal`(Default) / `Disabled` / `Pressed` / `Focused` / `PointerOver`(Hover)；在 `VisualStateGroup` 里对 `BackgroundColor` 等设值，颜色取自 DESIGN.md 变体键。
+- Five states map to **VisualStateManager**: `Normal`(Default) / `Disabled` / `Pressed` / `Focused` / `PointerOver`(Hover); in `VisualStateGroup` set values like `BackgroundColor`, colors from DESIGN.md variant keys.
 
 ## 5. High-DPI
 
-- MAUI 用 **DPS（密度无关单位）**，按平台自动缩放；MauiImage 多分辨率资源自动匹配，无需手动 DPR。
+- MAUI uses **DPS (density-independent units)**, auto-scaled per platform; MauiImage multi-resolution assets auto-matched, no manual DPR.
 
-## 6. 验收手段
+## 6. Acceptance means
 
-- 在模拟器 / 仿真器 / 真机或 Windows 桌面跑，截图（Xharness / 平台截图工具 / 桌面截图）；再用 `references/verification.md` + `scripts/pixel_diff.py` 比对（DPR=1、禁动画、窗口 = 该档基准宽：web 1440 / pad 834 / mobile 375）。
-- MAUI 无内建黄金测试，靠设备/模拟器截图 + 逐层比对。
+- Run on emulator / simulator / real device or Windows desktop, screenshot (Xharness / platform screenshot tools / desktop screenshot); then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width: web 1440 / pad 834 / mobile 375).
+- MAUI has no built-in golden tests; relies on device/simulator screenshots + layer-by-layer comparison.
 
-## 7. 已知坑
+## 7. Known pitfalls
 
-- **平台渲染差异**：同一 XAML 在 Android/iOS/Windows 渲染略有差异（阴影/圆角/字体度量），验收需逐平台比对。
-- **Handler 架构（.NET 8+）**：控件逻辑在 Handler，深度定制走 `Handler` / `Mapper` 覆盖。
-- 字体命名与版权、CJK 字体嵌入体积；`FlexLayout` 与 WPF/UWP 行为不同。
+- **Platform rendering differences**: the same XAML renders slightly differently on Android/iOS/Windows (shadows/radii/font metrics); acceptance must compare per platform.
+- **Handler architecture (.NET 8+)**: control logic lives in Handler; deep customization goes through `Handler` / `Mapper` overrides.
+- Font naming and licensing, CJK font embedding size; `FlexLayout` behaves differently from WPF/UWP.
 
-## 8. pixel-perfect 纪律（MAUI 特有）
+## 8. pixel-perfect discipline (MAUI-specific)
 
-1. **整数像素**：布局用 DPS 整数值 + `Thickness`/`CornerRadius` 常量，取设计整数标注。
-2. **坐标对齐**：Grid 行列 / `Margin`/`Padding` 与解剖板核对；1px 偏移即 bug。
-3. **状态完备**：VSM 五态逐一实现，颜色取自 DESIGN.md 变体键。
-4. **字体**：嵌入字体字重/字号/行高与 F2 一致；CJK 齐全。
-5. **截图验证**：模拟器/真机/桌面截图，窗口 = 该档基准宽，DPR=1，逐平台核对。
-6. **资源零外链**：图片/字体走 MauiImage/EmbeddedResource，编译进包，不依赖运行时路径。
-7. **响应式 / 档位**：`targetProfiles` 多档时用 `Grid`/`FlexLayout` 重排实现 pad/mobile 单列，触控 ≥44px；逐档截图比对。
+1. **Integer pixels**: layout uses DPS integer values + `Thickness`/`CornerRadius` constants, taking integer design annotations.
+2. **Coordinate alignment**: Grid rows/columns / `Margin`/`Padding` checked against the anatomy board; a 1px offset is a bug.
+3. **State completeness**: implement the five VSM states one-by-one, colors from DESIGN.md variant keys.
+4. **Font**: embedded font weight/size/line-height consistent with F2; complete CJK.
+5. **Screenshot verification**: emulator/real-device/desktop screenshot, window = that tier's baseline width, DPR=1, per-platform check.
+6. **Zero external asset links**: images/fonts go through MauiImage/EmbeddedResource, compiled into the package, no runtime path dependence.
+7. **Responsive / tiers**: when `targetProfiles` has multiple tiers, use `Grid`/`FlexLayout` to reflow into pad/mobile single-column, touch ≥44px; screenshot each tier and compare.

@@ -1,54 +1,54 @@
-# Design → Code：通用纪律（所有技术栈共用基线）
+# Design → Code: Generic Discipline (shared baseline across all tech stacks)
 
-所有栈的出码都先遵守本文，再据 DESIGN.md `targetStacks` 从 `references/stacks/manifest.md`
-选对应适配器补差异。原 Qt / Web 两份指南的共性已抽到此处；适配器只写该栈特有部分。
+Every stack's codegen follows this article first, then picks the corresponding adapter from `references/stacks/manifest.md` by DESIGN.md `targetStacks` to fill in differences.
+The common parts of the original Qt / Web guides have been pulled here; adapters only cover that stack's specifics.
 
-## 0. 三个档位约束（开工前必读）
+## 0. Three-tier constraints (read before starting)
 
-- **视口档位 `targetProfiles`**：见 `references/viewport-profiles.md`；验收 viewport/窗口宽 = 该档基准宽，逐档比对。
-- **技术栈档位 `targetStacks`**：见 `references/stack-profiles.md`；**未确认不得进入代码生成，禁止默认 React/Web**。
-- **配色模式 `colorSchemes`**：见 `references/color-schemes.md`；两套配色时**必须走同一套语义 token**，
-  禁止在组件里硬编码第二套色值，且**验收组合数 = 档位数 × 配色数**（每档位 × 每配色分别截图比对）。
-  切换机制与持久化（跟随系统 / 手动 / 是否记忆）读 DESIGN.md `## Colors` 与 Do's and Don'ts 的声明。
-- 三者正交：一个设计系统可同时面向 (stack, profile, scheme) 组合，例如 web+React+dark 与 mobile+Flutter+light。
+- **Viewport tier `targetProfiles`**: see `references/viewport-profiles.md`; acceptance viewport/window width = that tier's baseline width, compared tier by tier.
+- **Tech-stack tier `targetStacks`**: see `references/stack-profiles.md`; **do not enter code generation without confirmation, defaulting to React/Web is forbidden**.
+- **Color mode `colorSchemes`**: see `references/color-schemes.md`; with two schemes you **must use the same set of semantic tokens**,
+  never hard-code the second scheme's values inside components, and **acceptance combination count = tiers × schemes** (each tier × each scheme screenshotted and compared separately).
+  The switch mechanism and persistence (follow system / manual / remember or not) are read from the declarations in DESIGN.md `## Colors` and Do's and Don'ts.
+- The three are orthogonal: one design system can simultaneously target (stack, profile, scheme) combinations, e.g. web+React+dark and mobile+Flutter+light.
 
-## 1. 分层实现组织（行业惯例，所有栈相同）
+## 1. Layered implementation organization (industry convention, same for all stacks)
 
-token 层 → atoms（Button/Input…）→ molecules（SearchBox/FormField…）→ organisms（TopNav/DataTable…）→ pages（对齐 14 页 Demo **各所选档位屏幕板**）。
+token layer → atoms (Button/Input…) → molecules (SearchBox/FormField…) → organisms (TopNav/DataTable…) → pages (aligned to page-14 Demo **each tier's screen boards**).
 
-- 组件名与 Penpot 一一对应（`Button·Primary` → `ButtonPrimary` / `Button variant="primary"`）；每组件单文件/单目录 + 同名样式 + 状态预览。
-- 类名/文件名映射表见 13 组件索引页。
+- Component names map 1:1 to Penpot (`Button·Primary` → `ButtonPrimary` / `Button variant="primary"`); each component is a single file/dir + same-named style + state preview.
+- The class-name/file-name mapping table is on the page-13 component index.
 
-## 2. Token 层（禁止散落魔法值）
+## 2. Token layer (no scattered magic values)
 
-- DESIGN.md tokens 是唯一真源；组件样式/常量只引用**导出的变量**（CSS 变量 / QSS 变量 / 常量头文件 / 主题单例…按栈而定），**禁止在组件里写死 hex/px 魔法数字**。
-- 导出手段见各栈适配器（`design.md export` / dtcg / 手写常量头文件）。
+- DESIGN.md tokens are the single source of truth; component styles/constants only reference **exported variables** (CSS variables / QSS variables / constant header files / theme singletons… per stack), **never hard-code hex/px magic numbers in components**.
+- Export means are in each stack adapter (`design.md export` / dtcg / hand-written constant header).
 
-## 3. 资源引用总则
+## 3. Asset reference general rules
 
-- **资源零外链**：所有图片/图标进该栈的资源系统（bundler import / `.qrc` / atlas / 二进制编译），代码只引用资源路径，不依赖运行时相对路径。
-- **导出尺寸 = 设计标注尺寸 × 倍率**（@1x/@2x/@3x），从 Penpot `export_shape` 导出；禁止在代码里缩放大图。
-- 纯色块/圆角/阴影优先用代码绘制（不导出位图），放大后才不糊。
-- 图标命名与 01 设计基础页 **F6 图标板**一致；图标按钮 = 标注图标尺寸 + padding，居中误差 ≤1px。
+- **Zero external asset links**: all images/icons go into the stack's asset system (bundler import / `.qrc` / atlas / binary compile), code only references asset paths, no runtime relative-path dependence.
+- **Export size = design annotation size × multiplier** (@1x/@2x/@3x), exported from Penpot via `export_shape`; never scale large images in code.
+- Solid blocks/radii/shadows are preferably drawn in code (not exported as bitmaps), so they stay sharp when enlarged.
+- Icon naming consistent with the 01 design-basics page **F6 icon board**; icon buttons = annotated icon size + padding, centering error ≤1px.
 
-## 4. 状态完备
+## 4. State completeness
 
-每个交互件实现 **Default / Hover / Pressed / Focused / Disabled** 五态（展示件 Default/Disabled），颜色逐一取自 DESIGN.md 变体键。
+Every interactive widget implements the five states **Default / Hover / Pressed / Focused / Disabled** (display widgets Default/Disabled), colors taken one-by-one from DESIGN.md variant keys.
 
-## 5. 字体
+## 5. Fonts
 
-自托管同设计字族；字重/字号/行高/字距逐项对齐 F2 字阶；禁用合成粗体。
+Self-host the same design font family; weight/size/line-height/letter-spacing aligned item-by-item to the F2 type scale; synthetic bold disabled.
 
-## 6. 整数像素与盒模型
+## 6. Integer pixels and box model
 
-所有间距/尺寸取设计整数标注；盒模型（如 `border-box`）与 Penpot `strokeAlignment='inner'` 对应；1px 偏移即视为 bug。
+All spacing/sizes take integer design annotations; the box model (e.g. `border-box`) corresponds to Penpot `strokeAlignment='inner'`; a 1px offset is treated as a bug.
 
-## 7. pixel-perfect 验收（逐层）
+## 7. pixel-perfect acceptance (layer by layer)
 
-每层落地即跑 `references/verification.md` 的 PIL 比对：DPR=1、禁动画、固定 viewport/窗口 = 该档基准宽；组件层达标后再对 14 页**各档屏幕板**整页比对（阈值 0.5%）。
-循环：导基准图 → 截图 → 比对 → 按热图定位（位置/颜色/字体/图标/资源）→ 修复 → 再比对。
+After each layer lands, run the PIL comparison in `references/verification.md`: DPR=1, animations off, fixed viewport/window = that tier's baseline width; after the component layer passes, do a **whole-page comparison** of page-14 **each tier's screen boards** (threshold 0.5%).
+Loop: export baseline → screenshot → compare → locate via heatmap (position/color/font/icon/asset) → fix → compare again.
 
-## 8. 选适配器
+## 8. Pick an adapter
 
-`targetStacks` 命中 `references/stacks/manifest.md` 中已登记栈 → 读对应 `stacks/<key>.md`；
-未命中 → 按本文 + 向用户问清关键约束出码，并生成草稿适配器（见 `stack-profiles.md` §5）。
+`targetStacks` hits a registered stack in `references/stacks/manifest.md` → read the corresponding `stacks/<key>.md`;
+miss → per this article + ask the user for key constraints to codegen, and produce a draft adapter (see `stack-profiles.md` §5).

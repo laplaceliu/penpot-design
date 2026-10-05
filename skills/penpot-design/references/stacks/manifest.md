@@ -1,22 +1,22 @@
-# 技术栈适配器注册表（manifest）
+# Tech-stack adapter registry (manifest)
 
-每个支持的栈一份适配器文档（`references/stacks/<key>.md`），遵循统一模板（见 `references/stack-profiles.md` §6）。
-SKILL.md 工作流 2 据 DESIGN.md `targetStacks` 在此查表选文档；未知栈处理见 `stack-profiles.md` §5。
+One adapter doc per supported stack (`references/stacks/<key>.md`), following a unified template (see `references/stack-profiles.md` §6).
+SKILL.md workflow 2 looks up the doc here by DESIGN.md `targetStacks`; unknown-stack handling is in `stack-profiles.md` §5.
 
-| key | 别名 / 框架 | 平台族 | 范式 | 适配器文档 |
+| key | Aliases / frameworks | Platform family | Paradigm | Adapter doc |
 |---|---|---|---|---|
-| `qt` | Qt4 / Qt5 / Qt6（QWidget·QML） | 桌面原生 / 跨端 | retained canvas | `stacks/qt.md` |
-| `web` | React / Vue / Angular / Svelte / Web Components | Web 前端 | retained DOM | `stacks/web.md` |
-| `lvgl` | LVGL | 嵌入式 / MCU | retained canvas | `stacks/lvgl.md` |
-| `imgui` | Dear ImGui / Nuklear | 立即模式 | immediate | `stacks/imgui.md` |
-| `maui` | .NET MAUI | 桌面 / 移动跨端 | retained XAML | `stacks/maui.md` |
-| `flutter` | Flutter | 跨端 | retained canvas | `stacks/flutter.md` |
-| `swiftui` | SwiftUI | 移动原生（iOS） | declared constraint | `stacks/swiftui.md` |
-| `compose` | Jetpack Compose | 移动原生（Android） | declared constraint | `stacks/compose.md` |
+| `qt` | Qt4 / Qt5 / Qt6 (QWidget·QML) | Desktop native / cross-platform | retained canvas | `stacks/qt.md` |
+| `web` | React / Vue / Angular / Svelte / Web Components | Web frontend | retained DOM | `stacks/web.md` |
+| `lvgl` | LVGL | Embedded / MCU | retained canvas | `stacks/lvgl.md` |
+| `imgui` | Dear ImGui / Nuklear | Immediate mode | immediate | `stacks/imgui.md` |
+| `maui` | .NET MAUI | Desktop / mobile cross-platform | retained XAML | `stacks/maui.md` |
+| `flutter` | Flutter | Cross-platform | retained canvas | `stacks/flutter.md` |
+| `swiftui` | SwiftUI | Mobile native (iOS) | declared constraint | `stacks/swiftui.md` |
+| `compose` | Jetpack Compose | Mobile native (Android) | declared constraint | `stacks/compose.md` |
 
-> 已规划栈均已完成适配器；用户选定未列栈时按 `stack-profiles.md` §5（generic + 问约束出码 + 生成草稿适配器）处理。
+> All planned stacks already have completed adapters; when the user picks an unlisted stack, handle it per `stack-profiles.md` §5 (generic + ask-constraints codegen + produce a draft adapter).
 
-## 询问选项（供 stack-profiles.md 两级询问）
+## Prompt options (for the two-level prompt in stack-profiles.md)
 
-- 平台族：Web 前端 / 桌面原生·跨端 / 移动原生 / 嵌入式·MCU / 立即模式 / 游戏引擎 UI / 其他
-- 框架（按族展开，末项恒为「其他 / 我来说明」自由输入）
+- Platform family: Web frontend / Desktop native·cross-platform / Mobile native / Embedded·MCU / Immediate mode / Game-engine UI / Other
+- Framework (expanded per family, last item always "Other / I'll specify" free input)

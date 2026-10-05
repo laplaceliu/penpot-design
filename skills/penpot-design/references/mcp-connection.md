@@ -1,51 +1,51 @@
-# 连接 Penpot MCP 指南
+# Connecting Penpot MCP guide
 
-## 0. 启动前检查（确认 Penpot / MCP 是否已就绪）
+## 0. Pre-start check (confirm whether Penpot / MCP is ready)
 
-**不要默认直接 `install.ps1` / `up.sh`**。先探测，按最小必要动作处理：既省时间（拉镜像约 5min），也避免误覆盖已有部署或误重跑 `create-profile`。
+**Don't default to directly `install.ps1` / `up.sh`**. Probe first, act with the minimal necessary action: saves time (pulling images ~5min) and avoids accidentally overwriting an existing deployment or re-running `create-profile`.
 
-### 0.1 探测 Penpot 服务状态
+### 0.1 Probe Penpot service status
 
-- 首选：`scripts/status.{sh,ps1}` —— 输出容器状态 + HTTPS 探活（`/` 与 `/api/main/methods/get-enabled-flags` 的 HTTP 码）。
-  - 两路 probe 均 `200` → **服务已在运行，跳到 §4 验证即可**。
-  - 容器存在但状态非 `Up` → 只需 `up.{sh,ps1}` 拉起，**不要重装**；数据卷（postgres/valkey）保留，账号仍在，免 `create-profile`。
-  - `compose ps` 报错 / 无容器 / 无 `$STACK/docker-compose.yml` → 需要完整安装（§1）。
-- 快速替代（无脚本环境）：`curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags`，返回 200 即已起。
+- Preferred: `scripts/status.{sh,ps1}` — outputs container status + HTTPS liveness (`/` and `/api/main/methods/get-enabled-flags` HTTP code).
+  - Both probes `200` → **service already running, jump to §4 verification**.
+  - Container exists but status not `Up` → just `up.{sh,ps1}` to bring up, **don't reinstall**; data volumes (postgres/valkey) preserved, account still there, no `create-profile` needed.
+  - `compose ps` errors / no container / no `$STACK/docker-compose.yml` → full install needed (§1).
+- Quick alternative (no script env): `curl -sk --max-time 5 https://penpot.local/api/main/methods/get-enabled-flags`, returns 200 = already up.
 
-### 0.2 探测 MCP 客户端配置
+### 0.2 Probe MCP client config
 
-- 工作区 `.mcp.json` 是否含 `penpot` 条目且 `url` 为 `https://penpot.local/mcp/stream`。
-- `NODE_EXTRA_CA_CERTS` 是否已设置，且 CA 证书文件存在：`$STACK/data/caddy/pki/authorities/local/root.crt`（trust-ca 跑过才会生成）。
-  - 两者都满足且 §0.1 端点可达 → **MCP 已就绪，直接 §4 验证**，不要重跑 trust-ca / 不要改 `.mcp.json`。
-  - 配置在但端点没起 → 仅启动服务（§0.1 的 `up`）。
-  - 未配置 → 按 §3 配置 `.mcp.json` + 跑 `trust-ca` + **重启客户端**。
+- Does the workspace `.mcp.json` contain a `penpot` entry with `url` `https://penpot.local/mcp/stream`.
+- Is `NODE_EXTRA_CA_CERTS` set, and does the CA cert file exist: `$STACK/data/caddy/pki/authorities/local/root.crt` (only generated after trust-ca ran).
+  - Both satisfied and §0.1 endpoint reachable → **MCP ready, directly §4 verify**, don't re-run trust-ca / don't change `.mcp.json`.
+  - Config present but endpoint down → just start the service (§0.1's `up`).
+  - Not configured → configure `.mcp.json` per §3 + run `trust-ca` + **restart the client**.
 
-### 0.3 确认动作（向用户）
+### 0.3 Confirm action (to user)
 
-把探测结论用一两句话汇报，并用 `ask_followup_question` 让用户确认下一步（轻量探测本身不打扰用户）：
+Report the probe conclusion in one or two sentences, and use `ask_followup_question` to let the user confirm the next step (lightweight probing itself doesn't bother the user):
 
-| 探测结论 | 建议动作 | 是否需询问 |
+| Probe conclusion | Suggested action | Ask? |
 |---|---|---|
-| 服务在跑 + MCP 已配 | 直接验证（§4） | 否，直接验证 |
-| 服务停了 + MCP 已配 | 仅 `up` 拉起 | 是（确认「仅启动」） |
-| 无部署 / 未配置 | 完整安装 + 配置 | 是（确认「完整安装，约 5min」） |
-| 服务在跑但 MCP 未配 | 仅配 MCP（trust-ca + `.mcp.json` + 重启客户端） | 是 |
+| Service running + MCP configured | directly verify (§4) | No, verify directly |
+| Service stopped + MCP configured | just `up` | Yes (confirm "start only") |
+| No deployment / not configured | full install + config | Yes (confirm "full install, ~5min") |
+| Service running but MCP not configured | configure MCP only (trust-ca + `.mcp.json` + restart client) | Yes |
 
-> 关键原则：能复用就复用，能只启动就只启动，**绝不**在已就绪时重装或重跑 `create-profile`。
+> Key principle: reuse when possible, start-only when possible, **never** reinstall or re-run `create-profile` when already ready.
 
-### 0.4 排障：`Connect Timeout Error (attempted address: penpot.local:443)`
+### 0.4 Troubleshooting: `Connect Timeout Error (attempted address: penpot.local:443)`
 
-这个报错**不代表客户端配置错**，而是端点根本没在监听。按下面顺序判定，**不要一上来就重装**：
+This error **does not mean the client config is wrong**; it means the endpoint isn't listening at all. Judge in this order, **don't reinstall upfront**:
 
-| 症状 | 判定 | 动作 |
+| Symptom | Judgment | Action |
 |---|---|---|
-| `curl https://penpot.local` → `000`，但容器的 `status` 显示 `Up` | caddy 尚未 ready 或端口未映射 | 等 10–20s 重试 |
-| `dockerDesktopLinuxEngine/.../containers/json` → `500`，报 "check if the server supports the requested API version" | Docker Desktop 引擎刚恢复 / API 版本协商抖动 | **用真实 docker 复核**（见下），能通即忽略这个 500 |
-| 引擎可达但 `docker compose ls` 无项目 / 无容器 | 栈确实没起 | `up.{sh,ps1}` 拉起；数据卷在，**免** `create-profile` |
-| 引擎本身不可达（`docker version` 连不上） | Docker Desktop 未启动 | 启动 Docker Desktop，等引擎 ready 再 `up` |
+| `curl https://penpot.local` → `000`, but the container's `status` shows `Up` | caddy not ready yet or port not mapped | wait 10–20s and retry |
+| `dockerDesktopLinuxEngine/.../containers/json` → `500`, "check if the server supports the requested API version" | Docker Desktop engine just recovered / API version negotiation jitter | **recheck with real docker** (below), if reachable ignore this 500 |
+| Engine reachable but `docker compose ls` has no project / no container | stack truly not up | `up.{sh,ps1}` to bring up; data volume present, **no** `create-profile` |
+| Engine itself unreachable (`docker version` can't connect) | Docker Desktop not started | start Docker Desktop, wait for engine ready then `up` |
 
-**Windows 陷阱：PATH 上的 `docker` 可能是 podman shim。**
-实测环境 `where docker` 首位是 `H:\dev\shim\docker.cmd`，内容是把参数转给 `podman.exe`：
+**Windows trap: the `docker` on PATH may be a podman shim.**
+In the tested env, `where docker`'s first hit is `H:\dev\shim\docker.cmd`, whose content forwards args to `podman.exe`:
 
 ```bat
 @echo off
@@ -54,10 +54,10 @@ set "DOCKER_HOST=tcp://127.0.0.1:2375"
 "%~dp0..\bin\podman.exe" %*
 ```
 
-此时 `docker ps` 会报 `Cannot connect to Podman socket ... A socket operation encountered a dead network`，
-**看起来像"容器全挂"，实际是问错了后端**。而本栈的 `lib.ps1` 明确以 **Docker Desktop** 为引擎
-（`docker compose` / `docker-compose`）并会主动跳过 PATH shim。
-复核请用真实二进制：
+At this point `docker ps` reports `Cannot connect to Podman socket ... A socket operation encountered a dead network`,
+**which looks like "all containers down" but is actually asking the wrong backend**. This stack's `lib.ps1` explicitly uses **Docker Desktop** as the engine
+(`docker compose` / `docker-compose`) and actively skips the PATH shim.
+Recheck with the real binary:
 
 ```powershell
 $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
@@ -66,122 +66,122 @@ $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
 & $d ps -a --format "{{.Names}} | {{.Status}}"
 ```
 
-**服务起来了但工具仍不可用**：`/mcp` 能返 200、MCP 容器日志显示工具已注册，
-但 `execute_code` 报 "tool does not exist or is not registered" →
-是**客户端把 MCP server 注册丢了**（连接失败被反复打断后失联）。此时：
-1. 确认客户端配置（Windows: `%USERPROFILE%\.codebuddy\mcp.json`，非工作区 `.mcp.json`）里的
-   `url` 为 `https://penpot.local/mcp/stream?userToken=...`；裸 curl 打 `/mcp/stream` 返 **406 属正常**
-   （缺 SSE Accept 头），不是故障；
-2. **重载 IDE 窗口 / 重连 MCP servers**，让客户端重新读取配置并注册 penpot 工具；
-3. 另需浏览器里的 Penpot 插件面板处于打开且已连上桥接（WS 4402），`execute_code` 才能触达文件。
+**Service is up but the tool is still unusable**: `/mcp` returns 200, the MCP container log shows tools registered,
+but `execute_code` says "tool does not exist or is not registered" →
+it's the **client dropped the MCP server registration** (lost after connection failures repeatedly interrupted). Then:
+1. confirm the client config (Windows: `%USERPROFILE%\.codebuddy\mcp.json`, not the workspace `.mcp.json`) has
+   `url` `https://penpot.local/mcp/stream?userToken=...`; bare curl hitting `/mcp/stream` returning **406 is normal**
+   (missing SSE Accept header), not a fault;
+2. **reload the IDE window / reconnect MCP servers**, letting the client re-read the config and register penpot tools;
+3. also the Penpot plugin panel in the browser must be open and already connected to the bridge (WS 4402) for `execute_code` to reach files.
 
-### 0.5 排障：浏览器把 Penpot 标签挂起（长会话的头号杀手）
+### 0.5 Troubleshooting: browser suspends the Penpot tab (the #1 killer of long sessions)
 
-`execute_code` 报：
+`execute_code` reports:
 
 ```
 The Penpot plugin tab appears to be suspended by the browser (no heartbeat for 194s).
 Please click/focus the Penpot tab to wake it, then retry.
 ```
 
-**这是浏览器（Chrome Memory Saver / Edge Sleeping tabs）把后台标签休眠了，不是服务或配置的问题。**
-心跳计数器只增不减，说明标签处于冻结态；此时任何工具调用都会失败。
+**This is the browser (Chrome Memory Saver / Edge Sleeping tabs) putting the background tab to sleep, not a service or config problem.**
+The heartbeat counter only increases and never decreases, indicating the tab is in a frozen state; at this point any tool call fails.
 
-从容器日志能看清完整时序（真实案例）：
+You can see the complete timeline clearly from the container log (real case):
 
 ```
-01:54:52  Tool #1 failed: No Penpot instance connected for user token.   ← 插件未连
-02:07:26  (PluginBridge): New WebSocket connection established (token provided)  ← 插件连上了
-02:10:40  Tool #3 failed: ... suspended by the browser (no heartbeat for 194s)   ← 立刻被休眠
+01:54:52  Tool #1 failed: No Penpot instance connected for user token.   ← plugin not connected
+02:07:26  (PluginBridge): New WebSocket connection established (token provided)  ← plugin connected
+02:10:40  Tool #3 failed: ... suspended by the browser (no heartbeat for 194s)   ← immediately suspended
 ```
 
-即"插件刚连上就被挂起"——用户切到 IDE 窗口后，Penpot 标签转入后台即被冻结。
+That is "plugin just connected then immediately suspended" — after the user switched to the IDE window, the Penpot tab went to background and got frozen.
 
-**机理（读容器内 `index.js` 得到，非猜测）**：
+**Mechanism (read from the container's `index.js`, not guessed)**:
 
 ```js
-var HEARTBEAT_STALE_THRESHOLD_MS = 3e4;                       // 30s，硬编码
+var HEARTBEAT_STALE_THRESHOLD_MS = 3e4;                       // 30s, hardcoded
 function assertPluginResponsive(state, now, staleThresholdMs = HEARTBEAT_STALE_THRESHOLD_MS) {
   const heartbeatAge = now - state.lastHeartbeat;
-  if (heartbeatAge > staleThresholdMs) { throw ... }          // 报错文案即用此常量
+  if (heartbeatAge > staleThresholdMs) { throw ... }          // error text uses this constant
 }
 ```
 
-- 阈值 **30 秒硬编码，不可用环境变量放宽**；`PENPOT_MCP_TOOL_TIMEOUT_S` 只管工具自身超时，与本检查无关。
-  超过 30s 未收到插件心跳，服务端**拒绝一切工具调用**（`execute_code` / `export_shape` 全挂）。
-- 插件侧心跳报文为 `{type:"heartbeat"}`，服务端每收到一次就刷新 `connection.lastHeartbeat`。
+- The threshold **30 seconds is hardcoded, cannot be relaxed via env var**; `PENPOT_MCP_TOOL_TIMEOUT_S` only governs the tool's own timeout, unrelated to this check.
+  No plugin heartbeat for over 30s, the server **rejects all tool calls** (`execute_code` / `export_shape` all fail).
+- The plugin-side heartbeat message is `{type:"heartbeat"}`, the server refreshes `connection.lastHeartbeat` each time it receives one.
 
-**诊断口诀：看心跳计数是否曾有清零。**
-- 计数**从不清零、单调增长** → 若在"重连后很快（如 34s）就已超阈值"，说明**一次心跳都没来过**，
-  即页面**从一开始就是隐藏态**（不是"可见但被节流"）。
-- 实测反证：本技能的一次真实构建里，浏览器窗口处于**可见但失焦**（焦点在 IDE）状态，
-  一口气跑完约 40 次工具调用、心跳始终正常。**所以"失焦"本身不会导致挂起。**
-- 结论：计数从未清零时，问题几乎一定是 **该标签不是所在窗口的当前选中标签**（同窗口切到了别的 tab），
-  或窗口被最小化 / 被完全遮挡。省电设置（Memory Saver / Sleeping tabs）通常是**第二位**原因。
+**Diagnostic rule: see whether the heartbeat counter has ever been reset.**
+- Counter **never resets, monotonically increases** → if "already over threshold soon after reconnect (e.g. 34s)", it means **not a single heartbeat ever came**,
+  i.e. the page **was hidden from the start** (not "visible but throttled").
+- Tested counter-evidence: in one real build of this skill, the browser window was **visible but unfocused** (focus on IDE),
+  ran ~40 tool calls in one go, heartbeat always normal. **So "unfocused" itself doesn't cause suspension.**
+- Conclusion: when the counter has never reset, the problem is almost certainly that **the tab is not the current selected tab of its window** (switched to another tab in the same window),
+  or the window is minimized / fully occluded. Power-saving settings (Memory Saver / Sleeping tabs) are usually the **secondary** cause.
 
-**处置**：
-1. **在该浏览器窗口里点击 Penpot 标签页，让它成为当前选中标签**（不是仅仅把窗口摆到旁边），然后立刻重试；
-2. 对 `penpot.local` 关闭浏览器省电策略（Chrome: 设置 → 性能 → Memory Saver 里把该站点加白；
-   Edge: 设置 → 系统和性能 → 关闭"使用睡眠标签页"/对站点加白）；
-3. 长会话建议把 Penpot 标签**单独开一个窗口并保持可见**（与 IDE 并排），不要藏在后台标签组里；
-4. 批量自动化时按"小批次 + 每批结束即落盘进度"组织（见 `positioning-audit.md` G6），
-   这样被挂起/断连后能续跑，不必从头再建。
+**Handling**:
+1. **In that browser window, click the Penpot tab to make it the current selected tab** (not just place the window aside), then immediately retry;
+2. For `penpot.local`, turn off the browser's power-saving policy (Chrome: Settings → Performance → Memory Saver, whitelist this site;
+   Edge: Settings → System and Performance → turn off "Use sleeping tabs" / whitelist the site);
+3. For long sessions, suggest opening the Penpot tab **in a separate window and keeping it visible** (side by side with the IDE), don't hide it in a background tab group;
+4. For batch automation, organize by "small batch + persist progress at each batch end" (see `positioning-audit.md` G6),
+   so after suspension/disconnection you can resume without rebuilding from scratch.
 
-> 判据速记：**`No Penpot instance connected` = 插件没连；`suspended by the browser` = 连了但标签被冻结；
-> `tool does not exist or is not registered` = 客户端丢了 server 注册；`Connect Timeout ... penpot.local:443` = 栈不在跑。**
-> 四种故障的修法完全不同，先看报错原文再动手。
+> Quick criteria: **`No Penpot instance connected` = plugin not connected; `suspended by the browser` = connected but tab frozen;
+> `tool does not exist or is not registered` = client dropped the server registration; `Connect Timeout ... penpot.local:443` = stack not running.**
+> The fixes for the four faults are completely different; read the original error first.
 
-### 0.5 排障：`No Penpot instance connected for user token`
+### 0.6 Troubleshooting: `No Penpot instance connected for user token`
 
-**这是"客户端↔服务端正常、服务端↔浏览器断开"的专属报错**，与 §0.4 的失联不是一回事，别混。判据：
+**This is the exclusive error of "client↔server ok, server↔browser disconnected"**, different from the disconnection in §0.4, don't confuse. Criteria:
 
-| 现象 | 含义 |
+| Phenomenon | Meaning |
 |---|---|
-| `high_level_overview` / `penpot_api_info` 正常返回 | 客户端↔MCP 服务端 **通**（这两个工具在服务端本地，不需要浏览器） |
-| `execute_code` 报 `No Penpot instance connected for user token` | MCP 服务端↔浏览器 **断**（`execute_code` 是唯一要触达文件的通道） |
-| 服务端日志只有 `WebSocket mcpServer started on port 4402`，无任何后续插件连接行 | 浏览器插件**从未连上**（不是掉线，是没装/没运行） |
-| 日志里 `userTokenFp=<fp>` 稳定出现 | 客户端 token 没问题，问题在浏览器侧 |
+| `high_level_overview` / `penpot_api_info` return normally | client↔MCP server **connected** (these two tools are server-local, don't need the browser) |
+| `execute_code` says `No Penpot instance connected for user token` | MCP server↔browser **disconnected** (`execute_code` is the only channel that reaches files) |
+| Server log only has `WebSocket mcpServer started on port 4402`, no subsequent plugin-connection line | browser plugin **never connected** (not dropped, not installed/not running) |
+| Log shows stable `userTokenFp=<fp>` | client token is fine, problem is browser-side |
 
-**浏览器侧接线（每档约 1 分钟）**：
+**Browser-side wiring (about 1 minute per tier)**:
 
-1. 打开 `https://penpot.local` 并登录（`admin@penpot.local` / `penpot123`）。
-2. 打开目标设计文件。
-3. 安装/启用插件，**manifest 地址**：`https://penpot.local/plugins/mcp/manifest.json`
-   （插件名 **Penpot MCP Plugin**，权限 `content:read/write`、`library:read/write`、`comment:read/write`）。
-4. **在该文件里运行这个插件**——它代表文件与 MCP 服务端建立桥接。
-   桥接是**按文件/按会话**的：刷新或切换文件后需要重新运行插件。
+1. Open `https://penpot.local` and log in (`admin@penpot.local` / `penpot123`).
+2. Open the target design file.
+3. Install/enable the plugin, **manifest address**: `https://penpot.local/plugins/mcp/manifest.json`
+   (plugin name **Penpot MCP Plugin**, permissions `content:read/write`, `library:read/write`, `comment:read/write`).
+4. **Run this plugin in that file** — it establishes the bridge between the file and the MCP server.
+   The bridge is **per-file / per-session**: after refresh or switching files you need to re-run the plugin.
 
-**端点自查（都可 curl 判定，不必猜）**：
+**Endpoint self-check (all curl-decidable, don't guess)**:
 
 ```bash
-curl -sk -o /dev/null -w '%{http_code}\n' https://penpot.local/plugins/mcp/manifest.json   # 200 = 插件可安装
-curl -sk -o /dev/null -w '%{http_code}\n' https://penpot.local/mcp/stream                  # 406 = 服务端活着（缺 SSE 头，正常）
-curl -sk -o /dev/null -w '%{http_code}\n' https://penpot.local/mcp/ws                      # 426 = 桥接端点活着（缺 Upgrade 头，正常）
+curl -sk -o /dev/null -w '%{http_code}\n' https://penpot.local/plugins/mcp/manifest.json   # 200 = plugin installable
+curl -sk -o /dev/null -w '%{http_code}\n' https://penpot.local/mcp/stream                  # 406 = server alive (missing SSE header, normal)
+curl -sk -o /dev/null -w '%{http_code}\n' https://penpot.local/mcp/ws                      # 426 = bridge endpoint alive (missing Upgrade header, normal)
 ```
 
-这三个码是**健康态**，别当成故障。反过来：`manifest` 404 = 前端 nginx 没代理到 `penpot-mcp`
-（检查 `docker exec <frontend> cat /etc/nginx/overrides/server.d/mcp-locations.conf`，
-应有 `/mcp/ws → penpot-mcp:4402`、`/mcp/stream → penpot-mcp:4401/mcp`、`/mcp/sse → penpot-mcp:4401/sse`）。
+These three codes are **healthy states**, don't treat them as faults. Conversely: `manifest` 404 = frontend nginx didn't proxy to `penpot-mcp`
+(check `docker exec <frontend> cat /etc/nginx/overrides/server.d/mcp-locations.conf`,
+should have `/mcp/ws → penpot-mcp:4402`, `/mcp/stream → penpot-mcp:4401/mcp`, `/mcp/sse → penpot-mcp:4401/sse`).
 
-**诊断日志口径**（Windows 注意 PATH 上的 `docker` 可能是 podman shim，见 §0.4）：
+**Diagnostic log angle** (Windows note: the `docker` on PATH may be a podman shim, see §0.4):
 
 ```powershell
 $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
 & $d logs --tail 40 penpot-server-penpot-mcp-1
-# 关心两类行：PluginBridge(插件连接) 与 userTokenFp=x(客户端会话)
+# care about two kinds of lines: PluginBridge (plugin connection) and userTokenFp=x (client session)
 ```
 
-## 1. 前置：本地 Penpot 部署
+## 1. Prerequisite: local Penpot deployment
 
-部署栈**随本技能自带**：`assets/penpot-server/`（compose 栈 7 服务：penpot-{frontend,backend,exporter,mcp,postgres,valkey} + caddy，Penpot 2.18，Caddy 在 `https://penpot.local` 终止 HTTPS）。完整说明见 `assets/penpot-server/README.md`。
+The deployment stack **ships with this skill**: `assets/penpot-server/` (compose stack 7 services: penpot-{frontend,backend,exporter,mcp,postgres,valkey} + caddy, Penpot 2.18, Caddy terminating HTTPS at `https://penpot.local`). Full explanation in `assets/penpot-server/README.md`.
 
-> **为什么没有绝对路径**：栈根目录由脚本从自身位置反推，所以把 `assets/penpot-server/` 整目录拷到任意位置（`~/penpot`、`C:\penpot`、CI workspace）都一样跑，不用改任何路径。Linux/macOS 用 `scripts/lib.sh`（`BASH_SOURCE` + 逐级解析符号链接），Windows 用 `scripts/lib.ps1`（`$PSScriptRoot`）。下文的 `$STACK` 指栈目录（默认 = `<SKILL_DIR>/assets/penpot-server`，`<SKILL_DIR>` = 本技能 `SKILL.md` 所在目录）。
+> **Why no absolute paths**: the stack root is reverse-derived by scripts from their own location, so copying `assets/penpot-server/` to any location (`~/penpot`, `C:\penpot`, CI workspace) runs the same, no path changes needed. Linux/macOS use `scripts/lib.sh` (`BASH_SOURCE` + stepwise symlink resolution), Windows uses `scripts/lib.ps1` (`$PSScriptRoot`). The `$STACK` below refers to the stack directory (default = `<SKILL_DIR>/assets/penpot-server`, `<SKILL_DIR>` = the directory containing this skill's `SKILL.md`).
 
-### 1.1 镜像 tag 口径（"Version mismatch" 的头号成因）
+### 1.1 Image tag convention (the #1 cause of "Version mismatch")
 
-- **tag 是两段 minor，不是三段 patch**：写 `2.18`，**不要**写 `2.18.0`。`2.18` 实际解析到 `2.18.1`。
-- 四个 `penpotapp/*` 镜像必须来自**同一次构建**。镜像自带 `org.opencontainers.image.version` 与
-  `org.opencontainers.image.revision` 标签，可直接自证：
+- **Tag is two-segment minor, not three-segment patch**: write `2.18`, **don't** write `2.18.0`. `2.18` actually resolves to `2.18.1`.
+- The four `penpotapp/*` images must come from the **same build**. Images carry `org.opencontainers.image.version` and
+  `org.opencontainers.image.revision` labels, self-verifiable:
 
   ```powershell
   $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
@@ -189,79 +189,79 @@ $d = "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe"
     $l = (& $d inspect "penpotapp/${i}:2.18" --format '{{json .Config.Labels}}' | ConvertFrom-Json)
     "$i -> $($l.'org.opencontainers.image.version') $($l.'org.opencontainers.image.revision')"
   }
-  # 四个 revision 必须一致。实测 2.18 = version 2.18.1 / revision 423cb411324d
+  # the four revisions must match. Tested 2.18 = version 2.18.1 / revision 423cb411324d
   ```
 
-- **症状 → 处方**：插件里出现
+- **Symptom → prescription**: the plugin shows
   `Version mismatch detected: This version of the MCP server is intended for Penpot X while the current version is Y`
-  → `penpotapp/mcp` 与 `penpotapp/frontend` 不是同一构建。**只改 `.env` 的 `PENPOT_IMAGE_TAG` 一处**
-  （`compose.yaml` 的四条 image 行、`prewarm.{sh,ps1}` 的默认值都读同一个变量），然后重建。
+  → `penpotapp/mcp` and `penpotapp/frontend` are not the same build. **Only change `.env`'s `PENPOT_IMAGE_TAG` in one place**
+  (the four image lines in `compose.yaml`, and the default value in `prewarm.{sh,ps1}`, all read the same variable), then rebuild.
 
-- **升级是一次全量重建**，顺序固定：
+- **Upgrade is a full rebuild**, fixed order:
 
   ```bash
-  # 1) 先停栈，做冷备份（后端启动即跑不可回退的库迁移，必须留退路）
+  # 1) Stop the stack first, cold backup (backend runs irreversible DB migration on startup, must leave an escape)
   ./scripts/down.{sh,ps1}
-  cp -r ./data/postgres/data ./data/postgres/data-backup-<旧tag>
-  # 2) 改 .env 的 PENPOT_IMAGE_TAG=<新tag>
-  # 3) 拉镜像 → 拉起（自动迁移）
+  cp -r ./data/postgres/data ./data/postgres/data-backup-<oldtag>
+  # 2) Change .env's PENPOT_IMAGE_TAG=<newtag>
+  # 3) Pull images → bring up (auto-migrate)
   ./scripts/prewarm.{sh,ps1}
   ./scripts/up.{sh,ps1}
-  # 4) 核验：容器全部 Exited 变成 Up，且 endpoints 三码健康
+  # 4) Verify: all containers Exited become Up, and the three endpoint codes are healthy
   ```
 
-  迁移后自证数据无损（Penpot 把页面存在 `file.data` 的 **bytea** 里，别指望能 SQL 解析页面树）：
+  After migration, self-prove data is intact (Penpot stores pages in `file.data`'s **bytea**, don't expect to SQL-parse the page tree):
 
   ```bash
   docker exec penpot-server-penpot-postgres-1 psql -U penpot -d penpot -t -A -F ' | ' \
     -c "SELECT name, pg_size_pretty(length(data)::bigint), revn, modified_at FROM file ORDER BY created_at;"
   ```
 
-  旧 tag 的镜像**先留着**（是唯一的快速回滚路径），确认新版稳定后再 `docker rmi` 回收磁盘。
+  Keep the old-tag images for now (the only quick rollback path), `docker rmi` to reclaim disk after confirming the new version is stable.
 
-**引擎**：脚本自动检测 —— 优先 `podman compose`（Windows 推荐 Podman Desktop），否则回退 `docker compose` / `docker-compose`。
+**Engine**: scripts auto-detect — prefer `podman compose` (Podman Desktop recommended on Windows), otherwise fall back to `docker compose` / `docker-compose`.
 
-**Linux / macOS（bash）：**
+**Linux / macOS (bash)**:
 
 ```bash
-STACK=<SKILL_DIR>/assets/penpot-server   # 目录可整体搬走，$STACK 随之变化
-cd "$STACK" && cp .env.example .env # 可选：改镜像 tag / 域名 / secret
-./scripts/prewarm.sh                # 首次拉镜像（~5 min）
-./scripts/up.sh                     # 启动 + 等待 https://penpot.local 就绪（自动补 /etc/hosts）
-./scripts/trust-ca.sh               # 装 CA → 见 §3（MCP 客户端必需）
-./scripts/create-profile.sh         # 建登录账号（新库是空的，必需；幂等）
-./scripts/status.sh                 # 容器状态 + HTTPS 探活 + 证书 + 磁盘占用
-./scripts/tail-logs.sh <service>    # 跟踪单服务日志
-./scripts/down.sh [--volumes]       # 停止（--volumes 清数据，不可逆）
+STACK=<SKILL_DIR>/assets/penpot-server   # directory can be moved whole, $STACK changes accordingly
+cd "$STACK" && cp .env.example .env # optional: change image tag / domain / secret
+./scripts/prewarm.sh                # first pull images (~5 min)
+./scripts/up.sh                     # start + wait until https://penpot.local ready (auto-patches /etc/hosts)
+./scripts/trust-ca.sh               # install CA → see §3 (MCP client required)
+./scripts/create-profile.sh         # create login account (empty fresh DB requires it; idempotent)
+./scripts/status.sh                 # container status + HTTPS liveness + cert + disk usage
+./scripts/tail-logs.sh <service>    # follow single-service log
+./scripts/down.sh [--volumes]       # stop (--volumes clears data, irreversible)
 ```
 
-**Windows（PowerShell，建议用管理员终端）：**
+**Windows (PowerShell, recommended admin terminal)**:
 
 ```powershell
 $STACK = "<SKILL_DIR>\assets\penpot-server"
 cd $STACK
-Copy-Item .env.example .env                              # 可选
-.\scripts\install.ps1                                   # 一键：prewarm→up→trust-ca→create-profile
-# 或分步：
+Copy-Item .env.example .env                              # optional
+.\scripts\install.ps1                                   # one-click: prewarm→up→trust-ca→create-profile
+# or step by step:
 .\scripts\prewarm.ps1
 .\scripts\up.ps1
 .\scripts\trust-ca.ps1
-.\scripts\create-profile.ps1                            # 建登录账号（新库是空的，必需；幂等）
+.\scripts\create-profile.ps1                            # create login account (empty fresh DB requires it; idempotent)
 .\scripts\status.ps1
 .\scripts\tail-logs.ps1 <service>
 .\scripts\down.ps1 [-Volumes]
 ```
 
-登录凭据（`create-profile.sh` 播种）：`https://penpot.local/`，`admin@penpot.local` / `penpot123`（登录后到 `/auth/profile` 改密码）。主机名改 `PENPOT_HOST` 时要同步改 `.env` 的 `PENPOT_PUBLIC_URI` 与 `caddy/Caddyfile` 站点块。
+Login credentials (seeded by `create-profile.sh`): `https://penpot.local/`, `admin@penpot.local` / `penpot123` (change password at `/auth/profile` after login). When changing the hostname to `PENPOT_HOST`, sync-change `.env`'s `PENPOT_PUBLIC_URI` and the `caddy/Caddyfile` site block.
 
-## 2. MCP 端点
+## 2. MCP endpoints
 
-| 通道 | URL |
+| Channel | URL |
 |---|---|
-| Streamable HTTP（推荐） | `https://penpot.local/mcp/stream` |
+| Streamable HTTP (recommended) | `https://penpot.local/mcp/stream` |
 | Legacy SSE | `https://penpot.local/api/mcp/sse` |
 
-## 3. 客户端配置（CodeBuddy / Codex / VSCode 通用）
+## 3. Client config (CodeBuddy / Codex / VSCode generic)
 
 ```json
 {
@@ -274,54 +274,54 @@ Copy-Item .env.example .env                              # 可选
 }
 ```
 
-- CodeBuddy：写入工作区 `.mcp.json`（或 CodeBuddy MCP 设置面板填上述 URL）。
-- **CA 每栈独立**：`$STACK/data/caddy/pki` 在首次启动时生成，换栈目录/重新拷一份 = 换 CA，浏览器与客户端仍信任旧的就会报错（不是脚本坏了）。解法见 `assets/penpot-server/README.md`「换目录 / 新克隆后浏览器报证书错误」：沿用旧 PKI，或重跑信任脚本并重启浏览器。
-- 端点走 Caddy 自签 TLS。Node/Electron 客户端不读系统证书库，必须设置（脚本自动处理）。
+- CodeBuddy: write into the workspace `.mcp.json` (or fill the above URL in the CodeBuddy MCP settings panel).
+- **CA is independent per stack**: `$STACK/data/caddy/pki` is generated on first startup; moving the stack dir / copying a fresh copy = changing the CA, and if the browser and client still trust the old one it errors (not a broken script). Solution in `assets/penpot-server/README.md` "Moved directory / re-clone and the browser reports a cert error": reuse the old PKI, or re-run the trust script and restart the browser.
+- Endpoint goes through Caddy self-signed TLS. Node/Electron clients don't read the system cert store, must set it (scripts handle it automatically).
 
-  - **Linux/macOS**：`./$STACK/scripts/trust-ca.sh` 会写入系统 OpenSSL 库 + NSS（Chrome/Edge/Playwright）+ Firefox + `NODE_EXTRA_CA_CERTS`（写入 `~/.zshenv`、`~/.bashrc`、`/etc/environment`）。手动指定时：
+  - **Linux/macOS**: `./$STACK/scripts/trust-ca.sh` writes into the system OpenSSL store + NSS (Chrome/Edge/Playwright) + Firefox + `NODE_EXTRA_CA_CERTS` (writes `~/.zshenv`, `~/.bashrc`, `/etc/environment`). When specifying manually:
 
     ```bash
     export NODE_EXTRA_CA_CERTS="$STACK/data/caddy/pki/authorities/local/root.crt"
     ```
 
-  - **Windows**：`.\$STACK\scripts\trust-ca.ps1` 把 CA 装进**当前用户**的 `Trusted Root Certification Authorities` 存储，并写入**用户级** `NODE_EXTRA_CA_CERTS`（无需管理员）。手动指定时（PowerShell）：
+  - **Windows**: `.\$STACK\scripts\trust-ca.ps1` installs the CA into the **current user**'s `Trusted Root Certification Authorities` store and writes the **user-level** `NODE_EXTRA_CA_CERTS` (no admin needed). When specifying manually (PowerShell):
 
     ```powershell
     $env:NODE_EXTRA_CA_CERTS = "$STACK\data\caddy\pki\authorities\local\root.crt"
-    # 持久化（用户级）：
+    # persist (user-level):
     [Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', "$STACK\data\caddy\pki\authorities\local\root.crt", 'User')
     ```
 
-**设置环境变量后必须重启 AI 客户端**（env 不会注入已运行进程）。否则报：
+**You must restart the AI client after setting the env var** (env doesn't inject into already-running processes). Otherwise it reports:
 
 ```
 SSE error: TypeError: fetch failed: unable to get local issuer certificate
 ```
 
-## 4. 连接验证
+## 4. Connection verification
 
-1. MCP 工具列表出现 4 个工具：`execute_code`、`export_shape`、`high_level_overview`、`penpot_api_info`。
-2. 调 `penpot_api_info` 确认握手成功。
-3. 调 `high_level_overview` 确认能读到当前文件的页/板树。
-4. `execute_code` 冒烟测试：`return {page: penpot.currentPage.name, pages: penpotUtils.getPages().map(p=>p.name)}`。
+1. The MCP tool list shows 4 tools: `execute_code`, `export_shape`, `high_level_overview`, `penpot_api_info`.
+2. Call `penpot_api_info` to confirm handshake success.
+3. Call `high_level_overview` to confirm it can read the current file's page/board tree.
+4. `execute_code` smoke test: `return {page: penpot.currentPage.name, pages: penpotUtils.getPages().map(p=>p.name)}`.
 
-## 5. 可用工具与工作定位
+## 5. Available tools and their roles
 
-| 工具 | 用途 | 备注 |
+| Tool | Purpose | Notes |
 |---|---|---|
-| `execute_code` | 唯一写入通道：建页/建板/建组件/改属性 | 沙箱执行，**30s 超时** |
-| `export_shape` | 导出 PNG 验收 | 只能导出**当前激活页**上的形状 |
-| `high_level_overview` | 读文件结构 | 构建前勘察、修复前比对 |
-| `penpot_api_info` | API/连接信息 | 排障 |
+| `execute_code` | the only write channel: build pages/boards/components/change properties | sandbox execution, **30s timeout** |
+| `export_shape` | export PNG for acceptance | can only export shapes on the **currently active page** |
+| `high_level_overview` | read file structure | survey before build, compare before repair |
+| `penpot_api_info` | API/connection info | troubleshooting |
 
-## 6. execute_code 会话纪律（速查）
+## 6. execute_code session discipline (quick ref)
 
-- **切页异步**：`penpot.openPage(pageObj)` 后同调用内操作会命中旧页。每条命令开头防御式验证：`openPage(pg); await sleep(400); if (penpot.currentPage.name !== '目标页') return {err: penpot.currentPage.name};`
-- `openPage` 只接受 Page 对象或 UUID：`storage.pg = n => penpotUtils.getPageByName(n)`。
-- **storage 易失**：插件重连/崩溃即丢，每批前探测 `storage.mkText` 等，缺失则重新播种（`scripts/seed_storage.js`）。
-- **批量上限**：每调用 ≤8 图元或 ≤10 文本；超时可能部分生效，重试前先探测残留。
-- 跨页修改报 "Cannot modify a page that is not currently active" → 先激活所属页。
-- 返回值只给原始值（数字/字符串/平铺数组），复杂对象 structuredClone 失败。
-- 崩溃损伤：最后一批 board/rect/ellipse 可能退化为 100×100（检测恰为 100×100 的非文本图元），按规格重 resize；禁用 WebGL 可显著稳定；轻度卡死 sleep 60~120s 自愈。
+- **Page switch is async**: after `penpot.openPage(pageObj)`, operations in the same call may hit the old page. Defensive verification at the start of each command: `openPage(pg); await sleep(400); if (penpot.currentPage.name !== 'target page') return {err: penpot.currentPage.name};`
+- `openPage` only accepts a Page object or UUID: `storage.pg = n => penpotUtils.getPageByName(n)`.
+- **Storage is volatile**: lost on plugin reconnect/crash; probe `storage.mkText` etc. before each batch, re-seed if missing (`scripts/seed_storage.js`).
+- **Batch limit**: each call ≤8 primitives or ≤10 text; timeout may partially take effect, probe residue before retry.
+- Cross-page modification reports "Cannot modify a page that is not currently active" → first activate the page it belongs to.
+- Return values only give raw values (number/string/flat array); complex objects fail structuredClone.
+- Crash damage: the last batch's board/rect/ellipse may degrade to 100×100 (detected as exactly 100×100 non-text primitive), resize per spec; disabling WebGL significantly stabilizes; mild hang self-heals after sleep 60~120s.
 
-布局三方案按序：A 裸板+世界坐标 appendChild（注意导出偏移风险）→ B flex 自动布局（警惕 hug 压塌）→ **C flex 容器 + 全员 absolute + 世界坐标（推荐兜底）**。完整引擎与陷阱表见本技能 `references/`：mcp-automation.md（纪律/速查）/ api-pitfalls.md（机理详解与三方案实测表）/ engines.md（引擎机理与页面配方）；引擎代码在 `scripts/`。
+Layout three approaches in order: A bare board + world-coordinate appendChild (note export-offset risk) → B flex auto-layout (watch for hug collapse) → **C flex container + all absolute + world coordinates (recommended fallback)**. Full engines and pitfall table are in this skill's `references/`: mcp-automation.md (discipline/quick-ref) / api-pitfalls.md (mechanism details and three-approach tested table) / engines.md (engine mechanism and page recipes); engine code is in `scripts/`.

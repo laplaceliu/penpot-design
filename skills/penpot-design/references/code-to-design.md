@@ -1,66 +1,67 @@
-# Code → Design：两种入口到固定结构设计系统
+# Code → Design: two entry points into a fixed-structure design system
 
-目标产物（缺一不可）：
-1. **DESIGN.md** —— 合规规范文件（references/design-md-spec.md 的骨架 + lint 通过）。
-2. **Penpot 设计系统文件** —— 固定结构（references/penpot-structure.md 契约）。
-3. **组件映射表**（13 · 组件索引页 + 工作区 `component-map.json`）—— design-to-code 的输入。
+Target artifacts (none dispensable):
 
-## 入口 A：给一个 URL
+1. **DESIGN.md** — the compliant spec file (the skeleton from references/design-md-spec.md + passing lint).
+2. **Penpot design-system file** — fixed structure (references/penpot-structure.md contract).
+3. **Component mapping table** (page-13 component index + workspace `component-map.json`) — input for design-to-code.
 
-1. **勘察**：web_fetch 目标 URL（以及关键子页：登录页、仪表盘、典型表单页），提取：
-   - 色彩：主色/辅色/中性色/语义色（从 CSS 变量、按钮、链接、状态组件取样）
-   - 字体：font-family 栈、字阶（h1–h6/正文/label）、字重使用
-   - 形状：圆角档位、描边粗细、阴影/发光
-   - 间距：页面边距、卡片 padding、列表行高（对齐 8px 栅格取整）
-   - 组件清单：截图式描述页面上出现的组件族（按钮类型、表单控件、导航、浮层、图表…）
-2. **风格定调**：写 Overview（品牌个性 / 目标用户 / 情绪基调），确定风格关键词（如「深蓝科技风 + 发光霓虹」）。
-3. **产出 DESIGN.md**：按骨架填 tokens 与正文；`npx @google/design.md lint DESIGN.md` 至 0 error。
-4. **进入统一构建管线**（见下）。
+## Entry A: give a URL
 
-## 入口 B：给一组图片
+1. **Survey**: web_fetch the target URL (and key subpages: login, dashboard, typical form page), extract:
+   - Color: primary/secondary/neutral/semantic colors (sample from CSS variables, buttons, links, state components)
+   - Font: font-family stack, type scale (h1–h6/body/label), weight usage
+   - Shape: radius tiers, stroke weight, shadow/glow
+   - Spacing: page margins, card padding, list row height (snap to 8px grid)
+   - Component inventory: screenshot-style description of component families appearing on the page (button types, form controls, navigation, overlays, charts…)
+2. **Style definition**: write Overview (brand personality / target users / emotional tone), determine style keywords (e.g. "deep-blue tech + glowing neon").
+3. **Produce DESIGN.md**: fill tokens and body per the skeleton; `npx @google/design.md lint DESIGN.md` until 0 errors.
+4. **Enter the unified build pipeline** (below).
 
-1. **读图**（read_file 逐张读入）：识别主题、组件族、布局密度、深浅主题。
-2. **取样**：颜色用 PIL 辅助取色（`scripts/pixel_diff.py` 同机可写取色小脚本，或直接在 execute_code 外用 Python 读像素），把主色/背景/文字色量化为 `#RRGGBB`；对图片内标尺/网格反推间距档位（4/8/12/16/24/32），字体按字面特征给最接近字族并注明「估计」。
-3. **组件清单**：逐图列出可见组件与状态（按钮的 hover/disabled 若图中未出现，按行业惯例补全并在 DESIGN.md 注明推断）。
-4. **产出 DESIGN.md**（同入口 A 第 3 步）。
-5. **进入统一构建管线**。
+## Entry B: give a set of images
 
-## 入口 C（扩展）：给既有 React/UI 库源码（复刻）
+1. **Read images** (read_file one by one): identify theme, component families, layout density, light/dark theme.
+2. **Sample**: use PIL to assist color picking (write a small picking script alongside `scripts/pixel_diff.py`, or read pixels with Python outside execute_code), quantize main/background/text colors to `#RRGGBB`; reverse-engineer the spacing tiers (4/8/12/16/24/32) from rulers/grids in the image; give the closest font family by literal features and mark "estimated".
+3. **Component inventory**: list visible components and states per image (if button hover/disabled doesn't appear in the image, fill by industry convention and note "inferred" in DESIGN.md).
+4. **Produce DESIGN.md** (same as Entry A step 3).
+5. **Enter the unified build pipeline**.
 
-用户给出一个现成组件库（`.tsx` + `.module.less` 等）要求复刻成设计系统时，走 **复刻流水线**（详见 `references/mcp-automation.md` §5）：
-先读源码全文（勿凭文档印象，教训：Title 文档一句话、源码实为五层结构）→ 提取 CSS 变量/tokens → 字体探测 + CJK 分流 → Foundations → Components → 注册库组件 → 典型页面组装。产出同样符合固定结构契约。
+## Entry C (extension): give an existing React/UI library source (recreate)
 
-## 统一构建管线（各入口共用）
+When the user gives an existing component library (`.tsx` + `.module.less` etc.) and asks to recreate it into a design system, use the **recreation pipeline** (details in `references/mcp-automation.md` §5):
+first read the full source (don't rely on doc impressions; lesson: Title doc was one sentence, source was actually five layers) → extract CSS variables/tokens → font probing + CJK split → Foundations → Components → register library components → assemble typical pages. The output also conforms to the fixed-structure contract.
 
-0. **确认两个启动档位——同一次 `ask_followup_question`（两个问题）问完**（拿到入口素材后、写 DESIGN.md 之前）：
-   - **视口档位**（先读 `references/viewport-profiles.md`）：multiSelect 问目标宽度——`Web 宽屏` / `平板 Pad` / `手机 Mobile`。
-     结果写入 DESIGN.md `targetProfiles`。
-   - **配色模式**（先读 `references/color-schemes.md`）：问是否需要**可切换的**明暗两套（整页翻转），
-     而不只是同一页里深浅区域交替 —— 选项 `只要浅色` / `浅色 + 深色两套`。
-     结果写入 DESIGN.md `## Colors` 章节正文。**提问必须讲清这两个概念的差别**。
-   两个答案共同构成后续所有构建与验收的硬约束。用户已明说（"做个手机端""要有深色模式"）可免问，但仍须落库。
-   两者共同决定 token 结构：只要浅色 → 1 set / 0 theme；两套 → `· Core` + `· Dark`（Core 在前）+ Scheme 组两个 theme。
-1. **连接 Penpot MCP**（references/mcp-connection.md）：验证 4 工具可用、`high_level_overview` 能读文件。
-2. **播种**：`scripts/seed_storage.js` 建工厂函数（`storage.T` 只是 JS 侧色值镜像）→
-   再用 `scripts/token_engine.js` 的 `TK.seed(spec)` **真正录入 Penpot design tokens**
-   （set 按配色模式切：只要浅色 → 1 个 `· Core`；两套 → `· Core` + `· Dark`），
-   最后 `TK.assert()` 必须 PASS。详见 `references/design-tokens.md`。
-3. **骨架**：`scripts/scaffold_structure.js` 建 16 页 + PageRoot/页头/页脚（PageRoot 恒 1920，属规格说明书画布）。
-4. **按页填充**（顺序 = 页码顺序，组件页内部按组件规格板契约 §4）：
-   - 01 设计基础 → 02 颜色系统（token 可视化先行，后续页引用）
-   - 03–12 组件页：每组件 一板一矩阵；**每板构建完立即 `export_shape` 验收**（越早发现重建成本越低）
-   - `12 · 布局模式`：按 `targetProfiles` 中**每个档位**分别建布局网格板（web 12 列 / pad 8 列 / mobile 4 列或单列堆叠）+ 该档响应式断点与 Empty/404 模板
-   - 13 组件索引 + `component-map.json`（组件名 → 页名/坐标/token 引用/变体清单）
-   - `14 · Demo`：对**每个所选档位**分别产出该档基准宽的六板（Dashboard/Landing/Login/List 管理/Detail 详情/Settings 表单），全部用库组件实例组装；多档并排置于 14 页 1920 画布
-5. **注册库组件**：母版放 `AI Component Masters`，`createComponent` + `createVariantContainer`。
-6. **审查修复**：对齐/描边/去裁剪引擎过一遍（engines.md），重点：闭合描边 inner、发光板 clipContent=false、CJK 字体正确；**pad/mobile 板核查触控目标 ≥44px**。
-7. **验收**：逐页导出 PNG 对照本契约自检清单（penpot-structure.md §7）；`14` 页逐档位逐板验收；请用户在编辑器放大复核。
+## Unified build pipeline (shared by all entries)
 
-## DESIGN.md 编写要点（两入口通用）
+0. **Confirm the two startup tiers — ask both in the same `ask_followup_question` (two questions)** (after obtaining entry materials, before writing DESIGN.md):
+   - **Viewport tier** (read `references/viewport-profiles.md` first): multiSelect for target width — `Web widescreen` / `Tablet Pad` / `Phone Mobile`.
+     Result written into DESIGN.md `targetProfiles`.
+   - **Color mode** (read `references/color-schemes.md` first): ask whether **switchable** light/dark two schemes are needed (whole-page flip),
+     rather than just light/dark regions alternating within the same page — options `Light only` / `Light + dark two schemes`.
+     Result written into DESIGN.md `## Colors` section body. **The question must clarify the difference between these two concepts.**
+   The two answers together form a hard constraint for all subsequent builds and acceptance. If the user has already stated it ("make a phone version", "must have dark mode"), skip the question but still persist.
+   Together they determine the token structure: light only → 1 set / 0 theme; two schemes → `· Core` + `· Dark` (Core first) + Scheme group with two themes.
+1. **Connect Penpot MCP** (references/mcp-connection.md): verify the 4 tools work, `high_level_overview` can read files.
+2. **Seed**: `scripts/seed_storage.js` builds factory functions (`storage.T` is only a JS-side color mirror) →
+   then use `scripts/token_engine.js`'s `TK.seed(spec)` to **actually record Penpot design tokens**
+   (set split by color mode: light only → 1 `· Core`; two schemes → `· Core` + `· Dark`),
+   finally `TK.assert()` must PASS. See `references/design-tokens.md`.
+3. **Skeleton**: `scripts/scaffold_structure.js` builds 16 pages + PageRoot/header/footer (PageRoot always 1920, it's the spec-sheet canvas).
+4. **Fill page by page** (order = page number order; within a component page follow the component spec-board contract §4):
+   - 01 design basics → 02 color system (token visualization first, later pages reference it)
+   - 03–12 component pages: each component one board one matrix; **immediately `export_shape` to accept after each board is built** (earlier rebuild costs less)
+   - `12 · Layout modes`: build a layout-grid board for **each tier** in `targetProfiles` (web 12 cols / pad 8 cols / mobile 4 cols or single-column stack) + that tier's responsive breakpoints and Empty/404 template
+   - 13 component index + `component-map.json` (component name → page name/coordinates/token reference/variant list)
+   - `14 · Demo`: for **each selected tier** produce that tier's baseline-width six boards (Dashboard/Landing/Login/List admin/Detail/Settings form), all assembled from library component instances; multiple tiers placed side by side on page-14's 1920 canvas
+5. **Register library components**: masters go to `AI Component Masters`, `createComponent` + `createVariantContainer`.
+6. **Review and fix**: run alignment/stroke/unclip engines (engines.md), focus: closed stroke inner, glow board clipContent=false, correct CJK font; **check pad/mobile boards for touch targets ≥44px**.
+7. **Accept**: export PNG per page and check against this contract's self-check list (penpot-structure.md §7); page `14` accepted tier by tier, board by board; ask the user to zoom in the editor to review.
 
-- tokens 为唯一规范值；正文只写语义与用法（"Primary 仅用于每屏单一最重要操作"式护栏）。
-- 组件 token 尽量引用基础 token（`{colors.primary}`），变体键独立（`button-primary-hover`）。
-- 未知/推断项不编造精确数值：用接近的档位 + 在 prose 标注「自图片估计」。
-- 图标与图片资源约定提前写进 Components/Do's and Don'ts（导出尺寸、命名、@2x），是 design-to-code 阶段 pixel-perfect 的前提。
-- **Layout 章节必须记录 `targetProfiles`**（web/pad/mobile）并据此调整：spacing 刻度（mobile 更紧凑 4/8/12）、
-  触控目标下限（pad/mobile ≥44px，引入 `touchMin` token）、栅格描述按档位分别写，禁止只假设单一宽度。
+## DESIGN.md writing notes (shared by both entries)
+
+- tokens are the only normative values; body only writes semantics and usage ("Primary used only for the single most important action per screen" style guardrails).
+- Component tokens reference base tokens where possible (`{colors.primary}`), variant keys independent (`button-primary-hover`).
+- Unknown/inferred items don't fabricate precise values: use the closest tier + mark "estimated from image" in prose.
+- Icon and image asset conventions are written into Components/Do's and Don'ts in advance (export size, naming, @2x), a prerequisite for pixel-perfect in the design-to-code stage.
+- **Layout section must record `targetProfiles`** (web/pad/mobile) and adjust accordingly: spacing scale (mobile tighter 4/8/12),
+  touch-target floor (pad/mobile ≥44px, introduce `touchMin` token), grid description written per tier, never assume a single width.
