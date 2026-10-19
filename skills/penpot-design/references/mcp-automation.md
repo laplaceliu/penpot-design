@@ -1,9 +1,28 @@
 # Penpot MCP automation handbook (execute_code)
 
-> Migrated from the penpot-mcp-automation skill (merged into penpot-design). Hardened through multiple complete runs (93 components + variants + 1920×1080 widescreen (web tier), 33 components + library components + Dashboard/Landing/Login/List/Detail/Settings six typical pages). **Now supports web / pad / mobile three viewport tiers** (see `references/viewport-profiles.md`); Demo and page-12 layout grids are built per selected tier, and the task start uses `ask_followup_question` to confirm the target width.
-> Detailed mechanics and code: api-pitfalls.md (pitfall details) / engines.md (mechanics and recipes) / scripts/*.js (seed and engine code).
+> Migrated from the penpot-mcp-automation skill (merged into penpot-design). Hardened through multiple complete runs (93 components + variants + 1920×1080 widescreen (web tier), 33 components + library components + Dashboard/Landing/Login/List/Detail/Settings six typical pages). **Now supports web / pad / mobile three viewport tiers** (see `references/viewport-profiles.md`); the screen pages `14 · Screens · app` / `15 · Screens · content` / `16 · Screens · mobile` are built per selected tier from `storage.LY` recipes, and the task start uses `ask_followup_question` to confirm the target width.
+> Detailed mechanics and code: api-pitfalls.md (pitfall details) / engines.md (mechanics and recipes) / scripts/*.js (seed, engines and repair code).
+>
+> **Since 1.6 the geometry is not improvised per task.** Three engines carry the design knowledge and the discipline below applies on top of them:
+> `scripts/layout_engine.js` (`storage.LY.*` — every region rect), `scripts/component_factory.js` (`storage.CF.*` — every control),
+> `scripts/audit_design.js` (`storage.designPage/designGate` — the design-rule lint, gate **G13**). Gate **G11** forbids hand-writing
+> a region coordinate; gate **G12** forbids hand-building a component that `CF` cannot produce. Both auditors are independent:
+> `audit_layout.js` judges positioning/overlap, `audit_design.js` judges spacing/typography/coverage.
 
-Operate Penpot files via the `execute_code` tool of the `penpot` MCP. All code runs in that tool's sandbox, with a 30-second timeout.
+Operate Penpot files via the `execute_code` tool of the `penpot` MCP. All code runs in that tool's sandbox.
+
+### The three timeouts, read off the deployed server (`/opt/penpot/mcp/index.js`), not guessed
+
+| Constant | Value | What it kills |
+|---|---|---|
+| `EVAL_TIMEOUT_MS` | **30 000** | one `execute_code` call. This is the number every batch size below is planned against |
+| `taskTimeoutSecs` | 30 (configurable) | the plugin-task round-trip (same order as eval) |
+| `IMPORT_TIMEOUT_MS` | 120 000 | file import only — **not** a licence to run a 2-minute `execute_code` |
+| `HEARTBEAT_STALE_THRESHOLD_MS` | 30 000 (hardcoded) | a hidden/minimized plugin tab stops the heartbeat → the server rejects **all** tool calls |
+| `resolveTimeoutMs` | 15 000 | resolving a connected plugin |
+
+Practical consequence: **30s per call is the real budget**, so every engine in `scripts/` is written as a queue runner
+(`designStart`/`designNext`/`designAll`, `auditAll`, `scaffoldQueue`) that does one page — sometimes one switch — per call.
 
 ## 1. Session discipline (must obey every call)
 
@@ -13,7 +32,7 @@ Operate Penpot files via the `execute_code` tool of the `penpot` MCP. All code r
    - **Defensive verification at the start of every command**: `openPage(pg); await sleep(400); if (penpot.currentPage.name !== 'target page') return {err: currentPage.name};` — return immediately on mismatch, never run remove/create on the wrong page.
 2. **Page object**: `openPage` only accepts a Page object or UUID. Helper `storage.pg = n => penpotUtils.getPageByName(n)`.
 3. **Storage is volatile**: lost after plugin reconnect / browser crash. Before each batch probe `storage.T / storage.mkText / storage.absMount`; if missing, re-seed (seed template: `scripts/seed_storage.js`, extend per project theme).
-4. **Batch size**: each call ≤8 primitives or ≤10 text; exceeding triggers the 30s timeout. A timed-out call may have partially taken effect — before retrying, probe residue to avoid duplicate creation. **When killed by timeout, openPage may not have committed**: the next command may land on the old page — switch page + verify before operating (lesson: once on the Foundations page a "remove all" was wrongly executed, wiping the whole page).
+4. **Batch size**: each call ≤8 primitives or ≤10 text; exceeding triggers the 30s eval timeout. A timed-out call may have partially taken effect — before retrying, probe residue to avoid duplicate creation. **When killed by timeout, openPage may not have committed**: the next command may land on the old page — switch page + verify before operating (lesson: once on the Foundations page a "remove all" was wrongly executed, wiping the whole page).
 5. **Crash-damage pattern**: canvas crash (lots of glow blur + large files + frequent page switching are triggers; a symptom is also MCP reporting "No plugin instance connected") degrades the **last batch created before the crash** of board/rect/ellipse to default 100×100 (text unaffected; position/fill/z-order preserved). Detection: non-text primitive size exactly 100×100. Fix = resize per design spec, **including the header board** (header-board degradation makes the export all black). Disabling WebGL significantly stabilizes; mild freeze self-heals after sleep 60~120s.
 6. **Return values**: only return raw values (number/string/flat array). Returning a function or complex object fails structuredClone (e.g. shape's makeMask).
 7. **Cross-page operations**: modifying/deleting a non-active page object reports "Cannot modify a page that is not currently active" → activate its owning page first.
@@ -32,7 +51,9 @@ storage.mkAbsBoard = (name, x, y, w, h, fill, radius) => {
   b.fills = fill ? [{ fillColor: fill, fillOpacity: 1 }] : [];
   b.addFlexLayout();
   b.flex.dir = 'column';
-  try { b.horizontalSizing = 'fixed'; b.verticalSizing = 'fixed'; } catch (e) {}
+  // sizing vocabulary is 'fix' | 'auto' — NOT 'fixed'/'hug'; assigning 'fixed' throws under the v2 manifest and a
+  // try/catch swallows it, so the board only appears to work because 'fix' happens to be the default.
+  try { b.horizontalSizing = 'fix'; b.verticalSizing = 'fix'; } catch (e) {}
   return b;
 };
 storage.absMount = (parent, child, worldX, worldY) => {
@@ -63,11 +84,11 @@ storage.absMount = (parent, child, worldX, worldY) => {
 | **Resizing a board and children** | Board resize **doesn't affect absolute children** (safe to expand the frame). But a board with non-absolute flex children, when resized, triggers the engine to `fix` sizing back to content size (collapse) — don't resize again after fixing |
 | **CJK font fallback** | Penpot has no CSS font-stack fallback: `applyToText` applies to the whole paragraph, Chinese in Latin fonts like Nunito renders as garbage. **mkText auto-selects Noto Sans SC by `/[\u3000-\u9fff\uff00-\uffef]/`**; scan existing text `characters` for batch fix (`Text.fontWeight` can read the current weight directly, replace at same weight) |
 | **Emoji rendering** | Penpot renders emoji as pixel-style graphics (same in exported PNG) — actually suitable for game/pixel-style design, can be used directly as icon placeholders |
-| **Assembly ownership** | A complete primitive set (base plate + label + icon) **must not be loose same-level stacking**: reuse → component (`createComponent([group])`, pages use `comp.instance()`), single-use → **group**. **⚠️ `penpot.group` has destructive side effects** (group drops into flex flow position, members shift −minParentXY, board gets inflated; `ungroup` doesn't restore coordinates) — must use **compensatory grouping** (capture min parentXY → group → `absolute=true` → reset → readback), canonical implementation in `groupAssemblies()`. Group name = host name, component name forbids `/` use `·`. Contract `penpot-structure.md` §4.1, audit `loose_assembly` |
+| **Assembly ownership** | A complete primitive set (base plate + label + icon) **must not be loose same-level stacking**: reuse → component (`createComponent([group])`; on a screen, call the same `CF` factory again — this build exposes no scriptable instance maker, see api-pitfalls.md §6), single-use → **group**. **⚠️ `penpot.group` has destructive side effects** (group drops into flex flow position, members shift −minParentXY, board gets inflated; `ungroup` doesn't restore coordinates) — must use **compensatory grouping** (capture min parentXY → group → `absolute=true` → reset → readback), canonical implementation in `groupAssemblies()`. Group name = host name, component name forbids `/` use `·`. Contract `penpot-structure.md` §4.3, audit `loose_assembly` |
 
 ## 4. Variant containers (Variant)
 
-**Group first, then register**: a multi-primitive assembly first `penpot.group([host, ...members])` to collect (assembly-ownership contract `penpot-structure.md` §4.1),
+**Group first, then register**: a multi-primitive assembly first `penpot.group([host, ...members])` to collect (assembly-ownership contract `penpot-structure.md` §4.3),
 then `createComponent([group])` registers the whole group — child elements stay collected, component semantics complete; registering loose primitives directly yields a defective component containing only a single piece.
 
 `penpotUtils.createVariantContainer(items)` requires the input to be **a registered library component's main instance**, passing a plain shape reports "ShapeProxy invalid":
@@ -90,8 +111,36 @@ After reparent, the instance's internal child elements shift (e.g. +30,30) → r
 1. **Read the full source before acting**: each component's `.tsx` + `.module.less` must be read. Drawing from a one-line doc impression misses key structure (lesson: the Title doc only says "swallowtail ribbon", the source is actually a five-layer structure — clip-path fishtail swallowtail / folded-corner border triangle / rotateX(3deg) front / inner shadow / text layer, default green `#27d039` not the theme color, em units scale with font size).
 2. **Extract tokens**: CSS variables → storage.T (color/radius/spacing/shadow color), synced into `penpot.library.local.tokens` (addSet + addToken, type: 'color'/'borderRadius'/'dimension').
 3. **Font decision**: read less's font-family stack → `penpot.fonts.findByName` to probe availability → mkText auto-routes by CJK regex.
-4. **Build order**: Foundations page (palette/type scale/spacing radius shadow) → Components page (board per component) → register library components → assemble typical pages (Dashboard/Landing/Login/List/Detail/Settings reusing component recipe coordinates).
+4. **Build order**: `01 · Foundations` (palette / type ramp / spacing / radius / elevation / icons) → `02 · Color in use`
+   → `03–09` one `Family·Spec` board per component family, produced by `CF.matrix` and packed by `LY.pack`
+   → `10–12` chrome, grid, recipes → `13 · Component index` → register library components → `14–16` the screen recipes.
+   When the recreated library has numbers of its own, they **override the consensus defaults** (they are the target);
+   where it gives none, keep `LY`/`CF` values.
 5. **Export and accept immediately after each board is built**, don't pile up to the end — layout problems found earlier cost less to rebuild.
+
+## 5.5 Driving the build through the engines (the only sanctioned path)
+
+```js
+// one call = one page. storage.LY / storage.CF must be seeded first (seed_storage → layout_engine → component_factory).
+const r = await storage.designNext({ tier: 'web' });       // build/audit the next queued page
+
+// a screen: regions come from LY, controls from CF, mounting is absMount — no typed numbers.
+const plan = storage.LY.recipe('dashboard', { w: 1440, tier: 'web', x0: 80, y0: 240 });
+if (plan.err) return plan;                                  // tier refusal is an answer, not an obstacle
+const board = storage.mkAbsBoard('dashboard · web', 80, 240, 1440, Math.max(plan.totalH, 900), '#FFFFFF', 0);
+await storage.CF.pageTitle({ parent: board, rect: storage.LY.rect('pageTitle'), title: 'Overview' });
+await storage.CF.toolbar({ parent: board, rect: storage.LY.rect('filterBar') });
+storage.LY.fold(board, 'web');                              // the dashed first-viewport marker
+```
+
+- **Numbers enter the file only from `LY` (rects, spacing, tiers) or `CF` (control metrics)**. A coordinate typed into
+  `execute_code` is gate **G11**; a control drawn without its factory is gate **G12** and will also fail `name_invalid`,
+  because coverage is read from the `Family·Type·Size·State·Slot` name the factories emit.
+- **A missing recipe or factory is a bug in the engine**, not a reason to hand-build: add the recipe to
+  `layout_engine.js` and document it in `layout-library.md`, or add the factory to `component_factory.js` and to
+  `CF.map()`. The docs and the scripts are diffed mechanically, so an undocumented addition fails.
+- **Before delivery**: `storage.designGate({ tier })` (G13, the merged design lint) **and** `storage.auditPage()`
+  (positioning). Two verdicts, both `CLEAN`, per page scope named in `penpot-structure.md §2`.
 
 ## 6. Review and repair engines (mechanics in engines.md §1, code: scripts/repair_engines.js, scripts/fix_layout.js)
 
@@ -99,9 +148,14 @@ After reparent, the instance's internal child elements shift (e.g. +30,30) → r
 - **vAlignPage**: vertical centering of single-line direct-child text inside small boards (≤70px tall), with **vertical-stacking guard** (multi-line text with same-board x overlap≥50% = deliberate stacking, skip — prevents false-hurt on stepper buttons, top-aligned labels).
 - **fixInner**: whole-file stroke batch fix (closed→inner, paths→center).
 - **unclip**: whole-file `clipContent=false`.
-- **gridSnap**: calendar/table grid snapping (colCx/rowCy to derive expected positions).
+- **fixStaleCenter / groupAssemblies / fixZOrder / cleanOrphans**: stale-center offset, assembly ownership (G10), group z-order, root-level crash residue.
+- **gridSnap**: calendar/table grid snapping (colCx/rowCy to derive expected positions) — for **repaired** legacy grids only; a new calendar is `LY.recipe('calMonth')` + `CF.miniCalendar`, which cannot be off-grid.
 
 Common pattern: engines stored in `storage` as **literal functions**, queue stored in `storage.xxxQueue`, page-by-page runner execution; repair log returns `[{position, content, axis, offset}]` for manual review.
+
+**Repair never outranks the producer.** If a signature keeps coming back (`off_grid`, `variant_sparse`, `rhythm_inconsistent`),
+the fix is in `LY`/`CF`/the palette, not in a one-off patch on the board — patching the pixels is how a file ends up with
+100 boards that all carry the same hand-typed mistake.
 
 ## 7. Acceptance discipline
 
@@ -117,10 +171,15 @@ Common pattern: engines stored in `storage` as **literal functions**, queue stor
 The theme recipe is derived from DESIGN.md, and can be deposited into project-private docs as needed (not into SKILL). Common composition:
 
 - **tokens**: color/font/radius/spacing/shadow/effect (e.g. glow) spec, strictly consistent with DESIGN.md.
-- **seeds and factories**: seed template (`scripts/seed_storage.js`) + themed factory functions (mkText/mkRect/card constructor etc., namespace on `storage`).
-- **layout coordinates**: component-page build order, full-page / widescreen partition coordinate table (visual-spec quick reference).
-- **typical pages**: Dashboard/Landing/Login/List admin/Detail/Settings form and other page assembly recipes (engines.md §4 pattern + theme coordinates).
+- **seeds and factories**: seed template (`scripts/seed_storage.js`) + the variant-producing factories
+  (`scripts/component_factory.js`); project-private additions go into `CF` with a `CF.map()` entry, never into a task script.
+- **layout**: `scripts/layout_engine.js` recipes + the theme's own overrides (`LY.SPACE`, `LY.TIERS`, container width).
+  A per-task "partition coordinate table" is **not** a deliverable any more — it is what gate G11 removes.
+- **typical pages**: the screen recipes of `layout-library.md §3/§5` rendered at each selected tier (pages 14–16), not a
+  hand-picked Dashboard/Landing/Login set re-derived per task.
 
-Experience: set tokens first → seed → build component pages board by board per spec + export accept → finally assemble full pages; complex decorations (ribbon/badge/multi-layer shadow) encapsulated as separate constructors, avoid scattered coordinates.
+Experience: set tokens first → seed (`seed_storage` → `layout_engine` → `component_factory`) → build component pages board
+by board per spec + export accept → finally assemble full pages; complex decorations (ribbon/badge/multi-layer shadow)
+encapsulated as a `CF.*` factory with a `·`-named host, so coverage and the lint can see them.
 
 Layout-approach decision and tested behavior table are in api-pitfalls.md §10; the absMount engine is in `scripts/seed_storage.js`; the collapse-repair engine is in `scripts/fix_layout.js`.

@@ -41,7 +41,7 @@
    - Large-block difference → locate by difference type: position offset (spacing/box model), color (token value), font (type-scale mapping), icon (asset reference/scaling).
    - Only edge scatter → pass.
 5. After fixing, return to step 2 and loop until it passes.
-6. After all component layers pass, do a **whole-page comparison** of page-14 Demo **each tier's screen boards** separately (threshold 0.5%).
+6. After all component layers pass, do a **whole-page comparison** of every screen board on pages `14–16`, separately per selected tier (threshold 0.5%).
 7. Summary report: component × metric table (user prefers tabular progress), with diff heatmap paths attached.
 
 ## 5. Common differences → root-cause quick ref

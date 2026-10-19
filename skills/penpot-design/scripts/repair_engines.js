@@ -8,6 +8,10 @@ return (function () {
   const rootOf = () => penpot.currentPage.root || penpot.root;
   const headOf = (root) => root.children.find(c => c.type === 'board');  // don't use children[0] (may have orphan text)
   const kidsOf = (n) => { try { const k = n.children; return Array.isArray(k) ? k : null; } catch (e) { return null; } };
+  // Penpot reports a rectangle as 'rect'; comparing only 'rectangle' silently matches nothing (see positioning-audit.md).
+  const PLATE = (s) => s.type === 'rect' || s.type === 'rectangle' || s.type === 'ellipse';
+  // Chrome that is deliberately bigger than the box it belongs to: focus ring offset, §6 hit pad.
+  const OVER = /^(ring·|hitpad·|shadow|glow|scrim|state·layer)/;
   const move = (s, px, py) => {
     try { s.parentX = px; s.parentY = py; return true; } catch (e1) {}
     try { s.x = px; s.y = py; return true; } catch (e2) {}
@@ -29,7 +33,7 @@ return (function () {
       const kids = kidsOf(node); if (!kids) return;
       for (const c of kids) {
         try {
-          if ((c.type === 'rectangle' || c.type === 'ellipse') && c.width >= 24 && c.height >= 24 && c.width * c.height <= 20000) hosts.push(c);
+          if (PLATE(c) && !OVER.test(c.name || '') && c.width >= 24 && c.height >= 24 && c.width * c.height <= 20000) hosts.push(c);
           if (rec(c)) collectHosts(c, hosts);
         } catch (e) { errors.push('ch:' + e.message); }
       }
@@ -169,7 +173,7 @@ return (function () {
     const log = [];
     const walk = (node) => {
       const kids = kidsOf(node); if (!kids) return;
-      const hosts = kids.filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 16 && h.height >= 16);
+      const hosts = kids.filter((h) => (PLATE(h) || h.type === 'board') && h.width >= 16 && h.height >= 16 && !OVER.test(h.name || ''));
       for (const c of kids) {
         try {
           const isFlow = c.layoutChild && c.layoutChild.absolute === false;
@@ -210,7 +214,7 @@ return (function () {
   // (button group into nav bar); a board is a partition container, not an assembly host; flow child primitives skipped (left to flex).
   // Idempotent: assemblies already in the same group/component aren't re-grouped; only changes hierarchy, not coordinates/style.
   // Upgrade path: single-use assembly = group; to reuse / enter the 13 index → `createComponent([group])` upgrades to a component,
-  // pages always `comp.instance()` (registration discipline see penpot-structure.md §4).
+  // a screen re-calls the same CF factory (this build has no scriptable instance maker; registration discipline see penpot-structure.md §4.3).
   storage.groupAssemblies = (root) => {
     root = root || rootOf();
     const log = [];
@@ -221,8 +225,8 @@ return (function () {
       for (const c of kids0.slice()) if (c.type === 'board' || c.type === 'group') walk(c);  // inner first
       const kids = kidsOf(node); if (!kids) return;
       const byArea = kids
-        .filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 24 && h.height >= 24 && !isFlow(h))
-        .sort((a, b) => a.width * b.height - b.width * b.height);
+        .filter((h) => (PLATE(h) || h.type === 'board') && h.width >= 24 && h.height >= 24 && !isFlow(h) && !OVER.test(h.name || ''))
+        .sort((a, b) => (b.width * b.height) - (a.width * a.height));
       const taken = new Set();      // members already absorbed
       const live = kids.slice();    // member stand-in list (replaced by group after grouping)
       for (const h of byArea) {

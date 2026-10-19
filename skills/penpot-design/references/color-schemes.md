@@ -52,22 +52,36 @@ not an inversion of `light`.
 
 ## 4. Artifact mapping (answer = two schemes)
 
+Bounded on purpose: **a second scheme costs a page, not the file.** The old "double every board" contract made dark
+mode unaffordable, so teams skipped it; the mapping below keeps dark first-class where color is the subject (00–02) and
+one-board-deep where color is a detail (03–16).
+
 | Location | Change |
 |---|---|
 | **token structure** | `sets: [ '<system> · Core'(all), '<system> · Dark'(only the same-named tokens to override) ]` + `Scheme` group with two themes (Light = {Core}, Dark = {Core, Dark}). **Core must come first** (`sets` order is priority, later wins). Use `TK.ensureTheme` / `TK.activateTheme`. |
-| **00 Cover** | Note the color mode and the two schemes' names |
-| **01 Design basics F1** | The palette board needs **dual polarity** side by side (light column, dark column + role correspondence) |
-| **02 Color system** | C1 semantic colors / C2 surface pairs / C3 text hierarchy / **C5 contrast audit all doubled** (side by side or stacked) |
-| **03–12 component spec boards** | every interactive component gives at least one dark-polarity state set; display widgets at least give polarity notes |
-| **12 Layout modes** | unchanged (layout is orthogonal to color) |
-| **14 Demo** | each tier × **each scheme** produces six boards → board count **doubles** (2 tiers × 2 schemes = 24 boards). Can be side by side but must be clearly labeled. |
-| **DESIGN.md `## Elevation & Depth`** | needs to explain the relationship between "sectional polarity" and "theme polarity": how `ink` / `canvas` roles swap or hold after flipping |
+| **`00 · Cover`** | Note the color mode and the two schemes' names |
+| **`01 · Foundations`** | The `Palette` board needs **dual polarity** side by side (light column, dark column + role correspondence) |
+| **`02 · Color in use`** | `Semantic roles` draws the wash / hue / **ink** triple for both polarities; `Contrast matrix` is **doubled** (a light table and a dark table, side by side or stacked); `Light vs dark` board; `Data colors` re-checked for the dark ramp |
+| **`03–09` spec boards** | **not duplicated**: one polarity (the one the system starts in) plus the dark state rows `CF` already draws (`onDark` variants where the family declares one) |
+| **`10 · App shell & chrome`** | Add the dark-panel variants the families own (`sideNav` dark panel, inverted `footer`); they are rows of the existing spec boards, not new boards |
+| **`11 · Grid & breakpoints`, `12 · Screen recipes`** | unchanged — layout is orthogonal to color |
+| **`13 · Component index`** | one extra column: which families carry a dark variant |
+| **`14 · Screens · app`, `15 · Screens · content`, `16 · Screens · mobile`** | **one dark twin per page** (the recipe that best shows the scheme), **not** one per board. 3 boards added, not 24. Label the scheme on the board name. |
+| **DESIGN.md `## Elevation & Depth`** | explain how "sectional polarity" and "theme polarity" relate: how the `ink` / `canvas` roles swap or hold after flipping |
+
+### 4.1 Dark is derived per tone step, not inverted
+
+The tone ramp is `[wash · hue · ink]` (design-guide §4) and only the `*Ink` step carries copy. In light, copy sits as
+`primaryInk` on a `primarySoft` wash (6.37–7.15:1); in dark the wash becomes a low-alpha tint over the dark surface, so the
+**ink step must move the other way** (a lifted hue step, e.g. `#93C5FD`-family text on `#0F172A`) or the pair lands
+under 4.5:1. That is why `· Dark` overrides the role tokens one by one and why the contrast matrix is the board that
+proves it — `audit_design.js` checks the pair each text actually sits on, in the scheme it was drawn in.
 
 ## 5. Acceptance (mandatory)
 
 - **WCAG contrast must be audited separately for both schemes**. dark is **not** the inverse of light:
-  simple inversion usually breaks mid-tone grayscale (`on-surface-muted` and similar are most likely to fail).
-- Page-02's C5 contrast-audit table needs a **light table + dark table**, two of them.
+  simple inversion usually breaks mid-tone grayscale (the `muted` / `on-surface-muted` role is the most likely to fail).
+- `02 · Color in use → Contrast matrix` needs a **light table and a dark table**, two of them.
 - `TK.audit()` under theme mode switches to the `mode: 'theme-driven'` criterion
   (an inactive set is normal; re-judge "no multiple same-group activations + all tokens in the active set resolvable").
 - Export acceptance: run both schemes once each, **combinations never exported must not be described as "verified"**.
@@ -82,7 +96,8 @@ not an inversion of `light`.
 
 ## 7. Why it must be asked at startup
 
-- Adding a second scheme afterward costs far more than deciding at the start: **the palette must be re-derived, page-02's contrast audit redone,
-  component spec boards get polarity added, Demo board count doubles**.
-- Conversely, deciding "light only" at the start saves the whole theme structure and the second set of boards — exactly
+- Adding a second scheme afterward costs far more than deciding at the start: **the palette must be re-derived, the
+  `02 · Color in use` contrast audit redoubled, the shell families gain dark variants, and every dark-scheme demo board
+  has to be rebuilt from the token set that did not exist when it was drawn**.
+- Conversely, deciding "light only" at the start saves the whole theme structure and the dark boards — exactly
   pix's current basis of 1 set / 0 themes.

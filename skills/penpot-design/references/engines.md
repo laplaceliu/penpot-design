@@ -4,22 +4,35 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 
 | Script | Content | Usage |
 |---|---|---|
-| `scripts/seed_storage.js` | tokens `storage.T`, `mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg` | run first each session; re-seed after storage loss |
-| `scripts/repair_engines.js` | `fixStaleCenter` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | run once to plant into storage, call page by page |
+| `scripts/seed_storage.js` | tokens `storage.T`, `mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg`/`sleep` | run first each session; re-seed after storage loss |
+| `scripts/layout_engine.js` | **`storage.LY.*`** — the region math: `SPACE`/`ROWS`/`TIERS`, `snap`/`onScale`, `frame`/`container`/`grid`/`split`/`rows`/`flow`/`repeat`/`pack`, `viewportHeight`/`fold`, `recipe`/`plan`/`rect`/`keys`, `slots`, `drawStart`/`drawStep` | run right after seed; every coordinate on every page comes from it (gate **G11**) |
+| `scripts/component_factory.js` | **`storage.CF.*`** — the variant-producing factories + `build`/`matrix`/`component`/`variants`, `P` palette, `STATE` alphas, `ladder`/`radius`/`fills`/`name`/`glyph`, `minHit`/`tier`/`autoHit`, `map`/`missing` | run after LY; every control on every page is produced by it (gate **G12**). The registry is `CF.map()`; **`CF.missing()` must return `[]`** — that is the count to trust, not a number written in a doc |
+| `scripts/audit_design.js` | **design-rule lint** (`designPage`/`designStart`/`designNext`/`designAll`/`designGate`): 18 signatures — grid/scale/ramp/gap/measure/split/cap/touch/primary/row-height/radius/contrast/viewport/state-coverage/`variant_sparse`/`focus_ring_missing`/`disabled_wrong`/`name_invalid` | run per board as built and per page at the end; gate **G13** blocks delivery |
+| `scripts/repair_engines.js` | `fixStaleCenter` / `groupAssemblies` / `fixZOrder` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | run once to plant into storage, call page by page |
 | `scripts/fix_layout.js` | flex-collapse repair (getDesignSize + absRow + fixCol, two-round convergence) | run directly on the target page |
 | `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) | record immediately after building skeleton; re-run health check before acceptance |
-| `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`, five signature classes + font histogram, read-only) | run on each board as built; recompute after finishing |
+| `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`): **eleven signature classes** + font histogram, read-only | run on each board as built; recompute after finishing |
 | `scripts/fix_geometry.js` | geometry repair (column offset/board height/root height/right overflow, four engines, all support dry-run) | repair page by page after audit lists |
-| `scripts/scaffold_structure.js` | fixed 16-page skeleton | first step of code-to-design |
+| `scripts/scaffold_structure.js` | **18-page skeleton**: pages → PageRoot/Header/Footer → `fit` (root height = used height) | first step of code-to-design; re-runnable, and phase 3 is the delivery-time height fix |
 
-> **Order iron rule**: `seed_storage.js` (G1) → build boards (each board `audit_layout.js` single-board audit, G3) →
+> **Seed order iron rule**: `seed_storage.js` → `layout_engine.js` → `component_factory.js` → `audit_design.js`
+> (each consumes the previous one's `storage` keys. Failure behavior is deliberately different:
+> `audit_design.js` **refuses to run** without LY+CF and returns `{ err: 'run … first' }`, because a lint that cannot
+> see the engines would report CLEAN; `component_factory.js` **reports** `slots: ['LY not seeded']` in its return value
+> instead of throwing, because half a seed is still worth more than none. Either way: read the return, do not assume.)
+>
+> **Build iron rule**: G11 = regions come from `LY` (a typed coordinate is a defect); G12 = controls come from `CF`
+> (a hand-built control is a defect and will also fail `name_invalid`); G13 = `designGate` CLEAN before delivery.
+>
+> **Repair iron rule**: `audit_layout.js` single-board audit as each board lands (G3) →
 > **Phase 1 geometry**: `fix_geometry.js`'s `fixGeometryAll({apply:false})` lists → review → `{apply:true}`
-> → **Phase 2 alignment**: `repair_engines.js` finishing (`cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip`, G4) →
-> `audit_layout.js` recompute to `CLEAN` (G5).
+> → **Phase 2 alignment**: `repair_engines.js` finishing (`cleanOrphans → fixStaleCenter → alignPage → vAlignPage → fixInner → unclip → groupAssemblies → fixZOrder`, G4/G10) →
+> `audit_layout.js` + `audit_design.js` recompute to `CLEAN` (G5 + G13).
 >
 > **The two phases must not be merged, and needn't both run**: tested 121 out-of-bounds all resolved by the geometry engine, `vAlignPage` hit 0;
 > running the alignment engine first would snap on a wrong baseline and introduce false-hurts. **Diagnose the signature first, then decide which engine.**
 > Signature judgment and noise rules are in `references/positioning-audit.md`.
+> **When a design-rule signature keeps coming back, fix the producer, not the board** (`LY`/`CF`/the palette), then rebuild that board.
 
 Generic runner (engines/repairs run page by page; **pre-cut next page at tail, must verify `penpot.currentPage.name` before probing**):
 
@@ -43,12 +56,16 @@ return { page: pg, ...r, remaining: q.length };
   (`|t.x−hcx|≤2` or `|t.y−hcy|≤2`, per-axis independent), the arithmetic consequence of "using 1×1 transient width/height at creation to compute `(w−1)/2` centering".
   Deliberately left-aligned text only lands at `host.x+padding`, never sticks to the center → fingerprint judgment zero false positives; only moves the hit-axis coordinate, touches no hierarchy/style.
   **Must come before alignPage** (division: >6px large offset belongs to this engine, ≤6px micro-diff belongs to alignPage snap).
-- **groupAssemblies**: assemble into groups (assembly-ownership contract `penpot-structure.md` §4.1). Under the same parent, "host (rect/ellipse/board ≥24)
+- **groupAssemblies**: assemble into groups (assembly-ownership contract `penpot-structure.md` §4.3). Under the same parent, "host (rect/ellipse/board ≥24)
   + sibling primitives whose center falls inside it and whose smallest host is it" → into a group, group name = host name.
   Inside-out (ascending area) → nested groups (button group into nav bar); idempotent (skip within same group/component, compare parent/child by `.id`);
   **built-in compensation grouping** (`penpot.group`'s destructive side effect see api-pitfalls §6.1: capture min parentXY → group →
   `absolute=true` → reset → readback verify), guaranteeing members' world coordinates zero displacement.
-  Upgrade reusable assembly to component: `createComponent([group])` → pages use `comp.instance()`.
+  Upgrade reusable assembly to component: `CF.component(group)` (= `createComponent([group])`). Note what registration does:
+  the host **becomes** the component's main instance — it stays on the canvas, and `comp.remove()` deletes it along with
+  every instance (api-pitfalls.md §6), so register from a masters board or accept that the board you registered from is the master.
+  **On a screen, "reuse" means calling the same `CF` factory again** — this build exposes no scriptable instance maker
+  (api-pitfalls.md §6), and a factory re-call produces identical geometry, so the ownership rule holds either way.
 - **fixZOrder**: in-group front/back order repair (z semantics: larger `parentIndex` = more front). `penpot.group` puts the base plate above the label
   (label covered) → within group sort by descending area `setParentIndex(i)` (large base at bottom, text on top), instance internals skipped.
   `groupAssemblies` already has the same logic built-in (with group layer-slot preservation); use this engine for old-group batch fixes. Verify by whole-board export (small-shape group export has a cache illusion).
@@ -79,34 +96,43 @@ Note: run an audit once before snapping (collect the offset list for manual revi
 - **Crash-damage repair**: walk detects 100×100 non-text primitives → resize per design spec (board + edge-touching children, header board must be handled).
 - **Cross-page delete**: first `penpot.openPage` that page (wait for switch to take effect), then remove.
 
-## 2. Build seeds and component factories
+## 2. Build seeds and the component factory
 
-Seeds and base factories take `scripts/seed_storage.js` as single source of truth (token values synced with DESIGN.md). Approach C key details and the three approaches' tested behavior are in api-pitfalls.md §10.
+`scripts/seed_storage.js` is the single source for the primitives (approach C, `mkAbsBoard`/`absMount`/`mkText`/`ct`) and
+`scripts/component_factory.js` for the controls; token values stay synced with DESIGN.md. Approach-C details and the
+three approaches' tested behavior are in api-pitfalls.md §10.
 
-Component factory template (fixed-size component = board attribute + text layer, all via `absMount`; shadow color **must be object format** `{color, opacity}` — string hex silently turns black). Theme params replaced per DESIGN.md:
+**Do not write a `storage.mkButtonA`-style one-off constructor any more.** A bespoke factory is exactly what gates
+G12/G13 reject: it is absent from `CF.map()`, its host carries no `Family·Type·Size·State·Slot` name, so coverage,
+focus rings and disabled dimming cannot be found by the lint, and the same button gets drawn twice with different
+numbers. The supported path is to add the control **to `CF`**:
 
 ```js
-storage.mkButtonA = (label, x, y, opts = {}) => {
-  const h = opts.h || 45, w = opts.w || 160;
-  const b = storage.mkAbsBoard('Button / ' + label, x, y, w, h, '#F8F8F0', opts.radius ?? 50);
-  const st = opts.type || 'default';
-  if (st === 'primary') {                       // 3D pixel shadow: blur=0 + offsetY=line thickness
-    b.strokes = [{ strokeColor: '#F8F8F0', strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner' }];
-    b.shadows = [{ style: 'drop-shadow', offsetX: 0, offsetY: 5, blur: 0, spread: 0, color: { color: '#BDAEA0', opacity: 1 } }];
-  } else if (st === 'danger') {
-    b.fills = [{ fillColor: '#E05A5A', fillOpacity: 1 }];
-    b.shadows = [{ style: 'drop-shadow', offsetX: 0, offsetY: 5, blur: 0, spread: 0, color: { color: '#C94444', opacity: 1 } }];
-  } else {                                      // soft shadow: blur 4 + low opacity
-    b.strokes = [{ strokeColor: '#C4B89E', strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner' }];
-    b.shadows = [{ style: 'drop-shadow', offsetX: 0, offsetY: 2, blur: 4, spread: 0, color: { color: '#3D3428', opacity: 0.06 } }];
-  }
-  const t = storage.mkText(label, x + w / 2, y + h / 2, opts.fs || 14, '#794F27', 600);
-  storage.absMount(b, t, x + (w - t.width) / 2, y + (h - t.height) / 2);
-  return b;
+// component_factory.js — the minimal shape of a factory (see CF.badge / CF.link for the smallest real ones)
+CF.myThing = async function (o) {
+  o = o || {};
+  var L = CF.ladder(o.size);                     // {h,fs,padX,icon,radius,gap} over CF.sizes: xs sm md lg xl 2xl
+  var label = String(o.label === undefined ? 'Label' : o.label);
+  // width is measured (estW) or handed in by the recipe rect — the ladder gives height, never width
+  var rect = o.rect || B(o.x || 0, o.y || 0, o.w || CF.estW(label, L.fs) + L.padX * 2, o.h || L.h);
+  var ctx = CF.build(CF.name('MyThing', { type: o.type, size: o.size,   // the NAME is what makes coverage decidable
+                                         state: o.state, slot: slotName(o) }),
+    rect, { parent: o.parent, fill: C('surface'), radius: CF.radius('sm'), stroke: C('border'), strokeW: 1 });
+  ctx.plate(B(rect.x + 8, rect.y + 8, 16, 16), { name: 'dot', fill: C('primary') });
+  ctx.text(label, B(rect.x + 32, rect.y, rect.w - 40, rect.h),
+    { size: L.fs, color: C('ink'), align: 'left', valign: 'middle' });
+  await ctx.settle(); ctx.place();               // settle = let text render, place = center + disabled clamp
+  return ctx.host;                               // ONE host with everything mounted inside (§4.3 ownership for free)
 };
+// then: add 'myThing' to the right CF.map() family, and a SPEC row so CF.matrix draws its state columns.
 ```
 
-3D pixel shadow vs soft shadow parameter comparison (Shadow/press effect generic):
+Rules that the `CF.*` context already implements and a hand-built control always forgets: `ctx.pend`/`settle`/`place`
+(measure after render, never from the 1×1 transient), `stateAlpha(S)` + the `·Disabled` ancestor clamp, `C(tone)` through
+the palette (never a literal hex), `ctx.ring` for focus, `CF.minHit`/`autoHit` for the touch floor, `CF.name` for naming.
+
+Shadow parameters (still the hand-mechanics reference for anything `CF` does not own — glow, press, decorative cards;
+shadow color **must be object format** `{color, opacity}`, a string hex silently turns black):
 
 | Effect | offsetX/Y | blur | spread | color.opacity |
 |---|---|---|---|---|
@@ -123,21 +149,52 @@ Symptom: buttons/cards on the export are squashed to text size (flex hug). Three
 - `getDesignSize` name-map is **project-specific**, rewrite per the target design system's component naming before pasting.
 - **Order trap**: first absRow (row sizing) then fixCol (container fix); fixCol skips `absolute` subtrees — otherwise absolute elements get re-squashed back to content size (tested lesson).
 
-## 4. Page assembly patterns (Dashboard/Landing/Login/List admin/Detail/Settings form)
+## 4. Screen assembly (code: `LY.recipe` + `CF.*`, recipes documented in layout-library.md §3/§5)
 
-Outer whole-page board (approach C) + manually laid-out partitions. Key points:
+**There is no page-assembly coordinate table in this skill any more** — that table was the thing gate G11 replaces. A
+screen is produced by three calls:
 
-1. Whole-page board 1440 wide, y partitions: Navbar(100-180) → Hero(200-660) → Stats(700-820) → Features(880-1490) → Showcase(1520-2180) → FAQ(2210-2660) → CTA(2680-2840) → Footer(2880+).
-2. Partition titles unified: swallowtail Path + rounded capsule board + centered text (reuse Title recipe).
-3. Dashboard two columns: sidebar 240px fixed + content area offset x+240; table zebra/hover rows use **full-width color backing** (append order controls z-order, backing layer appended first).
-4. Login centered card + decorative ellipse (ellipse directly appended to page board).
-5. In-page components directly redrawn by recipe coordinates (scripts can't instantiate library components), keeping tokens consistent = visually consistent.
+```js
+var t = LY.tier(tier);
+// probe pass: recipe().totalH = what the bands *require* (independent of the h you pass in)
+var probe = LY.recipe(key, { w: t.w, tier: tier });
+if (probe.err) return probe;                                  // tier refusal = the answer, not an obstacle
+var h = Math.max(probe.totalH, LY.viewportHeight(tier));      // §0.4: never below one viewport, never a typed number
+// build pass: same numbers plus the page origin, so LY.rect() returns world coordinates
+var plan = LY.recipe(key, { w: t.w, h: h, tier: tier, x0: 80, y0: 240 });
+var host = storage.mkAbsBoard(key + ' · ' + tier, 80, 240, t.w, h, storage.T.surface, 0);
+await CF.pageTitle({ parent: host, rect: LY.rect('pageTitle'), title: 'Overview' });
+await CF.toolbar({ parent: host, rect: LY.rect('filterBar') });
+LY.fold(host, tier);                                          // dashed first-viewport marker
+```
+
+`h` only *stretches* the flexible region, while `totalH` is the content requirement — that is why the shape above is two
+passes: measure, then rebuild at `max(totalH, viewport)` so an app board is never a viewport-shaped box with dead bands.
+
+What the recipes already encode (so nobody has to re-decide it per task): the pane set and its widths (`rail`/`nav`/
+`list`/`detail`/`facet`/`copy` presets), the band stack and `totalH` for long documents, chrome heights (56/64 app bar,
+49/80 bottom bar, 44 status bar, 34 home-indicator inset), gutters and per-region padding, the split ratio and the
+container ladder. layout-library §3 lists every recipe's regions in visual order with their numbers; §0.4 states the
+long-page heights (marketing 1600–4000+, app `max(viewport, contentH)`, mobile feed 1600–2400).
+
+Still worth knowing from the pre-engine era, because `LY`/`CF` do not cover it:
+
+1. **Z-order of backing layers**: a zebra/hover row paints its full-width backing plate *first*, then the row content —
+   inside one host this is `CF.tableRow`'s job; outside a host it is `fixZOrder`'s (area-descending).
+2. **Decorative shapes may hang off the page board** (an oversized ellipse behind an auth card) as long as the host
+   board has `clipContent = false`; they are exempt from the grid rules as `plate`/decoration, never as a layout box.
+3. **Anatomy illustration recipes** (swallowtail title, capsule section header) are `CF.*` factories now; if the target
+   system has one `CF` lacks, add the factory (G12), do not hand-draw it on the screen.
+4. **Never re-derive a region for a second tier**: `LY.recipe(key, { tier })` either returns that tier's own pane set or
+   refuses with `{ err, use }`. Refusal is the correct answer for "three-pane email at 375" — the fix is `mobileListDetail`.
 
 ## 5. Post-crash rebuild checklist
 
 Browser/plugin crash → storage all lost. Rebuild in order:
 
-1. `scripts/seed_storage.js` re-seed (T/fonts/mkText/mkAbsBoard/absMount/pg) — one command probes + supplements seeds;
+1. re-seed **in the engine order**: `seed_storage.js` (T/fonts/mkText/mkAbsBoard/absMount/pg/sleep) → `layout_engine.js`
+   (`LY`) → `component_factory.js` (`CF`) → `audit_design.js` (`designPage`/`designGate`); one command probes and
+   supplements what is missing;
 2. `penpotUtils.getPages()` inventory page structure, confirm canvas damage (100×100 degradation check in api-pitfalls.md §8);
 3. re-collect all board ids (old ids invalid);
 4. when the user reports "some component missing", prioritize suspecting: component deletion taking the main instance along, timeout landing on wrong page causing mis-delete, crash degradation — investigate one by one per api-pitfalls.md §6/§11/§8.

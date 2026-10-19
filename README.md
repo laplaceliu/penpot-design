@@ -5,8 +5,14 @@ A skill pack conforming to the [vercel-labs/skills](https://github.com/vercel-la
 
 Both directions share the same design-system contract (DESIGN.md + the fixed Penpot structure):
 
-- **Code → Design**: feed a URL / a set of images / an existing React component-library source tree → produce DESIGN.md + a Penpot design system (16-page fixed structure).
+- **Code → Design**: feed a URL / a set of images / an existing React component-library source tree → produce DESIGN.md + a Penpot design system (18 pages in 4 layers).
 - **Design → Code**: feed a Penpot design file → emit code for the chosen tech stack (Qt / Web frontend / LVGL / imgui / MAUI / Flutter …), with PIL pixel-level acceptance testing aimed at pixel-perfect results; supports Web widescreen / tablet / phone viewports.
+
+Layout, components and design rules are **executable engines, not prose**: `layout_engine.js` holds the spacing/type/grid scales and 29 screen
+recipes (app chrome — header, sidebar, footer, toolbar — plus email, calendar, dashboard, chat, kanban, hero, landing, blog, docs, e-commerce,
+auth, OTP, pricing, wizard, mobile…), `component_factory.js` produces every variant × state of its 74 control factories with machine-checkable
+names (`Button·IconStart·Md·Hover`), and `audit_design.js` lints the result against the 18 HARD rules of `design-guide.md` (grid, rhythm, ramp,
+contrast, touch floors, state coverage). A missing variant or region is fixed by extending the factory/recipe, never by hand-building a board.
 
 ## Installation
 
@@ -40,27 +46,45 @@ npx skills add ./
 └── skills/
     └── penpot-design/          # Skill root: the directory containing SKILL.md is the skill directory
         ├── SKILL.md            # Entry point: frontmatter (name / description) + workflow overview
-        ├── references/         # Reference docs loaded on demand (10+ articles)
-        │   ├── design-md-spec.md      # DESIGN.md spec, lint rules, skeleton template
-        │   ├── penpot-structure.md    # 16-page fixed-structure contract
-        │   ├── code-to-design.md      # Three entry points: URL / images / source reuse
-        │   ├── mcp-connection.md      # Connect Penpot MCP (endpoint, CA, client config)
-        │   ├── mcp-automation.md      # execute_code practical handbook
-        │   ├── api-pitfalls.md        # Detailed Penpot API pitfalls
-        │   ├── engines.md             # Repair engine / component factory / page recipes
+        ├── references/         # Reference docs loaded on demand
+        │   ├── design-guide.md          # Prescriptive rules: spacing / whitespace / typography / color / states / targets (18 HARD rules)
+        │   ├── layout-library.md        # Built-in layouts: app chrome, region slots, 29 screen recipes, grid & breakpoints
+        │   ├── component-library.md     # Variant taxonomy + the minimum variant/state set every family must draw
+        │   ├── design-md-spec.md        # DESIGN.md spec, lint rules, skeleton template
+        │   ├── penpot-structure.md      # 18-page fixed-structure contract (page/board/element + self-check list)
+        │   ├── code-to-design.md        # Three entry points: URL / images / source reuse + unified build pipeline
+        │   ├── mcp-connection.md        # Connect Penpot MCP (endpoint, CA, client config)
+        │   ├── mcp-automation.md        # execute_code practical handbook (session discipline, layout approaches, acceptance)
+        │   ├── api-pitfalls.md          # Detailed Penpot API pitfalls
+        │   ├── positioning-audit.md     # Positioning failure signatures S1–S11, root causes, preventive gates
+        │   ├── design-tokens.md         # Penpot Design Tokens: 17 TokenTypes, activation, themes, doc-vs-impl gaps
+        │   ├── engines.md               # Seed order, repair-engine mechanics, factory templates, screen-assembly pattern
+        │   ├── viewport-profiles.md     # Viewport tiers: web 1440 / pad 834 / mobile 375
+        │   ├── color-schemes.md         # Light-only vs switchable light+dark, bounded artifact mapping
         │   ├── design-to-code-generic.md  # Generic codegen discipline (shared across stacks)
-        │   ├── stack-profiles.md      # Stack tiers: platform-family classification / runtime prompts / unknown-stack handling
-        │   ├── stacks/                # Tech-stack adapter registry
-        │   │   ├── manifest.md        # Stack → adapter doc + platform-family tags
-        │   │   ├── qt.md              # Qt4 / Qt5 / Qt6 adapters
-        │   │   └── web.md             # Web frontend adapter (React/Vue/Angular/Svelte…)
-        │   ├── viewport-profiles.md   # Viewport tiers: web/pad/mobile
-        │   └── verification.md        # PIL pixel-level verification flow
+        │   ├── stack-profiles.md        # Stack tiers: platform-family classification / runtime prompts / unknown-stack handling
+        │   ├── verification.md          # PIL pixel-level verification flow
+        │   └── stacks/                  # Tech-stack adapter registry (one doc per stack, unified template)
+        │       ├── manifest.md          # Stack → adapter doc + platform-family tags
+        │       ├── qt.md                # Qt4 / Qt5 / Qt6 (QWidget · QML)
+        │       ├── web.md               # React / Vue / Angular / Svelte / Web Components
+        │       ├── flutter.md           # Flutter (retained canvas)
+        │       ├── compose.md           # Jetpack Compose (declared constraints)
+        │       ├── swiftui.md           # SwiftUI (declared constraints)
+        │       ├── maui.md              # .NET MAUI (retained XAML)
+        │       ├── lvgl.md              # LVGL for embedded / MCU
+        │       └── imgui.md             # Dear ImGui / Nuklear (immediate mode)
         ├── scripts/            # Engines that can be pasted directly into execute_code / run from the CLI
-        │   ├── seed_storage.js        # Seeding engine (tokens + factory functions)
-        │   ├── scaffold_structure.js  # Batch-build the 16-page skeleton
-        │   ├── repair_engines.js      # Alignment / de-cropping / orphan cleanup
+        │   ├── seed_storage.js        # Seeding engine (JS-side color mirror + mkAbsBoard/absMount/mkText/ct)
+        │   ├── layout_engine.js       # `storage.LY`: space/type/grid scales, 29 recipes, pack, fold, tier gate
+        │   ├── component_factory.js   # `storage.CF`: 74 control factories (6 `CF.map()` groups) + spec matrices
+        │   ├── audit_design.js        # `storage.designGate`: 18 HARD design-rule checks (read-only)
+        │   ├── audit_layout.js        # `storage.auditPage`: 11 positioning signatures (read-only)
+        │   ├── token_engine.js        # `storage.TK`: design-token seed / apply / audit
+        │   ├── scaffold_structure.js  # Batch-build the 18-page skeleton (pages → headers → fit)
+        │   ├── repair_engines.js      # fixStaleCenter / groupAssemblies / fixZOrder / align / vAlign / fixInner / unclip
         │   ├── fix_layout.js          # Batch-flex-collapse repair
+        │   ├── fix_geometry.js        # Geometry repair (offset / fit / reflow / move subtree, dry-run capable)
         │   └── pixel_diff.py          # PIL pixel comparison (heatmap + JSON metrics)
         └── assets/
             └── penpot-server/         # Bundled local Penpot deployment stack (self-resolving paths, fully relocatable)

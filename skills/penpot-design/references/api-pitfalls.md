@@ -122,10 +122,15 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
   - Toggle (76×44): track(12,8), dot On(39,11)/Off(15,11)
   - Checkbox (120×32): box(0,4), ✓(11−w/2, 15−h/2), label(32, 15−h/2)
   - Switch (76×44): track(12,7), dot On(37,10)/Off(15,10)
-- Component objects have no `makeInstance`, instances can't be script-generated.
+- **Instantiating is not scriptable in this build**: `mainInstance()` exists (that is what `createVariantContainer` consumes), but the
+  Component object has **no `makeInstance`**, and no instance factory was found by probing `Object.keys(comp)` + `penpot_api_info`.
+  So a script cannot place library instances on a screen. **What to do instead**: build the screen by calling the same
+  `CF` factory again — a factory returns byte-identical geometry, so it is visually equivalent to instancing and it keeps
+  the ownership rule (§6.1) intact. `comp.instance()` appears in several contract sentences as the "reuse" verb: treat it as
+  **unverified until a probe confirms it in the connected build**, and never let a delivery claim depend on it.
 - Component boards must be absorbed into the page header board (`head.appendChild(compBoard)`, same-page reparent keeps world coordinates unchanged), otherwise the component is missing when exporting the header board. Identify the header board with `root.children.find(c => c.type === 'board')` (root may mix in orphan text, don't use children[0]).
 
-### 6.1 group semantics and assembly ownership (contract: penpot-structure.md §4.1)
+### 6.1 group semantics and assembly ownership (contract: penpot-structure.md §4.3)
 
 - **API**: `penpot.group(shapes)` groups in place (within the same parent level, **no parent parameter**), returns a `Group`; `penpot.ungroup(g)` ungroups.
 - **⚠️ `penpot.group` has destructive side effects (tested, must compensate)**: after grouping
@@ -146,7 +151,7 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
   Verification note: **small-shape group export may hit a cache illusion** (looks like no text), go by **whole-board export**.
   Batch-fix engine `storage.fixZOrder()` (groupAssemblies already has the same logic built-in).
 - **Difference between group and board**: assigning x/y to a **board** with absolute children is "shell moves, content doesn't" (children world coordinates don't follow); **a group is different — moving the group shell drags the children along** (a group is a bounding wrapper), so dragging/reusing an assembly after grouping is safe.
-- **Three-level ownership**: reusable assembly → component (`createComponent([group])`, pages `comp.instance()`); single-use complete set → group; partition container → board. **Complete primitive sets must not be loose same-level stacking** (audit signature `loose_assembly`, fix `groupAssemblies()`, gate G10).
+- **Three-level ownership**: reusable assembly → component (`createComponent([group])`; on a screen re-call the `CF` factory — see §6 above); single-use complete set → group; partition container → board. **Complete primitive sets must not be loose same-level stacking** (audit signature `loose_assembly`, fix `groupAssemblies()`, gate G10).
 - **Group name** = host name / `component name·variant`; component name forbids `/` (assignment silently fails).
 - **Nesting is normal**: a button group collected into a nav-bar group — layer by layer from inside out with `penpot.group`; `createComponent` can take nested groups.
 - **Registration order**: group first to collect → then `createComponent([group])`; registering loose primitives directly yields a defective component.

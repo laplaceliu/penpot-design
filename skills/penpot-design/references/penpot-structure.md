@@ -1,183 +1,275 @@
-# Penpot design-system fixed structure (the output contract defined by this skill)
+# Penpot file contract — the 18-page output structure
 
-Every code-to-design task **must** produce the same fixed structure: one Penpot file = 16 numbered pages; one root board per page; uniform component spec-board structure. Relationship with DESIGN.md: DESIGN.md is the **single source of truth** for tokens and design rationale, the Penpot file is its **visual implementation**, token names/colors/type-scale/radius/spacing scale correspond 1:1.
+> Every code-to-design task produces **the same file**: one Penpot file, 18 numbered pages in 4 layers, one root board
+> per page, one spec board per component family, one board per screen recipe. The page list is fixed; the *contents* of
+> the pages are derived from the engines, so adding a factory or a recipe automatically adds a board without changing
+> this contract.
+>
+> **DESIGN.md is the source of truth** for tokens and rationale; this file is its visual implementation. Token names,
+> colors, type scale, radius and spacing correspond 1:1. Where the two disagree, DESIGN.md wins for values and
+> `layout_engine.js` / `component_factory.js` win for geometry.
+
+## 0. How the page list is derived (read this first)
+
+| Layer | Pages | Derivation rule |
+|---|---|---|
+| **L0 Identity & foundations** | `00`–`02` | the token groups of DESIGN.md, drawn once per token family |
+| **L1 Components** | `03`–`09` | one page per group of `storage.CF.map()` (`actions` · `forms` split into fields/pickers · `data` split into lists/metrics · `navigation` · `feedback`) |
+| **L2 Layout** | `10`–`12` | `CF.map().shell` + `LY.slots` (chrome) · `LY.TIERS` (grid) · `LY.keys()` (recipes) |
+| **L3 Delivery** | `13`–`17` | the component registry, then the screen recipes split by **scroll idiom**, then the optional imitation page |
+
+Three consequences that make the contract checkable instead of aspirational:
+
+1. **A board that `CF`/`LY` cannot produce is not in this contract.** Every required board is named by an engine key.
+   If a variant is missing, add the factory (gate G12); if a region is missing, add the recipe (gate G11). Do not
+   hand-build a one-off board inside `execute_code`.
+2. **Every page declares its audit scope** (last column of §2). `storage.designGate({ … })` is run with exactly that
+   scope, so "page 14 is clean" is a statement with a definition, not an opinion.
+3. **Page count never grows with the number of components.** A 40th Button variant is a row in an existing
+   `Button·Spec` board; a 30th recipe is a board in `LY.pack()`'s next shelf row.
 
 ## 1. File-level conventions
 
-- File name: `<system>-<style keyword>.penpot` (e.g. `Blue-Tech-Glow.penpot`)
-- Version features: components/v2, variants/v1, design-tokens/v1, layout/grid
-- All tokens recorded into `penpot.library.local.tokens`, using `scripts/token_engine.js` (**do not hand-write addSet/addToken**).
-  **TokenType has 17 kinds** (`color` / `borderRadius` / `dimension` / `fontFamilies` / `fontSizes` / `fontWeights` /
-  `letterSpacing` / `number` / `opacity` / `rotation` / `shadow` / `sizing` / `spacing` / `borderWidth` /
-  `textCase` / `textDecoration` / `typography`), recorded per the DESIGN.md section mapping.
-  **How to split sets**: **by default build only 1 set** (`<system> · Core`, internally auto-grouped by type, one set can hold all 17 kinds).
-  **Splitting sets by type is forbidden** (Color/Radius/Spacing each one = a category error: these three are always active together, splitting just turns 1 switch into N).
-  Only when there is a theme (dark/density/brand) do you add an **override layer**, and **the base layer must come first** (`sets` order is priority, later wins).
-  **Three iron rules**: ① `addSet()` defaults to `active:false`, **tokens in an inactive set bind "successfully but don't take effect"**, building a set must explicitly activate it;
-  ② after applying **you must readback `shape.tokens`**, an inapplicable shape silently no-ops;
-  ③ within the same set, token names treat `.` as a path, **leaf and parent nodes are mutually exclusive** (if `t.color` exists, `t.color.x` cannot).
-  See `references/design-tokens.md`.
-- CJK text uniformly uses Noto Sans SC (Penpot has no font-stack fallback)
-- Component-name separator is always `·` (**`/` is forbidden**, assignment silently fails): `Button·Primary·Default`
-- Coordinates follow the 8px grid; place final coordinates directly at build time, never move an already-built board
-- **PageRoot width fixed at 1920 is the "spec-sheet canvas"** (shows component matrix / spec boards), unrelated to the final screen target width.
-  The target screen width is decided by the **viewport tier** (see §2.1 and `references/viewport-profiles.md`), reflected in
-  `12 · Layout modes` per-tier grid boards and `14 · Demo` per-tier screen boards. The design-system core (00–13, 15) is shared across the three tiers, built once.
+- File name `<system>-<style keyword>.penpot` (e.g. `Blue-Tech-Glow.penpot`).
+- Version features: `components/v2`, `variants/v1`, `design-tokens/v1`, `layout/grid`.
+- Tokens go into `penpot.library.local.tokens` through `scripts/token_engine.js` — **never** hand-written
+  `addSet`/`addToken`. 17 TokenTypes, one `· Core` set by default, an override set only when a theme exists
+  (`sets` order is priority, later wins). The three iron rules (activate the set, read back `shape.tokens`, `.` is a
+  path so leaf and parent are mutually exclusive) are in `references/design-tokens.md`.
+  **Machine gate**: `storage.TK.audit().ok === true`.
+- Names are `·` separated (`Button·Primary·Md·Hover`). `/` in a component name silently fails to assign.
+  The token order is the variant-property order: `Family·Type·Size·State·Slot·Tone` (§4.2).
+- CJK text uses Noto Sans SC (Penpot has no font-stack fallback).
+- Coordinates are placed **once**, on the 4px grid, from `LY` numbers. Never move a board after it is built.
+- **PageRoot is 1920 wide: it is the spec-sheet canvas, not a screen.** The screen width comes from the viewport tier
+  (`LY.TIERS`: web 1440 / pad 834 / mobile 375) and only appears as the width of a board placed *inside* a page.
 
-## 2. Page master table (16 pages, fixed numbering and order)
+## 2. Page master table (18 pages, fixed numbering and order)
 
-Layering principle: 01–02 basics (token visualization) → 03–07 controls (by task domain: input→select→collection→display, one component normalizes to one page) → 08–10 patterns (navigation/overlay/feedback) → 11–12 scenarios (visualization/layout) → 13–15 delivery.
+`Required boards` is the delivery contract. `Scope` is the argument passed to `storage.designGate()` for that page.
 
-| # | Page name | Required content boards |
-|---|--------|-----------|
-| 00 | `00 · Cover` | System name big title, version+date, style keyword tags, primary-color band 6 cells, page table of contents |
-| 01 | `01 · Design Basics` | F1 palette, F2 type scale, F3 spacing & grid, F4 radius, F5 shadow/glow, F6 icons, F7 stroke & dividers |
-| 02 | `02 · Color System` | C1 semantic colors, C2 light/dark theme comparison, C3 state colors, C4 gradients, C5 WCAG contrast check table |
-| 03 | `03 · Basic Controls` | Button (Type×State×Size matrix), IconButton, ButtonGroup, Switch, Checkbox, Radio, Segmented |
-| 04 | `04 · Text & Input` | Input, Textarea, InputNumber, SearchBox, Slider, Upload, FileTrigger, DropZone, ColorPicker, Form container (label/helper/error three states) |
-| 05 | `05 · Selectors` | Select, AutoComplete, Cascader, TreeSelect, Transfer, DatePicker, TimePicker, DateRangeField, Calendar, RangeCalendar, DateField, TimeField |
-| 06 | `06 · Data Collection` | Table (sort/filter/expand/fixed columns), List, Tree, Descriptions, Statistic, Timeline, Pagination |
-| 07 | `07 · Display` | Card (≥3 sizes), Tag/Chip, Badge, Avatar, Image, Video, FileCard, Carousel, Collapse, Divider |
-| 08 | `08 · Navigation` | TopNav, Sidebar/Menu, Tabs, Breadcrumb, Stepper, Dropdown, ContextMenu, CommandMenu, Toolbar, Anchor, BackTop, keyboard shortcut table |
-| 09 | `09 · Overlay` | Modal, Dialog, Drawer, Sheet, Popover, Tooltip, Popconfirm + positioning/mask spec board |
-| 10 | `10 · Feedback & Status` | Toast, Notification, Alert, Result, Skeleton, Progress, Spinner, Empty, ErrorState |
-| 11 | `11 · Data Visualization` | legend, KPI cards, line/bar/pie chart examples, dashboard widgets, chart color mapping |
-| 12 | `12 · Layout Modes` | one layout-grid board per selected tier: web 12 grid / pad 8 grid (drop to 4 when narrow) / mobile 4 grid or single-column stack; per-tier PageHeader, Grid/Space, ScrollArea, responsive breakpoints, Empty/404/Error whole-page templates (by tier width) |
-| 13 | `13 · Component Index` | all library component instance thumbnail grid + name + owning page coordinates (design-to-code mapping table) |
-| 14 | `14 · Demo` | board matrix (all assembled from library component instances): for **each selected tier** produce that tier's baseline-width six boards — Dashboard, Landing, Login, List admin page (search+filter+table+pagination), Detail page (description+action area+Timeline), Settings form page (grouped form+danger zone); multiple tiers can sit side by side within the 1920 canvas (e.g. 5 mobile-375 boards in a row). The original "optional Mobile 375 app board" is upgraded to a mandatory board per tier |
-| 15 | `15 · Reference Imitation` | optional: imitation-target contrast analysis; if no target, omit and declare in DESIGN.md `omitted` |
+| # | Page | Required boards | Scope |
+|---|---|---|---|
+| **L0** | `00 · Cover` | 1 identity board (name, version+date, style-keyword chips, the 6 tone ramps as wash/hue/ink triples, the 18-page table of contents) | default |
+| | `01 · Foundations` | 8 boards: `Palette` (every `CF.P` key, dual polarity when a dark scheme exists) · `Type ramp` (one line per step of the declared ramp — `storage.T.fontRamp` when the system overrides it, else design-guide §3.2 `[11,12,13,14,16,20,24,32,40,56,64]` — each with its role) · `Spacing` (`LY.SPACE` bars) · `Grid` (12/8/4 diagrams) · `Radius` · `Elevation` · `Icons` (`CF.glyphKinds` on `CF.iconSquare` pitches) · `Strokes & dividers` | default |
+| | `02 · Color in use` | 5 boards: `Semantic roles` (tone → wash / hue / **ink**, design-guide §4) · `State layers` (the `CF.STATE` alphas drawn on one base) · `Contrast matrix` (every text/background pair the kit can produce, WCAG ratio + verdict) · `Light vs dark` · `Data colors` (categorical ramp) | default |
+| **L1** | `03 · Actions` | one `Family·Spec` per `CF.map().actions` (button, iconButton, buttonGroup, splitButton, fab, link, segmented) | default |
+| | `04 · Text fields` | `CF.map().forms` ∩ fields: field, fieldBox, input, textarea, searchField, passwordField, maskedInput, otpInput, numberField, upload, colorPicker | default |
+| | `05 · Selection & pickers` | the rest of `CF.map().forms`: select, combobox, multiSelect, datePicker, timePicker, switch, checkbox, radio, slider, rating, transfer, tree — plus the shared `OptionList` composite they mount (judged inside its own board, §4.1) | default |
+| | `06 · Data & lists` | tableHeader, tableRow, tableState, listItem, descriptions, timeline, accordion, carousel, miniCalendar | default |
+| | `07 · Display & metrics` | card, kpi, badge, statusText, chip, avatar, avatarGroup, progress, skeleton, emptyState | default |
+| | `08 · Navigation` | navItem, tabs, tabBand, breadcrumb, pagination, steps, menu, commandPalette, anchor | default |
+| | `09 · Overlays & feedback` | modal, drawer, sheet, popover, popconfirm, tooltip, toast, notification, alert, spin — **each drawn over its real host** (a scrim, a dimmed screen, an anchor row), not floating on white | default |
+| **L2** | `10 · App shell & chrome` | one board per `CF.map().shell` (appBar, sideNav, toolbar, pageTitle, footer, mobileBar) + one anatomy board per `LY.slots` key (appBar, sideNav, toolbar, pageTitle, tabs, footer, modal, kpiCard, tableRow, card, field, messageRow) + the remaining chrome keys of `layout-library §2` that no factory owns (navRail, filterBar, breadcrumbBar, paginationBar, listPaneHeader, statusBar, emptyState, commandPalette) | `{ families: [ … the composite names … ] }` |
+| | `11 · Grid & breakpoints` | per selected tier: the column/gutter/margin diagram (`LY.TIERS[tier]`), the container ladder (1376 / 1152 / 720 / 640 / measure 760), the collapse order (`layout-library §4.2`), the touch-floor board (32 web / 44 touch, with the `hitpad·` escape), the fold anatomy | `{ tier: <tier of the board>` }` |
+| | `12 · Screen recipes` | **one annotated skeleton per `LY.keys()`** (`LY.drawStart` → `drawStep`, every region labelled with its `LY.rect` key) + the tier-gate table (which recipe refuses which tier, and the `use` pointer it returns) | default |
+| **L3** | `13 · Component index` | 1 registry board: thumbnail of every registered component/variant + its `Family·Type·Size·State·Slot` name + the page/board it lives on + the DESIGN.md component key (this is the design-to-code mapping table) | default |
+| | `14 · Screens · app` | the 11 app-idiom recipes: dashboard, listCrud, detailRecord, settings, email3, chat, kanban, calMonth, calWeek, gallery, wizard — one board per recipe **per selected tier that `LY.recipe` accepts** (web 11/11, pad 10/11 refuses `calWeek`, mobile 1/11 = `settings`) | `{ tier }` per board |
+| | `15 · Screens · content` | the 14 document-idiom recipes: landing, heroCenter, heroSplit, pricing, blogArticle, docsLayout, ecomListing, ecomPdp, cart, checkout, authCard, authSplit, otp, reportPrint (web 14/14, pad 12/14 refuses `authSplit` + `reportPrint`, mobile 5/14 = heroCenter, blogArticle, cart, authCard, otp) | `{ tier }` per board |
+| | `16 · Screens · mobile` | the mobile tier's own set: `mobileFeed`, `mobileListDetail`, plus every 14/15 recipe that survives at 375 (`settings`, `heroCenter`, `blogArticle`, `cart`, `authCard`, `otp`) drawn at 375 and labelled `@375`. `eventPopover` belongs to page 09 (it is an overlay over its host); `commandPalette` to page 10 | `{ tier: 'mobile' }` |
+| | `17 · Reference imitation` | *optional*: side-by-side of the recreation target and the produced screen + the delta list. Omit it and say so in DESIGN.md `omitted` | default |
 
-## 2.1 Viewport tier (profile) — decides 12/14 page forms
+All 29 `LY.keys()` recipes have a home above (11 + 14 + `mobileFeed` + `mobileListDetail` + `eventPopover` +
+`commandPalette`), which is what makes "the screen pages are complete" checkable: `LY.keys()` minus the board names on
+14–16 must be empty. **Refused tier × recipe pairs are not gaps** — page 12's tier-gate table records the `{ err, use }`
+pointer each refusal returns, and that table is the delivery answer for "why is there no mobile three-pane email".
 
-Before the task starts the skill uses `ask_followup_question` to ask the user for the target tier (web/pad/mobile, multi-select allowed),
-the result written into DESIGN.md `targetProfiles`. Tier definitions, baseline width, grid, touch targets, and the complete impact on artifacts
-are in `references/viewport-profiles.md`. Key points:
+**Page 14/15/16 split is by scroll idiom, not by tier.** An app screen is a fixed shell whose *content region* scrolls;
+a content page is a whole document that scrolls (1600–4000px tall); a mobile screen is a device frame with the chrome
+stack of `layout-library §4.3`. Pad-width boards sit on 14/15 beside their web twins, labelled `@834`.
 
-- `web`: baseline width 1440 (design canvas 1920), 12 grid, touch target ≥36px (mouse).
-- `pad`: baseline width 834, 8 grid (drop to 4 when narrow), touch target ≥44px.
-- `mobile`: baseline width 375, 4 grid or single-column stack, touch target ≥44px.
-- The design-system core (00–13, 15) is shared across the three tiers, built once; only the `12` grid board and `14` screen board are built per tier.
-- Each `14` screen board width = the corresponding tier's baseline width, multiple boards can sit side by side on the 1920 canvas.
+### 2.1 Viewport tiers — decide the shape of pages 11 and 14–16
 
-## 2.2 Color mode (color schemes) — decides 01/02/14 page forms and token set structure
+Asked **before the task starts** (one `ask_followup_question` round-trip, multi-select), written into DESIGN.md
+`targetProfiles`. Full definitions in `references/viewport-profiles.md`.
 
-Asked in the **same batch** as the viewport tier via `ask_followup_question` (one round-trip), the result written into DESIGN.md `## Colors` section body.
-Definitions, artifact mapping, and acceptance are in `references/color-schemes.md`; set/theme mechanism in `references/design-tokens.md` §5. Key points:
+- `web` 1440 baseline (canvas 1920), 12 columns, margin 32, gutter 24, touch floor 32, viewport height 900.
+- `pad` 834, 8 columns (4 when narrow), margin 24, gutter 16, touch 44, viewport 1112.
+- `mobile` 375, 4 columns, margin 16, gutter 12, touch 44, viewport 812.
+- **L0–L2 (00–13) are built once for all tiers**; only page 11 gains a board per tier and pages 14–16 gain a board per
+  recipe × tier. `LY.recipe(key, { tier })` *refuses* a recipe that has no definition for that tier and returns
+  `{ err, use }` — a three-pane app screen asked at 375 is not "the same layout, narrower", so it is replaced by
+  `mobileListDetail`, never squeezed.
+- A screen board is built at its own tier width, so `CF.tier` must be set to that tier **before** building the screen
+  (`CF.tier = 'mobile'`). `CF.autoHit` pads compact controls to 32 on web and to 44 on touch; leaving the tier at the
+  default is how a phone screen ships 32px targets.
 
-- **Distinguish two concepts first**: most systems naturally have "**sectional surface polarity**" (light/dark regions alternating within the same page, e.g. hero uses ink, body uses canvas) —
-  that is **not** a theme, needs no theme. This tier asks about "**switchable** whole-page light/dark flip".
-- Answer `Light only` → tokens build **1 set** (`<system> · Core`), **0 themes** (pix is currently this form).
-- Answer `Light + dark two schemes` → tokens build `· Core` (all) + `· Dark` (only the overriding same-named tokens),
-  **Core must come first** (`sets` order is priority, later wins); then build a `Scheme` group with two themes
-  (Light = {Core}, Dark = {Core, Dark}), mutual exclusion within a group auto-guaranteed by Penpot.
-- Artifact impact:
-  - `01 Design Basics F1`: palette **dual-polarity side by side**.
-  - `02 Color System`: C1/C2/C3/**C5 contrast audit all doubled** (two tables, dark is not the inverse of light).
-  - `03–12`: interactive components at least add a dark-polarity state group; display widgets give polarity notes.
-  - `14 Demo`: **board count = tiers × schemes** (2 tiers × 2 schemes = 24 boards).
-  - `12` layout modes unaffected (layout is orthogonal to color).
+### 2.2 Color schemes — decide 01, 02 and the demo boards
 
-## 3. Per-page required elements (page anatomy contract)
+Asked in the **same round-trip**, written into DESIGN.md `## Colors`. Definitions in `references/color-schemes.md`.
 
-Every page (00 may be simplified) must have one and only one top-level root board, all elements mounted into it:
+- Distinguish the two things first: **sectional surface polarity** (a dark hero inside a light page) is a property of
+  every system and needs no theme. This question is about a **switchable whole-page light/dark pair**.
+- `Light only` → 1 token set (`<system> · Core`), 0 themes.
+- `Light + dark` → `· Core` (all tokens) then `· Dark` (only the overriding same-named tokens, **Core first**), plus a
+  `Scheme` theme group with `Light = {Core}` and `Dark = {Core, Dark}`; Penpot enforces the group's mutual exclusion.
+- Artifact impact — bounded on purpose, so a second scheme costs a page, not the file:
+  - `01 Palette` and `02 Color in use` show both polarities side by side (the contrast matrix is **doubled**: dark is
+    not the inverse of light).
+  - `03–09` spec boards keep one polarity (the one the system starts in) plus the `onDark` state rows where `CF` draws
+    them; they are not duplicated.
+  - `14–16` add **one dark twin per demo page** (the recipe that best shows the scheme), not one per board.
+  - `11 Grid & breakpoints` and `12 Screen recipes` are unaffected: layout is orthogonal to color.
+
+## 3. Page anatomy (per-page contract)
+
+Every page (00 may be simplified) has exactly one top-level root board, and everything mounts inside it:
 
 ```
-NN-PageRoot (1920 × variable height, clipContent = false)
-├── NN-Header   header area 1920×160
-│   ├── page number + Chinese name + English name (32px title, left-aligned)
-│   ├── one-line page description (16px, secondary color)
-│   ├── token chips bar (this page's token names + color blocks)
-│   └── version + date (top-right, label-sm)
-├── <content area: spec-board array>
-└── NN-Footer   footer 1920×80
-    ├── this page's token reference list
-    └── "← NN-prev page name   NN-next page name →" nav bar
+NN-PageRoot (1920 × used height, clipContent = false)
+├── NN-Header    1920×160 at y=0
+│   ├── page number + name        32px, x=80, y=40          (ramp: 32)
+│   ├── one-line description      14px secondary, x=80, y=88
+│   ├── token reference line      "tokens · …" 12px, x=80, y=120
+│   └── version + date            12px, right-aligned so its measured width ends at x=1840
+├── <content column>  x ∈ [80, 1840] (1760 wide), starting at y=240
+└── NN-Footer    1920×80 at y = used content bottom + 32
+    ├── footerTokens   "tokens · …"  12px, x=80
+    └── footerNav      "prev · NN · Page name      next · NN · Page name"  12px, right-aligned
 ```
+
+`scaffold_structure.js` owns this geometry — the constants are `CANVAS_W 1920 · CONTENT_X 80 · CONTENT_R 1840 ·
+HEADER_H 160 · FOOTER_H 80 · CONTENT_Y 240` and its `PAGES` table **is** §2 (page name + header description + token
+line), so the doc and the scaffolder can be diffed mechanically. `storage.scaffoldContract()` returns the page names.
+The script is a 3-phase queue runner, re-runnable at any time: phase 1 creates the missing pages (6 per call), phase 2
+builds one PageRoot+Header+Footer per page (idempotent), phase 3 **fits** every root to its used height and moves the
+footer. Run phase 3 again after the content exists — that is the delivery-time height fix.
 
 Hard rules:
-1. All elements mount into PageRoot (otherwise exported header loses components).
-2. `clipContent = false`, glow/shadow not clipped.
-3. Header/Footer/content-board coordinates fixed (§5), free placement forbidden.
-4. Degraded Header board (crash damage 100×100) causes the whole page export to be all black — verify Header size after each build batch.
+1. Everything mounts into PageRoot (a shape outside it is lost on export and read as `root_stray`).
+2. `clipContent = false`, so glow/shadow/ring layers are not cropped.
+3. Header/Footer/content geometry comes from `scaffold_structure.js`; do not re-derive it per task.
+4. A header degraded to 100×100 (the crash signature) blacks out the whole page export — verify Header size after
+   every build batch (`storage.auditPage()` reports `crash_100x100`).
+5. PageRoot height = the used height of the content column. **Do not pad a page to a round number** — a footer
+   floating 2000px below its content reads as `viewport_locked`.
+6. No arrow/check/dingbat glyphs in generated text: Penpot has no font-stack fallback, so a glyph missing from Nunito
+   or Noto Sans SC renders as tofu. Write `prev ·` / `next ·`, not `←` / `→`.
 
-## 4. Component spec board contract
+## 4. Spec-board anatomy (what `CF.matrix` draws)
 
-Board name = component English name (e.g. `Button`), internal structure fixed:
+`CF.matrix({ family, axes, rows, parent, x, y })` returns one board named `Family·Spec`, exactly as wide as its
+content (it shrinks to fit; `shrink:false` keeps the requested width):
 
 ```
-Button (880 × N, surface base, rounded.md)
-├── Title row: Chinese name + English name
-├── Anatomy board: leader lines annotate padding / gap / radius / icon slot / text slot
-├── Variant matrix (rows = State, cols = Type or Size)
-│   ├── rows: Default / Hover / Pressed / Focused / Disabled (interactive full five states; display Default/Disabled)
-│   ├── cols: Type (Primary/Secondary/Tertiary/Ghost/Danger…) or Size (S/M/L)
-│   └── each cell = variant board `Button·Primary·Default`, caption below: `W×H · padding · {tokens}`
-├── Usage rule bar: one Do line + one Don't line (each with a 48px mini illustration)
-└── Library component master instance (master shape in 'AI Component Masters' master board)
+Button·Spec (measuredW × padY·2 + 40 + 28 + rows·(cellH+gapY))
+├── title row            20px   "Button · variants"        + optional 13px right-aligned subtitle
+├── state-axis header    11px, role:axis — one label per column (default/hover/focus/…)
+├── one row per variant  label 13px at labelW=168, then one control host per state column
+│   └── each cell = a CF host, `Family·Type·Size·State·Slot`, vertically centred in cellH
+├── hairlines            1px, 70% border colour, between rows
+└── notes                up to 3 wrapped 12px lines (the usage rule / Do-Don't row)
 ```
 
-Registration discipline (see references/mcp-automation.md §4):
-- Register always with the `AI Component Masters` master board's shape via `createComponent([shape])`; `comp.remove()` deletes the master instance too, never register/re-register on a display-board shape.
-- Variant container via `penpotUtils.createVariantContainer` (input must be a registered master instance); after reparent, reset `parentX/parentY`.
+### 4.1 Minimum coverage per family (signatures `state_coverage`, `variant_sparse`, `focus_ring_missing`)
 
-### 4.1 Assembly-ownership contract (group / component / board) — complete primitive sets forbidden from loose same-level stacking
+The rows a family must show are `references/component-library.md §3.0` (states) and `§3` (variants). The auditor's
+thresholds, single-sourced in `audit_design.js`:
 
-**Every "visual component"'s constituent primitives (base plate + label + icon + sub-parts…) must be collected into and only into one kind of container**:
+| Check | Threshold | Notes |
+|---|---|---|
+| states | every state column of the family's class (`ctl` / `field` / `toggle` / `row` / `sel`) bar at most 2 | a matrix built from `component-library §3.0` passes by construction |
+| variants | ≥ 3 distinct **non-state, non-size** name tokens | skipped for `Checkbox` / `Radio`: one drawing per state, no style axis exists |
+| sizes | ≥ 2 ladder sizes, only when the family declares a size at all | `xs`–`2xl` tokens |
+| icon slots | a `IconStart`/`IconEnd`/`Clear` variant wherever the family is in `ICON_FAMS` | named by `CF`'s `slotName()`, not by prose |
+| focus | ≥ 1 `ring·` layer or a ≥2px focus border on the Focus hosts | drawn by `ctx.ring`, never by darkening a 1px border |
+| disabled | content alpha in `.25–.40` (`CF.STATE.disabledContent`) | `place()` clamps it for the whole host subtree |
+| coverage scope | families present with < 2 hosts are not judged; composites listed in `SPEC_SKIP` are judged only inside their own board | page 10 runs `{ families: […] }` to bring them back |
 
-| Ownership | Judgment | Approach | Naming |
+**Naming is what makes coverage decidable.** A control that draws a leading icon must be *named* `…·IconStart…`; a
+11px axis label must be *named* `axis`. `CF` does this for both (`slotName()`, `ctx.text({ role })`); a hand-built
+board that draws the pixels without the token reads as absent.
+
+### 4.2 Registration (variant containers)
+
+- Register with `CF.component(host)` — which is `createComponent([host])`: the host **becomes** the component's main
+  instance (it stays on the canvas, so a spec board may be registered from), masters are conventionally collected in the
+  `AI Component Masters` board. `comp.remove()` also deletes its instances, so never delete a component to "undo" a
+  registration, and never re-register the same host in place.
+- Group the variant hosts with `CF.variants(hosts, name)` when `penpotUtils.createVariantContainer` exists; report,
+  never assume, its availability.
+- Variant properties, in this order and **≤ 4 per family**: `Type` · `Size` · `State` · `Slot`. `Slot` carries the
+  boolean-ish anatomy switches (with-icon, with-clear, addon, loading) so `State` stays a clean axis.
+
+### 4.3 Assembly ownership (no loose primitive sets)
+
+Every visual component's primitives live in **exactly one** container:
+
+| Ownership | Judgment | How | Name |
 |---|---|---|---|
-| **component** | **Reused**: listed in the 13 component index, or appears in ≥2 places in 14 Demo | assemble first into a group → `penpot.library.local.createComponent([group])` registers into `AI Component Masters`; in pages/examples **always `comp.instance()`**, never copy loose primitives | `A·B·C` (no `/`) |
-| **group** | **Single-use** primitive set: variant-matrix cells, Anatomy illustration, KPI cards, swatch trio, button/field/label examples | `penpot.group([host, ...members])` groups in place (within the same parent), group name = host name/component name·variant | same component-name convention |
-| **board** | page partition / spec board / screen board / overlay container (option C) | `mkAbsBoard`, not an assembly host (not grouped with label) | see §4 |
+| **component** | reused: in the 13 index, or in ≥ 2 places on 14–16 | assemble into a group → `CF.component(group)`; on a screen, **call the same `CF` factory again** (this build has no scriptable instance maker — api-pitfalls §6), never copy loose primitives into a screen | `Family·Type·Size·State` |
+| **group** | single-use primitive set: a matrix cell, an anatomy illustration, a KPI card | `penpot.group([host, …members])` in the same parent | host name |
+| **board** | page partition, spec board, screen board, overlay container | `storage.mkAbsBoard` (approach C), not a group host | see §2 |
 
-- **Unsure group or component → group first**; when upgrading, `createComponent([group])` registers the whole group, child elements stay collected, zero rework.
-- **Only loose primitives allowed**: pure decorative singles (divider, grid column, independent caption) and sub-primitives **inside** a group/component.
-- **Label-less primitive sets** (track+thumb, radio ring+dot) cannot be recognized by text-pairing in audit, **group manually** (group name takes the main-part name).
-- Hierarchy iron rule: label must be **same parent** as the base plate (enter the group together); after registration the label becomes an internal child element of the component — otherwise registration yields an empty-shell component (§4 registration discipline).
-- **Front-to-back order (z-order)**: larger `parentIndex` is more front (0 = bottom). After grouping/componentizing it must be kept —
-  within a group **area descending** (large base plate at bottom, label/icon on top), the group itself occupies **the top member's layer slot**, instance replacement occupies **the original group's layer slot**.
-  `penpot.group` scrambles members' z-order (label covered by base plate); repair engine `fixZOrder()` (`groupAssemblies` already built in).
-- Machine enforcement: audit signature `loose_assembly` (S11) detects loose assemblies; repair engine `storage.groupAssemblies()`
-  (inside-out, minimal-host ownership, nested groups, idempotent, **z-order preserving**); gate G10.
+- Unsure group-or-component → **group first**; `CF.component(group)` upgrades it with zero rework.
+- Only decorative singles (divider, hairline, caption) and primitives **inside** a host may stay loose.
+- Label-less primitive sets (track + thumb, ring + dot) cannot be found by text pairing: group them manually.
+- A `CF.*` factory **always returns one host with everything mounted inside it** — building through `CF` satisfies
+  this section for free, which is the real reason G12 exists.
+- Z-order: within a group the area descends (base plate at the bottom, label/icon on top) and the group takes the top
+  member's slot. `penpot.group` scrambles it; repair with `storage.fixZOrder()`.
+- Machine enforcement: `loose_assembly` (audit_layout.js) + `storage.groupAssemblies()` + gate G10.
 
-## 5. Coordinates and grid spec
+## 5. Coordinates, columns and packing
 
 | Item | Value |
 |---|---|
-| PageRoot width | 1920 |
-| Content area | x ∈ [80, 1840] |
-| Standard spec board | 560 wide, 3 cols x = 80 / 680 / 1280, column gap 40 |
-| Large spec board | 880 wide, 2 cols x = 80 / 1000 |
-| Board vertical gap / in-board blocks / elements | 48 / 24 / 8–16 |
-| Header / Footer height | 160 / 80, content starts from y=240 |
-| Demo screen board width (web) | 1440 (landscape) or 1920; placed on page-14's 1920 canvas |
-| Demo screen board width (pad) | 834 (portrait) or 1194 (landscape) |
-| Demo screen board width (mobile) | 375 (portrait) or 812 (landscape); multiple can sit side by side (1920÷375≈5) |
-| Touch-target floor (pad/mobile) | ≥44px (use token `touchMin`); web ≥36px |
+| PageRoot width | **1920** (pages 00–13, 17) |
+| Content column | x ∈ [80, 1840] → 1760 wide |
+| Spec-board shelf | `LY.pack({x:80,y:240,w:1760}, widths, { gapX: 32, gapY: 32 })` — wrap at the column edge, never overlap, `out.height` gives the used height |
+| Max spec-board width | 1760 (a board wider than the shelf is clamped by `LY.pack`, not allowed to bleed) |
+| Screen boards | one per row when the board is ≥ 900 wide (app/content); 4 × 375 boards per row on page 16 (`LY.pack` with `gapX: 24`) |
+| Vertical rhythm on a page | 32 between spec boards, **64** between screen boards (they are the deliverable) |
+| Header / footer | 160 / 80, content starts at y = 240 |
+| Tier viewport height (fold marker) | web 900 · pad 1112 · mobile 812 (`LY.viewportHeight(tier)`) |
+| Screen board width | web 1440 · pad 834 · mobile 375/390 — **never** 1920 (that is the canvas, §1) |
+| Touch floor | mobile/pad ≥ 44, web ≥ 32, incl. `hitpad·` (`CF.minHit()` reads `CF.tier`) |
 
-## 6. Mapping with DESIGN.md (design-to-code basis)
+`LY.pack()` exists because a spec board's width is *measured* (`CF.matrix` shrinks to its content): a page cannot
+pre-plan 3 fixed columns, it packs. Packing by hand is the same class of error as hand-writing a pane width (G11).
 
-| DESIGN.md | Penpot | Code implementation |
+## 6. Screen pages: the long-document rule (pages 14–16)
+
+This is where amateur output is most visible, so the rules are explicit:
+
+1. **Height comes from the bands, never from a canvas habit.** Build with `LY.recipe(key, { w, tier })` (app screens)
+   or `LY.flow()` (content pages) and resize the screen board to `totalH`. A marketing board shorter than 1600 at 1440
+   wide, or an app board locked to exactly 1080 with an empty bottom, fails `viewport_locked`.
+2. **Every screen board carries a fold marker**: `LY.fold(board, tier)` draws the dashed viewport outline labelled
+   `fold·<tier>` so a reviewer sees what the first screen contains. A board taller than 2000 without one is flagged.
+3. **Only the extent the agent chose is judged.** Grid, scale, rhythm, split ratio, viewport and control-cap rules
+   apply to the sections and boxes you placed; geometry *inside* a `CF` host or a `·Spec` board is not grid-audited,
+   because an auto-width chip is 97px wide when its label is 97px wide.
+4. **Screens are assembled from the factories, not from re-drawn primitives** (§4.3): chrome from `CF.appBar`/`CF.sideNav`,
+   regions from `LY.rect`, content from the `CF` family that owns it. Re-calling a factory is the scripted equivalent of
+   instancing — same geometry, same name, and the coverage lint can see it.
+5. `CF.tier` is set per screen (§2.1) and the board is audited with the matching `{ tier }`.
+
+## 7. Mapping to DESIGN.md (design-to-code basis)
+
+| DESIGN.md | Penpot | Code |
 |---|---|---|
-| `colors.*` | 01-F1 palette + tokens set | theme variables (QSS var / CSS custom properties) |
-| `typography.*` | 01-F2 type scale | font tokens / TextStyles |
-| `spacing.*` | 01-F3 spacing grid | layout constants |
-| `rounded.*` | 01-F4 radius | radius constants |
-| `components.<name>` | 03–12 page spec boards + library components | code components (same-name mapping, see 13 index page) |
-| Do's and Don'ts | each spec board's usage rule bar | code-review checklist items |
+| `colors.*` | 01 Palette + 02 Color in use + token set | theme variables / CSS custom properties |
+| `typography.*` | 01 Type ramp | font tokens / TextStyles |
+| `spacing.*`, `grid` | 01 Spacing + 11 Grid & breakpoints | layout constants |
+| `rounded.*`, `shadow.*` | 01 Radius / Elevation | radius + elevation constants |
+| `components.<name>` | 03–09 spec boards + registered components + 13 index | code components (same-name mapping) |
+| `layouts.<recipe>` | 12 Screen recipes + 14–16 boards | page templates / route views |
+| Do's and Don'ts | each spec board's `notes` row | code-review checklist |
+| `targetProfiles`, `## Colors` | how many boards 11/14–16 carry, and the set/theme structure | breakpoint + theme config |
 
-## 7. Delivery self-check list
+## 8. Delivery self-check
 
-- [ ] 16 pages complete (15 optional) and correctly named/ordered
-- [ ] Each page has a unique PageRoot, Header/Footer in place, clipContent=false
-- [ ] Component spec boards conform to §4 contract, variant naming `Component·Attribute·Attribute`
-- [ ] **Assembly ownership compliant (§4.1)**: all primitive sets grouped or componentized, no loose same-level stacking (audit `loose_assembly` = 0);
-      reused components use `comp.instance()` in pages rather than copied loose primitives
-- [ ] All tokens recorded into library tokens, same name and value as DESIGN.md; **`storage.TK.audit().ok === true`**
-      (all sets `active:true` + all tokens `resolvedValueString` non-empty, i.e. no failures/broken links)
-- [ ] All components registered as library components (masters in AI Component Masters), 13 index page info complete
-- [ ] 14 Demo each selected tier's screen boards all assembled from library component instances (six boards per tier: Dashboard/Landing/Login/List/Detail/Settings);
-      **when color mode is "two schemes", board count = tiers × schemes**, and both schemes exported and accepted
-- [ ] Color mode implemented per DESIGN.md `## Colors` declaration: light only → 1 set / 0 theme;
-      two schemes → `· Core` + `· Dark` (Core first) + Scheme group with two themes, and **page 02 contrast audit has light/dark two tables**
-- [ ] Each page `export_shape` exports PNG acceptance pass (no 100×100 degradation, no clipping, no offset)
+- [ ] 18 pages present, named and ordered per §2 (17 optional, declared in DESIGN.md `omitted`).
+- [ ] One PageRoot per page with Header/Footer in place, `clipContent=false`, root height = used height (§3).
+- [ ] Pages 03–09: one `Family·Spec` per family of `CF.map()`, packed by `LY.pack`, names in
+      `Family·Type·Size·State·Slot` form, no `/`.
+- [ ] Coverage per §4.1: `variant_sparse`, `state_coverage`, `focus_ring_missing`, `disabled_wrong` all **0**.
+- [ ] Assembly ownership per §4.3: `loose_assembly` = 0; screens re-call the `CF` factories, never re-draw loose primitives.
+- [ ] Tokens: `storage.TK.audit().ok === true` and every name/value pair matches DESIGN.md.
+- [ ] Pages 14–16: one board per recipe × selected tier, each sized by `LY` (never by a typed height), each with a
+      `fold·` marker; every board audited with its own `{ tier }`.
+- [ ] Color scheme implemented as declared (§2.2), including the doubled contrast matrix on 02 when a dark scheme exists.
+- [ ] `storage.designGate({ … })` **CLEAN for every page scope in §2**, and `storage.auditPage()` CLEAN for positioning
+      (the two auditors are independent: this file's rules say nothing about overlap, and vice versa).
+- [ ] `export_shape` PNG per page accepted: no 100×100 degradation, no clipping, no offset; CJK renders with Noto Sans SC.

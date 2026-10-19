@@ -34,7 +34,7 @@ This file covers only LVGL-specific parts; the general principles and viewport-t
 
 - Preferred: run the same UI in the **LVGL simulator (SDL/PC port)**, layer by layer call `lv_refr_now(disp)` then save the framebuffer (`driver->flush_cb`'s output buf) as PNG.
 - Or use the display driver `flush_cb` to dump the whole frame as a bitmap; then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width: pad 834 / mobile 375).
-- After the component layer passes, do a whole-page comparison of each tier's screen board on page 14.
+- After the component layer passes, do a whole-page comparison of each screen board on pages `14–16` for the selected tier.
 
 ## 7. Known pitfalls
 

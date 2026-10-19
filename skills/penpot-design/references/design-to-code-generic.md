@@ -14,10 +14,10 @@ The common parts of the original Qt / Web guides have been pulled here; adapters
 
 ## 1. Layered implementation organization (industry convention, same for all stacks)
 
-token layer → atoms (Button/Input…) → molecules (SearchBox/FormField…) → organisms (TopNav/DataTable…) → pages (aligned to page-14 Demo **each tier's screen boards**).
+token layer → atoms (Button/Input…) → molecules (SearchBox/FormField…) → organisms (TopNav/DataTable…) → pages (aligned to the **screen boards of pages 14–16, one per selected tier**).
 
 - Component names map 1:1 to Penpot (`Button·Primary` → `ButtonPrimary` / `Button variant="primary"`); each component is a single file/dir + same-named style + state preview.
-- The class-name/file-name mapping table is on the page-13 component index.
+- The class-name/file-name mapping table is on page `13 · Component index`.
 
 ## 2. Token layer (no scattered magic values)
 
@@ -45,7 +45,7 @@ All spacing/sizes take integer design annotations; the box model (e.g. `border-b
 
 ## 7. pixel-perfect acceptance (layer by layer)
 
-After each layer lands, run the PIL comparison in `references/verification.md`: DPR=1, animations off, fixed viewport/window = that tier's baseline width; after the component layer passes, do a **whole-page comparison** of page-14 **each tier's screen boards** (threshold 0.5%).
+After each layer lands, run the PIL comparison in `references/verification.md`: DPR=1, animations off, fixed viewport/window = that tier's baseline width; after the component layer passes, do a **whole-page comparison** of every screen board on pages `14–16` for the selected tier (threshold 0.5%).
 Loop: export baseline → screenshot → compare → locate via heatmap (position/color/font/icon/asset) → fix → compare again.
 
 ## 8. Pick an adapter

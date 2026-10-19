@@ -299,6 +299,27 @@ npx @google/design.md export --format dtcg DESIGN.md > tokens.json   # machine-r
 Using it avoids hand-copying values; but **DTCG type names don't map 1:1 to Penpot's 17 TokenTypes**
 (e.g. DTCG has no `sizing`/`rotation`, Penpot has no `duration`/`cubicBezier`), still needs an explicit mapping layer.
 
+### 8.1 A tone seeds as three `color` tokens, and the override set must carry all three
+
+`design-guide.md §4.1` defines each tone as the triple **wash · hue · ink**; the names below are the contract between
+`TK.seed`, the palette in `seed_storage.js` (`storage.T`), the mirror in `CF.P` and `CF.theme(map)` — keep them identical,
+or a re-skinned file silently keeps drawing the default blue.
+
+```
+color.primary        #2563EB   hue   → graphics only (icon, 3px bar, ring, chart)
+color.primarySoft    #DBEAFE   wash  → background that the ink sits on
+color.primaryInk     #1E40AF   ink   → the ONLY step that carries copy (on wash 7.15:1, under white 7.09–8.72:1)
+color.onPrimary      #FFFFFF   copy on an ink-step solid
+```
+
+Same three-way split for `info` / `success` / `warning` / `error` (`*Soft` + `*Ink`), plus the neutral roles
+(`color.ink` `color.muted` `color.surface` `color.surfaceAlt` `color.border`).
+
+**Consequence for themes**: `· Dark` must override **`color.primaryInk`**, not only `color.primary`. In dark the wash becomes a
+low-alpha tint and the ink step has to *lift* (`color-schemes.md §4.1`); a dark set that overrides only the hue leaves copy at
+the light ink on a dark surface, which `audit_design.js` reports as `contrast`. Reference the pair instead of repeating hexes
+where you can (`{color.primaryInk}` inside a typography token), so one override propagates.
+
 ## 9. Acceptance recipe [Gate G9] (must run)
 
 After pasting `scripts/token_engine.js`:

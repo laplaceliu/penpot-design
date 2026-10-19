@@ -12,6 +12,16 @@ return (function () {
   const fsz = (s) => { const v = parseFloat(s.fontSize); return isFinite(v) ? v : 14; };
   const alignOf = (s) => { try { return s.horizontalAlign || s.align || 'left'; } catch (e) { return 'left'; } };
   const R = (s) => ({ x: s.x, y: s.y, w: s.width, h: s.height, r: s.x + s.width, b: s.y + s.height });
+  // Audit **annotation** layers: LY.fold() draws the first-viewport outline over a long board, LY.drawStart() draws labelled
+  // region templates. Both sit on top of real boards on purpose, so the stacking/ownership signatures must not judge them.
+  const ANNO = /^(fold·|region·)/;
+  // Layers that *deliberately* escape the box they sit in: a focus ring is drawn at a 2px offset, the §6 hit pad is
+  // larger than the control it wraps, a scrim/shadow covers its sibling. They must never read as out_of_bounds, and
+  // never as an assembly host or a centering target.
+  const OVER = /^(ring·|hitpad·|shadow|glow|scrim|state·layer|fold·|region·)/;
+  // A painted box a shape can sit on or in. Penpot reports rectangles as 'rect'; older code compared 'rectangle'.
+  // Accepting both is not hedging — a missed spelling silently disables every plate-based signature below.
+  const PLATE = (s) => s.type === 'rect' || s.type === 'rectangle' || s.type === 'ellipse';
 
   // Text uses "visual rect": wide text boxes (centered/right-aligned whitespace) falsely overflow a lot, must estimate the glyph extent by alignment
   storage.visRect = function (c) {
@@ -57,7 +67,7 @@ return (function () {
           if (c.type === 'text') out.fonts[c.fontFamily] = (out.fonts[c.fontFamily] || 0) + 1;
           const cr = storage.visRect(c);
           // S1/S2/S3/S4 out-of-bounds (bottom = board height insufficient, right = right overflow, left = constant column offset)
-          if (cr.x < pb.x - 1.5 || cr.y < pb.y - 1.5 || cr.r > pb.r + 1.5 || cr.b > pb.b + 1.5) {
+          if (!OVER.test(c.name || '') && (cr.x < pb.x - 1.5 || cr.y < pb.y - 1.5 || cr.r > pb.r + 1.5 || cr.b > pb.b + 1.5)) {
             add('out_of_bounds', c, node, 'escapes (L' + Math.round(cr.x - pb.x) + ',T' + Math.round(cr.y - pb.y) + ',R' + Math.round(cr.r - pb.r) + ',B' + Math.round(cr.b - pb.b) + ')');
           }
           if (c.type !== 'text' && c.type !== 'path' && Math.round(c.width) === 100 && Math.round(c.height) === 100) add('crash_100x100', c, node);
@@ -72,7 +82,7 @@ return (function () {
             let al = 'x'; try { al = c.align; } catch (e) {}
             if (al === undefined || al === null) add('align_missing', c, node, 'align undefined - property write likely failed');
           }
-          if (hdr.length && (c.type === 'rectangle' || c.type === 'ellipse')) {
+          if (hdr.length && PLATE(c) && !OVER.test(c.name || '')) {
             for (const ht of hdr) { const o = ovr(cr, ht.r); if (o > 0.6) { add('header_collision', c, node, 'over "' + String(ht.s.characters).slice(0, 12) + '" ' + Math.round(o * 100) + '%'); break; } }
           }
           if (rec(c)) walkA(c);
@@ -82,9 +92,10 @@ return (function () {
     walkA(head);
 
     const hosts = [];
-    const ch = (n2) => { const ks = kidsOf(n2); if (!ks) return; for (const c of ks) { try { if ((c.type === 'rectangle' || c.type === 'ellipse') && c.width >= 24 && c.height >= 24 && c.width * c.height <= 20000) hosts.push(c); if (rec(c)) ch(c); } catch (e) {} } };
+    const ch = (n2) => { const ks = kidsOf(n2); if (!ks) return; for (const c of ks) { try { if (PLATE(c) && !OVER.test(c.name || '') && c.width >= 24 && c.height >= 24 && c.width * c.height <= 20000) hosts.push(c); if (rec(c)) ch(c); } catch (e) {} } };
     ch(head);
     const walkB = (node) => {
+      if (ANNO.test(node.name || '')) return;
       const kids = kidsOf(node); if (!kids) return;
       for (const c of kids) {
         try {
@@ -118,13 +129,15 @@ return (function () {
     // Repair engine: storage.groupAssemblies(). A board is a partition container, not an assembly host; deliberate singles (pure decorative) are exempt.
     const walkD = (node) => {
       if (node.isComponentInstance && node.isComponentInstance()) return;  // instance internals are compliant (main-instance constraint)
+      if (ANNO.test(node.name || '')) return;                             // annotation layers are deliberately stacked over real boards
       const kids = kidsOf(node); if (!kids) return;
-      const cand = kids.filter((h) => (h.type === 'rectangle' || h.type === 'ellipse' || h.type === 'board') && h.width >= 24 && h.height >= 24);
+      const cand = kids.filter((h) => (PLATE(h) || h.type === 'board') && h.width >= 24 && h.height >= 24 && !OVER.test(h.name || ''));
       for (const h of cand) {
         try {
           const hr = R(h);
           const members = kids.filter((s) => {
             if (s === h) return false;
+            if (OVER.test(s.name || '')) return false;                    // a ring/hit-pad layer is chrome, not an assembly member
             const sr = R(s); const scx = sr.x + sr.w / 2, scy = sr.y + sr.h / 2;
             if (scx < hr.x || scx > hr.r || scy < hr.y || scy > hr.b) return false;
             let smallest = h, sa = hr.w * hr.h;
@@ -153,7 +166,7 @@ return (function () {
     // S7 sibling-board overlap: pairwise intersection of top-level boards.
     // **This is the easiest class to miss** — it's created by the "fix" itself: after growing a board to wrap its content,
     // if the row length exceeds the grid row gap, it presses onto the next row's board. An audit that only checks containment is completely blind to it.
-    const tops = Array.from(head.children).filter((c) => c.type === 'board' && c !== head);
+    const tops = Array.from(head.children).filter((c) => c.type === 'board' && c !== head && !ANNO.test(c.name || ''));
     for (let i = 0; i < tops.length; i++) {
       for (let j = i + 1; j < tops.length; j++) {
         const a = tops[i], b = tops[j];

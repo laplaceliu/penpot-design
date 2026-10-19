@@ -156,7 +156,7 @@ Eyeballing the export can only find "looks crooked". Below are four machine-deci
   invalid `fill` means the intended font size fell into `fills`; `h` = the intended weight. Combined with "same-level same-x/w rect height" you can reverse-look-up the intended height.
   ⚠️ After restoring, **must re-set `align`** (see S10), and verify via readback after writing.
 
-### S10 `align_not_applied` — alignment property write silently fails
+### S10 `align_missing` — alignment property write silently fails
 
 - **Meaning**: the code set centering/right-alignment on text, but it renders left-aligned (label stuck to the container's left edge).
 - **Cause**: wrong property name. Text horizontal alignment is **`align`**, **there is no `horizontalAlign`**;
@@ -170,8 +170,8 @@ Eyeballing the export can only find "looks crooked". Below are four machine-deci
   form an assembly (base plate + label/icon/sub-part), but they aren't collected into the same **group** or **component** — loose same-level stacking.
 - **Cause**: building by `absMount`-ing each piece into the board without ever collecting; consequence is **select/move/reuse all degrade**:
   dragging the base plate leaves the label behind, component registration yields an empty shell, design-to-code can't map an assembly to one component.
-- **Contract** (`penpot-structure.md` §4.1): reusable assembly → **component** (`createComponent([group])`,
-  pages use `comp.instance()`); single-use complete set → **group** (`penpot.group([host, ...members])`);
+- **Contract** (`penpot-structure.md` §4.3): reusable assembly → **component** (`createComponent([group])`,
+  a screen re-calls the same `CF` factory — no scriptable instance maker in this build, api-pitfalls §6); single-use complete set → **group** (`penpot.group([host, ...members])`);
   pure decorative singles can be loose. Label-less complete sets (track+thumb) can't be identified by the audit, group manually.
 - **Fix**: `storage.groupAssemblies()` (inside-out by ascending area, minimal-host ownership, nested groups, idempotent, only touches hierarchy not coordinates).
   Already-compliant assemblies (within a group/component) aren't reported; after fixing, recompute `loose_assembly = 0`.
@@ -300,10 +300,10 @@ This is the costliest lesson of the two incidents: **when the audit covers only 
 
 ### G10 [Gate] Assembly must be grouped (group) or componentized (component); no loose same-level stacking
 
-Full contract in `penpot-structure.md` §4.1, three-sentence version:
+Full contract in `penpot-structure.md` §4.3, three-sentence version:
 
 1. **A complete primitive set (base plate + label + icon + sub-part) must be collected into one kind of container**: reuse / into the 13 index → **component**
-   (`createComponent([group])`, pages always `comp.instance()`); single use → **group** (`penpot.group([host, ...members])`).
+   (`createComponent([group])`, a screen re-calls the same `CF` factory); single use → **group** (`penpot.group([host, ...members])`).
 2. **Machine enforcement**: audit signature `loose_assembly` (S11) checks loose assemblies; repair engine `groupAssemblies()` absorbs them;
    run at the end of each page's G4 chain (idempotent), recompute `loose_assembly = 0` to pass the page.
 3. **Unsure → group first**: `createComponent([group])` can upgrade the whole group to a component, zero rework; reverse (loose → component) needs rebuild.

@@ -8,8 +8,14 @@ return (function () {
   // ---- storage.T: JS-side color mirror only (fill/replace per DESIGN.md); does not create Penpot tokens ----
   storage.T = storage.T || {
     primary: '#2563EB', primaryHover: '#1D4ED8', primaryActive: '#1E40AF', primaryDisabled: '#93C5FD',
-    onPrimary: '#FFFFFF', secondary: '#64748B', neutral: '#F8FAFC', surface: '#FFFFFF',
+    onPrimary: '#FFFFFF', secondary: '#475569', neutral: '#F8FAFC', surface: '#FFFFFF',
     onSurface: '#0F172A', border: '#E2E8F0', error: '#DC2626', success: '#16A34A',
+    // §4 ramp: the 7–8 step is the only tone allowed to carry copy (text on a tint, white on a solid).
+    primaryInk: '#1E40AF', errorInk: '#991B1B', successInk: '#166534', warningInk: '#92400E', infoInk: '#075985',
+    // the graphic (6-level) step of the remaining semantic tones, and each tone's wash. Copy never sits on either:
+    // ink-on-own-wash is the readable pair (design-guide §4.1).
+    warning: '#D97706', info: '#0284C7',
+    primarySoft: '#DBEAFE', errorSoft: '#FEE2E2', successSoft: '#DCFCE7', warningSoft: '#FEF3C7', infoSoft: '#E0F2FE',
     radiusMd: 8, radiusLg: 12, padBtnX: 16, fontBtn: 14
   };
   const T = storage.T;
@@ -25,7 +31,9 @@ return (function () {
     b.fills = fill ? [{ fillColor: fill, fillOpacity: 1 }] : [];
     b.addFlexLayout();
     b.flex.dir = 'column';
-    try { b.horizontalSizing = 'fixed'; b.verticalSizing = 'fixed'; } catch (e) {}
+    // Sizing vocabulary is fix|auto (NOT 'fixed'/'hug'): assigning 'fixed' throws under the v2 manifest and was silently
+    // swallowed by try/catch, so the board only worked because `fix` is the default. Name it explicitly instead.
+    try { b.horizontalSizing = 'fix'; b.verticalSizing = 'fix'; } catch (e) {}
     return b;
   };
 
