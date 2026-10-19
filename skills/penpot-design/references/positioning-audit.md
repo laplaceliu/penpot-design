@@ -170,8 +170,8 @@ Eyeballing the export can only find "looks crooked". Below are four machine-deci
   form an assembly (base plate + label/icon/sub-part), but they aren't collected into the same **group** or **component** — loose same-level stacking.
 - **Cause**: building by `absMount`-ing each piece into the board without ever collecting; consequence is **select/move/reuse all degrade**:
   dragging the base plate leaves the label behind, component registration yields an empty shell, design-to-code can't map an assembly to one component.
-- **Contract** (`penpot-structure.md` §4.3): reusable assembly → **component** (`createComponent([group])`,
-  a screen re-calls the same `CF` factory — no scriptable instance maker in this build, api-pitfalls §6); single-use complete set → **group** (`penpot.group([host, ...members])`);
+- **Contract** (`penpot-structure.md` §4.3): reusable assembly → **component** (`createComponent([group])`, a screen
+  places an instance via `CF.instance` — api-pitfalls §6); single-use complete set → **group** (`penpot.group([host, ...members])`);
   pure decorative singles can be loose. Label-less complete sets (track+thumb) can't be identified by the audit, group manually.
 - **Fix**: `storage.groupAssemblies()` (inside-out by ascending area, minimal-host ownership, nested groups, idempotent, only touches hierarchy not coordinates).
   Already-compliant assemblies (within a group/component) aren't reported; after fixing, recompute `loose_assembly = 0`.

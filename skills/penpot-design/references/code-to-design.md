@@ -78,12 +78,18 @@ register components → recipe screens. Where the library contradicts a `design-
      each built at its own tier width with `CF.tier` set first, height from the recipe's `totalH` (long documents stack bands, they do not fit one screen),
      each carrying `LY.fold(board, tier)`.
 5. **Register library components**: `CF.component(host)` (masters collected in `AI Component Masters`; the host *becomes* the main instance),
-   `CF.variants(hosts, name)` where `penpotUtils.createVariantContainer` is available — probe it, never assume it.
+   then `CF.variantSet(hosts, family, props)` — one `properties` object per host (`Type/Size/State/Slot`, capabilities §5);
+   it renames the container and the merged record to `family`, and **the heads must never be renamed** (that wipes the
+   property table). Screens then place **instances**: `CF.instance(CF.name(…), {parent, text})` + `CF.swap` per state.
 6. **Review and fix**: run the G4 repair chain (`cleanOrphans` → `fixStaleCenter` → `alignPage` → `vAlignPage` → `fixInner` → `unclip` →
    `groupAssemblies` → `fixZOrder`), focus: closed stroke inner, glow board `clipContent=false`, correct CJK font, pad/mobile touch targets ≥44.
+   Screens additionally pass `NL.auditFlow(board) === 'CLEAN'` (settle with `NL.whenSettled`, size controls `fix`, never `auto`).
 7. **Accept**: both auditors CLEAN with the page scope named in contract §2 — `storage.auditPage()` (positioning) and
    `storage.designGate({ tier | families })` (the 18 design rules) — then export PNG per page and check against the self-check list
    (`penpot-structure.md` §8); pages 14–16 accepted recipe by recipe, tier by tier; ask the user to zoom in the editor to review.
+   With a light+dark answer, prove the switch on the **paint** (`TK.paint` → `TK.activateTheme` → `TK.changed` ≥ 1) and
+   re-export after switching; if the delivery is interactive, wire it with `PR.prototype(links, {flow})` and check
+   `dropped:false` + `PR.flows()` (capabilities §8/§9).
 
 ## DESIGN.md writing notes (shared by all entries)
 

@@ -39,7 +39,19 @@ Practical consequence: **30s per call is the real budget**, so every engine in `
 
 ## 2. Building a new board: layout-approach decision
 
-Try the three approaches in order, degrade when rendering is abnormal: **A bare board + world-coordinate appendChild** (simplest, but some environments export with a whole-page offset) → **B flex auto-layout** (needs engine layout, nested sub-boards get hug-collapsed) → **C flex container + all absolute + world coordinates** (recommended fallback, 33 components + 3 full pages 0 failures). The three approaches' build/render behavior and tested conclusions are in the detailed table in api-pitfalls.md §10.
+Choose the approach **per artifact**, not by habit — the old "B fails → fall back to C" ordering is superseded
+(capabilities §2 marked it FALSIFIED; the historical hug collapse was vocabulary: `'fixed'` instead of `'fix'`, `paddingTop…`
+instead of `topPadding…`, both silently dropped, and a `resize()` that downgrades a flow child's sizing, R5):
+
+* **B flex auto-layout (`storage.NL`)** — **the default for screens and regions**, because the file stays editable
+  (a designer changing copy re-wraps the row). Settle with `NL.whenSettled`, prove with `NL.auditFlow`.
+* **A bare board + world-coordinate appendChild** — simple one-offs only; re-check the whole-page export offset on the
+  first board before batching (some environments show `-board.y` in export while readback looks right).
+* **C flex container + all absolute (`mkAbsBoard`/`absMount`)** — spec boards, anatomy diagrams, art and pixel-exact
+  overlays (native-layout §9): 33 components + 3 full pages with 0 rendering failures, and it bypasses reflow by design.
+
+Degrade only with evidence from an export: export offset → suspect A; a screen that no longer re-flows → it was authored
+absolute, re-build the interior with `NL`, not `fix_layout`. The measured table for all three is in api-pitfalls.md §10.
 
 Approach C standard writing (`mkAbsBoard`/`absMount` full engine in `scripts/seed_storage.js`):
 
@@ -63,7 +75,7 @@ storage.absMount = (parent, child, worldX, worldY) => {
 };
 ```
 
-**Diagnosis**: readback coordinates correct but export whole-page offset → approach A failed, rebuild that board with approach C (rebuilding is faster than patching). Export buttons/cards squashed to text size → approach B's hug collapse, after all `layoutChild.absolute = true` re-layout by design size.
+**Diagnosis**: readback coordinates correct but export whole-page offset → approach A failed, rebuild that board with approach C (rebuilding is faster than patching). Export buttons/cards squashed to text size → a **sizing/padding vocabulary** bug (invalid `'fixed'`, `paddingTop…` names — capabilities §2, or a `resize()` that downgraded the sizing: `NL.auditFlow` → `sizing_dropped`), repair with `NL.nudge`/`NL.sizing`; only a spec/art board should be re-laid out absolute (approach C).
 
 ## 3. Core pitfall quick-reference table (detailed mechanics and code in api-pitfalls.md)
 
@@ -81,10 +93,16 @@ storage.absMount = (parent, child, worldX, worldY) => {
 | Text positioning | Width/height at the creation instant is unreliable (may be 1×1). **Center by actual width/height after rendering** (`await storage.ct(...)`, internally sleeps 120ms tested; or `storage.centerIn(t, host)`), otherwise offset by a few to tens of pixels. **Fingerprint**: the misaligned text's top-left corner lands exactly on the host center (arithmetic consequence of `(w−1)/2`); repair engine `storage.fixStaleCenter()`, audit mark `stale-center` (positioning-audit.md S2) |
 | Coordinate-system mixing | `child.x/y` and `board.x/y` are world coordinates; `parentX/parentY` are parent-relative. Containment judgment / snap computation use world coordinates throughout. Conversion: `new parentX = worldX - parent.x` |
 | **Moving a board = shell moves, content doesn't** | Assigning x/y to a board with `absolute` children, the children keep world coordinates and don't follow → board content falls apart. **Place final coordinates directly at build time, never move an already-built board**; when bulk-moving is unavoidable, compensate `dy` element by element |
-| **Resizing a board and children** | Board resize **doesn't affect absolute children** (safe to expand the frame). But a board with non-absolute flex children, when resized, triggers the engine to `fix` sizing back to content size (collapse) — don't resize again after fixing |
+| **Resizing a board and children** | Board resize **doesn't affect absolute children** (safe to expand the frame). On a **flow** child it is destructive: `resize()` silently downgrades that child's sizing to `fix` (native-layout R5) — declare the sizing after the last resize; resizing the **parent** downgrades the parent's own sizing the same way (that is what `NL.nudge` compensates). `NL.auditFlow` reports both as `sizing_dropped` |
 | **CJK font fallback** | Penpot has no CSS font-stack fallback: `applyToText` applies to the whole paragraph, Chinese in Latin fonts like Nunito renders as garbage. **mkText auto-selects Noto Sans SC by `/[\u3000-\u9fff\uff00-\uffef]/`**; scan existing text `characters` for batch fix (`Text.fontWeight` can read the current weight directly, replace at same weight) |
 | **Emoji rendering** | Penpot renders emoji as pixel-style graphics (same in exported PNG) — actually suitable for game/pixel-style design, can be used directly as icon placeholders |
-| **Assembly ownership** | A complete primitive set (base plate + label + icon) **must not be loose same-level stacking**: reuse → component (`createComponent([group])`; on a screen, call the same `CF` factory again — this build exposes no scriptable instance maker, see api-pitfalls.md §6), single-use → **group**. **⚠️ `penpot.group` has destructive side effects** (group drops into flex flow position, members shift −minParentXY, board gets inflated; `ungroup` doesn't restore coordinates) — must use **compensatory grouping** (capture min parentXY → group → `absolute=true` → reset → readback), canonical implementation in `groupAssemblies()`. Group name = host name, component name forbids `/` use `·`. Contract `penpot-structure.md` §4.3, audit `loose_assembly` |
+| **Assembly ownership** | A complete primitive set (base plate + label + icon) **must not be loose same-level stacking**: reuse → component (`createComponent([group])`; on a screen **place an instance** with `CF.instance` + `CF.swap` — instancing is scriptable, api-pitfalls.md §6), single-use → **group**. **⚠️ `penpot.group` has destructive side effects** (group drops into flex flow position, members shift −minParentXY, board gets inflated; `ungroup` doesn't restore coordinates) — must use **compensatory grouping** (capture min parentXY → group → `absolute=true` → reset → readback), canonical implementation in `groupAssemblies()`. Group name = host name, component name forbids `/` use `·`. Contract `penpot-structure.md` §4.3, audit `loose_assembly` |
+| **Interaction destination** | `addInteraction('click', {type:'navigate-to', destination: board})` needs the **shape**; an id (or `destinationId`/`screen`/`target`) is accepted with no error and **silently dropped** — verify with `PR.read(shape).destination` (`prototype_engine.js`, capabilities §8) |
+| **Interaction list is append-only** | `shape.interactions` is read-only; `addInteraction` appends; the only mutator is `removeInteraction(interactionObject)` (an index/id throws `Value not valid: 0`) → `PR.clear(shape)` before re-authoring |
+| **Prototype entry point** | With no flow on the page, wiring navs creates machine-named `Flow 1..N`. Call `PR.ensureFlow(name, board)` **first**, then read `page.flows` back |
+| **Checkpoint ≠ returned call** | `file.saveVersion(label)` resolved once and later never settled while the write landed *after* the call had timed out — the only evidence is the label appearing in `await file.findVersions()`. `PR.checkpoint` polls 6 s and returns `ok:false` if it cannot see it |
+| **SVG icon import location** | `createShapeFromSvg` drops the group **at world (0,0) inside the board covering the origin** (selection/viewport ignored) and adds a `base-background` rectangle; if the origin sits in a component copy the group cannot be reparented (`…Cannot change the structure of a component copy`) → `CF.svgIcon` imports through a throwaway board there (capabilities §7/§9) |
+| **Library color creation** | `penpot.library.local.createColor({name, color})` **ignores its arguments** (six shapes measured) → create then assign `.name`/`.color`; the call lives on `library.local`, not on `library.local.colors` |
 
 ## 4. Variant containers (Variant)
 
@@ -100,7 +118,23 @@ comp.name = 'Button·Primary·Default';                              // '/' not 
 const container = penpotUtils.createVariantContainer(
   comps.map(c => ({ shape: c.mainInstance(), properties: { Type: t, State: s } }))
 );
+container.name = 'Button';                                        // rename the container …
+// … and the merged record (find it via `c.variants.id === container.id`), e.g. `rec.name = 'Button'`
 ```
+
+Measured rules (capabilities §5, `CF.variantSet` implements them):
+
+- **`properties` is required on every entry** — without it: `TypeError: Cannot convert undefined or null to object`.
+  The property table comes from that argument only; layer names are not the source of truth.
+- The merge **consumes the source records** (two flat records → one variant record with `variants:{id, properties:[…]}`).
+- The platform **renames every head to the container's name**, and renaming a head afterwards **wipes the property
+  table** (`variantProps` → `{}`, `properties` → `[]`) and reverts the name. Never touch the heads; the family name goes
+  on the container **and** the record. Head layer names are therefore the one place where `CF.name`'s
+  `Family·Type·Size·State·Slot` format does **not** apply.
+- Switch placed instances with **`inst.switchVariant(posIndex, value)`** — pos is a **number** (a string throws
+  `Value not valid: Type. Code: :pos`); the same value is a silent no-op. Set the record's default with
+  `setVariantProperty(pos, value)` (record-level; `setVariantProperty` does not exist on instances).
+  For flat (non-variant) components use `CF.swap(inst, name)` instead.
 
 After reparent, the instance's internal child elements shift (e.g. +30,30) → reset `parentX/parentY` by the design relative coordinates. The component showcase board must be appendChild'd into the page header board (same-page reparent keeps world coordinates unchanged), otherwise the component is missing when exporting the header board.
 
@@ -121,26 +155,36 @@ After reparent, the instance's internal child elements shift (e.g. +30,30) → r
 ## 5.5 Driving the build through the engines (the only sanctioned path)
 
 ```js
-// one call = one page. storage.LY / storage.CF must be seeded first (seed_storage → layout_engine → component_factory).
+// one call = one page. Seed order: seed_storage → layout_engine → component_factory → native_layout → audit_design
+// (token_engine / palette_engine / prototype_engine have no engine deps, seed any time).
 const r = await storage.designNext({ tier: 'web' });       // build/audit the next queued page
 
-// a screen: regions come from LY, controls from CF, mounting is absMount — no typed numbers.
-const plan = storage.LY.recipe('dashboard', { w: 1440, tier: 'web', x0: 80, y0: 240 });
-if (plan.err) return plan;                                  // tier refusal is an answer, not an obstacle
-const board = storage.mkAbsBoard('dashboard · web', 80, 240, 1440, Math.max(plan.totalH, 900), '#FFFFFF', 0);
-await storage.CF.pageTitle({ parent: board, rect: storage.LY.rect('pageTitle'), title: 'Overview' });
-await storage.CF.toolbar({ parent: board, rect: storage.LY.rect('filterBar') });
-storage.LY.fold(board, 'web');                              // the dashed first-viewport marker
+// a screen = LY outside (absolute region plan) + NL inside (flow) + CF leaves (controls or instances):
+const host = storage.mkAbsBoard('dashboard · web', 80, 240, 1440, 900, '#FFFFFF', 0);
+const sk = storage.NL.fromRecipe('dashboard', { w: 1440, tier: 'web', x0: 80, y0: 240, parent: host });
+if (sk.err) return sk;                                    // tier refusal is an answer, not an obstacle
+await storage.CF.toolbar({ parent: sk.regions.header, rect: storage.LY.rect('filterBar') });
+const cell = storage.CF.instance(storage.CF.name('Button', { type: 'primary', size: 'md' }),
+                                 { parent: sk.regions.header, text: 'Deploy' });   // reuse, not re-draw
+storage.NL.guide(sk.regions.content, { cols: 12, margin: 24, gutter: 16 });         // native grid
+await storage.NL.whenSettled(host);                       // poll the stale fingerprint, don't guess a sleep
+const flow = storage.NL.auditFlow(host);                  // must be CLEAN before the gates below
+storage.LY.fold(host, 'web');                             // the dashed first-viewport marker
 ```
 
 - **Numbers enter the file only from `LY` (rects, spacing, tiers) or `CF` (control metrics)**. A coordinate typed into
   `execute_code` is gate **G11**; a control drawn without its factory is gate **G12** and will also fail `name_invalid`,
   because coverage is read from the `Family·Type·Size·State·Slot` name the factories emit.
+- **Sizing on a flow child is declared last, after every `resize()`** (native-layout R5): `resize()` downgrades a flow
+  child's sizing to `fix` silently, and `NL.auditFlow` is the only thing that notices (`sizing_dropped`). Control hosts
+  and instances take `'fix'/'fix'`; `'auto'` on a board means **hug** and collapses a button to its label.
 - **A missing recipe or factory is a bug in the engine**, not a reason to hand-build: add the recipe to
   `layout_engine.js` and document it in `layout-library.md`, or add the factory to `component_factory.js` and to
   `CF.map()`. The docs and the scripts are diffed mechanically, so an undocumented addition fails.
-- **Before delivery**: `storage.designGate({ tier })` (G13, the merged design lint) **and** `storage.auditPage()`
-  (positioning). Two verdicts, both `CLEAN`, per page scope named in `penpot-structure.md §2`.
+- **Before delivery**: `storage.designGate({ tier })` (G13) **and** `storage.auditPage()` (positioning) **and**
+  `storage.NL.auditFlow(board)` per screen — three verdicts, all `CLEAN`. Then, if the deliverable ships interactive:
+  wire it with `storage.PR.prototype(links, {flow})` (check every row's `dropped:false` and read `PR.flows()` back),
+  and prove the theme with `TK.paint` → `TK.activateTheme` → `TK.changed` (design-tokens §9.1).
 
 ## 6. Review and repair engines (mechanics in engines.md §1, code: scripts/repair_engines.js, scripts/fix_layout.js)
 
@@ -178,8 +222,12 @@ The theme recipe is derived from DESIGN.md, and can be deposited into project-pr
 - **typical pages**: the screen recipes of `layout-library.md §3/§5` rendered at each selected tier (pages 14–16), not a
   hand-picked Dashboard/Landing/Login set re-derived per task.
 
-Experience: set tokens first → seed (`seed_storage` → `layout_engine` → `component_factory`) → build component pages board
-by board per spec + export accept → finally assemble full pages; complex decorations (ribbon/badge/multi-layer shadow)
-encapsulated as a `CF.*` factory with a `·`-named host, so coverage and the lint can see them.
+Experience: set tokens first (`TK.seed` + `LIB.seed`) → seed (`seed_storage` → `layout_engine` → `component_factory` →
+`native_layout`) → build component pages board by board per spec + export accept → assemble full pages with
+`NL.fromRecipe` + `CF.instance` → wire interactions (`PR.prototype`) and prove the theme (`TK.paint`/`changed`) at
+acceptance; complex decorations (ribbon/badge/multi-layer shadow) encapsulated as a `CF.*` factory with a `·`-named host,
+so coverage and the lint can see them.
 
-Layout-approach decision and tested behavior table are in api-pitfalls.md §10; the absMount engine is in `scripts/seed_storage.js`; the collapse-repair engine is in `scripts/fix_layout.js`.
+The layout-approach history (A/B/C) and its measured status — B is fixed and now the default, C stays for spec/art — is
+in api-pitfalls.md §10; the absolute engines are `scripts/seed_storage.js` + `scripts/fix_layout.js`, the flow engine is
+`scripts/native_layout.js`, and the color/prototype channels are `scripts/palette_engine.js` / `scripts/prototype_engine.js`.

@@ -3426,25 +3426,195 @@ return (function () {
     return ctx.host;
   };
 
+  // ---------------------------------------------------------------- components: register / place / switch (C2/C3)
+  /** The library record for a CF name — scanned, not cached, because the library outlives `storage`; a name lookup
+      still works after a crash rebuild (post-crash checklist §5). Returns null when nothing matches. */
+  CF.get = function (name) {
+    if (!name) return null;
+    try {
+      var list = penpot.library.local.components || [];
+      for (var i = 0; i < list.length; i++) if (list[i].name === name) return list[i];
+    } catch (e) {}
+    return null;
+  };
+
   /** Register a host board as a Penpot component. createComponent does NOT copy: the host *becomes* the main instance
-      (it stays visible, but comp.remove() would delete it — register from a masters board, or accept the board as master). */
+      (it stays visible, but comp.remove() would delete it along with every instance — register from a masters board, or
+      accept the board as master). Returns the record so callers can chain into CF.instance / CF.variantSet. */
   CF.component = function (host, name) {
     if (!host) return { err: 'no host' };
     try {
       var comp = penpot.library.local.createComponent([host]);
       if (name && comp && comp.name !== undefined) { try { comp.name = name; } catch (e) {} }
-      return { ok: true, name: name || host.name };
+      return { ok: true, name: (comp && comp.name) || name || host.name, comp: comp || null, id: comp && comp.id };
     } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
   };
-  /** Group variant hosts into a variant set. Requires penpotUtils.createVariantContainer; reported, never assumed. */
-  CF.variants = function (hosts, name) {
-    if (!hosts || !hosts.length) return { err: 'no variants' };
+  /** "register" reads better at the call site; same operation. */
+  CF.register = function (host, name) { return CF.component(host, name || (host && host.name)); };
+
+  /**
+   * CF.instance(name, o) → place a **real instance** of a registered control (C2), instead of re-running a factory.
+   *   o = { parent, h, v, sizing:'fix'|'auto'|'fill', z, absolute:{x,y}, text, resize:[w,h] }
+   * `name` is the exact registered name — `CF.instance(CF.name('Button', {type:'primary', size:'md'}))`.
+   *
+   * Two measured rules govern the sizing, and both are applied here rather than left to the caller:
+   *   1. sizing is declared **after** `appendChild` and after any `resize()` (R5: resize downgrades a flow child to `fix`);
+   *   2. a board in flow must be told `'fix'` to keep its master's box — `auto` on a *board* means **hug**, and a host
+   *      whose label is in flow collapses to label size (measured: a 160×52 button → **30×17**). Absolute-interior hosts
+   *      happen to survive `auto` because hug has no flow children to measure, but that is luck, not a contract.
+   * Returns `{ok, inst, …}`; geometry is transitional until the layout engine settles (`NL.whenSettled` first).
+   */
+  CF.instance = function (name, o) {
+    o = o || {};
+    var rec = CF.get(name);
+    if (!rec) return { err: 'no component named "' + name + '" in the local library — CF.component(host) registers one' };
+    var inst = null;
+    try { inst = rec.instance(); }
+    catch (e) { return { err: 'instance() failed for "' + rec.name + '": ' + String(e && e.message || e) + ' — a record whose head shape was removed reports mainInstance() null; never detach a main instance' }; }
+    if (!inst) return { err: 'instance() returned nothing for "' + rec.name + '"' };
+    if (o.resize) { try { inst.resize(o.resize[0], o.resize[1]); } catch (e) {} }
+    if (o.text !== undefined) {
+      try {
+        var kids = Array.from(inst.children || []);
+        for (var i = 0; i < kids.length; i++) if (kids[i].type === 'text') { kids[i].characters = String(o.text); break; }
+      } catch (e) {}
+    }
+    var sizing = null;
+    if (o.parent) {
+      o.parent.appendChild(inst);
+      if (inst.layoutChild) {
+        if (o.absolute) { inst.layoutChild.absolute = true; inst.x = o.absolute.x; inst.y = o.absolute.y; }
+        var hs = o.h || o.sizing || 'fix', vs = o.v || o.sizing || 'fix';
+        try { inst.layoutChild.horizontalSizing = hs; inst.layoutChild.verticalSizing = vs; sizing = hs + '/' + vs; } catch (e) {}
+        if (o.z !== undefined) { try { inst.layoutChild.zIndex = o.z; } catch (e) {} }
+      }
+    }
+    return { ok: true, inst: inst, name: rec.name, componentId: rec.id, sizing: sizing };
+  };
+
+  /**
+   * CF.swap(inst, name) → switch an instance to another registered control (C3), via `swapComponent`.
+   * Measured: the layer name follows the target component, the paint follows the target, the instance stays an
+   * instance, and **per-instance text overrides survive the swap** (a matched text layer keeps 'Ship it').
+   * (`switchVariant` is only for records built by CF.variantSet, below — and its `pos` must be a number.)
+   */
+  CF.swap = function (inst, name) {
+    if (!inst) return { err: 'no instance' };
+    var rec = CF.get(name);
+    if (!rec) return { err: 'no component named "' + name + '" in the local library' };
     try {
-      if (!penpotUtils.createVariantContainer) return { ok: false, err: 'penpotUtils.createVariantContainer unavailable' };
-      var c = penpotUtils.createVariantContainer(hosts);
-      if (name && c) { try { c.name = name; } catch (e) {} }
-      return { ok: true, count: hosts.length, name: name || (c && c.name) };
+      var main = rec.mainInstance ? rec.mainInstance() : null;
+      if (!main) return { err: 'record "' + name + '" has no main instance — its head shape is gone (detach a main instance? see api-pitfalls §6)' };
+      var target = main.component();
+      inst.swapComponent(target);
+      return { ok: true, name: inst.name, componentId: rec.id,
+               fill: (inst.fills && inst.fills[0] && inst.fills[0].fillColor) || null };
     } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+  };
+
+  /**
+   * CF.variantSet(hosts, family, props) → group already-registered hosts into a native **variant set** (C3).
+   *   hosts = [mainInstance boards…]  (register with CF.component first — or pass records, either is accepted)
+   *   props = [{ Type:'Primary', Size:'Md' }, …] one entry per host — **required**:
+   *     `createVariantContainer` throws `TypeError: Cannot convert undefined or null to object` without it, and the
+   *     property table lives only in that argument.
+   * Measured: the platform then **renames every head to the container's name** and renaming a head afterwards wipes the
+   * property table (`{Type:…,Size:…}` → `{}`, `properties: []`) and the rename itself is reverted to 'Component'.
+   * So: family goes on the *container* and the *record* (both renameable), and **never touch the heads** — that is the
+   * one place where `CF.name`'s `Family·Type·Size` layer naming does not apply.
+   */
+  CF.variantSet = function (hosts, family, props) {
+    if (!hosts || hosts.length < 2) return { err: 'a variant set needs at least two hosts' };
+    if (!props || props.length !== hosts.length) return { err: 'props must have one properties object per host (it is the only place the property table comes from)' };
+    if (!penpotUtils.createVariantContainer) return { ok: false, err: 'penpotUtils.createVariantContainer unavailable' };
+    var entries = [], names = [];
+    for (var i = 0; i < hosts.length; i++) {
+      var h = hosts[i], rec = h && h.comp ? h.comp : null;
+      if (!rec && h && typeof h.mainInstance === 'function') rec = h;                       // a record was passed
+      if (!rec && h && typeof h.component === 'function') { try { rec = h.component(); } catch (e) {} }   // a main instance was passed
+      if (!rec) { try { rec = CF.component(h, h && h.name).comp; } catch (e) {} }
+      if (!rec || !rec.mainInstance) return { err: 'host ' + i + ' is not registered (createComponent failed or returned nothing)' };
+      entries.push({ shape: rec.mainInstance(), properties: props[i] });
+      names.push(rec.name);
+    }
+    try {
+      var vc = penpotUtils.createVariantContainer(entries);
+      if (family) { try { vc.name = family; } catch (e) {} }
+      var rec2 = null, list = penpot.library.local.components || [];
+      for (var j = 0; j < list.length; j++) if (list[j].variants && list[j].variants.id === vc.id) { rec2 = list[j]; break; }
+      if (family && rec2) { try { rec2.name = family; } catch (e) {} }
+      var headNames = [];
+      try { headNames = Array.from(vc.children || []).map(function (k) { return k.name; }); } catch (e) {}
+      return { ok: true, container: vc, record: rec2, containerName: vc.name,
+               recordName: rec2 ? rec2.name : null, heads: headNames, properties: rec2 ? rec2.variantProps : null,
+               note: 'heads carry the platform name — never rename a head (it wipes the property table); switch instances with inst.switchVariant(posIndex, value), pos must be a number' };
+    } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+  };
+  /** `CF.variants` is the name the map and the docs use; the `props` argument is required in both spellings. */
+  CF.variants = function (hosts, family, props) { return CF.variantSet(hosts, family, props); };
+
+  /**
+   * CF.svgIcon(svg, o) → import an SVG as **editable vectors** (C11) instead of the hand-authored `CF.glyph` set.
+   *   o = { parent, x, y, w, h, color, name, sizing:'fix'|'fill' }
+   *
+   * Measured rules this helper encodes:
+   *   1. `createShapeFromSvg` always drops the group **at world (0,0), inside whichever board covers the origin**
+   *      (verified: two different boards at the origin each received it at x/y −12,−12; with no board there it goes
+   *      to the page root). Selection and `viewport.center` are ignored.
+   *   2. If that board happens to be a **component copy**, the import cannot be reparented out
+   *      (`Value not valid: Cannot change the structure of a component copy`) — so this helper always imports through
+   *      its own throwaway board sitting at the origin, then moves the group from *there* (a plain board: allowed).
+   *   3. The platform adds a `base-background` rectangle; it is removed here, otherwise it paints a plate behind the icon.
+   *   4. `remove()` *inside* a component copy works (measured) — only re-parenting is blocked.
+   *   5. **`x/y` (both given, world coordinates) = absolute placement** — the same contract as `absMount`/`NL.mount`,
+   *      which is what a grid of icons needs inside a flex board; omit them and the icon joins the flow at `sizing`.
+   */
+  CF.svgIcon = function (svg, o) {
+    o = o || {};
+    if (!penpot.createShapeFromSvg) return { err: 'penpot.createShapeFromSvg unavailable' };
+    var tmp = null, g = null;
+    try {
+      tmp = penpot.createBoard(); tmp.name = 'svgIcon·tmp'; tmp.x = -1; tmp.y = -1; tmp.resize(2, 2);
+      g = penpot.createShapeFromSvg(String(svg));
+      if (!g) return { err: 'createShapeFromSvg returned nothing (content:write permission needed)' };
+      if (g.parent !== tmp) {
+        // the origin was covered by something else first — move it out of wherever it landed (never a copy: we own tmp)
+        try { if (g.parent && typeof g.parent.isComponentInstance === 'function' && g.parent.isComponentInstance()) { g.remove(); g = penpot.createShapeFromSvg(String(svg)); } } catch (e) {}
+      }
+    } catch (e) { return { err: String(e && e.message || e) }; }
+    var cleaned = [];
+    Array.from(g.children || []).forEach(function (c) {
+      if (/base-background/.test(c.name || '')) { try { c.remove(); cleaned.push('base-background'); } catch (e) {} }
+    });
+    var color = o.color;
+    if (color) {
+      var paint = function (sh) {
+        try { if (sh.strokes && sh.strokes.length) sh.strokes = [{ strokeColor: color, strokeOpacity: 1, strokeWidth: (sh.strokes[0] && sh.strokes[0].strokeWidth) || 2 }]; } catch (e) {}
+        try { if (sh.fills && sh.fills.length && sh.fills[0].fillColor) sh.fills = [{ fillColor: color, fillOpacity: sh.fills[0].fillOpacity === undefined ? 1 : sh.fills[0].fillOpacity }]; } catch (e) {}
+        Array.from(sh.children || []).forEach(paint);
+      };
+      paint(g);
+    }
+    if (o.name) { try { g.name = o.name; } catch (e) {} }
+    if (o.w && g.resize) { try { g.resize(o.w, o.h || o.w); } catch (e) {} }   // resize first, sizing declared last (R5)
+    if (o.parent) {
+      o.parent.appendChild(g);
+      if (g.layoutChild) {
+        // x/y together mean "world position" — the absMount contract — so they opt the icon out of flow; with no
+        // x/y the icon joins the flow at `sizing` (a group in flow behaves like any board child, R5/R6 apply).
+        if (o.x !== undefined && o.y !== undefined) { try { g.layoutChild.absolute = true; g.x = o.x; g.y = o.y; } catch (e) {} }
+        else { try { g.layoutChild.horizontalSizing = o.sizing || 'fix'; g.layoutChild.verticalSizing = o.sizing || 'fix'; } catch (e) {} }
+        if (o.z !== undefined) { try { g.layoutChild.zIndex = o.z; } catch (e) {} }
+      } else if (o.x !== undefined) { try { g.x = o.x; g.y = o.y; } catch (e) {} }
+    } else {
+      // no parent: the group was born *inside the throwaway board* (I1) — move it to the page root first, because
+      // removing the throwaway deletes its children
+      try { penpot.currentPage.root.appendChild(g); } catch (e) {}
+      if (o.x !== undefined) { try { g.x = o.x; g.y = o.y; } catch (e) {} }
+    }
+    try { if (tmp) tmp.remove(); } catch (e) {}
+    return { ok: true, group: g, name: g.name, removed: cleaned, type: g.type,
+             kids: Array.from(g.children || []).map(function (c) { return c.name; }) };
   };
 
   /** §3 registry — every row's CF key, so the docs and this file can be diffed mechanically (gate G12). */
@@ -3459,7 +3629,7 @@ return (function () {
       navigation: ['navItem', 'tabs', 'tabBand', 'breadcrumb', 'pagination', 'steps', 'menu', 'commandPalette', 'anchor'],
       feedback: ['alert', 'notification', 'toast', 'tooltip', 'popover', 'popconfirm', 'modal', 'drawer', 'spin', 'sheet'],
       shell: ['appBar', 'sideNav', 'toolbar', 'pageTitle', 'footer', 'mobileBar'],
-      composer: ['build', 'matrix', 'component', 'variants', 'move']
+      composer: ['build', 'matrix', 'component', 'variants', 'instance', 'swap', 'get', 'register', 'variantSet', 'svgIcon', 'move']
     };
   };
   CF.missing = function () {

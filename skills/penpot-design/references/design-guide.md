@@ -250,6 +250,9 @@ without them is a finding, not a style difference.
 - **Never** mix stroke weights or corner styles in one icon set; never stretch non-uniformly; never use an emoji as a business icon
   (Penpot renders emoji as pixel art — legitimate only for game/pixel styles, see api-pitfalls §5).
 - Icon-only control needs: a tooltip/hint board in the spec + a name in `component-map.json` (the code side needs the accessible label).
+- **Where the icons come from** (this grid is exactly why): `CF.glyph` for in-control marks, the bundled Lucide catalog
+  (24×24, 2px round stroke, ISC) through `storage.IC` for page/decorative icons, `CF.svgIcon` for the target system's own
+  SVGs — channel choice, licensing and the `.penpot`-import verdict are in `references/icons.md`.
 
 ## 8. Alignment (from AntD's published Do/Don't + Carbon practice)
 

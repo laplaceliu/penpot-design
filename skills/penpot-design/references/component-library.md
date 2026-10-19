@@ -231,6 +231,34 @@ Applies the ownership contract (`penpot-structure.md §4.3`), per family:
 Variant container property names (keep ≤4 per family, in this order): **`Type` · `Size` · `State` · `Slot`**.
 `Slot` covers boolean-ish anatomy switches (with-icon, with-clear, addon, loading) so `State` stays a clean 7-value axis.
 
+### 5.1 The two naming worlds (both are required — they cannot be merged)
+
+| Where | Layer name | Why |
+|---|---|---|
+| a control drawn by `CF`, a spec board, a flat registered master | `CF.name('Button', {type,size,state,slot})` → **`Button·Primary·Md·Hover`** | this is what the design-rule lint parses (`famOf`/`parseName`), what G12/G13 check, and what a screen instance *inherits* when you place it |
+| a head **inside a variant container** | **the platform's** — after `createVariantContainer` it overwrites both heads with the container's name, and renaming one afterwards **wipes the property table** (`variantProps` → `{}`, `properties` → `[]`) | the property table comes from the `properties` argument only; layers are not the source of truth in this build (capabilities §5) |
+
+So a variant set reads as: container + record named `Button`, heads named `Button`, props `Type/Size/State/Slot` on the
+record — and the **flat** `CF.name` strings remain the keys you use everywhere else (`CF.instance(CF.name(...))`,
+`CF.swap(inst, CF.name(...))`, spec rows, `component-map.json`).
+
+### 5.2 Reuse on a screen: instances, not re-drawn copies
+
+```js
+const name = CF.name('Button', { type: 'primary', size: 'md' });
+CF.component(btnHost, name);                     // once, from the masters board (the host *becomes* the main)
+const a = CF.instance(name, { parent: region, text: 'Publish' });   // screen placement — sizing fix/fix, declared last
+CF.swap(a, CF.name('Button', { type: 'primary', size: 'md', state: 'hover' }));   // hover state, no new geometry
+```
+
+* an instance **inherits the master's name**, so screens of instances pass the naming gates for free;
+* `CF.swap` → `swapComponent`: paint and name follow the target, **text overrides survive**;
+* in a variant set, switch with `inst.switchVariant(posIndex, value)` (numeric pos; same value = silent no-op);
+* **never** declare `'auto'` on an instance or control host — a board's `auto` is *hug* and it collapses to the label
+  (measured 160×52 → 41×17). `CF.instance` defaults to `'fix'/'fix'`;
+* deleting a main instance's shape removes its record (and `isComponentInstance()` is true for **mains** too), so batch
+  cleanups must not filter on it; `inst.detach()` on a main leaves an unremovable ghost (capabilities §5).
+
 ## 6. Icon rules for component slots
 
 - Sizes used **inside controls**: 16 (xs/sm), **18–20 (md, the default)**, 24 (lg / icon-only 40 control), 28–32 (empty state, upload), 40–48 (empty-state illustration).
@@ -238,6 +266,13 @@ Variant container property names (keep ≤4 per family, in this order): **`Type`
 - Gap icon↔label: **4 / 6 / 8** by control size (§2 table); icon-only controls keep the control square.
 - An icon that carries meaning (status, "delete", "download") needs a **label or tooltip**: the board shows the tooltip variant.
 - Exported size = annotated size × multiplier (@1x/@2x), from `export_shape`, never scaled in code (design-to-code §3).
+- **Default renderer: `CF.glyph(ctx, kind, box, o)`** — the built-in 24-grid path set (chevron, check, search, close, …),
+  drawn as fill/stroke paths with the control's palette color, so it inherits tone and state automatically.
+- **Catalog / imported vectors: `IC.place(name, {parent, color, size})`** (embedded Lucide set, `storage.IC`, one line
+  per icon from `assets/icons/lucide.jsonl`) and **`IC.grid({names, x, y, …})`** for the `01 · Foundations` icon sheet;
+  **`CF.svgIcon(svg, {parent, color, size})`** for the target system's own icon file. The channel decision, licenses and
+  the "why not a `.penpot` download" analysis are in `references/icons.md`. Never mix two sources inside one control,
+  and never hand-draw an icon with loose rectangles.
 
 ## 7. Feeding design → code
 

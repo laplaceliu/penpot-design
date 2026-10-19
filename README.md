@@ -11,8 +11,13 @@ Both directions share the same design-system contract (DESIGN.md + the fixed Pen
 Layout, components and design rules are **executable engines, not prose**: `layout_engine.js` holds the spacing/type/grid scales and 29 screen
 recipes (app chrome — header, sidebar, footer, toolbar — plus email, calendar, dashboard, chat, kanban, hero, landing, blog, docs, e-commerce,
 auth, OTP, pricing, wizard, mobile…), `component_factory.js` produces every variant × state of its 74 control factories with machine-checkable
-names (`Button·IconStart·Md·Hover`), and `audit_design.js` lints the result against the 18 HARD rules of `design-guide.md` (grid, rhythm, ramp,
-contrast, touch floors, state coverage). A missing variant or region is fixed by extending the factory/recipe, never by hand-building a board.
+names (`Button·IconStart·Md·Hover`), `native_layout.js` authors the screens as **native auto-layout** (flow padding/gap/sizing a designer can
+edit, with a flow lint of its own), `audit_design.js` lints the result against the 18 HARD rules of `design-guide.md` (grid, rhythm, ramp,
+contrast, touch floors, state coverage), `token_engine.js`/`palette_engine.js` own the two repaintable color channels (theme-switched tokens,
+library colors), and `prototype_engine.js` wires the delivered screens into a clickable prototype with export presets and verifiable checkpoints.
+Screens place **instances** of registered components (`CF.instance`/`CF.swap`) rather than redrawing them. A missing variant or region is fixed
+by extending the factory/recipe, never by hand-building a board. Every API claim is backed by a measured readback in
+`references/penpot-capabilities.md` (with a "still unverified" list).
 
 ## Installation
 
@@ -57,7 +62,10 @@ npx skills add ./
         │   ├── mcp-automation.md        # execute_code practical handbook (session discipline, layout approaches, acceptance)
         │   ├── api-pitfalls.md          # Detailed Penpot API pitfalls
         │   ├── positioning-audit.md     # Positioning failure signatures S1–S11, root causes, preventive gates
-        │   ├── design-tokens.md         # Penpot Design Tokens: 17 TokenTypes, activation, themes, doc-vs-impl gaps
+        │   ├── design-tokens.md         # Penpot Design Tokens: 17 TokenTypes, activation, themes, paint proof, doc-vs-impl gaps
+        │   ├── penpot-capabilities.md   # Measured Penpot API evidence base (what may be claimed / still unverified)
+        │   ├── native-layout.md         # Native auto-layout authoring (storage.NL): rules R1–R6, sizing traps, flow lint
+        │   ├── icons.md                 # Icon channels, bundled Lucide catalog (ISC), licenses, why not a .penpot download
         │   ├── engines.md               # Seed order, repair-engine mechanics, factory templates, screen-assembly pattern
         │   ├── viewport-profiles.md     # Viewport tiers: web 1440 / pad 834 / mobile 375
         │   ├── color-schemes.md         # Light-only vs switchable light+dark, bounded artifact mapping
@@ -77,16 +85,21 @@ npx skills add ./
         ├── scripts/            # Engines that can be pasted directly into execute_code / run from the CLI
         │   ├── seed_storage.js        # Seeding engine (JS-side color mirror + mkAbsBoard/absMount/mkText/ct)
         │   ├── layout_engine.js       # `storage.LY`: space/type/grid scales, 29 recipes, pack, fold, tier gate
-        │   ├── component_factory.js   # `storage.CF`: 74 control factories (6 `CF.map()` groups) + spec matrices
+        │   ├── component_factory.js   # `storage.CF`: 74 control factories (6 `CF.map()` groups) + spec matrices + instance/variantSet/svgIcon
+        │   ├── native_layout.js       # `storage.NL`: native flex/grid authoring, whenSettled, auditFlow, fromRecipe
         │   ├── audit_design.js        # `storage.designGate`: 18 HARD design-rule checks (read-only)
         │   ├── audit_layout.js        # `storage.auditPage`: 11 positioning signatures (read-only)
-        │   ├── token_engine.js        # `storage.TK`: design-token seed / apply / audit
+        │   ├── token_engine.js        # `storage.TK`: design-token seed / apply / paint proof / audit
+        │   ├── palette_engine.js      # `storage.LIB`: library colors (seed / ref-bind / three-channel audit / raw replace)
+        │   ├── prototype_engine.js    # `storage.PR`: flows, interactions, export presets, verifiable checkpoints
+        │   ├── icon_engine.js         # `storage.IC`: embedded Lucide catalog → editable vectors (place / grid)
         │   ├── scaffold_structure.js  # Batch-build the 18-page skeleton (pages → headers → fit)
         │   ├── repair_engines.js      # fixStaleCenter / groupAssemblies / fixZOrder / align / vAlign / fixInner / unclip
         │   ├── fix_layout.js          # Batch-flex-collapse repair
         │   ├── fix_geometry.js        # Geometry repair (offset / fit / reflow / move subtree, dry-run capable)
         │   └── pixel_diff.py          # PIL pixel comparison (heatmap + JSON metrics)
         └── assets/
+            ├── icons/                 # Embedded icon catalog: lucide.jsonl (1966 icons, 24-grid, ISC) + LICENSE
             └── penpot-server/         # Bundled local Penpot deployment stack (self-resolving paths, fully relocatable)
                 ├── compose.yaml       # 7 services: frontend/backend/exporter/mcp/postgres/valkey/caddy
                 ├── caddy/Caddyfile    # Terminate TLS at https://penpot.local

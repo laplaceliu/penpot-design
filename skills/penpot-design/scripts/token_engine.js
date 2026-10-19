@@ -164,6 +164,32 @@ return (function () {
     return { shape: shape.name, tokens: JSON.stringify(shape.tokens) };
   };
 
+  // ---------- paint snapshot (theme-switch acceptance, capabilities §6) ----------
+  // Bindings and paint are read at different moments: a shape can keep `tokens.fill` while showing a stale color,
+  // because adding a later active set changes the token's resolvedValueString **without** re-skinning bound shapes —
+  // only `activateTheme` does that. So acceptance reads the *paint*: snapshot → switch → settle → TK.changed().
+  TK.paint = function (shapes) {
+    const arr = Array.isArray(shapes) ? shapes : [];
+    return arr.map((s, i) => {
+      let f = null, st = null;
+      try { f = s.fills && s.fills[0] ? { color: s.fills[0].fillColor, opacity: s.fills[0].fillOpacity, ref: s.fills[0].fillColorRefId || null } : null; } catch (e) {}
+      try { st = s.strokes && s.strokes[0] ? { color: s.strokes[0].strokeColor, opacity: s.strokes[0].strokeOpacity, ref: s.strokes[0].strokeColorRefId || null } : null; } catch (e) {}
+      return { key: (s.name || 'shape') + '#' + i, fill: f, stroke: st };
+    });
+  };
+  TK.changed = function (before, shapes) {
+    const now = TK.paint(shapes);
+    const out = [];
+    now.forEach((n, i) => {
+      const b = before[i];
+      if (!b) return;
+      const fc = b.fill && n.fill && String(b.fill.color).toLowerCase() !== String(n.fill.color).toLowerCase();
+      const sc = b.stroke && n.stroke && String(b.stroke.color).toLowerCase() !== String(n.stroke.color).toLowerCase();
+      if (fc || sc) out.push({ key: n.key, fill: [b.fill && b.fill.color, n.fill && n.fill.color], stroke: [b.stroke && b.stroke.color, n.stroke && n.stroke.color] });
+    });
+    return { changed: out.length, rows: out };
+  };
+
   // ---------- health-check ----------
   // The judgment logic depends on whether a theme is used:
   //   No theme: an inactive set = a fault (token binding would "succeed but not take effect").
@@ -226,5 +252,5 @@ return (function () {
     return a;
   };
 
-  return { seeded: true, fns: ['TK.seed', 'TK.ensureSet', 'TK.put', 'TK.find', 'TK.apply', 'TK.unbindFill', 'TK.unbindStroke', 'TK.audit', 'TK.assert', 'TK.theme', 'TK.ensureTheme', 'TK.activateTheme', 'TK.activeSets'] };
+  return { seeded: true, fns: ['TK.seed', 'TK.ensureSet', 'TK.put', 'TK.find', 'TK.apply', 'TK.unbindFill', 'TK.unbindStroke', 'TK.paint', 'TK.changed', 'TK.audit', 'TK.assert', 'TK.theme', 'TK.ensureTheme', 'TK.activateTheme', 'TK.activeSets'] };
 })();

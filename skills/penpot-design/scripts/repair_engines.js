@@ -214,7 +214,8 @@ return (function () {
   // (button group into nav bar); a board is a partition container, not an assembly host; flow child primitives skipped (left to flex).
   // Idempotent: assemblies already in the same group/component aren't re-grouped; only changes hierarchy, not coordinates/style.
   // Upgrade path: single-use assembly = group; to reuse / enter the 13 index → `createComponent([group])` upgrades to a component,
-  // a screen re-calls the same CF factory (this build has no scriptable instance maker; registration discipline see penpot-structure.md §4.3).
+  // a screen places an instance with `CF.instance` (instancing IS scriptable — api-pitfalls §6 / capabilities §5;
+  // registration discipline see penpot-structure.md §4.3).
   storage.groupAssemblies = (root) => {
     root = root || rootOf();
     const log = [];

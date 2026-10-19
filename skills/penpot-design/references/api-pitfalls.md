@@ -122,12 +122,23 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
   - Toggle (76×44): track(12,8), dot On(39,11)/Off(15,11)
   - Checkbox (120×32): box(0,4), ✓(11−w/2, 15−h/2), label(32, 15−h/2)
   - Switch (76×44): track(12,7), dot On(37,10)/Off(15,10)
-- **Instantiating is not scriptable in this build**: `mainInstance()` exists (that is what `createVariantContainer` consumes), but the
-  Component object has **no `makeInstance`**, and no instance factory was found by probing `Object.keys(comp)` + `penpot_api_info`.
-  So a script cannot place library instances on a screen. **What to do instead**: build the screen by calling the same
-  `CF` factory again — a factory returns byte-identical geometry, so it is visually equivalent to instancing and it keeps
-  the ownership rule (§6.1) intact. `comp.instance()` appears in several contract sentences as the "reuse" verb: treat it as
-  **unverified until a probe confirms it in the connected build**, and never let a delivery claim depend on it.
+- **Instantiating IS scriptable — the old "no `makeInstance` / treat `comp.instance()` as unverified" verdict is
+  FALSIFIED** (capabilities §5). Measured: `comp.instance()` returns a real instance board; `parent.appendChild(inst)` +
+  a `'fix'/'fix'` sizing declaration places it in flow; `Array.from(inst.children).find(c => c.type === 'text').characters = '…'`
+  overrides text **locally** (the master keeps its own); `inst.swapComponent(other.mainInstance().component())` switches
+  a control to another registered variant (name and paint follow, **text overrides survive**). The skill's API is
+  `CF.instance(CF.name('Button', {type,size,state}))` / `CF.swap(inst, name)`; use a fresh `CF` factory re-call only when
+  no master was registered. Two traps that still apply:
+  1. **declare `'fix'`, not `'auto'`** — an instance (or any control host) with `layoutChild` sizing `auto` **hugs to
+     label size** (measured 160×52 → 41×17); `CF.instance` defaults to `'fix'/'fix'` and declares sizing last;
+  2. **never delete the main instance's shape as cleanup** — `isComponentInstance()` is `true` for *mains too*, so a
+     filter on it deletes masters (library records then follow), and `detach()` on a main leaves an unremovable ghost.
+- **Variant containers**: `createVariantContainer` **requires** `properties` per entry (`{shape: rec.mainInstance(), properties:{Type:'Primary'}}`
+  — without it: `TypeError: Cannot convert undefined or null to object`); the merge consumes the source records into one
+  variant record; the platform **renames every head to the container's name** and renaming a head afterwards **wipes the
+  property table**. Switch on instances with `inst.switchVariant(posIndex, value)` (numeric pos; string pos throws
+  `Value not valid: Type. Code: :pos`), set the default on the record with `setVariantProperty(pos, value)`. Family name
+  goes on the container **and** the record (`vc.name = 'Button'`, `rec.name = 'Button'`), never on the heads.
 - Component boards must be absorbed into the page header board (`head.appendChild(compBoard)`, same-page reparent keeps world coordinates unchanged), otherwise the component is missing when exporting the header board. Identify the header board with `root.children.find(c => c.type === 'board')` (root may mix in orphan text, don't use children[0]).
 
 ### 6.1 group semantics and assembly ownership (contract: penpot-structure.md §4.3)
@@ -151,7 +162,10 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
   Verification note: **small-shape group export may hit a cache illusion** (looks like no text), go by **whole-board export**.
   Batch-fix engine `storage.fixZOrder()` (groupAssemblies already has the same logic built-in).
 - **Difference between group and board**: assigning x/y to a **board** with absolute children is "shell moves, content doesn't" (children world coordinates don't follow); **a group is different — moving the group shell drags the children along** (a group is a bounding wrapper), so dragging/reusing an assembly after grouping is safe.
-- **Three-level ownership**: reusable assembly → component (`createComponent([group])`; on a screen re-call the `CF` factory — see §6 above); single-use complete set → group; partition container → board. **Complete primitive sets must not be loose same-level stacking** (audit signature `loose_assembly`, fix `groupAssemblies()`, gate G10).
+- **Three-level ownership**: reusable assembly → component (`createComponent([group])`; on a screen place an **instance**
+  with `CF.instance(name)` — see §6 above; a `CF` factory re-call is the fallback when nothing was registered); single-use
+  complete set → group; partition container → board. **Complete primitive sets must not be loose same-level stacking**
+  (audit signature `loose_assembly`, fix `groupAssemblies()`, gate G10).
 - **Group name** = host name / `component name·variant`; component name forbids `/` (assignment silently fails).
 - **Nesting is normal**: a button group collected into a nav-bar group — layer by layer from inside out with `penpot.group`; `createComponent` can take nested groups.
 - **Registration order**: group first to collect → then `createComponent([group])`; registering loose primitives directly yields a defective component.
@@ -186,21 +200,29 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
 | Approach | Build | Render | Tested conclusion |
 |---|---|---|---|
 | A. Bare board + world-coordinate append | Simple | Mostly normal; some files/versions export whole-page offset `-board.y` (readback correct, render misaligned) | Environment-dependent, use batch only after first-board export acceptance |
-| B. flex auto-layout | Engine layout | Nested board children force-hugged (160×45 button collapses to text size); `layoutChild.horizontalSizing='fix'` declared but still async-reset; `minWidth/minHeight` also overridden; no `removeFlexLayout()` API | Uncontrollable in nested-board scenarios |
-| **C. flex container + all absolute + world coordinates** | Manual coords | 33 components + 3 full pages (Landing 1440×3140 etc.) 0 rendering failures | **Recommended fallback**; absolute children position-absolute, completely bypasses flex reflow |
+| B. flex auto-layout | Engine layout | The historical failures (160×45 button collapsed to text size; `horizontalSizing` "declared but ignored") were **vocabulary bugs**: `'fixed'` is an invalid value (only `'fix'`/`'auto'`), and the padding names were `paddingTop…` instead of `topPadding…` — both silently dropped, so the board fell back to hug | ~~Uncontrollable in nested-board scenarios~~ **FALSIFIED by capabilities §2** — with the right names, nested `fix` boards keep 160×52, `fill` stretches them, padding moves children, hug re-grows. **B is now the default path for screens** (`storage.NL`), because it is what keeps the file editable |
+| **C. flex container + all absolute + world coordinates** | Manual coords | 33 components + 3 full pages (Landing 1440×3140 etc.) 0 rendering failures | Correct **for spec boards, art and pixel-exact overlays** (native-layout §9) — not the default for screens any more; an absolute tree does not re-flow when copy changes |
 
 ### Key details of approach C
 
 - `child.layoutChild.absolute = true` **must be set AFTER appendChild** (setting before is ineffective).
 - In absolute mode `child.x/y` read/write are both world coordinates (same as normal shapes).
-- The container itself `horizontalSizing/verticalSizing = 'fixed'` prevents the engine from changing size; after `addFlexLayout()` `flex.dir` must be assigned (adding without setting dir has default-behavior differences).
+- The container itself `horizontalSizing/verticalSizing = 'fix'` (write **`'fix'`, never `'fixed'`** — `'fixed'` throws and
+  the old `try/catch` swallowed it, so the board silently hugged: that is the root cause the collapse-repair engine was
+  fighting). After `addFlexLayout()` `flex.dir` must be assigned (adding without setting dir has default-behavior differences).
 - **Board resize doesn't affect absolute children** — safe to expand the frame (when Dashboard bottom components overlap, shift children down + resize board taller, in one step).
 - **Moving a board (assign x/y), absolute children don't follow** — place final coordinates directly at build time; when moving is truly needed, compensate element by element (walk subtree and translate by the same dy).
-- Diagnostic rule: **readback correct, render wrong → approach A failed, switch to C; data correct, render collapsed → flex hug, all absolute re-layout**.
+- Diagnostic rule: **readback correct, render wrong → approach A failed, switch to C; data correct, render collapsed →
+  a sizing/padding name was wrong (B's vocabulary, capabilities §2) or a `resize()` downgraded a flow child (`NL.auditFlow`
+  reports `sizing_dropped`) — repair with `NL.nudge`/`NL.sizing`, do not blanket-absolutize a screen any more.**
 
 ### Collapse-repair engine
 
-See `scripts/fix_layout.js` (getDesignSize restores design size by name + absRow manual re-layout + fixCol container fix, two-round convergence; usage and order trap in engines.md §3).
+Two generations, both kept:
+- **Today (preferred)**: `NL.auditFlow` → `NL.nudge`/`NL.sizing` → re-audit next call (native-layout §7). This fixes the
+  producer instead of re-laying the board out.
+- Legacy whole-file repair: `scripts/fix_layout.js` (getDesignSize restores design size by name + absRow manual re-layout
+  + fixCol container fix, two-round convergence; usage and order trap in engines.md §3).
 
 ## 11. openPage timeout lands on wrong page (data-safety incident)
 

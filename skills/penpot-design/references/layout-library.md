@@ -9,8 +9,12 @@
 
 ## 0. Use rules (gate G11)
 
-1. **Never hand-write region coordinates.** Build a screen by `LY.frame()` → `LY.split()` / `LY.grid()` / `LY.flow()` → `LY.rect(key)` and
-   mount components into the returned rects with `storage.absMount`. If a recipe is missing, **add a recipe to `layout_engine.js` and document it here** — do not improvise numbers in `execute_code`.
+1. **Never hand-write region coordinates.** Build a screen by `LY.frame()` → `LY.split()` / `LY.grid()` / `LY.flow()` → `LY.rect(key)`,
+   and mount the region boards at those rects — the supported path is `NL.fromRecipe(key, {parent, x0, y0, …})`, which
+   mounts each region **absolute at its `LY.rect` and gives it a flex interior**; fill that interior with `NL.add(region, control, 'fix','fix')`
+   / `CF.instance(...)` (never `'auto'` on a board — it hugs and collapses to the label). `storage.absMount` remains correct
+   for spec boards, anatomy diagrams and pixel-exact overlays (native-layout §9). If a recipe is missing,
+   **add a recipe to `layout_engine.js` and document it here** — do not improvise numbers in `execute_code`.
 2. **Web screens are long documents, not one viewport.** Height comes from band stacking (`LY.flow`), not from a canvas habit. See §0.4.
 3. **Panes abut with a 1px hairline and 0 gap**; gaps live inside panes (design-guide §1.3).
 4. **Every region carries its own padding**; do not let two nested regions share one pad (that is how content ends up 96px from the edge).

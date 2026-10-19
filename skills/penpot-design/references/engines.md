@@ -6,20 +6,28 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 |---|---|---|
 | `scripts/seed_storage.js` | tokens `storage.T`, `mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`mkChip`/`ct`/`pg`/`sleep` | run first each session; re-seed after storage loss |
 | `scripts/layout_engine.js` | **`storage.LY.*`** — the region math: `SPACE`/`ROWS`/`TIERS`, `snap`/`onScale`, `frame`/`container`/`grid`/`split`/`rows`/`flow`/`repeat`/`pack`, `viewportHeight`/`fold`, `recipe`/`plan`/`rect`/`keys`, `slots`, `drawStart`/`drawStep` | run right after seed; every coordinate on every page comes from it (gate **G11**) |
-| `scripts/component_factory.js` | **`storage.CF.*`** — the variant-producing factories + `build`/`matrix`/`component`/`variants`, `P` palette, `STATE` alphas, `ladder`/`radius`/`fills`/`name`/`glyph`, `minHit`/`tier`/`autoHit`, `map`/`missing` | run after LY; every control on every page is produced by it (gate **G12**). The registry is `CF.map()`; **`CF.missing()` must return `[]`** — that is the count to trust, not a number written in a doc |
+| `scripts/component_factory.js` | **`storage.CF.*`** — the variant-producing factories + `build`/`matrix`/`component`/`variants`, **components** `get`/`register`/`instance`/`swap`/`variantSet`/`svgIcon`, `P` palette, `STATE` alphas, `ladder`/`radius`/`fills`/`name`/`glyph`, `minHit`/`tier`/`autoHit`, `map`/`missing` | run after LY; every control on every page is produced by it (gate **G12**). The registry is `CF.map()`; **`CF.missing()` must return `[]`** — that is the count to trust, not a number written in a doc. Screens reuse controls through `CF.instance(CF.name(...))` + `CF.swap` (instances, not re-drawn copies); a variant set needs `CF.variantSet(hosts, family, props)` with one `properties` object per host |
+| `scripts/native_layout.js` | **`storage.NL.*`** — native flex/grid authoring: `frame`/`row`/`col`/`gridFrame`/`cell`, `mount`/`add`/`sizing`/`fill`/`fix`/`hug`/`alignSelf`/`margin`, `applyFlex` (whitelisted pad/gap/align vocabulary), `label`/`plate`/`line`, `guide`/`rulerGuide`, `stamp`/`readStamp`, `settle`/`whenSettled`/`report`/`auditFlow`/`nudge`/`reflow`/`fromRecipe` | run after CF; turns the LY region plan into **flow** boards so the file stays editable (`references/native-layout.md`). `fromRecipe` needs LY, `frame({shadow})` needs CF, both degrade instead of throwing |
 | `scripts/audit_design.js` | **design-rule lint** (`designPage`/`designStart`/`designNext`/`designAll`/`designGate`): 18 signatures — grid/scale/ramp/gap/measure/split/cap/touch/primary/row-height/radius/contrast/viewport/state-coverage/`variant_sparse`/`focus_ring_missing`/`disabled_wrong`/`name_invalid` | run per board as built and per page at the end; gate **G13** blocks delivery |
 | `scripts/repair_engines.js` | `fixStaleCenter` / `groupAssemblies` / `fixZOrder` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | run once to plant into storage, call page by page |
 | `scripts/fix_layout.js` | flex-collapse repair (getDesignSize + absRow + fixCol, two-round convergence) | run directly on the target page |
-| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) | record immediately after building skeleton; re-run health check before acceptance |
+| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.paint`·`TK.changed` theme-switch paint proof / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) | record immediately after building skeleton; re-run health check before acceptance (gate **G9**) |
+| `scripts/palette_engine.js` | Library colors (`LIB.seed` idempotent create+rename+set / `LIB.fill`·`LIB.stroke` ref-bound paint with readback / `LIB.audit` channel inventory via `shapesColors` / `LIB.replace` raw-hex swap) | the second re-skin channel (capabilities §7); independent of LY/CF/NL, so it can be seeded at any point |
+| `scripts/prototype_engine.js` | Prototype + delivery (`PR.flow`/`ensureFlow`, `PR.nav`/`overlay`/`close`/`url`/`delay`, `PR.prototype(links,{flow})`, `PR.read`/`clear`, `PR.exports`/`bytes`, `PR.checkpoint`/`versions`/`restore`, `PR.ANIM` presets) | wire `14–16 · Screens` into a clickable flow before delivery (C6/C7/C9); its four rules P1–P4 (destination is a **shape**, interactions are append-only, animation fields complete, versions are verified not trusted) are in capabilities §8/§9 |
+| `scripts/icon_engine.js` | Icons (`IC.seed` JSONL/`IC.add` any SVG / `IC.get`·`search`·`missing` / `IC.svg` color substitution / `IC.place` / `IC.grid`) | catalog `assets/icons/lucide.jsonl` (Lucide, ISC, 1966 icons); seed only the lines a page needs; channel choice + licenses in `references/icons.md` — in-control glyphs stay `CF.glyph` |
 | `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`): **eleven signature classes** + font histogram, read-only | run on each board as built; recompute after finishing |
 | `scripts/fix_geometry.js` | geometry repair (column offset/board height/root height/right overflow, four engines, all support dry-run) | repair page by page after audit lists |
 | `scripts/scaffold_structure.js` | **18-page skeleton**: pages → PageRoot/Header/Footer → `fit` (root height = used height) | first step of code-to-design; re-runnable, and phase 3 is the delivery-time height fix |
 
-> **Seed order iron rule**: `seed_storage.js` → `layout_engine.js` → `component_factory.js` → `audit_design.js`
+> **Seed order iron rule**: `seed_storage.js` → `layout_engine.js` → `component_factory.js` → `native_layout.js` → `audit_design.js`
 > (each consumes the previous one's `storage` keys. Failure behavior is deliberately different:
 > `audit_design.js` **refuses to run** without LY+CF and returns `{ err: 'run … first' }`, because a lint that cannot
 > see the engines would report CLEAN; `component_factory.js` **reports** `slots: ['LY not seeded']` in its return value
-> instead of throwing, because half a seed is still worth more than none. Either way: read the return, do not assume.)
+> instead of throwing, because half a seed is still worth more than none; `native_layout.js` refuses without `mkText`
+> and reads `storage.LY`/`storage.CF` **at call time**, so it can be seeded last. `token_engine.js`,
+> `palette_engine.js`, `prototype_engine.js` and `icon_engine.js` depend only on `penpot.library.local` /
+> `createShapeFromSvg` — they seed at any point (`IC.grid` additionally wants `mkText` from the first seed), and
+> re-seed after a storage wipe. Either way: read the return, do not assume.)
 >
 > **Build iron rule**: G11 = regions come from `LY` (a typed coordinate is a defect); G12 = controls come from `CF`
 > (a hand-built control is a defect and will also fail `name_invalid`); G13 = `designGate` CLEAN before delivery.
@@ -64,8 +72,9 @@ return { page: pg, ...r, remaining: q.length };
   Upgrade reusable assembly to component: `CF.component(group)` (= `createComponent([group])`). Note what registration does:
   the host **becomes** the component's main instance — it stays on the canvas, and `comp.remove()` deletes it along with
   every instance (api-pitfalls.md §6), so register from a masters board or accept that the board you registered from is the master.
-  **On a screen, "reuse" means calling the same `CF` factory again** — this build exposes no scriptable instance maker
-  (api-pitfalls.md §6), and a factory re-call produces identical geometry, so the ownership rule holds either way.
+  **On a screen, "reuse" means `CF.instance(CF.name('…'))`** — instancing *is* scriptable (api-pitfalls.md §6,
+  capabilities §5), and `CF.swap` switches the placed control to another registered variant; a `CF` factory re-call stays
+  valid as the fallback when no master was registered, and produces identical geometry either way.
 - **fixZOrder**: in-group front/back order repair (z semantics: larger `parentIndex` = more front). `penpot.group` puts the base plate above the label
   (label covered) → within group sort by descending area `setParentIndex(i)` (large base at bottom, text on top), instance internals skipped.
   `groupAssemblies` already has the same logic built-in (with group layer-slot preservation); use this engine for old-group batch fixes. Verify by whole-board export (small-shape group export has a cache illusion).
@@ -193,8 +202,14 @@ Still worth knowing from the pre-engine era, because `LY`/`CF` do not cover it:
 Browser/plugin crash → storage all lost. Rebuild in order:
 
 1. re-seed **in the engine order**: `seed_storage.js` (T/fonts/mkText/mkAbsBoard/absMount/pg/sleep) → `layout_engine.js`
-   (`LY`) → `component_factory.js` (`CF`) → `audit_design.js` (`designPage`/`designGate`); one command probes and
-   supplements what is missing;
-2. `penpotUtils.getPages()` inventory page structure, confirm canvas damage (100×100 degradation check in api-pitfalls.md §8);
+   (`LY`) → `component_factory.js` (`CF`) → `native_layout.js` (`NL`) → `audit_design.js` (`designPage`/`designGate`) →
+   `audit_layout.js` (`auditPage`), plus the three engines that carry their own state and work at any point once their
+   shapes exist: `token_engine.js` (`TK`), `palette_engine.js` (`LIB`), `prototype_engine.js` (`PR`); one command probes and
+   supplements what is missing. Storage loss also wipes `NL._reg` (the build-time declarations) — without it `auditFlow`
+   loses its `sizing_dropped`/`size_stale`/`not_settled` precision — so re-stamp with `NL.stamp` and prefer
+   `whenSettled` over remembered sleeps;
+2. `penpotUtils.getPages()` inventory page structure (measured working — returns the page objects; the alternative is
+   `penpot.currentFile.pages`; **there is no `penpot.pages`**, capabilities §10), confirm canvas damage (100×100
+   degradation check in api-pitfalls.md §8);
 3. re-collect all board ids (old ids invalid);
 4. when the user reports "some component missing", prioritize suspecting: component deletion taking the main instance along, timeout landing on wrong page causing mis-delete, crash degradation — investigate one by one per api-pitfalls.md §6/§11/§8.

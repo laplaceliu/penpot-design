@@ -324,4 +324,9 @@ SSE error: TypeError: fetch failed: unable to get local issuer certificate
 - Return values only give raw values (number/string/flat array); complex objects fail structuredClone.
 - Crash damage: the last batch's board/rect/ellipse may degrade to 100×100 (detected as exactly 100×100 non-text primitive), resize per spec; disabling WebGL significantly stabilizes; mild hang self-heals after sleep 60~120s.
 
-Layout three approaches in order: A bare board + world-coordinate appendChild (note export-offset risk) → B flex auto-layout (watch for hug collapse) → **C flex container + all absolute + world coordinates (recommended fallback)**. Full engines and pitfall table are in this skill's `references/`: mcp-automation.md (discipline/quick-ref) / api-pitfalls.md (mechanism details and three-approach tested table) / engines.md (engine mechanism and page recipes); engine code is in `scripts/`.
+Layout approach is a **per-artifact choice**, not an ordering: **flex via `storage.NL` is the default for screens** (the
+historical "B hug collapse" was vocabulary — `'fixed'`→`'fix'`, `paddingTop`→`topPadding` — capabilities §2), **absolute
+(`mkAbsBoard`/`absMount`)** for spec boards/art/pixel-exact overlays, **bare boards** for one-offs after checking the
+export offset. Full engines and pitfall table are in this skill's `references/`: mcp-automation.md (discipline/quick-ref) /
+api-pitfalls.md (mechanism details and three-approach tested table) / native-layout.md (flow authoring and its rules) /
+engines.md (engine mechanism and page recipes); engine code is in `scripts/`.

@@ -105,7 +105,10 @@ Out of scope: general coding tasks unrelated to Penpot / design systems / design
 | `references/mcp-automation.md` | **execute_code practical handbook**: session discipline, three layout approaches, pitfall quick-ref, variants/components, recreating UI libraries, driving the build through `LY`/`CF`, acceptance discipline |
 | `references/api-pitfalls.md` | Detailed execute_code API pitfalls (coordinates/Path/stroke/crop/text/variants/sandbox/crash/export/layout) |
 | `references/positioning-audit.md` | **Positioning audit**: incident post-mortem, eleven positioning-failure signatures S1–S11 (out-of-bounds/centering residual incl. the stale-center fingerprint/size degradation/header collision/root stray/font/board overlap/text overlap/malformed text/alignment-not-applied/loose assembly), root-cause chains, preventive gates G1–G7, standard operation order |
-| `references/design-tokens.md` | **Authoritative Design Tokens usage** (tested locally): 17 TokenTypes, value formats, default-applied properties, active/themes/priority, 6 application pitfalls, unbinding details, 9 doc-vs-implementation discrepancies |
+| `references/design-tokens.md` | **Authoritative Design Tokens usage** (tested locally): 17 TokenTypes, value formats, default-applied properties, active/themes/priority, 6 application pitfalls, unbinding details, 9 doc-vs-implementation discrepancies, and the theme-switch **paint proof** (§9.1) |
+| `references/penpot-capabilities.md` | **The authority on what may be claimed** — every Penpot API used by this skill with the exact call, the measured readback and the date: sizing/flex vocabulary, grid, components/variants (§5), tokens/themes (§6), library colors (§7), prototype interactions (§8), delivery/export/versions (§9), plus §12 "still unverified". Read this **before** believing a doc or designing against an API |
+| `references/native-layout.md` | **Native auto-layout authoring** (`storage.NL`): the four-layer division of labour (LY/CF/NL/absolute), seed + call shape, rules R1–R6, the sizing decision table and its six measured traps, screen build order, grid, construction aids, and `auditFlow`'s signature → repair table |
+| `references/icons.md` | **Icons**: which channel (`CF.glyph` in-control / `IC.place` / `CF.svgIcon`), the embedded Lucide catalog (1966 icons, ISC) and its JSONL contract, why a `.penpot` library download is not automatable, license table (Lucide/Material/FontAwesome/penpothub), extending the catalog, SVG constraints |
 | `references/engines.md` | Engines and recipes: seed order, repair-engine mechanics, factory templates, screen-assembly pattern, crash-rebuild checklist (code in scripts/) |
 | `references/design-to-code-generic.md` | **Generic codegen discipline** (shared across all stacks: layering/tokens/assets/five states/integer pixels/acceptance) |
 | `references/stack-profiles.md` | **Tech-stack tiers**: platform-family classification, runtime prompts (only before design→code), unknown-stack handling |
@@ -117,9 +120,13 @@ Out of scope: general coding tasks unrelated to Penpot / design systems / design
 | `references/verification.md` | PIL pixel-level verification full flow and root-cause quick-ref |
 | `scripts/seed_storage.js` | execute_code seeding engine (**`storage.T` is only a JS-side color mirror, it does NOT create Penpot tokens** + `mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`; `ct()` is **async, measures real centering after render**, calls must `await`) |
 | `scripts/layout_engine.js` | **Layout engine** (`storage.LY`): `SPACE`/`ROWS`/ramp, `TIERS`, `slots`, `recipe(key,{tier,w,h,x0,y0})` → a frozen region plan read with `LY.rect(name)`, `snap`/`pack`/`fold`/`viewportHeight`, `keys()`, `missing()` |
-| `scripts/component_factory.js` | **Component factory** (`storage.CF`): 74 control factories over the 6 `CF.map()` groups (`ladder`/`P`/`STATE`/`fills`/`name`/`minHit`/`tier`/`matrix`/`map`/`missing`/`component`/`variants`); every variant × state of a family drawn and **named** so coverage is decidable |
+| `scripts/component_factory.js` | **Component factory** (`storage.CF`): 74 control factories over the 6 `CF.map()` groups (`ladder`/`P`/`STATE`/`fills`/`name`/`minHit`/`tier`/`matrix`/`map`/`missing`); every variant × state of a family drawn and **named** so coverage is decidable. Plus the **component layer**: `component`/`register` (master), `get`/`instance`/`swap` (place + switch a control on a screen), `variantSet`/`variants` (native variant container), `svgIcon` (SVG → editable vectors) |
+| `scripts/native_layout.js` | **Native auto-layout engine** (`storage.NL`): flow authoring with `frame`/`row`/`col`/`gridFrame`/`cell`, `sizing`/`fill`/`fix`/`hug`, whitelisted flex vocabulary (`applyFlex`, rules R1–R6), `guide`/`stamp`, **`whenSettled`** (polls the stale fingerprint), **`auditFlow`** (the flow lint: `not_settled`/`sizing_dropped`/`main_axis_overflow`/… ), `nudge`, `reflow`, `fromRecipe` — the editable half of every screen (native-layout.md) |
 | `scripts/audit_design.js` | **Design-rule lint engine** (read-only): `designPage` / `designStart`+`designNext` / `designGate` — the 18 HARD rules of `design-guide.md` §11, verdict `CLEAN`/`NEEDS_REPAIR` (gate G13) |
-| `scripts/token_engine.js` | **Design Tokens engine**: `TK.seed` (build set + record tokens, auto `active:true`) / `TK.apply` (apply + readback verify, catch silent failures) / `TK.audit` (inactive/broken-reference health check) / `TK.unbindFill` |
+| `scripts/token_engine.js` | **Design Tokens engine**: `TK.seed` (build set + record tokens, auto `active:true`) / `TK.apply` (apply + readback verify, catch silent failures) / `TK.paint`+`TK.changed` (theme-switch **paint** proof) / `TK.audit` (inactive/broken-reference health check) / `TK.unbindFill` |
+| `scripts/palette_engine.js` | **Library-color engine** (`storage.LIB`): `LIB.seed`/`put` (idempotent create→rename→set, because `createColor` ignores its args) / `LIB.fill`·`LIB.stroke` (ref-bound paint, readback = `fillColorRefId`) / `LIB.audit` (three-channel inventory: library / token / raw) / `LIB.replace` (raw-hex swap) |
+| `scripts/icon_engine.js` | **Icon catalog + import engine** (`storage.IC`): `seed`/`add` (JSONL or any SVG) / `get`·`search`·`missing` (alias + camel↔kebab lookup) / `svg` (currentColor substituted) / `place` (import through the origin throwaway; `x/y` = world, no `x/y` = flow) / `grid` (labeled sheet for `01 · Foundations`) — catalog `assets/icons/lucide.jsonl`, decision + licenses in `references/icons.md` |
+| `scripts/prototype_engine.js` | **Prototype + delivery engine** (`storage.PR`): `flow`/`ensureFlow`, `nav`/`overlay`/`close`/`url`/`delay`, `prototype(links,{flow})` (batch, self-verifying `dropped`), `read`/`clear`, `exports`/`bytes`, `checkpoint`/`versions`/`restore`, `ANIM` presets — rules P1–P4 in capabilities §8/§9 |
 | `scripts/repair_engines.js` | Repair engines (**fixStaleCenter** / **groupAssemblies** / **fixZOrder** / alignPage / vAlignPage / fixInner / unclip / cleanOrphans) |
 | `scripts/fix_layout.js` | flex-collapse batch repair engine (absRow + fixCol, two-round convergence) |
 | `scripts/audit_layout.js` | **Positioning audit engine** (read-only): `auditPage` / `auditAll`, **eleven signature classes** (out-of-bounds/centering residual (incl. **stale-center fingerprint**)/size degradation/header collision/root-level float/sibling board overlap/text overlap/font/**malformed text**/**alignment-not-applied**/**loose assembly loose_assembly**) + verdict `CLEAN`/`NEEDS_REPAIR` — independent of `audit_design.js`, which owns the 18 design rules |
@@ -146,9 +153,13 @@ Then (shared by both ways, details in `references/code-to-design.md`):
    two schemes → `<system> · Core` + `<system> · Dark` (Core first) + Scheme group with two themes.
 0.5 **[Gate G1] Read and paste the canonical scripts verbatim, in seed order**:
    `scripts/seed_storage.js` (`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`) → `scripts/layout_engine.js` (`storage.LY`) →
-   `scripts/component_factory.js` (`storage.CF`) → `scripts/token_engine.js` (`TK.*`) → `scripts/audit_layout.js` (`auditPage`) →
-   `scripts/audit_design.js` (`designPage`/`designGate`). The order matters: `CF` reads `LY` at seed time and reports
-   `slots:['LY not seeded']` when it is missing; `audit_design.js` returns `{ err: 'run … first' }` rather than a false CLEAN.
+   `scripts/component_factory.js` (`storage.CF`) → `scripts/native_layout.js` (`storage.NL`) → `scripts/token_engine.js` (`TK.*`) →
+   `scripts/audit_layout.js` (`auditPage`) → `scripts/audit_design.js` (`designPage`/`designGate`).
+   The order matters: `CF` reads `LY` at seed time and reports `slots:['LY not seeded']` when it is missing;
+   `audit_design.js` returns `{ err: 'run … first' }` rather than a false CLEAN; `native_layout.js` reads `LY`/`CF`
+   **at call time**, so it tolerates being seeded late. `palette_engine.js` (`LIB`) and `prototype_engine.js` (`PR`)
+   depend only on `penpot.library.local` — seed them any time, and re-seed **every** engine after a storage wipe
+   (the post-crash order is in engines.md §5). Read each seed's return value: `seeded`, `factories`, `slots`, `fns`.
    **Do not invent your own coordinate/text/layout helpers** — the incident post-mortem in `references/positioning-audit.md`: a temporary
    self-made `mkAbsBoard`/text-box copied the same systematic offset into every page. When something is missing, **add a factory to `CF`
    or a recipe to `LY`**; do not rewrite the ones above and do not hand-build a one-off board in `execute_code`.
@@ -163,6 +174,11 @@ Then (shared by both ways, details in `references/code-to-design.md`):
    `storage.TK.assert()` must PASS (no inactive set, no broken reference).
    ⚠️ Two must-knows: `addSet()` defaults to **`active:false`**, tokens in an inactive set **bind successfully but the value does not take effect (silent failure)**;
    `storage.T` in `seed_storage.js` is only a JS-side color mirror, **it does not create any Penpot token**. See `references/design-tokens.md`.
+   For a light+dark answer, build `<system> · Core` + `<system> · Dark` + the `Scheme` group with two themes now — the
+   switch is a **theme operation** (capabilities §6), and the proof is the paint: `TK.paint(shapes)` → `TK.activateTheme('Scheme','Dark')`
+   → settle → `TK.changed(before, …)` must report `changed ≥ 1` (design-tokens §9.1).
+   **Also seed the library-color channel**: `storage.LIB.seed(spec)` from the same palette — `LIB.fill`/`LIB.stroke` bind
+   refs that repaint on one `c.color` write, and `LIB.audit(shapes)` later tells you which channel each fill uses.
 4. **[Gate G2/G3] Pilot the first board, then batch**: build the first board of `01 · Foundations` → `storage.auditPage()` must have no
    `out_of_bounds` / `header_collision` → immediately export and eyeball that there is no overall offset → only then allow batch building.
    During batch, **run a single-board audit right after each board is built** (only this board's findings), do not copy the same offset into 100+ boards.
@@ -180,24 +196,37 @@ Then (shared by both ways, details in `references/code-to-design.md`):
      every control from a `CF` factory. One board per recipe × **tier that the recipe accepts** (`LY.recipe` returns
      `{ err, use }` otherwise — follow the `use` pointer, never squeeze); set `CF.tier` per board before building.
      Height comes from the recipe's `totalH` (long-document bands), not from a canvas habit, and each board gets `LY.fold(board, tier)`.
+     **Regions mount absolute, their interiors are flow**: `NL.fromRecipe(key, {…, parent: host})` turns each `LY.rect`
+     into a flex board (`NL.stamp` records recipe/region/tier), then `NL.add(region, control, 'fix','fix')` joins controls
+     to the flow (**`fix`, never `auto`** — a board's `auto` is hug and collapses to the label), instances through
+     `CF.instance`. Finish each screen with `await NL.whenSettled(host)` + `NL.auditFlow(host)` reading `CLEAN`.
 5. Register library components with `CF.component(host)` (masters conventionally collected in `AI Component Masters`;
    **the tag must be a child element of the master board**, otherwise registration yields an empty-shell component;
    `createComponent` does **not** copy — the host *becomes* the main instance).
 6. **[Gate G4] Finish page by page, fixed order**: `cleanOrphans()` → `fixStaleCenter()` → `alignPage()` → `vAlignPage()` → `fixInner()` → `unclip()` → `groupAssemblies()` → `fixZOrder()`;
    (`fixStaleCenter` fixes the large offset from "centering computed from the transient width/height at creation moment" baked into coordinates, must run before `alignPage`; text centering always `await storage.ct(...)` or `storage.centerIn(t, host)`, see positioning-audit.md S2)
    **[Gate G10] Assembly ownership**: a complete set of primitives (base plate + label + icon) must be **grouped or made a component, no loose same-level stacking**
-   — reuse/registration that enters the 13 index becomes a component (screens **re-call the same `CF` factory**: this build has no scriptable instance maker, api-pitfalls §6), one-off use `penpot.group(...)` groups them;
+   — reuse/registration that enters the 13 index becomes a component (screens **place an instance**: `CF.instance(CF.name(…))`
+   + `CF.swap` for state switches — instancing is scriptable, api-pitfalls §6; a `CF` factory re-call is the fallback when
+   no master exists), one-off use `penpot.group(...)` groups them;
    judgment and naming contract in `penpot-structure.md` §4.3, audit signature `loose_assembly` (S11), repair engine `groupAssemblies()` (idempotent, at the end of the G4 chain).
    Record the repair log `[position, content, axis, offset]` for manual review, then restore deliberately non-centered elements per `engines.md` §1.
 7. **Recompute + accept [Gate G5 + G13]**: two independent auditors must both read CLEAN, per page, with the scope named in contract §2:
    `storage.auditPage()` (positioning) and `storage.designGate({ tier | families })` (the 18 design rules — grid, scale, rhythm, ramp,
    contrast, touch floor, split ratio, state/variant coverage, fold marker). A `designGate` that returns `{ err: 'run … first' }` is not a CLEAN.
+   Every **screen** additionally carries `storage.NL.auditFlow(board) === 'CLEAN'` (flow authoring: settled, sized, no dropped declarations).
    Remaining findings must each be manually confirmed as deliberate. Then export PNG per board (or a contact sheet per page) and accept against the
    self-check list (pages 14–16 accepted per recipe × tier).
    **Boards never exported must not be described as "verified"**.
    Also run `storage.TK.audit()`, and on **at least one real shape** do
    `await storage.TK.apply(tokenName, [shape])` and confirm `ok:true` is returned —
    **"no error" ≠ "took effect"**: wrong set-activation state or inapplicable shape both silently no-op; the only verdict is readback.
+   With two schemes, prove the switch on the **paint** (`TK.paint` → `TK.activateTheme` → `TK.changed`, design-tokens §9.1)
+   and re-export after switching.
+   If the delivery ships interactive: `storage.PR.prototype(links, { flow: 'Task · …' })` first (a named flow beats the
+   auto-generated `Flow N`), then confirm every row reports `dropped:false` and `PR.flows()` shows only your names;
+   set `PR.exports(board, presets)` per screen so the file leaves batch-export configured, and take a `PR.checkpoint(label)`
+   before any risky batch — **only `ok:true` counts**, because `saveVersion` can be silent (capabilities §9).
 
 ## Pre-start check: confirm whether Penpot / MCP is ready (mandatory, probe before acting)
 

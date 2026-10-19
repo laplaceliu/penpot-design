@@ -339,6 +339,29 @@ Health-check items (any failure = not qualified):
 4. name maps 1:1 to DESIGN.md, no cross-set name conflict (unless intentional theme override);
 5. If `themes` exist, their `activeSets` and `active` states match expectations.
 
+### 9.1 The theme switch must be proven on the **paint**, not on the bindings (added with `TK.paint`/`TK.changed`)
+
+Bindings and paint are read at different moments, and this build separates them: adding a later active set changes the
+token's `resolvedValueString` while **the already-bound shape keeps its old fill** — only a **theme activation**
+re-skins it (capabilities §6). So `tokens.fill === 'color.primary'` proves nothing about what a reviewer sees. The
+acceptance loop, run after the light/dark sets and the `Scheme` group exist:
+
+```js
+const shapes = /* the real shapes you care about, e.g. every control on a screen board */;
+const before = storage.TK.paint(shapes);              // [{key, fill:{color,opacity,ref}, stroke:{…}}]
+storage.TK.activateTheme('Scheme', 'Dark');           // one call re-skins every token-bound shape
+await storage.NL.whenSettled(board);                  // then let layout settle (R3)
+storage.TK.changed(before, storage.TK.paint(shapes)); // {changed: n, rows:[{key, fill:[before, after]}]}
+```
+
+Requirements on that read: `changed === 0` while a switch was requested is a **failure** (nothing re-skinned), a stable
+second run must report `changed: 0`, and the comparison is case-insensitive on purpose — this build lowercases hex
+fills on readback (`#2563EB` reads back `#2563eb`). After the switch, settle and **re-export** before judging
+(capabilities §0.2: the render is the referee).
+
+Same rule on the library-color channel (`scripts/palette_engine.js`): edit `c.color`, settle, read the bound shape's
+`fillColor` — the ref surviving is what proves the paint came from the channel and not from a literal write.
+
 ## 10. Doc-vs-implementation discrepancy list (following docs will trip you up)
 
 | Item | Docs say | Tested |

@@ -197,7 +197,7 @@ Every visual component's primitives live in **exactly one** container:
 
 | Ownership | Judgment | How | Name |
 |---|---|---|---|
-| **component** | reused: in the 13 index, or in ≥ 2 places on 14–16 | assemble into a group → `CF.component(group)`; on a screen, **call the same `CF` factory again** (this build has no scriptable instance maker — api-pitfalls §6), never copy loose primitives into a screen | `Family·Type·Size·State` |
+| **component** | reused: in the 13 index, or in ≥ 2 places on 14–16 | assemble into a group → `CF.component(group)`; on a screen, **place an instance** with `CF.instance(CF.name(…))` and switch states with `CF.swap` (instancing is scriptable — api-pitfalls §6, capabilities §5); a `CF` factory re-call is the fallback when no master exists. Never copy loose primitives into a screen | `Family·Type·Size·State` |
 | **group** | single-use primitive set: a matrix cell, an anatomy illustration, a KPI card | `penpot.group([host, …members])` in the same parent | host name |
 | **board** | page partition, spec board, screen board, overlay container | `storage.mkAbsBoard` (approach C), not a group host | see §2 |
 
