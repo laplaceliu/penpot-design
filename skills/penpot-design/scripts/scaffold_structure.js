@@ -5,7 +5,9 @@
 // PageRoot is always 1920 — the spec-sheet canvas, not a screen. Screen widths come from the tier (LY.TIERS: web 1440 / pad 834 / mobile 375).
 
 var CANVAS_W = 1920, CONTENT_X = 80, CONTENT_R = 1840;
-var HEADER_H = 160, FOOTER_H = 80, CONTENT_Y = 240, MIN_H = 1000;
+var HEADER_H = 160, FOOTER_H = 80, CONTENT_Y = 256, MIN_H = 1000;
+// CONTENT_Y = header bottom (160) + one LY.SPACE step (96): 240 produced an 80px chrome→content gap, and 80 is not on
+// the spacing scale, so designGate flagged the scaffold itself (measured). 96 is on-scale; fit() uses this as the floor.
 
 // The page contract, one row per §2 line: n = page name, d = header description, t = token reference line.
 var PAGES = [
@@ -40,11 +42,22 @@ return (function () {
   storage.scaffoldContract = function () { return PAGES.map(function (p) { return p.n; }); };
 
   // Phase 1: create the missing pages (≤6 per call, to avoid the timeout).
+  // ⚠️ Measured in this build: `penpot.createPage('00 · Cover')` and `penpot.createPage({name: …})` BOTH ignore the
+  // argument — the page lands as `Page N`. Create first, then assign `.name` (assignment readback works). Without the
+  // assignment every re-run sees the contract pages as "missing" and mints six more generic pages forever.
   var missing = [];
   for (var i = 0; i < PAGES.length; i++) if (!penpotUtils.getPageByName(PAGES[i].n)) missing.push(PAGES[i].n);
   if (missing.length) {
-    var batch = missing.slice(0, 6);
-    for (var j = 0; j < batch.length; j++) penpot.createPage(batch[j]);
+    var batch = missing.slice(0, 6), made = [];
+    for (var j = 0; j < batch.length; j++) {
+      var pg = null;
+      try { pg = penpot.createPage(); } catch (e) { return { err: 'createPage failed for ' + batch[j] + ': ' + String(e).slice(0, 90) }; }
+      try { pg.name = batch[j]; } catch (e) { return { err: 'page.name assignment failed for ' + batch[j] + ': ' + String(e).slice(0, 90) }; }
+      made.push(pg);
+    }
+    // readback: report, never assume (the same rule every other gate follows)
+    var notApplied = batch.filter(function (n) { return !penpotUtils.getPageByName(n); });
+    if (notApplied.length) return { err: 'page names did not apply: ' + notApplied.join(', '), created: made.length };
     return { createdPages: batch, left: missing.length - batch.length };
   }
 

@@ -441,6 +441,13 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 * `Page` members: `id name root getRoot remove background flows rulerGuides getShapeById findShapes openPage createFlow
   removeFlow addRulerGuide removeRulerGuide addCommentThread removeCommentThread findCommentThreads` + pluginData.
   `findShapes({name, nameLike, type})` is the cheap lookup; `addCommentThread` means design feedback is scriptable too.
+* **`penpot.createPage(name)` and `createPage({name})` both ignore the argument** — the page lands as `Page N` (measured
+  two ways). The working recipe is `const p = penpot.createPage(); p.name = '01 · Foundations';` — the assignment
+  round-trips. Without the assignment, a name-checked queue (like the scaffold's) sees every page as permanently
+  missing and mints six more generic pages per run.
+* **`penpotUtils.getPages()` returns detached snapshots**: writes to `.name` silently do nothing and `remove` is
+  `undefined`. Resolve through **`penpotUtils.getPageByName(name)`** (live proxy: rename ✓, `remove()` ✓ even on a
+  non-active page) or `penpot.currentPage` after `openPage`. `getPages()` is fine for reading names/ids.
 * `Object.keys(penpotUtils)` returns `[]` (prototype accessors) — probe with the names you need, not by enumeration.
   Measured to exist: **`getPages()`** (returns the page objects — used by the audit queues; the alternative is
   `penpot.currentFile.pages`), `addFlexLayout`, `createVariantContainer`, `shapeStructure`, `getBounds`, `generateCss`

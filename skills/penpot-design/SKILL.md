@@ -151,10 +151,16 @@ Then (shared by both ways, details in `references/code-to-design.md`):
      **You must clarify "sectional surface polarity ≠ switchable theme" when asking**, otherwise users easily mismatch.
    The two answers together determine the subsequent **token structure**: light only → 1 set, 0 themes;
    two schemes → `<system> · Core` + `<system> · Dark` (Core first) + Scheme group with two themes.
-0.5 **[Gate G1] Read and paste the canonical scripts verbatim, in seed order**:
+0.5 **[Gate G1] Load the canonical scripts verbatim, in seed order**:
    `scripts/seed_storage.js` (`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`) → `scripts/layout_engine.js` (`storage.LY`) →
    `scripts/component_factory.js` (`storage.CF`) → `scripts/native_layout.js` (`storage.NL`) → `scripts/token_engine.js` (`TK.*`) →
    `scripts/audit_layout.js` (`auditPage`) → `scripts/audit_design.js` (`designPage`/`designGate`).
+   **"Load", not "paste": `execute_code` arguments are capped at ~21 KB**, so the big engines must be fetched from the
+   skill's loopback server (`python3 scripts/serve_skill.py`) and built with
+   `new Function('storage','penpot','penpotUtils', src)` — full recipe in engines.md §"Seeding without pasting"
+   (measured: 259 KB `component_factory.js` seeds in 35 ms). `scaffold_structure.js` and `fix_layout.js` **execute on
+   load** (they are runners, and scaffold schedules page switches) — load them only when you mean to run them, and
+   re-verify `penpot.currentPage.name` before touching shapes afterwards.
    The order matters: `CF` reads `LY` at seed time and reports `slots:['LY not seeded']` when it is missing;
    `audit_design.js` returns `{ err: 'run … first' }` rather than a false CLEAN; `native_layout.js` reads `LY`/`CF`
    **at call time**, so it tolerates being seeded late. `palette_engine.js` (`LIB`) and `prototype_engine.js` (`PR`)
@@ -167,7 +173,10 @@ Then (shared by both ways, details in `references/code-to-design.md`):
    the numbers must be the ones `LY.SPACE` / `LY.ROWS` / the type ramp / `CF.ladder` already use, or an explicit override of them) →
    `npx @google/design.md lint DESIGN.md` until 0 errors.
 2. **Connect Penpot MCP** (see next section). Persist the build queue and completed-page list **to disk** (e.g. `build-progress.json`, gate G6).
-3. Seed the engines (G1) → `scripts/scaffold_structure.js` builds the 18-page skeleton + PageRoot/header/footer
+3. Seed the engines (G1) → `scripts/scaffold_structure.js` builds the 18-page skeleton + PageRoot/header/footer —
+   it is a **queue runner**: one batch per call (≤6 pages created per call; one page per call for the PageRoot/Header/Footer
+   and the fit phases), **run it repeatedly until it returns `{done:true}`** (`createPage` ignores its name argument, so the
+   fixed script assigns `.name` itself and verifies the readback)
    (PageRoot is always 1920: it is the spec-sheet canvas, never a screen).
    **Immediately record Design Tokens [Gate G9]**: `storage.TK.seed(spec)`
    (spec generates 17 TokenTypes from DESIGN.md sections per the mapping in `references/design-tokens.md` §8) →

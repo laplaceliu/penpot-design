@@ -137,7 +137,7 @@ return (function () {
       if (o.parent) {
         o.parent.appendChild(g);
         if (g.layoutChild) {
-          if (o.x !== undefined && o.y !== undefined) { try { g.layoutChild.absolute = true; g.x = o.x; g.y = o.y; } catch (e) {} }
+          if (o.x !== undefined && o.y !== undefined) { try { g.layoutChild.absolute = true; g.x = o.x; g.y = o.y; if (storage.NL && storage.NL._note) storage.NL._note(g, { declaredAbsolute: true }); } catch (e) {} }
           else { try { g.layoutChild.horizontalSizing = o.sizing || 'fix'; g.layoutChild.verticalSizing = o.sizing || 'fix'; } catch (e) {} }
         } else if (o.x !== undefined) { try { g.x = o.x; g.y = o.y; } catch (e) {} }
       } else {

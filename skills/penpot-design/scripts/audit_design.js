@@ -38,7 +38,7 @@ return (function () {
   // ---------------------------------------------------------------- rule registry (design-guide §11 + component-library §4)
   const RULES = {
     off_grid: '§1 · composed-layout coordinates and box sizes on the 4px grid (hairlines, text and glyph-derived control boxes exempt)',
-    off_scale_gap: '§1 · a measured gap between two sibling blocks must be on LY.SPACE',
+    off_scale_gap: '§1 · the gap between two ADJACENT sibling blocks (<=256) must be on LY.SPACE; cumulative distances and larger separations are not judged',
     off_ramp_size: '§3.2 · font size ∈ the declared ramp; ≥12px, 11px only for a role-named node (axis / overline / kbd)',
     measure_overflow: '§3.4 · multi-line prose wider than the 760px measure (chat/table/code exempt)',
     split_ratio_50_50: '§8 · a two-pane split narrower than 2.2:1, or 3+ identical panes',
@@ -68,6 +68,7 @@ return (function () {
     OptionList: 1, CommandPalette: 1 };
 
   // ---------------------------------------------------------------- tunables (each one cites the prose it comes from)
+  const SPREAD_MAX = 256;   // > 2x the largest LY.SPACE step (128): a layout spread, not a rhythm gap
   const CFG = {
     hairline: 2,           // §1 exception: 1px border/divider
     gapTol: 0.5,          // every producer of these numbers is integer-exact (LY.SPACE, snap-to-4, C4 growth), so a
@@ -317,18 +318,21 @@ return (function () {
 
       // level 1 (composed layout only): grid + radius nesting
       const compos = !st.inCf && !st.inSpec;
-      if (compos && !exempt && (isPlate(s) || typeOf(s) === 'board')) {
+      // imported SVG interiors (createShapeFromSvg → groups named svg/… with svg-* children) are vector geometry:
+      // their sizes/positions come from the drawing, not from authored coordinates — judging them on the 4px grid is noise.
+      const inImported = par && typeOf(par) === 'group' && (/^(svg|base-background)/.test(nm) || /^svg/.test(nameOf(par)));
+      if (compos && !exempt && !inImported && (isPlate(s) || typeOf(s) === 'board')) {
         const pr = par ? box(par) : { x: 0, y: 0 };
         const axes = [];
         if (isPlate(s) || !fam) {                                  // a CF control host's own size is ladder- or content-derived
           // A device viewport (375, 834) is a hardware fact, not a coordinate the designer chose — §1 does not bind it.
           const devw = [LY.TIERS.web.w, LY.TIERS.pad.w, LY.TIERS.mobile.w];
-          if (r.w > CFG.hairline && devw.indexOf(N(r.w)) < 0 && LY.snap(r.w) !== r.w) axes.push('w=' + N(r.w));
-          if (r.h > CFG.hairline && LY.snap(r.h) !== r.h) axes.push('h=' + N(r.h));
+          if (r.w > CFG.hairline && devw.indexOf(N(r.w)) < 0 && Math.abs(LY.snap(r.w) - r.w) > 0.5) axes.push('w=' + N(r.w));   // epsilon: penpot.group bbox math leaves 1e-13 residue
+          if (r.h > CFG.hairline && Math.abs(LY.snap(r.h) - r.h) > 0.5) axes.push('h=' + N(r.h));
         }
         if (r.w > CFG.hairline && r.h > CFG.hairline) {
-          if (LY.snap(r.x - pr.x) !== r.x - pr.x) axes.push('x=' + N(r.x - pr.x));
-          if (LY.snap(r.y - pr.y) !== r.y - pr.y) axes.push('y=' + N(r.y - pr.y));
+          if (Math.abs(LY.snap(r.x - pr.x) - (r.x - pr.x)) > 0.5) axes.push('x=' + N(r.x - pr.x));
+          if (Math.abs(LY.snap(r.y - pr.y) - (r.y - pr.y)) > 0.5) axes.push('y=' + N(r.y - pr.y));
         }
         if (axes.length) add('off_grid', s, st.top, axes.join(' ') + ' off the 4px grid');
       }
@@ -419,23 +423,24 @@ return (function () {
       // §1 measured gaps between sibling blocks (the 2× rule and the scale are the same check from two sides).
       const vs = blocks.slice().sort((a, c) => num(a, 'y', 0) - num(c, 'y', 0));
       for (let i = 0; i < vs.length - 1; i++) {
-        for (let j = i + 1; j < vs.length; j++) {
+        for (let j = i + 1; j < i + 2; j++) {   // neighbour only: non-adjacent "gaps" are cumulative spacing, not rhythm
           const A = box(vs[i]), Bc = box(vs[j]);
           if (Math.min(A.r, Bc.r) - Math.max(A.x, Bc.x) <= 0) continue;
           const gap = A.b <= Bc.y ? Bc.y - A.b : (Bc.b <= A.y ? A.y - Bc.b : 0);
-          if (gap > 0 && gap < r.h && !LY.onScale(gap, CFG.gapTol)) {
+          if (gap > 0 && gap < r.h && gap <= SPREAD_MAX && !LY.onScale(gap, CFG.gapTol)) {
             add('off_scale_gap', gap === Bc.y - A.b ? vs[j] : vs[i], b, 'gap ' + N(gap) + ' between "' + nameOf(vs[i]) + '" and "' + nameOf(vs[j]) + '" is off ' + LY.SPACE.join('/'));
           }
         }
       }
       const hs = blocks.slice().sort((a, c) => num(a, 'x', 0) - num(c, 'x', 0));
       for (let i = 0; i < hs.length - 1; i++) {
-        for (let j = i + 1; j < hs.length; j++) {
+        for (let j = i + 1; j < i + 2; j++) {   // neighbour only (same reason)
           const A = box(hs[i]), Bc = box(hs[j]);
           if (Bc.x - A.r <= 0) continue;                            // not ordered / overlapping in x
           const yh = Math.min(A.b, Bc.b) - Math.max(A.y, Bc.y);
           if (yh < Math.min(A.h, Bc.h) * 0.5) continue;             // different rows, not a column gap
           const gap = Bc.x - A.r;
+        if (gap > SPREAD_MAX) continue;
           if (gap > 0 && !LY.onScale(gap, CFG.gapTol)) {
             add('off_scale_gap', hs[j], b, 'column gap ' + N(gap) + ' between "' + nameOf(hs[i]) + '" and "' + nameOf(hs[j]) + '" is off scale');
           }

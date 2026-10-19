@@ -216,6 +216,8 @@ return (function () {
       child.layoutChild.absolute = true;
       child.x = o.absolute.x !== undefined ? o.absolute.x : o.x;
       child.y = o.absolute.y !== undefined ? o.absolute.y : o.y;
+      // a deliberate pin must be declared, or auditFlow reports it as absolute_child (same rule as absMount)
+      NL._note(child, { declaredAbsolute: true });
       return { mounted: child.name, mode: 'absolute' };
     }
     if (o.alignSelf) { try { child.layoutChild.alignSelf = o.alignSelf; } catch (e) {} }
@@ -641,18 +643,34 @@ return (function () {
     o = o || {};
     const plan = LY.recipe(key, { tier: o.tier, w: o.w, h: o.h, x0: o.x0, y0: o.y0 });
     if (plan && plan.err) return plan;
-    const names = Object.keys(plan.regions || {});
+    // Two plan shapes exist (measured): app recipes carry `regions` (world boxes, resolved through LY.rect which adds
+    // the recipe x0/y0 offset); document/band recipes — landing, blogArticle, pricing… — carry `bands`, which are
+    // **frame-relative** and must be offset by LY._ofs here. Reading only `regions` made NL.fromRecipe return an EMPTY
+    // skeleton with `err:null` for every band recipe — a silent no-op, exactly what an engine must never do.
+    const boxes = {};
+    if (plan.regions && Object.keys(plan.regions).length) {
+      Object.keys(plan.regions).forEach((n) => { const r = LY.rect(n); if (r && r.w && r.h) boxes[n] = { rect: r, kind: 'region' }; });
+    } else if (plan.bands && Object.keys(plan.bands).length) {
+      const ofs = LY._ofs || { x: 0, y: 0 };
+      Object.keys(plan.bands).forEach((n) => {
+        const b = plan.bands[n];
+        if (!b || !b.w || !b.h) return;
+        boxes[n] = { rect: { x: (b.x || 0) + ofs.x, y: (b.y || 0) + ofs.y, w: b.w, h: b.h }, kind: 'band' };
+      });
+    }
+    const names = Object.keys(boxes);
+    if (!names.length) return { err: 'recipe ' + key + ' produced neither regions nor bands — plan keys: ' + Object.keys(plan).join(',') };
     const out = {};
     names.forEach((name) => {
-      const r = LY.rect(name);
-      if (!r || !r.w || !r.h) return;
+      const r = boxes[name].rect;
       const b = NL.frame('region·' + name, { x: r.x, y: r.y, w: r.w, h: r.h, fill: o.fill || null, radius: o.radius || 0,
         dir: 'column', gap: o.gap === undefined ? 16 : o.gap, pad: o.regionPad === undefined ? 24 : o.regionPad,
         sizing: 'fix', parent: o.parent, absolute: o.parent ? { x: r.x, y: r.y } : null });
-      NL.stamp(b, { recipe: key, region: name, tier: plan.tier || o.tier || 'web' });
+      NL.stamp(b, { recipe: key, region: name, kind: boxes[name].kind, tier: plan.tier || o.tier || 'web' });
       out[name] = b;
     });
-    return { recipe: key, tier: plan.tier, frame: plan.frame, notes: plan.notes, regions: out, keys: Object.keys(out) };
+    return { recipe: key, tier: plan.tier, frame: plan.frame, notes: plan.notes, regions: out, keys: names,
+             bands: names.length && boxes[names[0]].kind === 'band' ? out : undefined, totalH: plan.totalH };
   };
 
   return { seeded: 'NL', version: NL.VERSION,

@@ -38,10 +38,14 @@ return (function () {
   };
 
   // ---- mount: appendChild first, then absolute, then write world coordinates ----
+  // Every deliberate pin is recorded in NL's `_reg`, so NL.auditFlow's `absolute_child` only fires on pins the build
+  // code did NOT make (crash leftovers, reflow escapes) — an absMount is by definition a declaration (measured gap:
+  // without this, every absMount'd child of an engine frame was reported as absolute_child).
   storage.absMount = function (parent, child, worldX, worldY) {
     parent.appendChild(child);
     child.layoutChild.absolute = true;
     child.x = worldX; child.y = worldY;
+    try { if (storage.NL && storage.NL._note) storage.NL._note(child, { declaredAbsolute: true }); } catch (e) {}
     return child;
   };
 
@@ -50,8 +54,10 @@ return (function () {
   // Iron rule: **this parameter must be present from the very start**. Adding a font option to mkText halfway through
   // would make the display font inconsistent between early and late batches, and this kind of inconsistency can't be caught by the geometry audit (only via auditPage().fonts histogram).
   const _noto = penpot.fonts.findByName('Noto Sans SC');
-  const _latin = penpot.fonts.findByName('Nunito');
-  const _display = penpot.fonts.findByName('Anton');   // ← replace with the display font from DESIGN.md
+  // fonts come from the system contract (storage.T), not from hard-coded families — a re-skinned file must not keep
+  // drawing in the default stack (same single-source rule as the palette: design-tokens §8.1)
+  const _latin = penpot.fonts.findByName((T && T.bodyFont) || 'Nunito');
+  const _display = penpot.fonts.findByName((T && T.displayFont) || 'Anton');
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
   storage.mkText = function (str, x, y, size, color, weight, fontRole) {
     const t = penpot.createText(str);

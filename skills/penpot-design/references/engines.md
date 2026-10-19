@@ -42,6 +42,40 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 > Signature judgment and noise rules are in `references/positioning-audit.md`.
 > **When a design-rule signature keeps coming back, fix the producer, not the board** (`LY`/`CF`/the palette), then rebuild that board.
 
+### Seeding without pasting: fetch + new Function (the only viable path for the big engines)
+
+**Pasting is capped** (`execute_code` arguments are truncated at ~21 KB), so `component_factory.js` (264 KB),
+`layout_engine.js` (60 KB) and `audit_design.js` (41 KB) *cannot* be pasted whole — the docs' "paste the file"
+language means "load the file", and the reliable loader is a loopback fetch (the plugin runs in a browser on this
+machine, so `http://127.0.0.1` is reachable and exempt from mixed-content blocking — measured 200):
+
+```bash
+python3 scripts/serve_skill.py            # loopback-only static server with CORS, port 8777
+```
+
+```js
+// one call seeds everything, in engine order; measured: 259 KB component_factory in 35 ms
+for (const f of ['layout_engine.js', 'component_factory.js', 'native_layout.js', 'audit_design.js']) {
+  const src = await (await fetch('http://127.0.0.1:8777/scripts/' + f)).text();
+  new Function('storage', 'penpot', 'penpotUtils', src)(storage, penpot, penpotUtils);
+}
+```
+
+The three sandbox objects must be passed as **parameters** — a `new Function` body cannot *see* `storage`/`penpotUtils`
+(api-pitfalls §7); the engines assign themselves into `storage`, so the return value is only the seed report (read it:
+`seeded`, `factories`, `slots`, …).
+
+⚠️ **Two of the scripts are runners, not planters**: `fix_layout.js` and `scaffold_structure.js` *execute* when loaded
+(scaffold creates up to 6 pages and schedules a page switch as a side effect of seeding — which hijacks
+`penpot.currentPage` mid-batch). Load them only when you intend to run them, never inside a bulk seed loop, and after
+any load that could switch pages **re-verify `penpot.currentPage.name` before touching shapes** — a write while the
+page is still switching fails with `Value not valid … Cannot modify a page that is not currently active`
+(api-pitfalls §11).
+
+Fallback when the Penpot file lives on another machine: paste the small engines directly and chunk the big ones
+(`storage.__part = (storage.__part || '') + chunk` … then join + `new Function`) — the fetch path only removes that
+cost.
+
 Generic runner (engines/repairs run page by page; **pre-cut next page at tail, must verify `penpot.currentPage.name` before probing**):
 
 ```js

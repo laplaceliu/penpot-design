@@ -3602,7 +3602,7 @@ return (function () {
       if (g.layoutChild) {
         // x/y together mean "world position" — the absMount contract — so they opt the icon out of flow; with no
         // x/y the icon joins the flow at `sizing` (a group in flow behaves like any board child, R5/R6 apply).
-        if (o.x !== undefined && o.y !== undefined) { try { g.layoutChild.absolute = true; g.x = o.x; g.y = o.y; } catch (e) {} }
+        if (o.x !== undefined && o.y !== undefined) { try { g.layoutChild.absolute = true; g.x = o.x; g.y = o.y; if (storage.NL && storage.NL._note) storage.NL._note(g, { declaredAbsolute: true }); } catch (e) {} }
         else { try { g.layoutChild.horizontalSizing = o.sizing || 'fix'; g.layoutChild.verticalSizing = o.sizing || 'fix'; } catch (e) {} }
         if (o.z !== undefined) { try { g.layoutChild.zIndex = o.z; } catch (e) {} }
       } else if (o.x !== undefined) { try { g.x = o.x; g.y = o.y; } catch (e) {} }

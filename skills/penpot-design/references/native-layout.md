@@ -95,6 +95,12 @@ const sk = NL.fromRecipe('dash3', { w: 1440, h, tier: 'web', parent: host, fill:
 NL.guide(sk.regions.content, { cols: 12, margin: 24, gutter: 16 });        // native column grid, not invisible rects
 ```
 
+`NL.fromRecipe(key, o)` also accepts **band recipes** (`landing`, `blogArticle`, …): app recipes carry `regions`
+(world boxes resolved through `LY.rect`), document/band recipes carry `bands` (frame-relative, offset by `LY._ofs`
+here). Both come back as `sk.regions` (band-style plans also expose `sk.bands`), and a plan with neither is an
+**error** — the previous behaviour of returning an empty skeleton with `err:null` for every band recipe was a silent
+no-op (measured: `fromRecipe('landing', …)` returned `{keys: []}` before the fix).
+
 Measured (a 4-region `fromRecipe` on a 1440×900 host at `x0:400, y0:2000`): the four region boards landed at exactly
 the rects `LY.rect` handed back (`rail 72×900 @400,2000`, `header 1368×56 @472,2000`, `list 320×844 @472,2056`,
 `detail 1048×844 @792,2056`), each `layoutChild.absolute = true`, each `dir:column` with `pad 24/24` and `gap 16`, all

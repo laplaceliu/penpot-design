@@ -56,7 +56,7 @@ return (function () {
         out.boards++;
         // Page header = top "large title" (font size >= titleMin). Without the font-size floor,
         // a demo screen's 18px logo background bar and PageRoot's Header background board would all falsely report header_collision.
-        if (node !== head) {
+        if (node.id !== head.id) {
           hdr = kids.filter((c) => c.type === 'text' && c.parentY < headBand && fsz(c) >= titleMin).map((c) => ({ s: c, r: storage.visRect(c) }));
           if (hdr.length && out.headerSizes.length < 6) out.headerSizes.push(node.name + ':' + fsz(hdr[0].s));
         }
@@ -99,7 +99,7 @@ return (function () {
       const kids = kidsOf(node); if (!kids) return;
       for (const c of kids) {
         try {
-          if (c.type === 'text' && c.parent !== head) {
+          if (c.type === 'text' && (!c.parent || c.parent.id !== head.id)) {
             const cr = R(c); const tcx = cr.x + cr.w / 2, tcy = cr.y + cr.h / 2;
             let host = null, ha = Infinity;
             for (const h of hosts) { const hr = R(h); if (tcx >= hr.x && tcx <= hr.r && tcy >= hr.y && tcy <= hr.b) { const a = hr.w * hr.h; if (a < ha) { ha = a; host = h; } } }
@@ -161,7 +161,10 @@ return (function () {
     walkD(head);
 
     // S5 root-level stray shapes: top-level shapes outside PageRoot (easily produced as bound-instance residue during component registration)
-    Array.from(root.children).forEach((c) => { if (c !== head) add('root_stray', c, root, 'top-level shape outside PageRoot'); });
+    // compare by .id: every access to .children yields a NEW proxy (api-pitfalls §7), so a reference comparison
+    // against head is always true — the old code flagged PageRoot itself as a stray on every scaffolded page.
+    const headId = head && head.id;
+    Array.from(root.children).forEach((c) => { if (c.id !== headId) add('root_stray', c, root, 'top-level shape outside PageRoot'); });
 
     // S7 sibling-board overlap: pairwise intersection of top-level boards.
     // **This is the easiest class to miss** — it's created by the "fix" itself: after growing a board to wrap its content,
