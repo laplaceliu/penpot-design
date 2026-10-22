@@ -11,7 +11,7 @@ Why this file exists (measured, capabilities §0 + engines.md):
 Usage (seed path in execute_code):
     node scripts/serve_skill.py            # default port 8777, binds 127.0.0.1 only
     # then in execute_code:
-    #   const src = await (await fetch('http://127.0.0.1:8777/skills/penpot-design/scripts/component_factory.js')).text();
+    #   const src = await (await fetch('http://127.0.0.1:8777/scripts/component_factory.js')).text();
     #   const summary = new Function('storage', 'penpot', 'penpotUtils', src)(storage, penpot, penpotUtils);
     # the engines assign themselves into storage, so `summary` is only the seed report.
 
@@ -23,7 +23,7 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # the repo root (scripts/..)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # this skill's directory: URLs hang off it, so /scripts/<file>.js
 PORT = int(os.environ.get('SKILL_SERVE_PORT', '8777'))
 BIND = os.environ.get('SKILL_SERVE_BIND', '127.0.0.1')
 

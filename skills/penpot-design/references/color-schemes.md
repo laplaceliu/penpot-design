@@ -60,8 +60,8 @@ one-board-deep where color is a detail (03–16).
 |---|---|
 | **token structure** | `sets: [ '<system> · Core'(all), '<system> · Dark'(only the same-named tokens to override) ]` + `Scheme` group with two themes (Light = {Core}, Dark = {Core, Dark}). **Core must come first** (`sets` order is priority, later wins). Use `TK.ensureTheme` / `TK.activateTheme`. |
 | **`00 · Cover`** | Note the color mode and the two schemes' names |
-| **`01 · Foundations`** | The `Palette` board needs **dual polarity** side by side (light column, dark column + role correspondence) |
-| **`02 · Color in use`** | `Semantic roles` draws the wash / hue / **ink** triple for both polarities; `Contrast matrix` is **doubled** (a light table and a dark table, side by side or stacked); `Light vs dark` board; `Data colors` re-checked for the dark ramp |
+| **`01.xx · Foundations`** | The `Palette` board shows **dual polarity** by being **projected twice, once per token set**: `FN.project({ page, kind:'palette', set:'<system> · Core' })` then the same call with `set:'<system> · Dark'` (`FN.source` filters `TK.declared().colors` by that set, and the board is stamped `nl:set=<set>` so the pairing is checkable). Two stacked projections, never a hand-drawn second column |
+| **`02.xx · Color in use`** | `Semantic roles`, `Contrast matrix` and `Data colors` are the same three projections re-run with `set:` the dark set — the dark table is a *record read*, so its numbers cannot drift from the theme. `Light vs dark` is the **declared exemption** (`FN.EXEMPT['02']`): a scheme comparison is not one record type, and it is the only board on 01/02 that may be composed |
 | **`03–09` spec boards** | **not duplicated**: one polarity (the one the system starts in) plus the dark state rows `CF` already draws (`onDark` variants where the family declares one) |
 | **`10 · App shell & chrome`** | Add the dark-panel variants the families own (`sideNav` dark panel, inverted `footer`); they are rows of the existing spec boards, not new boards |
 | **`11 · Grid & breakpoints`, `12 · Screen recipes`** | unchanged — layout is orthogonal to color |
@@ -81,7 +81,9 @@ proves it — `audit_design.js` checks the pair each text actually sits on, in t
 
 - **WCAG contrast must be audited separately for both schemes**. dark is **not** the inverse of light:
   simple inversion usually breaks mid-tone grayscale (the `muted` / `on-surface-muted` role is the most likely to fail).
-- `02 · Color in use → Contrast matrix` needs a **light table and a dark table**, two of them.
+- `02 · Color in use → Contrast matrix` needs a **light table and a dark table**: run the same projection twice,
+  `FN.project({ page, kind: 'contrast' })` and `FN.project({ page, kind: 'contrast', set: '<system> · Dark' })` — the second
+  board is stamped `nl:set` and both carry `nl:fn=contrast` (gate G16: no hand-drawn matrix).
 - `TK.audit()` under theme mode switches to the `mode: 'theme-driven'` criterion
   (an inactive set is normal; re-judge "no multiple same-group activations + all tokens in the active set resolvable").
 - Export acceptance: run both schemes once each, **combinations never exported must not be described as "verified"**.

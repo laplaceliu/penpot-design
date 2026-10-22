@@ -226,6 +226,21 @@ TK.activeSets();                        // current actually-activated set names
 > `TK.audit()` also auto-switches its criterion: no theme → inactive set counts as a fault; with theme → inactive is a normal state,
 > re-judged to "no same-group multi-activation + all tokens in activated sets resolvable".
 
+### 5.5 A token set is **not** the 素材 panel (measured 2026-10-21)
+
+There is a third surface beside sets and themes: the **library style records** the Assets panel lists —
+`library.local.colors` (fills) and `library.local.typographies` (text). Creating tokens fills **neither**. The Rayo file
+proved it: 40 active `typography` tokens, `themes: []`, `typographies.length === 0` → the Typography panel was empty,
+and every design rule still passed, because every rule reads the shape tree or the token set.
+
+`storage.TP.seed()` (in `token_engine.js`) closes that gap: one `LibraryTypography` per declared ramp step, **named
+exactly like its token**, fields written then read back (`drift: []`), idempotent (second run makes nothing), plus
+`TP.audit()` (tokens ↔ styles diff) and `TP.apply(shape)`. Note the measured trap in the apply path:
+`style.applyToText(shape)` transfers family/size/weight/tracking but **forces `lineHeight` to 1.2** regardless of the
+record (1.05 → 1.2, 1.4 → 1.2), so `TP.apply` re-asserts the style's own leading, and a style pass over already-bound
+text is a rhythm regression — register styles for consumers, keep `tokens.typography` as the binding of record.
+`audit_design` rule 30 `no_type_styles` fails a text-bearing board whose library has 0 styles.
+
 ## 6. Applying tokens
 
 ```js
@@ -257,6 +272,17 @@ await nap(500);                                 // ⏳ async, must wait before r
    spacingToken.applyToShapes([flexBoard], ['rowGap', 'columnGap']);
    // also 'paddingLeft' / 'marginTop' / 'layoutItemMinW' … (see TokenSpacingProps)
    ```
+7. **`borderRadius` writes FOUR corner keys and rewrites the drawn value** (measured 2026-10-22). A scalar `shape.borderRadius`
+   is one number, but the token map is `{borderRadiusTopLeft, TopRight, BottomRight, BottomLeft}`; applying the token to only one
+   key leaves a partial map, so `TK.bindBoard` applies all four together — and that apply is not a no-op on the geometry, it
+   *retunes* the corner to the token's value. Binding is therefore the repair for an off-ladder corner, not just a label on it.
+   A `9999` value renders as a clean pill (the renderer clamps it), which is why `radius.full` can be the control step.
+8. **A write is committed only when the event loop yields** (measured 2026-10-22, and this one cost a whole false-green pass).
+   `applyToShapes` returns immediately and reports success, but the change is queued: with no `await` after it, an independent
+   read later in the same session found 1,757 corners still unbound across 68 pages even though the sweep had "bound" 3,465.
+   With an 800–1200 ms yield the same shapes read back bound. So the settle wait in `TK.bindBoard` **is not a courtesy pause for
+   the readback — it IS the commit**, and a batch pass may collapse it to one yield per PAGE (`pageSettle`) because every write
+   the page queued lands together.
 
 `shape.tokens` is a map of `{ property name: token name }` (note there is **no** trap beyond `x`/`y`/`height`;
 `fontFamilies` here also appears as **`fontFamily`**).
@@ -319,6 +345,34 @@ Same three-way split for `info` / `success` / `warning` / `error` (`*Soft` + `*I
 low-alpha tint and the ink step has to *lift* (`color-schemes.md §4.1`); a dark set that overrides only the hue leaves copy at
 the light ink on a dark surface, which `audit_design.js` reports as `contrast`. Reference the pair instead of repeating hexes
 where you can (`{color.primaryInk}` inside a typography token), so one override propagates.
+
+### 8.2 The `borderRadius` set is the only source of a corner
+
+`design-guide.md §5.1` makes this a HARD rule, and the mechanics that make it checkable are here:
+
+- **Seed the ladder as tokens, then never write a corner again.** `TK.seed` records `radius.none / xs / sm / md / lg / xl / full`
+  from DESIGN.md's `Shapes` section — for a recreation, **the source site's own ladder** (Rayo: `0 / 4 / 10 / 26 / 50 / 80 / 9999`),
+  not the skill's default ramp. A recreated file that invents its own steps documents a system the source does not have.
+- **Every writer goes through `CF.radius(role)`** (`ctx.plate`, `ctx.ring`, `ctx.clip`, `CF.build`, `NL.frame`, `NL.gridFrame`,
+  `mkAbsBoard`, `mkRect`). A number that is not a declared step is *snapped* to the nearest one and recorded in `CF.coerced`, so
+  an invented value is visible in the registry instead of silently drawn.
+- **`full = 9999` is a real step, not a trick.** It renders as a clean pill (see pitfall 7 above), so a control's corner is
+  `radius.full`, and a pill's `h/2` derivation is gone: the value comes from the set, so retuning the set retunes every pill.
+- **Gate**: rules **35 `radius_off_ladder`**, **36 `radius_unbound`** and **37 `ring_off_host`** judge the ladder, the binding
+  and the ring↔host pair from the LIVE declared set (`TK.declared().radii`), never from `CF.RAD`.
+- **`TK.roleSweep()` — the repair for a corner that is legal but wrong (rule 37's twin).** 35/36 can only judge values that
+  exist, so the two real defects of a rebuilt file are invisible to them: a control host still square because an older
+  factory generation drew it, and a `ring·*` layer that disagrees with that host. Both are judged against the **source's own
+  contract**: `TK.PILL_FAMS` (button · iconbutton · splitbutton · fab · chip · badge · tag) is the set of families DESIGN.md
+  binds to `{rounded.full}` — a family absent from the table is never judged — and `CF.ROLE.ring = 'host'` supplies the second
+  rule. `TK.roleStart()` + `TK.roleSweep({budget})` until `done: true`, then `TK.rolePages()` for the per-page table and a
+  **dry re-read** for the proof (measured: 136 pages → 367 hosts (241 masters + 23 copies) + 192 rings repaired, re-read 0/0/0).
+- **Two measured facts that decide the sweep's scope** (`api-pitfalls.md §17`): a component's own shape answers
+  `isComponentInstance() === true` **and** `isComponentMainInstance() === true`, so "skip instances" would skip every master
+  and fix nothing; and a plugin-side write to a master **does not re-sync the copies already placed in the file** (measured:
+  `Button·SM` on `14 · Screens · app` still read `r0` after its master was set to 9999 and the page re-opened). So the sweep
+  visits masters, plain boards **and** copies, and does not call `resetOverrides()` — that would also revert the label and
+  paint a screen deliberately set.
 
 ## 9. Acceptance recipe [Gate G9] (must run)
 

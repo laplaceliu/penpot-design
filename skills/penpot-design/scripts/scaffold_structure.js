@@ -1,13 +1,22 @@
-// scaffold_structure.js — build the fixed 18-page skeleton of references/penpot-structure.md §2–§3.
+// scaffold_structure.js — build the fixed skeleton of references/penpot-structure.md §2–§3.
 // Usage: run seed_storage.js first, then run this script repeatedly (queue-runner mode, one batch per call) until it returns {done:true}.
 // Re-runnable at any moment: existing pages and PageRoots are skipped, and phase 3 always re-fits PageRoot to its *used* height —
 // so running it again after the content is built is the delivery-time height fix (§3 rule 5: never pad a page to a round number).
 // PageRoot is always 1920 — the spec-sheet canvas, not a screen. Screen widths come from the tier (LY.TIERS: web 1440 / pad 834 / mobile 375).
+//
+// TWO GRANULARITIES (penpot-structure.md §2a):
+//   · chapter pages (default) — the 18-row PAGES table below: one page per chapter, boards shelved side by side.
+//   · block pages — `storage.scaffoldPages(rows)` installs a per-block row list (`{n,d,t}` per board) and every phase
+//     iterates that instead. Page name grammar: `NN.MM · <Chapter> · <Block>`. Use it whenever a page will hold ONE
+//     board: a shape can never change pages in this API (appendChild AND remove both throw "Cannot modify a page that
+//     is not currently active" — measured 2026-10-21), so the page must be decided before the first shape is drawn.
 
 var CANVAS_W = 1920, CONTENT_X = 80, CONTENT_R = 1840;
-var HEADER_H = 160, FOOTER_H = 80, CONTENT_Y = 256, MIN_H = 1000;
-// CONTENT_Y = header bottom (160) + one LY.SPACE step (96): 240 produced an 80px chrome→content gap, and 80 is not on
-// the spacing scale, so designGate flagged the scaffold itself (measured). 96 is on-scale; fit() uses this as the floor.
+var HEADER_H = 160, FOOTER_H = 80, CONTENT_Y = 208, MIN_H = 1000;
+// CONTENT_Y = header bottom (160) + 48. The page root is itself an audited band stack (design-guide §2 / rule 14): the
+// chrome→content gap, the inter-board gap (32) and the content→footer gap written below (32) must sit within ONE
+// LY.SPACE step of each other. 96 broke it (`band gaps 96/32/32/32/32 spread over 3 scale steps`) and 80 was off-scale
+// outright; 48 is design-guide §2 "new concern" and one step from 32. fit() uses this as the floor.
 
 // The page contract, one row per §2 line: n = page name, d = header description, t = token reference line.
 var PAGES = [
@@ -40,13 +49,24 @@ return (function () {
   var rightX = function (s, size) { return G(Math.max(CONTENT_X, CONTENT_R - estW(s, size))); };
 
   storage.scaffoldContract = function () { return PAGES.map(function (p) { return p.n; }); };
+  /** Install the block-page row list (`[{n,d,t}]`, one row per board) — every phase below iterates it instead of
+      PAGES. Passing null restores chapter granularity. */
+  storage.scaffoldPages = function (rows) {
+    storage._scafRows = rows && rows.length ? rows : null;
+    storage.scaffoldQueue = null;
+    return (storage._scafRows || PAGES).length;
+  };
+  var rowsOf = function () { return storage._scafRows || PAGES; };
+  // `NN.MM · Chapter · Block` pages name their chrome after the full code (04.07-PageRoot); chapter pages keep NN-.
+  var prefixOf = function (pageName) { return String(pageName).split(' · ')[0]; };
 
   // Phase 1: create the missing pages (≤6 per call, to avoid the timeout).
   // ⚠️ Measured in this build: `penpot.createPage('00 · Cover')` and `penpot.createPage({name: …})` BOTH ignore the
   // argument — the page lands as `Page N`. Create first, then assign `.name` (assignment readback works). Without the
   // assignment every re-run sees the contract pages as "missing" and mints six more generic pages forever.
   var missing = [];
-  for (var i = 0; i < PAGES.length; i++) if (!penpotUtils.getPageByName(PAGES[i].n)) missing.push(PAGES[i].n);
+  var ROWS = rowsOf();
+  for (var i = 0; i < ROWS.length; i++) if (!penpotUtils.getPageByName(ROWS[i].n)) missing.push(ROWS[i].n);
   if (missing.length) {
     var batch = missing.slice(0, 6), made = [];
     for (var j = 0; j < batch.length; j++) {
@@ -62,19 +82,19 @@ return (function () {
   }
 
   // Phase 2: one PageRoot + Header per page (one page per call: page switching needs its own round-trip).
-  if (!storage.scaffoldQueue) storage.scaffoldQueue = { fit: false, q: PAGES.map(function (p) { return p.n; }) };
+  if (!storage.scaffoldQueue) storage.scaffoldQueue = { fit: false, q: ROWS.map(function (p) { return p.n; }) };
   var st = storage.scaffoldQueue, q = st.q;
   if (!q.length) {
-    if (!st.fit) { st.fit = true; st.q = PAGES.map(function (p) { return p.n; }); q = st.q; }
-    else { storage.scaffoldQueue = null; return { done: true, pages: PAGES.length }; }
+    if (!st.fit) { st.fit = true; st.q = ROWS.map(function (p) { return p.n; }); q = st.q; }
+    else { storage.scaffoldQueue = null; return { done: true, pages: ROWS.length }; }
   }
 
-  var pageName = q[0], meta = PAGES.filter(function (p) { return p.n === pageName; })[0];
+  var pageName = q[0], meta = rowsOf().filter(function (p) { return p.n === pageName; })[0] || { n: pageName, d: '', t: '' };
   if (penpot.currentPage.name !== pageName) {
     penpot.openPage(storage.pg(pageName));
     return { switching: pageName, left: q.length };
   }
-  var prefix = pageName.slice(0, 2), rootName = prefix + '-PageRoot';
+  var prefix = prefixOf(pageName), rootName = prefix + '-PageRoot';
   var page = storage.pg(pageName), rootKids = Array.from(page.root.children || []);
   var root = rootKids.filter(function (s) { return s.name === rootName; })[0];
 
@@ -107,7 +127,7 @@ return (function () {
   }
 
   // Phase 3: fit = PageRoot height takes the used height of the content column, footer sits at its bottom (§3 rule 5).
-  var idx = PAGES.map(function (p) { return p.n; }).indexOf(pageName);
+  var idx = rowsOf().map(function (p) { return p.n; }).indexOf(pageName);
   var footerName = prefix + '-Footer';
   var foot = Array.from(root.children || []).filter(function (s) { return s.name === footerName; })[0];
   if (!foot) {
@@ -122,7 +142,8 @@ return (function () {
   var fy = G(bottom + 32), h = G(fy + FOOTER_H);
   if (Math.abs(root.height - h) > 1) root.resize(CANVAS_W, h);
   if (Math.abs(foot.y - fy) > 1) { foot.x = 0; foot.y = fy; }
-  var nav = (idx > 0 ? 'prev · ' + PAGES[idx - 1].n : 'first page') + '      ' + (idx < PAGES.length - 1 ? 'next · ' + PAGES[idx + 1].n : 'last page');
+  var rowsNow = rowsOf();
+  var nav = (idx > 0 ? 'prev · ' + rowsNow[idx - 1].n : 'first page') + '      ' + (idx < rowsNow.length - 1 ? 'next · ' + rowsNow[idx + 1].n : 'last page');
   var kids = Array.from(foot.children || []);
   var tokens = kids.filter(function (s) { return s.name === 'footerTokens'; })[0];
   if (!tokens) { tokens = storage.mkText('tokens · ' + meta.t, CONTENT_X, fy + 32, 12, T.secondary, 400); tokens.name = 'footerTokens'; }

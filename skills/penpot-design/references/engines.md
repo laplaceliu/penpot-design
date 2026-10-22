@@ -8,14 +8,15 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 | `scripts/layout_engine.js` | **`storage.LY.*`** — the region math: `SPACE`/`ROWS`/`TIERS`, `snap`/`onScale`, `frame`/`container`/`grid`/`split`/`rows`/`flow`/`repeat`/`pack`, `viewportHeight`/`fold`, `recipe`/`plan`/`rect`/`keys`, `slots`, `drawStart`/`drawStep` | run right after seed; every coordinate on every page comes from it (gate **G11**) |
 | `scripts/component_factory.js` | **`storage.CF.*`** — the variant-producing factories + `build`/`matrix`/`component`/`variants`, **components** `get`/`register`/`instance`/`swap`/`variantSet`/`svgIcon`, `P` palette, `STATE` alphas, `ladder`/`radius`/`fills`/`name`/`glyph`, `minHit`/`tier`/`autoHit`, `map`/`missing` | run after LY; every control on every page is produced by it (gate **G12**). The registry is `CF.map()`; **`CF.missing()` must return `[]`** — that is the count to trust, not a number written in a doc. Screens reuse controls through `CF.instance(CF.name(...))` + `CF.swap` (instances, not re-drawn copies); a variant set needs `CF.variantSet(hosts, family, props)` with one `properties` object per host |
 | `scripts/native_layout.js` | **`storage.NL.*`** — native flex/grid authoring: `frame`/`row`/`col`/`gridFrame`/`cell`, `mount`/`add`/`sizing`/`fill`/`fix`/`hug`/`alignSelf`/`margin`, `applyFlex` (whitelisted pad/gap/align vocabulary), `label`/`plate`/`line`, `guide`/`rulerGuide`, `stamp`/`readStamp`, `settle`/`whenSettled`/`report`/`auditFlow`/`nudge`/`reflow`/`fromRecipe` | run after CF; turns the LY region plan into **flow** boards so the file stays editable (`references/native-layout.md`). `fromRecipe` needs LY, `frame({shadow})` needs CF, both degrade instead of throwing |
-| `scripts/audit_design.js` | **design-rule lint** (`designPage`/`designStart`/`designNext`/`designAll`/`designGate`): 18 signatures — grid/scale/ramp/gap/measure/split/cap/touch/primary/row-height/radius/contrast/viewport/state-coverage/`variant_sparse`/`focus_ring_missing`/`disabled_wrong`/`name_invalid` | run per board as built and per page at the end; gate **G13** blocks delivery |
+| `scripts/audit_design.js` | **design-rule lint** (`designPage`/`designStart`/`designNext`/`designAll`/`designGate`/`designCoverage`): 37 signatures — grid/scale/ramp/gap/measure/split/cap/touch/primary/row-height/radius/contrast/viewport/state-coverage/`variant_sparse`/`focus_ring_missing`/`disabled_wrong`/`name_invalid` + token-binding `paint_unbound`/`paint_off_palette`/`type_unbound`/`type_off_ramp`/`space_unbound`/`space_off_scale` + `no_guides`/`pane_filled`/`not_component`/`caption_stale`/`empty_cell`/`no_type_styles` + the G16 provenance rule `not_projected`, whose chapter/exemption table it imports from `storage.FN` + the **whitespace trio** `cramped_gap`/`hierarchy_gap`/`text_cramped` (amounts from `LY.BREATH`, leading floor from the declared ramp, both published to the repairer as `storage.breathSpec`; `designPage()` also returns `out.breath`, the per-page **adoption read**) + the **radius pair** `radius_off_ladder`/`radius_unbound` (ladder read from the live `TK.declared().radii`, never from `CF.RAD`; `designPage()` returns `out.radius = {shapes, onLadder, bound, steps, off}`, and both skip `v <= 0` — see design-guide §5.1 "what the gate cannot see") + `ring_off_host` (a `ring·*` plate whose corner is not its host control's; `CF.ROLE.ring = 'host'`, repair `TK.roleSweep`). It judges **component masters** too: the skip is `isComponentCopyInstance()`, never `isComponentInstance()` — a main instance answers the latter `true`, so the old guard exempted every master in the file | run per board as built and per page at the end; gate **G13** blocks delivery |
 | `scripts/repair_engines.js` | `fixStaleCenter` / `groupAssemblies` / `fixZOrder` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | run once to plant into storage, call page by page |
 | `scripts/fix_layout.js` | flex-collapse repair (getDesignSize + absRow + fixCol, two-round convergence) | run directly on the target page |
-| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.paint`·`TK.changed` theme-switch paint proof / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) | record immediately after building skeleton; re-run health check before acceptance (gate **G9**) |
+| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.paint`·`TK.changed` theme-switch paint proof / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) **plus the library typography styles** (`storage.TP`: `TP.seed` one `LibraryTypography` per declared ramp step, named exactly like its token, idempotent and readback-verified / `TP.audit` tokens ↔ styles diff / `TP.apply` apply-to-shape) **plus the two whole-file corner drivers** (`TK.radiusStart`/`TK.radiusSweep`/`TK.radiusPages` snap every drawn corner onto the live ladder and bind it; `TK.roleStart`/`TK.roleSweep`/`TK.rolePages` force the corner a family must carry — pill hosts to `CF.radius('control')` and every `ring·*` to its host — across masters **and** placed copies, then re-bind, because a raw `borderRadius` write clears the token binding) | record immediately after building skeleton; re-run health check before acceptance (gate **G9**); `TP.seed()` once per file **after** the ramp tokens exist — 素材 → 排版 lists `library.local.typographies`, which a token set never fills (capabilities §6, rule 30 `no_type_styles`) |
 | `scripts/palette_engine.js` | Library colors (`LIB.seed` idempotent create+rename+set / `LIB.fill`·`LIB.stroke` ref-bound paint with readback / `LIB.audit` channel inventory via `shapesColors` / `LIB.replace` raw-hex swap) | the second re-skin channel (capabilities §7); independent of LY/CF/NL, so it can be seeded at any point |
+| `scripts/foundations_engine.js` | **`storage.FN.*`** — the Foundations/Color-in-use boards **projected out of the library records**: `FN.setContent` (editorial content as data) / `FN.project({page,kind[,set]})` one board per call, stamped `nl:fn=<kind>` / `FN.bindNext({page})` bind+gate / `FN.check`·`FN.audit` / `FN.lanes`·`place`·`reflow`·`fitRoot`·`relayout` / `FN.source`·`tones`·`ratio`·`verdict` / the provenance read side `FN.CHAPTER`·`EXEMPT`·`boards`·`stampOf`·`kindsOn`·`foreign`·`chapterPages`·`coverage`·`restamp` | run LAST (it refuses without LY+CF+NL+TK); replaces hand-composed spec pages §7, and **is what makes gate G16 checkable**: `audit_design` rule 31 `not_projected` reads its stamp and `storage.designCoverage()` reads its chapter table (§7.1) |
 | `scripts/prototype_engine.js` | Prototype + delivery (`PR.flow`/`ensureFlow`, `PR.nav`/`overlay`/`close`/`url`/`delay`, `PR.prototype(links,{flow})`, `PR.read`/`clear`, `PR.exports`/`bytes`, `PR.checkpoint`/`versions`/`restore`, `PR.ANIM` presets) | wire `14–16 · Screens` into a clickable flow before delivery (C6/C7/C9); its four rules P1–P4 (destination is a **shape**, interactions are append-only, animation fields complete, versions are verified not trusted) are in capabilities §8/§9 |
 | `scripts/icon_engine.js` | Icons (`IC.seed` JSONL/`IC.add` any SVG / `IC.get`·`search`·`missing` / `IC.svg` color substitution / `IC.place` / `IC.grid`) | catalog `assets/icons/lucide.jsonl` (Lucide, ISC, 1966 icons); seed only the lines a page needs; channel choice + licenses in `references/icons.md` — in-control glyphs stay `CF.glyph` |
-| `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`): **eleven signature classes** + font histogram, read-only | run on each board as built; recompute after finishing |
+| `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`): **15 defect signatures + `text_centre_info`** (S1–S14 catalogue: containment, stale-center, size degradation, header, root stray, board/text overlap incl. S8b cross-parent, malformed, align, loose assembly, S12 stroke covered, S12b stroke clipped, S13 duplicate board) + font histogram, read-only | run on each board as built; recompute after finishing |
 | `scripts/fix_geometry.js` | geometry repair (column offset/board height/root height/right overflow, four engines, all support dry-run) | repair page by page after audit lists |
 | `scripts/scaffold_structure.js` | **18-page skeleton**: pages → PageRoot/Header/Footer → `fit` (root height = used height) | first step of code-to-design; re-runnable, and phase 3 is the delivery-time height fix |
 
@@ -29,8 +30,22 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 > `createShapeFromSvg` — they seed at any point (`IC.grid` additionally wants `mkText` from the first seed), and
 > re-seed after a storage wipe. Either way: read the return, do not assume.)
 >
+> `foundations_engine.js` (`FN`) is the exception in the other direction: it captures `LY`/`CF`/`NL`/`TK` **at seed
+> time** and returns `{err:'load seed_storage + layout_engine + component_factory + native_layout + token_engine
+> first'}`, so it is always loaded last and re-loaded last after a storage wipe.
+>
+> **Re-seeding is not exempt from the order.** `audit_design.js` and `FN` bind `const LY = storage.LY` in their closure,
+> so re-seeding `layout_engine.js` alone leaves every consumer pointing at the *superseded object* — the new table is on
+> `storage.LY` and the auditor never looks at it. Measured 2026-10-21: after a `LY.BREATH`-only edit, `designPage()` kept
+> judging gaps against the previous ladder and reported 16px as off-ladder until `audit_design.js` was re-seeded *after*
+> `layout_engine.js`. When you change a table one engine publishes, re-seed that engine **and everything downstream of it,
+> in order**, then re-read the value through the consumer (`storage.designCFG()` / `out.ramp` / `out.breath`), not through
+> `storage.LY` — the consumer's view is the one that produced the verdict.
+>
 > **Build iron rule**: G11 = regions come from `LY` (a typed coordinate is a defect); G12 = controls come from `CF`
-> (a hand-built control is a defect and will also fail `name_invalid`); G13 = `designGate` CLEAN before delivery.
+> (a hand-built control is a defect and will also fail `name_invalid`); G16 = Foundations/Color boards come from `FN`
+> (a typed row height or a `storage.T` hex mirror is a defect, see §7; **machine-checked** by rule 31 `not_projected` +
+> `storage.designCoverage()`, see §7.1); G13 = `designGate` CLEAN before delivery.
 >
 > **Repair iron rule**: `audit_layout.js` single-board audit as each board lands (G3) →
 > **Phase 1 geometry**: `fix_geometry.js`'s `fixGeometryAll({apply:false})` lists → review → `{apply:true}`
@@ -59,6 +74,8 @@ for (const f of ['layout_engine.js', 'component_factory.js', 'native_layout.js',
   const src = await (await fetch('http://127.0.0.1:8777/scripts/' + f)).text();
   new Function('storage', 'penpot', 'penpotUtils', src)(storage, penpot, penpotUtils);
 }
+// `token_engine.js` (TK) must be seeded before anything binds, and `foundations_engine.js` (FN) AFTER TK — it captures
+// LY/CF/NL/TK at load time. Measured whole chain: 8 files / 277 KB in 69 ms, so re-seeding after a storage wipe is free.
 ```
 
 The three sandbox objects must be passed as **parameters** — a `new Function` body cannot *see* `storage`/`penpotUtils`
@@ -113,6 +130,17 @@ return { page: pg, ...r, remaining: q.length };
   (label covered) → within group sort by descending area `setParentIndex(i)` (large base at bottom, text on top), instance internals skipped.
   `groupAssemblies` already has the same logic built-in (with group layer-slot preservation); use this engine for old-group batch fixes. Verify by whole-board export (small-shape group export has a cache illusion).
 - **cleanOrphans**: clean root-level orphan text (historical crash residue, pollutes traversal).
+- **componentize**: replace a redrawn control host **in place** with a real instance of the registered master (same parent, box, z; text overrides copied by text-layer name). Flow children are reported, never re-laid. Two guards are deliberate:
+  - **size guard** — a factory's interior is absolute, so `instance.resize()` does not reflow it; a 200-wide copy swapped for a
+    300-wide master leaves its field rect outside the host. Only a same-size copy (±2) is swapped; a different one is `misfit`.
+  - **anatomy guard** — a copy can be the same size and still carry **more** than the master (a screen's pricing card with
+    title + subtitle + seven feature rows vs the library's 2-text demo). The swap would keep the box and drop the copy's
+    children. A copy with more descendants than the master is `anatomy`, never replaced; register a fuller master instead.
+  - **Rebuild hazard**: rebuilding a screen can leave a *stale master* in the library (old anatomy, old name) while the
+    new host is drawn again — run `componentize({apply:true})` after the rebuild and clear both `misfit` and `anatomy`
+    before claiming the screen uses components. A component copy also **rejects structural edits** (appendChild throws
+    "Cannot change the structure of a component copy"); text overrides and properties are allowed, which is why a master
+    without a label/body slot cannot be given one on the screen — add the slot at the factory and re-register.
 
 The repair log returns `[{position, content, axis, offset}]`, **audit-review before going to the next page**.
 
@@ -174,6 +202,27 @@ Rules that the `CF.*` context already implements and a hand-built control always
 (measure after render, never from the 1×1 transient), `stateAlpha(S)` + the `·Disabled` ancestor clamp, `C(tone)` through
 the palette (never a literal hex), `ctx.ring` for focus, `CF.minHit`/`autoHit` for the touch floor, `CF.name` for naming.
 
+Factory lessons that cost a shipped screen each:
+
+- **A Penpot text does not reflow a box.** A body paragraph handed to `createText` grows to its measured width; placing it
+  in a 520-wide accordion renders one 732px line and the host crops it mid-sentence. Wrap first (`CF.wrap(text, w, fs)`),
+  emit one text layer per line at `CF.lineH(fs)` and mark a deliberate ellipsis only when the reserved lines run out.
+  The same rule applies to prose in `CF.card`, `CF.alert` and a `listBlock` meta line.
+- **An idle OTP cell shows a caret, not a spinner.** The spinner arc on a 44px cell read as a broken ring over the border
+  in export; loading is an explicit state (`o.loading`), not the default of the active cell. When it is loading, the 16px
+  spinner is **centred** and replaces the caret — a 10px spinner in the cell's top-right corner reads as a trailing icon
+  and sits on the active cell's 2px border (measured on `04 · Text fields`, `OTP·Spec`). The focus ring belongs to that
+  same active cell (never box 1), and a `·Disabled` host suppresses the caret and accent border entirely.
+- **Glyph aliases are one catalog.** `iconOf`/`CF.glyph` accept camelCase and kebab-case (`chevron-down` ↔ `chevronDown`);
+  a new name that is not in `CF.glyphKinds` is a registration diff (`CF.missing()`), never a reason to draw a path inline.
+- **A label is a slot.** `Checkbox`/`Radio`/`Switch` name the labelled composition `…·Label`; the bare master has no text
+  child and a component copy refuses structural edits, so a screen cannot add a label to an unlabelled master. Register the
+  labelled master or draw the label as a sibling composition — never append into a copy.
+- **A composed card is a new composition, not a rerun of the demo.** When a screen needs a richer anatomy than the
+  registered master (pricing card, FAQ accordion), give the host its own composition name (`Accordion·FAQ·Multi`) rather
+  than drawing the master's name again; `not_component` is judged on the name, and `componentize`'s anatomy guard will
+  refuse a swap that would drop children.
+
 Shadow parameters (still the hand-mechanics reference for anything `CF` does not own — glow, press, decorative cards;
 shadow color **must be object format** `{color, opacity}`, a string hex silently turns black):
 
@@ -208,7 +257,7 @@ var plan = LY.recipe(key, { w: t.w, h: h, tier: tier, x0: 80, y0: 240 });
 var host = storage.mkAbsBoard(key + ' · ' + tier, 80, 240, t.w, h, storage.T.surface, 0);
 await CF.pageTitle({ parent: host, rect: LY.rect('pageTitle'), title: 'Overview' });
 await CF.toolbar({ parent: host, rect: LY.rect('filterBar') });
-LY.fold(host, tier);                                          // dashed first-viewport marker
+LY.fold(host, tier);                                          // 2px accent first-viewport marker
 ```
 
 `h` only *stretches* the flexible region, while `totalH` is the content requirement — that is why the shape above is two
@@ -247,3 +296,216 @@ Browser/plugin crash → storage all lost. Rebuild in order:
    degradation check in api-pitfalls.md §8);
 3. re-collect all board ids (old ids invalid);
 4. when the user reports "some component missing", prioritize suspecting: component deletion taking the main instance along, timeout landing on wrong page causing mis-delete, crash degradation — investigate one by one per api-pitfalls.md §6/§11/§8.
+
+## 6. Re-pagination driver (chapter pages → block pages, contract: penpot-structure.md §2.3)
+
+Re-splitting an existing file is a **migration**, not a rebuild: the boards already exist, the gates already pass, and
+every destructive step costs a rebuild of a derived artifact. Write it as a small driver on `storage` (the Rayo file's
+`storage.MIG` is the reference implementation) with exactly these steps, in this order:
+
+| Step | What it does | Why it is where it is |
+|---|---|---|
+| `plan()` / `recall()` | derive the row table `{n, ch, block, d, t}` — `plan` from the old chapter pages, `recall` from the live `NN.MM · …` page names | `recall` is the only path that works **after** the old pages are gone; re-seeding an engine resets `rows`, so the driver must be re-runnable from the file itself |
+| `scaffoldPages(rows)` | create `NN.MM · Chapter · Block` pages + PageRoot/Header/Footer (`scripts/scaffold_structure.js`) | it is a runner, not a planter: loading it executes, so load it only when you mean to build |
+| `remap()` | point every queued build spec at its new page; **drop** specs that never shipped | migration preserves the delivered artifact — it must not silently add boards |
+| `fast(k)` | build → `whenSettled` → de-duplicate same-name boards → `place` → `fixStaleCenter` → bind tokens | idempotent by construction: a spec whose board exists is skipped, so a call that hit the 30 s ceiling can simply be re-driven |
+| `strays({apply})` | page-root hygiene: a stray whose name is already on the shelf is an interrupted rebuild's leftover → remove; a stray that is the real board → mount | this is what makes timeouts survivable instead of scary |
+| `sweep(k)` | per-page repair chain (`groupAssemblies` → `fixStaleCenter` → rings → strays → guides → unclip) then **both** gates | one execution per page; the per-board audits of `R0.run` are what a 131-page migration cannot afford |
+| `delOld()` | remove the chapter pages | **destructive and far-reaching**: masters die with the pages and every flow/interaction in the file is wiped (capabilities §8) |
+| `mastersAll()` / `rebuildCover()` / `rebuildIndex()` / prototype re-author | re-register masters, then regenerate the derived boards, then re-wire flows | all four read the page list or the library, so they run **after** the structure is final |
+
+Hard-won rules for this driver:
+
+1. **Never trust a timed-out call's failure.** It usually completed. Re-drive idempotently and let `strays` clean up,
+   rather than rebuilding again — the second rebuild is what produced stacked twins on the cover page.
+2. **`instanceize` (copy → instance) must be guarded and dry-runnable.** `CF.instance(name, {resize})` moves the head but
+   does not re-lay out its internals, so a wide screen row built from a narrow spec master keeps the master's columns —
+   real damage. The guard: the head shape must resolve, the copy's box must match the master's (±2), and the text-slot
+   counts must match; anything else is skipped with a reason.
+3. **Fix in place by DFS index map before rebuilding.** When a repair must touch an instance's internals, walk the
+   *sibling* copy for the authored offsets and apply the same deltas to the instance's children (`x`/`y`/`characters`
+   are writable; `width` is not — api-pitfalls §14).
+4. **Budget every loop to ~21 s** and return the remaining queue, so the client can call again. A loop that assumes it
+   will finish is a loop that gets killed mid-page and leaves the file in a state only `strays` understands.
+5. **A timeout can silently rob a board of its content pass.** The build is two-stage — `fast()` creates the frame, then
+   `spec.build()`'s `after` hook draws the region plates (`build_l4.js` `anatomyBoard`, `build_l5.js` `recipeBoard`). If
+   the call dies between the two, the bare frame is still in the tree, `strays` mounts it as the real board, the spec is
+   already off the queue, and `MIG.fast` skips it forever because "board exists". Every geometric rule then passes on an
+   empty frame — 39 blocks in the Rayo file were hollow this way and all 39 read CLEAN.
+   Detect by **child count**, not geometry (that is rule 29, `empty_cell`: a `cell·slot·*` / `cell·recipe·*` with zero
+   children). Repair by re-driving the **spec**, which still lives in `R0.l4.specs` / `R0.l5.specs`: `R0.requeue(spec)`
+   sets `replace=true`, then `fast(1)`, then delete the same-name twin by **id** (name comparison is not enough — proxy
+   identity never holds across `.children` accesses). Never "fix" a hollow block by hand-drawing plates: the plates come
+   from `LY.rect`/`LY.drawStep`, and hand-drawn ones are the defect gate G11 exists to prevent.
+
+## 7. Foundations projection (`storage.FN`) — the pages are output, not composed
+
+`01 · Foundations` and `02 · Color in use` used to be the most expensive pages in the file, and not because there is
+design in them: each board needed a hex list (a `storage.T` mirror), a caption per swatch, and **an array of row heights
+typed by the caller** (`[56,136,40,40]`, `104 not 96 because swatch 48 + key 19 + hex 16 + 2×8 gaps`). Every one of those
+numbers was a guess, `off_grid` / `off_scale_gap` / `paint_off_palette` rejected the guess, and each rejection cost a
+full audit round-trip paid in model tokens. `FN` deletes both inputs:
+
+| Removed input | What replaces it | What that means for the caller |
+|---|---|---|
+| **values** | `FN.source()` → `TK.declared()` (measured probe: 36 colours / 40 type steps / 10 spaces / 6 radii / 4 shadows / 10 dims) | there is no hex to type and no ramp to copy; a token kind the set does not declare is a **refusal** (`{err:'token set is missing …'}`), never a fallback literal, because a drawn value nothing can bind to is exactly what rules 19–24 report |
+| **geometry** | every board is a **hug** column of hug rows, so its height is the sum Penpot computes (`padT + Σh + (n−1)·gap + padB`) | `FN.project` takes no height; there is nothing to get wrong, and `auditFlow`'s `hug_frozen` (§ native-layout.md) is the check that the sum still holds |
+| **editorial copy** | `FN.prose` + `FN.setContent({usage, rules, notes, samples, seriesTones, strokeWidths})`, and **what a board consumed is stamped back into the file** (`nl:prose`) | what a board *says* is data; changing a sentence never means editing how the board is drawn. A fresh session that never called `FN.setContent` re-projects the same sentences (`FN.recoverProse`, §7.2) |
+| **WCAG arithmetic** | `FN.ratio` / `FN.verdict` (relative luminance, AA / AA large / AAA) | the `Contrast matrix` cannot disagree with the palette, because it is computed from it |
+
+**Call shape** (after G1; `FN` seeds last because it captures LY/CF/NL/TK at load time):
+
+```js
+storage.FN.setContent({ usage: { primary: '…' }, rules: { hover: '…' } });   // optional, per system
+await storage.FN.project({ page: '01.03 · Foundations · Spacing', kind: 'spacing' });  // ONE kind per call
+await storage.FN.bindNext({ page: '01.03 · …' });                            // repeat until {allBound:true}
+await storage.FN.check('01.03 · …');                                         // both page gates + FN's own records
+storage.FN.audit();                                                          // cost report: needsRepair must be []
+```
+
+`FN.KINDS` is the projectable set: `palette · typeRamp · spacing · radius · elevation · strokes · grid` (page 01) and
+`semantic · stateLayers · contrast · dataColors` (page 02). `Icons` stays `IC.grid`/`CF.glyph` and `Light vs dark` stays
+with the scheme boards (penpot-structure §2.2) — neither is a projection of one record type.
+
+`FN.tones()` is where the triple naming contract is read: a tone exists only when `color.X` has both an ink and a wash
+sibling, and **both spellings resolve** — `X-ink`/`X-wash`/`X-soft` (hyphen) and `XInk`/`XSoft`/`XWash` (the camelCase of
+`design-guide.md` §4.1 and `CF.P`) — while a hue that merely ends in those letters (`color.pink`) never parses as a triple
+(unit-tested in the connected build: `{primary: Soft/Ink, brand: -wash/-ink}`, and `inkOf('pink')` is `null`). The board's
+own caption prints the suffixes the set actually declares, so 02 · Semantic roles documents the file rather than a template.
+A set with no triple is a **refusal** (`{err: 'no colour token triple is declared: …'}`), never a fallback hex.
+
+**Why exactly one board per call.** The plugin's `setTimeout(300)` answered in 0.479 / 0.799 / 0.825 / **12.457 s** inside
+one session, so any settle-poll is a coin-flip against the 30 s ceiling — and **a call that times out is not cancelled**:
+it keeps mutating the page while the next one queues behind it (that is how four boards and a stray ended up mis-shelved
+during the probe). So `FN.project` does not sleep, poll, bind or gate; `FN.bindNext` binds exactly one board (the measured
+`Spacing` board needed 36 s for its bind alone). Everything between the two is re-derived from the live page.
+
+**The shelf is read, not remembered.** `FN.lanes(page)` walks the PageRoot's children and takes the two lane tops;
+`FN.shelfStep` advances a lane by `round(h) + gap*2` **exactly** (rounding the next top up to a multiple of 8 widens the
+measured gap to 33-39 px and `off_scale_gap` then fires *between* two FN boards — measured 36). Two consequences that the
+stages are built around:
+
+1. **A height is provisional inside the call that built it.** `Palette` returned `h=726` at project time and settled at
+   **1052** on the next call (+62 for the head, +33 per swatch row), because a frozen hug only recomputes once the layout
+   engine runs again. Shelving board *n+1* against 726 buries it under board *n*. Hence `FN.project` calls `FN.reflow`
+   (re-shelve everything from live heights) **before** `FN.place`, and `FN.bindNext` reflows again and reports `grew`.
+2. **A hug that never recomputed is a real render defect, not a stale read.** `row·head` shipped at `h=6` under two
+   texts of 44 + 4 + 20 and the PNG proved the caption printed over the title. `FN.relayout(board)` — walk bottom-up,
+   write any flex property (`cell.flex.topPadding = cell.flex.topPadding`) — repairs it in the same call. `FN.project`
+   runs it after building, `FN.bindNext` after binding (binding writes fonts, and a font changes a text's height, which
+   is precisely what freezes the parent).
+
+`FN.fitRoot(page)` is the third derived number: root height = deepest child bottom + margin, snapped to 8 (the root is
+an authored box, §1). Without it the layout audit reports every lower board as `out_of_bounds` (measured: four boards
+escaping the scaffold-height root by 587-3763 px).
+
+**Measured cost** (2026-10-21, a dedicated probe page, 11 boards, Web tier, one token set of 36 colours / 40 type steps):
+
+| Stage | Cost | Note |
+|---|---|---|
+| `FN.project` (build + shelf) | ≈ 0.9 s + 0.16 s per board | 11 boards → 11 calls |
+| `FN.bindNext` (bind + `relayout` + `reflow` + `auditFlow` + `designPage`) | 1.5–2.2 s typical · 4.4–6.3 s dense (`Palette` 42 batches, `Type ramp` 48) · **36 s** worst (`Spacing`, and that call still completed after its own timeout) | a re-run on an already-bound board is 4–46 ms, so `bindNext` is safe to poll |
+| `TK.bindBoard(…, {dry:true})` | 37 ms | what `FN.check` uses to list `unbound` |
+| settled heights | Radius 260 · Strokes 272 · Elevation 284 · Grid 372 · Data colors 455 · Spacing 492 · Semantic 693 · State layers 748 · Palette 1052 · Contrast 1338 · Type ramp 2657 | **0 of these were typed by anyone** |
+| outcome | `FN.audit()` → `{projected: 11, gated: 11, needsRepair: [], flowBroken: []}`; `FN.check` → design CLEAN + layout CLEAN + `unbound: []` | **repair rounds: 0**, which is the whole point — the hand-composed path needed one audit round-trip per guessed height |
+
+Two exports were eyeballed at the probe stage (`Palette`, `Semantic roles`) and both render correctly; every other board
+is gated, not eyeballed, so claim them as audited rather than as visually verified. (Since then, `02 · Color in use` is
+four-for-four exported and eyeballed — §7.2.)
+
+**When a board you need is not a kind**: add the projector to `FN` (`FN.<kind>` + a `FN.KINDS` entry + the prose table),
+never draw that board inside `execute_code`. A hand-composed Foundations/Color board re-introduces every defect class G16
+removes, and cannot be re-projected when the palette changes.
+
+### 7.1 How G16 is enforced (the projection is the only and default path)
+
+Prose cannot block a build, so the contract is a **durable stamp in the file** plus two machine reads of it:
+
+| Mechanism | What it proves |
+|---|---|
+| `FN.project` → `NL.stamp(board, {fn:<kind>, shelf:'1'})` (= `setPluginData('nl:fn', …)`) | this board was projected, by which kind. It lives **in the file**, so it survives a storage wipe and is readable by anyone who opens it — unlike `FN.records`, which is JS memory and dies with the session |
+| `FN.CHAPTER` / `FN.EXEMPT` / `FN.stampOf` / `FN.boards` / `FN.foreign` | the single source of the contract: **which two chapters are projections** (`01` carries 7 kinds, `02` carries 4 — the same gate over both), which two boards (`Icons`, `Light vs dark`) may be composed, and what counts as proof |
+| `audit_design.js` rule 31 `not_projected` | a board on a chapter page with no stamp. It **imports the table from FN** rather than keeping a copy, so auditor and engine cannot drift; and when `storage.FN` is not seeded it *reports* rather than passing — an unverifiable gate is a failed gate |
+| `storage.designCoverage()` / `FN.coverage()` | the **file-level** half. Pagination is block-per-page (`01.09 · Foundations · Palette`), so a chapter lives on ~9 pages and "is `Palette` in this system at all" can only be answered across them. `missing` = a chapter kind never projected, `foreign` = a chapter board hand-drawn, `offChapter` = a projected board parked on the wrong chapter's page (reported, not blocking). Riding along in `designGate` whenever FN is seeded |
+| `FN.check(page).g16` | `CLEAN` / `NEEDS_REPAIR` for that page, with the per-board `kind` + `stamped` readback |
+| `FN.strays(page)` | boards sitting at the **page root beside `NN.MM-PageRoot`**. `FN.boards()` reads *inside* the PageRoot, so such a board was invisible to rule 31 and only another auditor's `root_stray` caught it (measured 2026-10-21). Strays count as `foreign` in both `FN.foreign` and `FN.coverage`, and are deliberately excluded from `restamp`/coverage so no placement accident can launder a hand-drawn board into a projection |
+| `FN.restamp(page, {byName:true})` | backfills the stamp on boards a **pre-provenance FN** built. Name matching is opt-in `{byName}` precisely because it is not proof: the live file has a hand-drawn board titled `Palette`, and laundering it into `fn=palette` would be the one bug that makes this gate worthless. Default path = FN's own in-session records |
+| `designPage({page:…})` **refuses**, `FN.check` settles first | both auditors read `penpot.currentPage`, and `openPage()` in the **same** `execute_code` call does not rebind it — measured: three requested pages, three identical `CLEAN` verdicts about the one page that happened to be open. A wrong-scope verdict is worse than none, so `designPage` returns `{err, want, verdict:'NEEDS_REPAIR'}` and `FN.check` opens, settles 700 ms, verifies `penpot.currentPage.name` and refuses on mismatch. Use `designStart`/`designNext` for a page walk |
+
+Measured 2026-10-21, both directions, on the live file (FN 1.1.0; seeding `audit_design.js` 21 ms + `foundations_engine.js`
+62 ms; the file holds 136 pages):
+
+* **Passes**: the 11-board probe page restamped, then `FN.check('01.90 · Foundations · FN probe')` → `design CLEAN`,
+  `layout CLEAN`, `g16 CLEAN`, `unbound []`, 11/11 stamped, 12.9 s; a component spec page (`03.01 · Actions · Button·Spec`)
+  reads `CLEAN` with no `not_projected` — the rule does not reach outside its chapters.
+* **Fires (inside the PageRoot)**: `designPage` on the two real pre-FN pages → `01.03 · Foundations · Spacing`
+  `NEEDS_REPAIR`, 27 boards / 68 shapes, provenance `projected kinds here: none`, finding
+  `1 further un-projected board(s) on this page: Spacing(864×736)`; same for `01.04 · Grid`.
+* **Fires (page-root stray)**: a `mkAbsBoard` board mounted beside `99-PageRoot` — the class the first round missed —
+  went from `FN.foreign() = []` to `[{name:'Negative control stray', 1920×240}]`, appeared in
+  `designCoverage().foreign` as `01.90 · … · Negative control stray`, produced the page finding
+  `99-PageRoot :: 1 further un-projected board(s) …`, and read `foreignNow: []` after the control was removed in the
+  next call (the staging page is unchanged).
+* **The real cost of the old mode, now visible**: `designCoverage()` on the Rayo file read `NEEDS_REPAIR` in 35 ms with
+  15 chapter pages, 12 `foreign` boards (every `01.01`–`02.04` board, all built before FN existed), 4 chapter-`02` kinds
+  `missing` and 4 `offChapter` (the staging page's 02 boards sit on an 01 page).
+  That was the migration backlog, stated by a gate instead of by memory. **After the chapter-`02` migration (§7.2) the
+  same read shows chapter `02` at 4/4 with `foreign []` and `missing []`, and the file still refuses `CLEAN` for the
+  8 remaining hand-composed `01.xx` boards** — the gate moves the number, it does not move the verdict out of politeness.
+
+A **second token set** is a projection argument, not a second builder: `FN.project({page, kind:'palette', set:'<system> ·
+Dark'})` filters `FN.source()` to that set (colour records carry `set`), stamps `nl:set`, and shelves the dark twin beside
+the light one — which is how `color-schemes.md`'s dual-polarity boards are made (one projection per set, never a hand-drawn
+dark column).
+
+### 7.2 What migrating `02 · Color in use` proved (FN 1.2 → 1.3)
+
+Chapter 02 was migrated onto the same projector with **no second builder and no special case**: `FN.CHAPTER` already owned
+its four kinds (`semantic · stateLayers · contrast · dataColors`), so "same as Foundations" meant calling the same three
+stages on four pages. That is the test of the contract — a chapter that needed a different code path would not be a
+projection. Four mechanisms came out of it, all now part of the default path:
+
+* **`FN.use(page)` — the page-binding contract (1.2.0).** `setPluginData` and every token bind are **writes**, and
+  `openPage()` does not rebind `penpot.currentPage` inside the same `execute_code` call. So `FN.project`, `FN.bindNext`,
+  `FN.check` and `FN.restamp` each open the page, settle 700 ms, re-read `penpot.currentPage.name`, and **refuse** with
+  `{err, want, wait}` on mismatch instead of stamping or reporting about whichever page happened to be open.
+* **Editorial copy is durable (`nl:prose`, 1.2.0).** `FN.project` stamps the sentences a board actually consumed
+  (`built.info.prose`) and re-reads them with `FN.recoverProse(page)` before building, so a fresh session that never called
+  `FN.setContent` re-projects a board that still *says* what the file says. A projector that also **refuses a column header
+  it has no sentence for** cannot silently ship an unnamed column. As of 1.3.0 every rule-drawing board stamps — `radius`,
+  `stateLayers` and `dataColors` as well as `semantic`.
+* **The state wash is a declared token, not `onDark` (1.3.0).** `CF.fills(…, {onDark:true})` shades with **black** because
+  over a saturated brand fill a white 8% overlay lifts `#2563EB` to `#3F76ED` and drops the white label to 4.18:1 (§5.2).
+  On a **neutral** inverse ground (`#161616`) that shade is a visual no-op, and the exported dark lane was seven identical
+  black tiles. `FN.stateLayers` now passes `{overlay: FN.ink(ground)}` — the lane's own on-surface token — and derives the
+  caption with `FN.over(base, tint, alpha)`. Two more rendering facts the same export proved: a content alpha must dim copy
+  sitting on a **ground-coloured tile** (white at 38% on the light board ground is invisible, and `FN.cell` does not
+  forward strokes, so the tile's hairline is set by hand), and **every** tile gets a hairline so a ground-coloured plate
+  still reads against the board.
+* **A rejected band aligns with an exported one.** The `contrast` matrix drew passing pairs in a fixed 480 `FN.cell` and
+  rejected pairs in a fill row, so the ratio column jumped from x≈896 to x≈1560 — two tables pretending to be one. Both
+  bands are cells of the same width now.
+
+**Measured on the live file, 2026-10-21** (re-seeding `audit_design.js` 707 ms + `foundations_engine.js` 115 ms / 67,092 B;
+`FN.project` ≈2.1 s, `FN.bindNext` 2.6–3.8 s per board, `designPage` 650 ms, `FN.check` 1.2 s; `02.03` project + bind +
+check in one call 11.3 s):
+
+| Board | Settled size | Gate |
+|---|---|---|
+| `02.01 · Semantic roles` | 1760×693 | usage column filled from DESIGN.md, `g16 CLEAN` |
+| `02.02 · State layers` | 1760×748 | `designPage CLEAN`, `g16 CLEAN`, bind proof **13/13**, `grew 0` |
+| `02.03 · Contrast matrix` | 1760×901 | 199 pairs measured / 12 exported / 6 rejected, proof **14/14** |
+| `02.04 · Data colors` | 1760×455 | 6 series, `g16 CLEAN` |
+
+All four were **exported and eyeballed**, so they are claimed as visually verified, not only gated. `designCoverage()`
+reads chapter `02` as 4/4 covered with `foreign []` and `missing []`; the file verdict stays `NEEDS_REPAIR` because the
+eight pre-FN `01.xx` boards are still hand-composed — that is the remaining backlog, reported by the gate rather than by
+memory.
+
+**One finding class the migration exposed about the auditor itself**: `audit_design.js` **stops walking at an instance
+boundary** (`if (isInstance(s)) … return`), so the text/alpha rules cannot fire inside a componentized host. The negative
+control for `disabled_wrong` therefore had to be run on a non-instance master (`Link·MD·Md·Disabled`): breaking its label
+alpha produced `NEEDS_REPAIR`, restoring `.38` produced `CLEAN` — the rule is live, it just cannot see inside a copy.
+The exemption test is also now the §4 **name grammar** (`inDisabledHost`: `disabled` as a `·`-segment of an ancestor host),
+not a word search — the old word search was triggered by my own caption "Disabled recedes a…". See `api-pitfalls.md` §15.
+

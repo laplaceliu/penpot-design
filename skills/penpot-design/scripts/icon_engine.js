@@ -130,7 +130,9 @@ return (function () {
       g = penpot.createShapeFromSvg(svg);
       if (!g) return { err: 'createShapeFromSvg returned nothing (content:write permission)' };
       Array.from(g.children || []).forEach((c) => { if (/base-background/.test(c.name || '')) { try { c.remove(); } catch (e) {} } });
-      if (o.color) { const paint = (sh) => { try { if (sh.strokes && sh.strokes.length) sh.strokes = [{ strokeColor: o.color, strokeOpacity: 1, strokeWidth: (sh.strokes[0] && sh.strokes[0].strokeWidth) || 2 }]; } catch (e) {} Array.from(sh.children || []).forEach(paint); }; paint(g); }
+      // Recolor must carry the whole stroke object over: writing a fresh `{strokeColor,strokeOpacity,strokeWidth}`
+      // drops `strokeAlignment`, and a null alignment exports as center (api-pitfalls §3). Paths are center by contract.
+      if (o.color) { const paint = (sh) => { try { if (sh.strokes && sh.strokes.length) sh.strokes = [Object.assign({}, sh.strokes[0], { strokeColor: o.color, strokeOpacity: 1, strokeAlignment: sh.strokes[0].strokeAlignment || 'center', strokeWidth: (sh.strokes[0] && sh.strokes[0].strokeWidth) || 2 })]; } catch (e) {} Array.from(sh.children || []).forEach(paint); }; paint(g); }
       if (o.nm) { try { g.name = o.nm; } catch (e) {} }
       // I4: the group arrives at its 24-grid bbox, not at the svg root size → scale it here, before any mount
       try { g.resize(size, size); } catch (e) {}

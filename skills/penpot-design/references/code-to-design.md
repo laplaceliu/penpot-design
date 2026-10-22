@@ -67,8 +67,13 @@ register components → recipe screens. Where the library contradicts a `design-
 3. **Skeleton**: `scripts/scaffold_structure.js` builds the 18 pages + PageRoot/header/footer (PageRoot always 1920, it's the spec-sheet canvas);
    run its phase-3 **fit** again at delivery time.
 4. **Fill page by page** (order = page number order; `export_shape` to accept after **each board**, earlier rebuild costs less):
-   - `01 · Foundations` (palette, type ramp, spacing, grid, radius, elevation, icons, strokes) → `02 · Color in use`
-     (semantic roles, state layers, **contrast matrix**, light vs dark, data colors) — every later page references these.
+   - `01 · Foundations` and `02 · Color in use` — **projected from the records; there is no composed alternative** (gate G16,
+     enforced by rule 31 `not_projected` + `storage.designCoverage()`, `engines.md` §7.1):
+     `FN.setContent({usage,rules,notes})` then `FN.project({page, kind})` one kind per call
+     (`palette · typeRamp · spacing · grid · radius · elevation · strokes` / `semantic · stateLayers · contrast · dataColors`;
+     the two **declared** exemptions are `Icons` — `IC.grid`/`CF.glyph` draws a catalog — and `Light vs dark`, a scheme
+     comparison) → `FN.bindNext({page})` until `allBound`.
+     Every later page references these.
    - `03–09`: one `CF.matrix` spec board per family of `CF.map()`, shelves placed with `LY.pack`; `CF.missing()` must be `[]`.
    - `10 · App shell & chrome`: the `CF.map().shell` composites + one anatomy board per `LY.slots` key (audited with `{ families: […] }`).
    - `11 · Grid & breakpoints`: one diagram board **per tier** in `targetProfiles` (`LY.TIERS`), the container ladder, the collapse order, the touch floor.
@@ -85,7 +90,8 @@ register components → recipe screens. Where the library contradicts a `design-
    `groupAssemblies` → `fixZOrder`), focus: closed stroke inner, glow board `clipContent=false`, correct CJK font, pad/mobile touch targets ≥44.
    Screens additionally pass `NL.auditFlow(board) === 'CLEAN'` (settle with `NL.whenSettled`, size controls `fix`, never `auto`).
 7. **Accept**: both auditors CLEAN with the page scope named in contract §2 — `storage.auditPage()` (positioning) and
-   `storage.designGate({ tier | families })` (the 18 design rules) — then export PNG per page and check against the self-check list
+   `storage.designGate({ tier | families })` (the 34 design rules, and the file-level `designCoverage()` when `storage.FN`
+   is seeded) — then export PNG per page and check against the self-check list
    (`penpot-structure.md` §8); pages 14–16 accepted recipe by recipe, tier by tier; ask the user to zoom in the editor to review.
    With a light+dark answer, prove the switch on the **paint** (`TK.paint` → `TK.activateTheme` → `TK.changed` ≥ 1) and
    re-export after switching; if the delivery is interactive, wire it with `PR.prototype(links, {flow})` and check

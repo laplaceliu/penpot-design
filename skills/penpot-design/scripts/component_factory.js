@@ -41,11 +41,14 @@ return (function () {
     // wash (6.4–7.2:1) and the surface under white copy (7.1–8.7:1). The 6-level base above is for graphics.
     primaryInk: T.primaryInk || '#1E40AF', infoInk: T.infoInk || '#075985', successInk: T.successInk || '#166534',
     warningInk: T.warningInk || '#92400E', errorInk: T.errorInk || '#991B1B',
+    // §4.1 on an ink surface the *muted* step has to lift: #585858 on #161616 reads 2.54:1, so a shell that wants a
+    // quieter group label must use a lighter grey, not a lower opacity (which the audit treats as a state layer).
+    mutedOnInk: T.mutedOnInk || '#A3A3A3',
     line: '#0F172A'
   };
   var CF = {};
   CF.P = P;
-  CF.theme = function (map) { Object.assign(P, map || {}); return Object.keys(P).length; };
+  CF.theme = function (map) { Object.assign(P, map || {}); C._res = null; return Object.keys(P).length; };
 
   // ---------------------------------------------------------------- §1.1 state model
   CF.STATE = { hover: 0.08, focus: 0.12, pressed: 0.12, dragged: 0.16, selected: 0.12,
@@ -83,13 +86,17 @@ return (function () {
   };
 
   // ---------------------------------------------------------------- §2 geometry ladder
+  // `radius` is the CONTROL role, and DESIGN.md §Shapes is unambiguous: every control of this system is a pill
+  // (`radius = height/2`), at 24px or 56px alike. It is therefore the same token at every size — the size axis changes
+  // height, type and padding, not the corner. A factory that needs a non-pill corner (a checkbox box, a card) asks for
+  // that ROLE, not for `L.radius`.
   var LADDER = {
-    xs:   { h: 24, fs: 12, padX: 8,  icon: 16, radius: 4,  gap: 4 },
-    sm:   { h: 28, fs: 13, padX: 12, icon: 16, radius: 6,  gap: 6 },
-    md:   { h: 32, fs: 14, padX: 12, icon: 18, radius: 6,  gap: 8 },
-    lg:   { h: 40, fs: 14, padX: 16, icon: 20, radius: 8,  gap: 8 },
-    xl:   { h: 48, fs: 16, padX: 24, icon: 20, radius: 8,  gap: 8 },
-    '2xl':{ h: 56, fs: 16, padX: 24, icon: 24, radius: 12, gap: 12 }
+    xs:   { h: 24, fs: 12, padX: 8,  icon: 16, radius: 'control', gap: 4 },
+    sm:   { h: 28, fs: 13, padX: 12, icon: 16, radius: 'control', gap: 6 },
+    md:   { h: 32, fs: 14, padX: 12, icon: 18, radius: 'control', gap: 8 },
+    lg:   { h: 40, fs: 14, padX: 16, icon: 20, radius: 'control', gap: 8 },
+    xl:   { h: 48, fs: 16, padX: 24, icon: 20, radius: 'control', gap: 8 },
+    '2xl':{ h: 56, fs: 16, padX: 24, icon: 24, radius: 'control', gap: 12 }
   };
   var ICONSQ = { xs: { s: 28, icon: 16 }, sm: { s: 28, icon: 16 }, md: { s: 40, icon: 24 },
                  lg: { s: 40, icon: 24 }, xl: { s: 52, icon: 28 }, '2xl': { s: 52, icon: 28 } };
@@ -114,8 +121,72 @@ return (function () {
     return [{ style: 'drop-shadow', offsetX: 0, offsetY: e.y, blur: e.b, spread: 0,
              color: { color: P.ink, opacity: e.o } }];
   };
-  var RAD = { xs: 4, sm: 6, md: 8, lg: 12, xl: 16, pill: 999 };
-  CF.radius = function (key) { return RAD[key] === undefined ? (typeof key === 'number' ? key : 8) : (key === 999 ? 999 : RAD[key]); };
+  // ---------------------------------------------------------------- §2.1 radius = the token ladder, and nothing else
+  // The ladder is the file's own `borderRadius` tokens (DESIGN.md §Shapes, measured from the source's `--_radius-*`),
+  // plus `xs 4`, which the source cannot give us: it ships no checkbox, no switch thumb, no 20px box — every one of
+  // those would become a circle at `sm 10`. So the spine is the site's, and the one addition is labelled [inferred].
+  // `full` is STORED as 9999 and rendered clamped (measured 2026-10-21: a 320×32 and a 320×8 at 9999 both export as
+  // clean pills), which is why a control is pill BY TOKEN instead of by the `h/2` arithmetic that used to mint 722
+  // one-off radii the auditor could never tie to a set.
+  var RAD = { none: 0, xs: 4, sm: 10, md: 26, lg: 50, xl: 80, full: 9999 };
+  CF.RAD = RAD;
+  // role → ladder key. A factory asks for the ROLE it is drawing; the number and the token name both come from here,
+  // so "which radius is legal where" has exactly one answer in the file.
+  var ROLE = { control: 'full', box: 'xs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
+               slab: 'lg', inverse: 'lg', hero: 'xl', flat: 'none', ring: 'host', clip: 'host' };
+  CF.ROLE = ROLE;
+  var TOKEN_OF = { none: 'radius.none', xs: 'radius.xs', sm: 'radius.sm', md: 'radius.md', lg: 'radius.lg',
+                   xl: 'radius.xl', full: 'radius.full' };
+  var VALUE_OF = { 0: 'radius.none', 4: 'radius.xs', 10: 'radius.sm', 26: 'radius.md', 50: 'radius.lg',
+                   80: 'radius.xl', 9999: 'radius.full' };
+  /** The token name a radius value belongs to, read from the LIVE set when the token engine is seeded (so a file that
+      renamed its ladder still resolves), falling back to the table above. null = the value is not the ladder. */
+  CF.radiusToken = function (v) {
+    var n = Math.round(Number(v) * 100) / 100;
+    if (storage.TK && storage.TK.declared) {
+      var r = storage.TK.declared().radii;
+      for (var i = 0; i < r.length; i++) if (Math.abs(r[i].value - n) < 0.05) return r[i].name;
+      return null;
+    }
+    return VALUE_OF[n] || null;
+  };
+  /** Ask for a radius by role or by ladder key; anything else is COERCED to the nearest ladder step and recorded, so
+      no factory can emit an orphan number. `CF.coerced` is the build-time report of what asked to be off-ladder. */
+  CF.coerced = [];
+  CF.radius = function (key) {
+    if (key === 'host' || key === null || key === undefined) return null;
+    if (typeof key === 'number') {
+      var t = CF.radiusToken(key);
+      if (t) return key;
+      var steps = Object.keys(RAD).map(function (k) { return RAD[k]; }).sort(function (a, b) { return a - b; });
+      var best = steps[0];
+      steps.forEach(function (s) { if (Math.abs(s - key) < Math.abs(best - key)) best = s; });
+      CF.coerced.push({ from: key, to: best });
+      return best;
+    }
+    var k = String(key);
+    if (ROLE[k]) k = ROLE[k];
+    if (RAD[k] !== undefined) return RAD[k];
+    if (/^radius\./.test(k)) { var kk = k.slice(7); if (RAD[kk] !== undefined) return RAD[kk]; }
+    return CF.radius(Number(k));
+  };
+  /** The token name for the same question `CF.radius` answers with a number — the binder's input. */
+  CF.radiusTokenFor = function (key) { return CF.radiusToken(CF.radius(key)); };
+  CF.radiusSteps = function () { return Object.keys(RAD).map(function (k) { return { key: k, value: RAD[k], token: TOKEN_OF[k] }; }); };
+  /** The one way a shape's `borderRadius` gets written: undefined/null is the FLAT step (0), never an orphan number. */
+  var RZ = function (v) { return (v === undefined || v === null) ? 0 : CF.radius(v); };
+
+  /** Readable ink for a filled surface, from its relative luminance: a wash or a pale tone takes the dark ink,
+      only a genuinely dark surface takes white. Hardcoding #FFFFFF is what makes a lime cover fail §4. */
+  CF.onTone = function (fill) {
+    var h = String(C(fill, fill) || '').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var v = parseInt(h, 16);
+    if (h.length !== 6 || !Number.isFinite(v)) return C('ink');
+    var c = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map(function (x) {
+      var s = x / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); });
+    return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) >= 0.20 ? C('ink') : '#FFFFFF';
+  };
 
   // ---------------------------------------------------------------- math helpers
   CF._warn = [];
@@ -158,6 +229,26 @@ return (function () {
     return Math.round(w);
   };
 
+  /** Width a beside-control label needs: gap + the estimate + 4. estW is a metric estimate, not a measurement, and a
+      host sized to the bare estimate lets the rendered run escape its right edge by ~2px (audit S2 out_of_bounds). */
+  CF.labelW = function (text, fs, gap) { return CF.estW(String(text), fs || 14) + (gap === undefined ? 8 : gap) + 4; };
+
+  /** The vertical twin of `labelW`: the rendered line-box height of a ramp step, read from the step's OWN leading.
+      A factory that stacks labels must reserve `lineH(fs)`, never `fs`: `mkText` writes the token's leading onto the
+      layer (body 1.5, display 1.15), so a box measured in em is a third short (measured 2026-10-20 on Steps·Bottom:
+      reserved 78, two label lines render 82 → `out_of_bounds`, and a caption that escapes its host is the same defect
+      that makes a tall control sit on top of the row below it). */
+  CF.lineH = function (fs, weight, family) {
+    var lh = 1.5;
+    try {
+      if (storage.TK && storage.TK.snapType) {
+        var st = storage.TK.snapType(family || (storage.T && storage.T.bodyFont) || 'Funnel Sans', fs, weight || 400, null);
+        if (st && st.leading) lh = st.leading;
+      }
+    } catch (e) {}
+    return Math.ceil(Number(fs) * lh);
+  };
+
   /** arc → cubic bezier, degrees, y-down. SVG `A` does not render in Penpot paths. */
   CF.arc = function (cx, cy, r, a0deg, a1deg) {
     var segs = max(1, Math.ceil(Math.abs(a1deg - a0deg) / 90));
@@ -191,7 +282,7 @@ return (function () {
   CF.bubble = function (box, o) {
     o = o || {};
     var x = box.x, y = box.y, w = box.w, h = box.h;
-    var r = min(o.radius === undefined ? 8 : o.radius, w / 2, h / 2);
+    var r = min(RZ(o.radius === undefined ? 'card' : o.radius), w / 2, h / 2);
     var f = function (v) { return v.toFixed(1); };
     var C = function (p1x, p1y, p2x, p2y, px, py) { return ' C ' + f(p1x) + ' ' + f(p1y) + ' ' + f(p2x) + ' ' + f(p2y) + ' ' + f(px) + ' ' + f(py); };
     var L = function (px, py) { return ' L ' + f(px) + ' ' + f(py); };
@@ -242,6 +333,13 @@ return (function () {
     return { Type: cap(o.type) || 'Default', Size: cap(o.size) || 'Md',
              State: cap(o.state) || 'Default', Slot: cap(o.slot) || 'None' };
   };
+  /** Shrink a box by `w` on every side. Any plate drawn *over* a bordered box (state layer, label tint, selection
+      fill) must use this: Penpot paints a shape's own stroke under its children, so a flush overlay covers the
+      1px border for its whole length and the control reads as "border missing on three sides". */
+  CF.inset = function (box, w) {
+    w = w === undefined ? 1 : w;
+    return B(box.x + w, box.y + w, max(0, box.w - w * 2), max(0, box.h - w * 2));
+  };
 
   // ---------------------------------------------------------------- builder context
   var ctxProto = {
@@ -258,7 +356,7 @@ return (function () {
       sh.name = o.name || ('plate·' + (++this._n));
       sh.x = box.x; sh.y = box.y;
       try { sh.resize(box.w, box.h); } catch (e) {}
-      sh.borderRadius = o.shape === 'ellipse' ? 0 : (o.radius || 0);
+      sh.borderRadius = o.shape === 'ellipse' ? 0 : RZ(o.radius);
       sh.fills = o.fills || (o.fill ? [{ fillColor: o.fill, fillOpacity: o.opacity === undefined ? 1 : o.opacity }] : []);
       if (o.stroke) this._stroke(sh, o.stroke, o.strokeW || 1, o.strokeOpacity);
       if (o.dashed && o.stroke) sh.strokes = [Object.assign({}, sh.strokes[0], { strokeStyle: 'dashed' })];
@@ -298,6 +396,9 @@ return (function () {
     text: function (str, box, o) {
       o = o || {};
       var t = storage.mkText(str, 0, 0, o.size || 14, o.color || P.ink, o.weight || 400, o.role);
+      // An empty label is not a shape: mkText returns null for it (createText('') is null in 2.17), and pushing that
+      // into `pend` would crash the settle pass that measures `t.width`.
+      if (!t) return null;
       // §3.2: 11px is legal only for declared typographic roles (axis / overline / kbd). Naming the node is what makes
       // that decidable by the lint instead of by reading the copy back.
       if (o.role) { try { t.name = String(o.role); } catch (e) {} }
@@ -307,7 +408,21 @@ return (function () {
       return h;
     },
     settle: async function () {
-      if (!this._settled && this.pend.length) { await storage.sleep(120); this._settled = true; }
+      // A second `settle()` after a factory already placed once (search button, select panel, chip row) used to return
+      // immediately, so every label pushed later was centred from the 1×1 transient. Gate on the pending count instead.
+      if (this.pend.length > (this._settledN || 0)) {
+        await storage.sleep(140);
+        // A cell row creates dozens of shapes in one render pass, so a freshly pushed label can still read 1×1 after
+        // 140ms. Placing from that transient is the stale-center fingerprint (and pushes a right-aligned box off the
+        // board), so poll a bounded number of extra frames before measuring.
+        for (var tries = 0, from = this._settledN || 0; tries < 3; tries++) {
+          var tiny = false;
+          for (var i = from; i < this.pend.length; i++) { if ((this.pend[i].t.width || 0) <= 2) { tiny = true; break; } }
+          if (!tiny) break;
+          await storage.sleep(160);
+        }
+        this._settledN = this.pend.length;
+      }
       return this;
     },
     place: function () {
@@ -376,16 +491,43 @@ return (function () {
       }
       return this;
     },
-    /** focus ring: its own 2px layer at 2px offset, ≥3:1 against the surface (§1.1 HARD, signature focus_ring_missing). */
+    /** focus ring: its own 2px layer at 2px offset, ≥3:1 against the surface (§1.1 HARD, signature focus_ring_missing).
+        A ring is authored to sit OUTSIDE the control, but a board clips by default (api-pitfalls §4) — drawn inside a
+        clipped host its outer band is cut and the focus state shows two line segments instead of a ring (measured
+        2026-10-20: 56 cropped `ring·focus` layers on page 03). `CF.fitToClip` releases the host clip, or pulls the
+        box inside a clip that must stay. */
     ring: function (box, o) {
       o = o || {};
-      var off = o.offset === undefined ? 2 : o.offset, w = o.width || 2, r = (o.radius === undefined ? 8 : o.radius) + off;
-      return this.plate(B(box.x - off, box.y - off, box.w + off * 2, box.h + off * 2),
-        { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: r });
+      var off = o.offset === undefined ? 2 : o.offset, w = o.width || 2, r = RZ(o.radius === undefined ? 'sm' : o.radius);
+      var want = B(box.x - off, box.y - off, box.w + off * 2, box.h + off * 2);
+      // CONTROL host (not a `clip·` crop): the ring is the host's own state, so lift the pill clip and draw it
+      // INSIDE the host, where the audit looks (`focus_ring_missing`). The box is taken from the HOST'S CURRENT
+      // bounds, not the caller's: factories call ctx.ring AFTER ctx.place(), and in a matrix the cell refit can
+      // move the host — a ring drawn at the pre-move box lands at board level and gets covered by the host fill
+      // (`stroke_covered`). Measured 2026-10-21 on 03.03 ButtonGroup; deliberate crops (`clip·` media, avatars,
+      // half-stars) keep the full fitToClip path below.
+      if (this.host && !/^clip·/.test(String(this.host.name || ''))) {
+        try { if (this.host.clipContent) this.host.clipContent = false; } catch (e) {}
+        var hb = B(this.host.x, this.host.y, this.host.width, this.host.height);
+        var iw = B(hb.x - off, hb.y - off, hb.w + off * 2, hb.h + off * 2);
+        var ir = r;
+        return this.plate(iw, { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: ir });
+      }
+      var fit = CF.fitToClip(this.host, want, w, { refuseClamp: true });
+      if (fit.mountOutside && this.host && this.host.parent) {
+        var sh = this.plate(fit.box, { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: r });
+        // one level up: the crop must stay a crop, so the ring belongs to the host's container, not inside it
+        if (sh) { try { storage.absMount(this.host.parent, sh, fit.box.x, fit.box.y); } catch (e) {} }
+        return sh;
+      }
+      var rb = fit.box;
+      return this.plate(rb, { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: r });
     },
-    /** empty hit pad so a 24px control still meets the touch floor (§2 HARD, signature touch_target). */
+    /** empty hit pad so a 24px control still meets the touch floor (§2 HARD, signature touch_target). It is invisible,
+        so it must keep its real size: only the clip is released, the box is never clamped (a 24px pad fails the floor). */
     hitPad: function (box, minSide) {
       var m = max(minSide || 32, box.w), mh = max(minSide || 32, box.h);
+      CF.fitToClip(this.host, box, 0, { clamp: false });
       return this.plate(B(box.x + (box.w - m) / 2, box.y + (box.h - mh) / 2, m, mh),
         { name: 'hitpad·' + m + '×' + mh, fill: null });
     },
@@ -394,8 +536,9 @@ return (function () {
     clip: function (box, o) {
       o = o || {};
       var self = this;
-      var c = storage.mkAbsBoard(o.name || ('clip·' + (++this._n)), box.x, box.y, box.w, box.h, o.fill || null, o.radius || 0);
+      var c = storage.mkAbsBoard(o.name || ('clip·' + (++this._n)), box.x, box.y, box.w, box.h, o.fill || null, RZ(o.radius));
       c.clipContent = true;
+      CF.keepClip(c);
       storage.absMount(this.host, c, box.x, box.y);
       this.kids.push(c);
       var sub = Object.create(ctxProto);
@@ -406,6 +549,62 @@ return (function () {
   };
 
   /**
+   * Registry of deliberately-authored crops (`clip·*` frames, compact button groups, avatars). The repair chain's
+   * `unclip` releases clipping so glow/shadow layers stay visible — it must never clear these, because a crop's
+   * purpose *is* to cut its overflow (clearing it makes the half-star's other half visible).
+   */
+  CF.keepClip = function (s) { try { (storage._clipKeep || (storage._clipKeep = {}))[s.id] = 1; } catch (e) {} return s; };
+
+  /** The clip that will crop a layer mounted in `node`: `node` itself when it clips, else the nearest clipping
+      ancestor (a board clips by default, api-pitfalls §4), as a world box; null when nothing upstream crops.
+      A 0×0 ancestor is not a clip — the page root reports clipContent:true with no geometry, and treating it as a
+      clipper would crop every board in the file. */
+  CF.clipBoxOf = function (node) {
+    var p = node, d = 0;
+    while (p && d++ < 24) {
+      try { if (p.clipContent && p.width > 1 && p.height > 1) return B(p.x, p.y, p.width, p.height); } catch (e) { return null; }
+      p = p.parent;
+    }
+    return null;
+  };
+
+  /**
+   * Make an outside-sitting layer (focus ring, hit pad, glow plate) survive the clip chain.
+   *   1. a host that was never asked to clip is released (`clipContent = false`) — the ring is the host's own state;
+   *   2. a host registered by `CF.keepClip` is a deliberate crop (cover media, avatar, compact group): the clip stays
+   *      and the box is pulled inside it, so the border is drawn at the clip edge instead of vanishing.
+   * Limitation, stated: the clip is resolved against what is mounted NOW. A host whose parent is attached later
+   * (`ctx.place()`) can still meet a tighter clip; `audit_layout`'s `stroke_clipped` and `storage.fixClippedStrokes`
+   * are the backstop for that case, not a silent pass.
+   */
+  CF.fitToClip = function (host, box, sw, o) {
+    o = o || {};
+    if (!host) return { box: box, clamped: false, released: false };
+    var cb = CF.clipBoxOf(host);
+    var released = false;
+    if (cb && o.release !== false && !(storage._clipKeep || {})[host.id] && !/^clip·/.test(String(host.name || ''))) {
+      try { host.clipContent = false; released = true; cb = CF.clipBoxOf(host); } catch (e) {}
+    }
+    if (!cb || o.clamp === false) return { box: box, clamped: false, released: released };
+    // `clipBoxOf` returns a CF box ({x,y,w,h}), NOT a shape: reading `cb.width` here made every bound NaN, the guard at
+    // the bottom of this function silently never fired, and the caller resized the plate to NaN — Penpot keeps 1×1, so
+    // every `ring·focus` drawn into a clipped spec board degenerated (measured 2026-10-20 on the Steps rebuild).
+    var cw = cb.w, ch = cb.h;
+    var x = Math.max(box.x, cb.x), y = Math.max(box.y, cb.y);
+    var r = Math.min(box.x + box.w, cb.x + cw), b = Math.min(box.y + box.h, cb.y + ch);
+    var t = Math.max(sw || 0, 0);                    // an inner stroke needs its own thickness inside the clip
+    if (!isFinite(r - x) || !isFinite(b - y) || r - x < 4 + t || b - y < 4 + t) return { box: box, clamped: false, released: released };
+    if (box.x < cb.x - 0.5 || box.y < cb.y - 0.5 || box.x + box.w > cb.x + cw + 0.5 || box.y + box.h > cb.y + ch + 0.5) {
+      // The clip here is a **deliberate crop** (CF.keepClip: cover media, avatar, compact group), so it cannot be
+      // released and the ring cannot be clamped into it either — a clamped ring would sit on the crop's own edge and
+      // read as a border, not as a focus state. Say so: the caller re-mounts the layer one level up, in the crop's
+      // parent, where the authored offset survives. (audit_layout `stroke_clipped` is the gate that catches it.)
+      if (o.refuseClamp) return { box: box, clamped: false, mountOutside: true, released: released };
+    }
+    return { box: B(x, y, r - x, b - y), clamped: true, released: released };
+  };
+
+  /**
    * Start a control. `box` = final world bounds (never moved afterwards).
    * o: {fill, radius, stroke, strokeW, shadow, clip, parent, name}
    */
@@ -413,9 +612,14 @@ return (function () {
     o = o || {};
     box = B(box.x, box.y, box.w, box.h);
     var ctx = Object.create(ctxProto);
-    ctx.host = storage.mkAbsBoard(name, box.x, box.y, box.w, box.h, o.fill === undefined ? null : o.fill, o.radius || 0);
+    ctx.host = storage.mkAbsBoard(name, box.x, box.y, box.w, box.h, o.fill === undefined ? null : o.fill, RZ(o.radius));
     if (o.stroke) ctx._stroke(ctx.host, o.stroke, o.strokeW || 1, o.strokeOpacity);
     if (o.shadow) ctx.host.shadows = CF.shadow(o.shadow);
+    // A control host clips for PILL CORNERS, not to crop content — so it must NOT join the keep-clip registry:
+    // ctx.ring's release path (fitToClip) has to be allowed to lift the clip and draw the focus ring inside the
+    // host, where the audit looks for it. Registering here made every pill host a "deliberate crop", the ring
+    // mounted OUTSIDE, and the board failed `focus_ring_missing` + `stroke_covered` (measured 2026-10-21 on
+    // 03.03 ButtonGroup). Deliberate crops — media, avatars, half-stars — still register via ctx.clip().
     if (o.clip) ctx.host.clipContent = true;
     if (o.parent) storage.absMount(o.parent, ctx.host, box.x, box.y);
     ctx.box = box; ctx.w = box.w; ctx.h = box.h; ctx.pend = []; ctx.kids = []; ctx._n = 0; ctx._settled = false; ctx.o = o;
@@ -530,12 +734,19 @@ return (function () {
     attachment: [{ p: [['M', 15.5, 7.5], ['L', 8.6, 14.4], ['C', 6.4, 16.6, 9.6, 19.6, 11.8, 17.4], ['L', 18.4, 10.6], ['C', 20.6, 8.4, 17.4, 5.2, 15.2, 7.4], ['L', 9.4, 13.2]] }],
     smile: [{ p: [['O', 12, 12, 8.6]] }, { p: [['M', 8.8, 14.4], ['C', 10.4, 16.4, 13.6, 16.4, 15.2, 14.4]] }, { p: [['O', 9.2, 9.8, 1.1], ['O', 14.8, 9.8, 1.1]], f: 1 }]
   };
+  /** Semantic aliases callers use in item arrays (`prev`/`next` in a toolbar) → the catalog's canonical kind.
+      Without this an unknown kind draws the 25%-muted placeholder square, which read as two empty buttons on both
+      calendar toolbars (calMonth/calWeek, 2026-10-21) instead of the previous/next chevrons. */
+  var GLYPH_ALIAS = { prev: 'chevronLeft', next: 'chevronRight', back: 'arrowLeft', forward: 'arrowRight',
+    up: 'arrowUp', down: 'arrowDown', add: 'plus', remove: 'minus', more: 'dots', settings: 'dots',
+    delete: 'trash', close: 'close', search: 'search' };
   /** Draw an icon mark at a world box → at most 2 path shapes (one filled group, one stroked group). */
   CF.glyph = function (ctx, kind, box, o) {
     o = o || {};
     box = B(box.x, box.y, box.w, box.h);
-    var def = G[kind];
-    if (!def) { warn('CF.glyph unknown kind "' + kind + '" (placeholder square drawn — add it to G)'); return ctx.plate(box, { name: 'glyph·' + kind, fill: o.color || P.muted, opacity: 0.25, radius: 2 }); }
+    var resolved = G[kind] ? kind : (GLYPH_ALIAS[kind] || kind);
+    var def = G[resolved];
+    if (!def) { warn('CF.glyph unknown kind "' + kind + '" (placeholder square drawn — add it to G)'); return ctx.plate(box, { name: 'glyph·' + kind, fill: o.color || P.muted, opacity: 0.25, radius: 'xs' }); }
     var size = min(box.w, box.h), k = size / 24;
     var ox = box.x + (box.w - 24 * k) / 2, oy = box.y + (box.h - 24 * k) / 2;
     var f = function (v) { return v.toFixed(2); };
@@ -554,22 +765,33 @@ return (function () {
     });
     var color = o.color || P.muted, alpha = o.opacity === undefined ? 1 : o.opacity;
     var out = [];
-    if (dFill) out.push(ctx.path(dFill, { name: o.name || ('glyph·' + kind + '·fill'), fill: o.fill || color, opacity: alpha }));
-    if (dLine) out.push(ctx.path(dLine, { name: o.name || ('glyph·' + kind + '·line'), stroke: color, strokeW: o.strokeW || max(1.5, size * 0.085), strokeOpacity: alpha, cap: o.cap || 'round' }));
+    if (dFill) out.push(ctx.path(dFill, { name: o.name || ('glyph·' + resolved + '·fill'), fill: o.fill || color, opacity: alpha }));
+    if (dLine) out.push(ctx.path(dLine, { name: o.name || ('glyph·' + resolved + '·line'), stroke: color, strokeW: o.strokeW || max(1.5, size * 0.085), strokeOpacity: alpha, cap: o.cap || 'round' }));
     if (o.anchor) out.forEach(function (sh) { if (sh) ctx._anchor(sh, box, o.anchor); });
     return out.length === 1 ? out[0] : out;
   };
   CF.glyphKinds = Object.keys(G);
 
   // ---------------------------------------------------------------- subtree move (compensates "board shell moves, content stays")
+  /** Move a host together with everything inside it. Measured (2026-10-20): writing `host.x/y` in world coordinates
+      already drags the whole subtree, so the children must **not** be offset first — doing both applies the delta
+      twice, and every label inside a moved host ends up one half-host above its control (audit_layout S1
+      `out_of_bounds` on every cell of a `Family·Spec` matrix). The loop below only *verifies* the move and repairs a
+      child that the parent write left behind. */
   CF.move = function (host, x, y) {
-    var dx = x - host.x, dy = y - host.y, kids = Array.from(host.children || []);
-    kids.forEach(function (c) {
-      if (c.type === 'board' || (c.children && c.children.length)) CF.move(c, c.x + dx, c.y + dy);
-      else { try { c.x = c.x + dx; c.y = c.y + dy; } catch (e) {} }
-    });
+    var dx = N(x - host.x), dy = N(y - host.y);
+    var kids = Array.from(host.children || []).map(function (c) { try { return { c: c, x: c.x, y: c.y }; } catch (e) { return null; } }).filter(Boolean);
     try { host.x = x; host.y = y; } catch (e) {}
-    return { dx: dx, dy: dy, moved: kids.length };
+    var stranded = 0;
+    kids.forEach(function (k) {
+      try {
+        if (Math.abs(k.c.x - (k.x + dx)) > 0.5 || Math.abs(k.c.y - (k.y + dy)) > 0.5) {
+          k.c.x = N(k.x + dx); k.c.y = N(k.y + dy);
+          stranded++;
+        }
+      } catch (e) {}
+    });
+    return { dx: dx, dy: dy, moved: kids.length, stranded: stranded };
   };
 
   // ================================================================ A · Actions (component-library §3.1)
@@ -598,8 +820,30 @@ return (function () {
     if (v === undefined || v === null) return dflt;
     if (P[v] !== undefined) return P[v];
     // Returning the key itself would silently paint a hex-shaped-on-paper-but-garbage fill; surface it instead.
-    if (!/^#[0-9a-fA-F]{6}$/.test(v)) warn('CF palette key missing: ' + v);
-    return v;
+    if (!/^#[0-9a-fA-F]{6}$/.test(v)) { warn('CF palette key missing: ' + v); return v; }
+    return CF.tokenHex(v);
+  };
+  /** The palette chokepoint for a literal hex: `TK.colorIndex` says whether the token set names it. A near miss
+      (≤ 12/255 on a channel) is snapped onto the declared colour, so a typo'd hex cannot create an unbindable paint;
+      a genuinely different colour is kept (data-visualisation hues are content, not palette) and reported in
+      `CF.offPalette`, which is what the `paint_off_palette` gate then reads on the canvas.
+      `CF.theme()` clears the memo — a re-skin changes which hexes are in the set. */
+  CF.tokenHex = function (hex) {
+    var h = String(hex).toLowerCase();
+    var TK = storage.TK;
+    if (!TK || !TK.colorIndex || !TK.colorIndex().hexes) return h;
+    var memo = C._res || (C._res = {});
+    if (memo[h] !== undefined) return memo[h];
+    if (TK.colorIndex().byHex[h]) { memo[h] = h; return h; }
+    var n = TK.nearestHex(h);
+    if (n && n.near) {
+      CF.paletteDrift = CF.paletteDrift || {};
+      CF.paletteDrift[h] = n.name + ' (' + n.hex + ')';
+      memo[h] = n.hex; return n.hex;
+    }
+    CF.offPalette = CF.offPalette || {};
+    CF.offPalette[h] = n ? 'nearest ' + n.hex + ' Δ' + n.d : 'no index';
+    memo[h] = h; return h;
   };
   CF.TONE = TONE;
   CF.tone = function (k) { return TONE[k] || TONE.default; };
@@ -644,9 +888,12 @@ return (function () {
     var w = o.block ? (o.w || 240) : (o.w || (iconOnly ? L.h : L.padX * 2 + leadW + trailW + lw));
     w = max(w, iconOnly ? L.h : L.h + 8);
     var round = o.shape === 'circle' || o.shape === 'round' || o.shape === 'pill';
-    var rad = o.shape === 'square' ? 0 : (round ? (iconOnly ? w / 2 : w / 2) : L.radius);
+    var rad = o.shape === 'square' ? 0 : CF.radius('control');
     var box = B(o.x || 0, o.y || 0, w, o.h || L.h);
-    var ctx = CF.build(CF.name('Button', { type: type, size: o.size, state: S, slot: slotName(o) }), box, { parent: o.parent });
+    // `shape` is a real axis in this kit (Rayo draws every CTA as a pill), so it belongs in the name: without it a
+    // pill and a radius-6 button of the same type/size/state would share one name and the size axis would lie.
+    var shapeV = o.shape === 'pill' || o.shape === 'round' || o.shape === 'circle' ? 'Pill' : (o.shape === 'square' ? 'Square' : null);
+    var ctx = CF.build(CF.name('Button', { type: type, size: o.size, state: S, variant: shapeV, slot: slotName(o) }), box, { parent: o.parent });
     ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : null, S, { onDark: tn.onDark });
     if (tn.line) ctx._stroke(ctx.host, C(tn.line), 1, S === 'disabled' ? 0.4 : 1);
     if (tn.dashed && tn.line) ctx.host.strokes = [Object.assign({}, ctx.host.strokes[0], { strokeStyle: 'dashed' })];
@@ -676,13 +923,15 @@ return (function () {
     var tn = TONE[o.tone] || TONE.ghost;
     var box = B(o.x || 0, o.y || 0, o.w || sq, o.h || sq);
     var ctx = CF.build(CF.name('IconButton', { type: o.type || 'ghost', size: o.size, state: S, slot: o.badge ? 'Badge' : (o.shape === 'circle' ? 'Circle' : null) }), box, { parent: o.parent });
-    ctx.host.fills = CF.fills(C(tn.bg), S, {});
+    ctx.host.fills = CF.fills(C(tn.bg), S, { onDark: tn.onDark });
     if (o.outlined) ctx._stroke(ctx.host, C('border'), 1, S === 'disabled' ? 0.4 : 1);
     ctx.glyph(o.glyph || 'dots', box, { color: C(o.tone === 'danger' ? 'error' : (tn.ink || 'muted')), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place();
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
-    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: o.shape === 'circle' ? final.w / 2 : L2r(o.size), color: C('primary') });
-    if (o.badge) CF.badge({ parent: ctx.host, x: final.x + final.w - 8, y: final.y - 2, dot: true, tone: o.badgeTone || 'error' });
+    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: o.shape === 'circle' ? 'control' : L2r(o.size), color: C('primary') });
+    // The dot is pinned to the corner **inside** the square: a board clips its own export box, so a badge that
+    // overhangs is cut in half the moment the control is exported or turned into a component.
+    if (o.badge) CF.badge({ parent: ctx.host, x: final.x + final.w - 8, y: final.y, dot: true, tone: o.badgeTone || 'error' });
     ctx.hitPad(final, o.hit || (o.tier === 'web' ? 32 : 44));
     return ctx.host;
   };
@@ -695,7 +944,12 @@ return (function () {
     var hs = items.map(function () { return L.h; });
     var box = vert ? B(o.x || 0, o.y || 0, max.apply(null, ws) + 2, L.h * items.length + items.length - 1)
       : B(o.x || 0, o.y || 0, ws.reduce(function (a, b) { return a + b; }, 0) + 1, L.h + 1);
-    var ctx = CF.build(CF.name('ButtonGroup', { size: o.size, state: S, slot: vert ? 'Vertical' : null }), box, {
+    // A group of icon segments and a group of labels are two different controls (a toolbar vs a paired action), and a
+    // group whose leading segment carries the brand tone is the attached-primary form — all three must be nameable.
+    var glyphSeg = items.filter(function (it) { return it.glyph && !it.label; }).length;
+    var gslot = [vert ? 'Vertical' : null,
+      glyphSeg === items.length ? 'IconOnly' : (glyphSeg ? 'WithIcon' : null)].filter(Boolean).join('-') || null;
+    var ctx = CF.build(CF.name('ButtonGroup', { type: o.type || (items[0] && items[0].type), size: o.size, state: S, slot: gslot }), box, {
       parent: o.parent, fill: C('surface'), stroke: C('border'), strokeW: 1, radius: L.radius, clip: true
     });
     var off = 0;
@@ -703,7 +957,7 @@ return (function () {
       var it = items[i], tn = CF.tone(it.type || 'default');
       var seg = vert ? B(box.x + 1, box.y + 1 + off, box.w - 2, hs[i] - (i ? 1 : 0)) : B(box.x + 1 + off, box.y + 1, ws[i] - (i ? 1 : 0), box.h - 2);
       if (tn.bg) ctx.plate(seg, { name: 'segment·' + (i + 1), fill: C(tn.bg), fills: CF.fills(C(tn.bg), S, { onDark: tn.onDark }) });
-      else if (i && S === 'hover') ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
+      else if (i && (S === 'hover' || S === 'pressed')) ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
       if (i) ctx.plate(vert ? B(seg.x, seg.y, seg.w, 1) : B(seg.x, seg.y, 1, seg.h), { name: 'divider', fill: C('border'), opacity: 0.6 });
       if (it.label) ctx.text(it.label, seg, { size: L.fs, color: C(tn.ink, P.ink), weight: 500, opacity: stateAlpha(S) });
       else if (it.glyph) ctx.glyph(it.glyph, seg, { color: C(tn.ink, P.ink), opacity: stateAlpha(S) });
@@ -741,7 +995,8 @@ return (function () {
     var S = o.state || 'default', label = o.extended ? String(o.label === undefined ? 'New note' : o.label) : null;
     var w = label ? max(d, 16 + (o.iconOnly ? 0 : 24) + 8 + CF.estW(label, 14) + 16 + 2) : d;
     var box = B(o.x || 0, o.y || 0, w, d);
-    var ctx = CF.build(CF.name('FAB', { size: o.size === 'sm' ? 'Sm' : (o.size === 'lg' ? 'Lg' : 'Md'), state: S, slot: label ? 'Extended' : null }), box, { parent: o.parent, radius: d / 2 });
+    var ctx = CF.build(CF.name('FAB', { size: o.size === 'sm' ? 'Sm' : (o.size === 'lg' ? 'Lg' : 'Md'), tone: o.tone,
+      state: S, slot: [label ? 'Extended' : null, label && o.iconOnly ? 'IconOnly' : null].filter(Boolean).join('-') || null }), box, { parent: o.parent, radius: 'control' });
     ctx.host.fills = CF.fills(C(tn.bg), S, { onDark: tn.onDark });
     ctx.host.shadows = CF.shadow(S === 'pressed' ? 2 : 3);
     if (label) {
@@ -749,22 +1004,25 @@ return (function () {
       ctx.text(label, B(box.x + (o.iconOnly ? 16 : 48), box.y, w - (o.iconOnly ? 32 : 64), d), { size: 14, color: C(tn.ink), weight: 600, opacity: stateAlpha(S) });
     } else ctx.glyph(o.glyph || 'plus', box, { color: C(tn.ink), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place(); ctx.refit(16);
-    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height), { radius: ctx.host.height / 2 });
+    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height), { radius: 'control' });
     return ctx.host;
   };
 
   /** Link: 14-15, underline appears on hover ONLY (§3.1), optional trailing icon, disabled = .38 content. */
   CF.link = async function (o) {
     o = o || {};
-    var fs = o.fs || 14, label = String(o.label === undefined ? 'Read the docs' : o.label), S = o.state || 'default';
-    var color = C(o.tone === 'neutral' ? 'ink' : 'primary'), w = CF.estW(label, fs) + (o.trail ? fs + 4 : 0) + 2;
-    var box = B(o.x || 0, o.y || 0, o.w || w, o.h || fs + 10);
+    var L = CF.ladder(o.size), fs = o.fs || L.fs;
+    var label = String(o.label === undefined ? 'Read the docs' : o.label), S = o.state || 'default';
+    // pressed = the ink step of the same hue (§1.2: a state is a step on the ramp, never a new hex)
+    var color = C(S === 'pressed' ? (o.tone === 'neutral' ? 'ink' : 'primaryInk') : (o.tone === 'neutral' ? 'ink' : 'primary'));
+    var w = CF.estW(label, fs) + (o.trail ? fs + 4 : 0) + 2;
+    var box = B(o.x || 0, o.y || 0, o.w || w, o.h || max(L.h, fs + 10));
     var ctx = CF.build(CF.name('Link', { size: o.size, state: S, variant: o.underline ? 'Underline' : null, slot: slotName(o) }), box, { parent: o.parent });
     ctx.text(label, B(box.x, box.y, max(8, box.w - (o.trail ? fs + 4 : 0)), box.h), { size: fs, color: color, weight: o.weight || 500,
-      opacity: stateAlpha(S), align: 'left', underline: (o.underline || S === 'hover' || S === 'focus') ? (o.underline === true ? color : o.underline) : false });
+      opacity: stateAlpha(S), align: 'left', underline: (o.underline || S === 'hover' || S === 'focus' || S === 'pressed') ? (o.underline === true ? color : o.underline) : false });
     if (o.trail) ctx.glyph(iconOf(o.trail, 'arrowRight'), B(box.x + box.w - fs, box.y + (box.h - fs) / 2, fs, fs), { color: color, opacity: stateAlpha(S), anchor: 'right' });
     await ctx.settle(); ctx.place(); ctx.refit(0);
-    if (S === 'focus') ctx.ring(B(box.x - 2, box.y + 2, ctx.host.width + 4, box.h - 4), { radius: 4, offset: 2, width: 2 });
+    if (S === 'focus') ctx.ring(B(box.x - 2, box.y + 2, ctx.host.width + 4, box.h - 4), { radius: 'xs', offset: 2, width: 2 });
     return ctx.host;
   };
 
@@ -776,20 +1034,26 @@ return (function () {
     var iw = o.itemW || max(64, L.padX * 2 + max.apply(null, items.map(function (t) { return CF.estW(String(t), L.fs); })) + (o.iconOnly ? L.icon : 0));
     var box = B(o.x || 0, o.y || 0, o.w || (iw * items.length + 8), o.h || L.h + 8);
     var ctx = CF.build(CF.name('Segmented', { size: o.size, state: S, variant: o.dark ? 'Ink' : null, slot: slotName(o) }), box,
-      { parent: o.parent, fill: C('surfaceAlt'), radius: L.radius + 4 });
+      { parent: o.parent, fill: C('surfaceAlt'), radius: 'control' });
     ctx.host.fills = CF.fills(C('surfaceAlt'), S === 'disabled' ? 'disabled' : null);
     items.forEach(function (t, i) {
       var seg = B(box.x + 4 + i * iw, box.y + 4, iw, box.h - 8);
       var on = i === active;
+      // A toggle group's `selected` is the chosen segment, so it is drawn as the active pill carrying a 12% brand wash
+      // (§1.2: a state layer, not a new hex); `hover`/`pressed` tint the segments the pointer can still reach.
       if (on) {
-        ctx.plate(seg, { name: 'segment·active', fill: o.dark ? C('ink') : C('surface'), radius: L.radius, shadow: o.dark ? 0 : 1 });
+        ctx.plate(seg, { name: 'segment·active', fill: o.dark ? C('ink') : C('surface'),
+          fills: S === 'selected' && !o.dark ? CF.fills(C('surface'), 'selected', { overlay: C('primary') }) : null,
+          radius: L.radius, shadow: o.dark ? 0 : 1 });
+      } else if (S === 'hover' || S === 'pressed') {
+        ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
       }
       if (o.iconOnly) ctx.glyph(o.glyphs ? o.glyphs[i] : 'grid', seg, { color: on ? (o.dark ? C('surface') : C('ink')) : C('muted'), opacity: stateAlpha(S) });
       else ctx.text(String(t), seg, { size: L.fs, color: on ? (o.dark ? C('surface') : C('ink')) : C('muted'), weight: on ? 600 : 400,
         opacity: (S === 'disabled' || i === o.disabled) ? CF.STATE.disabledContent : 1 });
     });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(box, { radius: L.radius + 4 });
+    if (S === 'focus') ctx.ring(box, { radius: 'control' });
     return ctx.host;
   };
 
@@ -828,11 +1092,13 @@ return (function () {
     if (o.status === 'error' && S === 'default') S = 'error';
     var fv = FIELD[variant] || FIELD.outlined;
     var fh = o.h || L.h;
-    var aB = o.addonBefore ? L.padX * 2 + CF.estW(String(o.addonBefore), L.fs) : 0;
-    var aA = o.addonAfter ? L.padX * 2 + CF.estW(String(o.addonAfter), L.fs) : 0;
+    var aB = o.addonBefore ? L.padX * 2 + CF.estW(String(o.addonBefore), L.fs) : (o.insetLeft ? Number(o.insetLeft) : 0);
+    var aA = o.addonAfter ? L.padX * 2 + CF.estW(String(o.addonAfter), L.fs) : (o.insetRight ? Number(o.insetRight) : 0);
     var fieldW = o.w || 240;
     var totalW = aB + fieldW + aA;
-    var extra = o.count ? 20 : 0;
+    // Foot area BELOW the plate: the counter and the strength readout are status copy, not field content — inside the
+    // plate they sit on the hover/focus wash, where a tone hue drops under its contrast floor.
+    var extra = (o.count ? 20 : 0) + (o.footH ? Number(o.footH) : 0);
     var box = B(o.x || 0, o.y || 0, totalW, fh + extra);
     var ctx = CF.build(CF.name(family, { type: variant, size: o.size, state: S, slot: slotName(o) }), box, { parent: o.parent });
     var fb = B(box.x + aB, box.y, fieldW, fh);
@@ -845,13 +1111,13 @@ return (function () {
     if (S === 'disabled') lineAlpha = 0.4;
     ctx.plate(fb, { name: 'field', fill: C(fv.bg), fills: CF.fills(C(fv.bg), S === 'readonly' ? null : (S === 'error' || S === 'success' || S === 'warning' ? null : S)),
       stroke: variant === 'underlined' ? null : line, strokeW: lw, strokeOpacity: lineAlpha,
-      radius: variant === 'outlined' || variant === 'filled' ? L.radius : 0 });
+      radius: variant === 'outlined' || variant === 'filled' ? L.radius : 'none' });
     if (variant === 'underlined') ctx.plate(B(fb.x, fb.y + fb.h - (S === 'focus' ? 2 : 1), fb.w, S === 'focus' ? 2 : 1), { name: 'underline', fill: S === 'focus' ? C('primary') : line, opacity: lineAlpha });
     if (S === 'disabled') ctx.plate(fb, { name: 'disabled-overlay', fills: [{ fillColor: C('ink'), fillOpacity: CF.STATE.disabledContainer }], radius: L.radius });
-    [aB ? B(box.x, box.y, aB, fh) : null, aA ? B(box.x + aB + fieldW, box.y, aA, fh) : null].forEach(function (ab, i) {
+    [o.addonBefore ? B(box.x, box.y, aB, fh) : null, o.addonAfter ? B(box.x + aB + fieldW, box.y, aA, fh) : null].forEach(function (ab, i) {
       if (!ab) return;
       ctx.plate(ab, { name: i ? 'addon·after' : 'addon·before', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1,
-        radius: i ? 0 : L.radius });
+        radius: i ? 'none' : L.radius });
       ctx.text(String(i ? o.addonAfter : o.addonBefore), ab, { size: L.fs, color: C('muted') });
     });
     var txt = o.value === undefined ? (o.placeholder === undefined ? null : o.placeholder) : String(o.value);
@@ -908,7 +1174,7 @@ return (function () {
     if (o.kbd) {
       var r2 = await CF.fieldBox('Search', Object.assign({}, o, { clear: false }));
       var kw = CF.estW(o.kbd, 11) + 12;
-      r2.ctx.plate(B(r2.field.x + r2.field.w - kw - 8, r2.field.y + (r2.field.h - 22) / 2, kw, 22), { name: 'kbd', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 4 });
+      r2.ctx.plate(B(r2.field.x + r2.field.w - kw - 8, r2.field.y + (r2.field.h - 22) / 2, kw, 22), { name: 'kbd', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 'xs' });
       r2.ctx.text(o.kbd, B(r2.field.x + r2.field.w - kw - 8, r2.field.y, kw, r2.field.h), { size: 11, role: 'kbd', color: C('muted'), weight: 500 });
       await r2.ctx.settle(); r2.ctx.place();
       return r2.host;
@@ -921,15 +1187,17 @@ return (function () {
     o = o || {};
     var L = CF.ladder(o.size), revealed = !!o.revealed, v = o.value === undefined ? 'hunter2pass' : String(o.value);
     var shown = revealed ? v : new Array(min(12, v.length) + 1).join('•');
-    var extra = o.strength ? 12 : 0;
-    var r = await CF.fieldBox('Password', Object.assign({}, o, { trail: revealed ? 'eyeOff' : 'eye', value: shown, h: L.h + extra, caret: o.caret }));
+    var extra = o.strength ? 28 : 0;
+    var r = await CF.fieldBox('Password', Object.assign({}, o, { trail: revealed ? 'eyeOff' : 'eye', value: shown, h: L.h, footH: extra, caret: o.caret }));
     if (o.caret === undefined) { /* caret handled by fieldBox */ }
     if (o.strength) {
       var n = 4, segW = (r.field.w - (n - 1) * 4) / n, lvl = Number(o.strength) || 2;
       var colr = lvl <= 1 ? C('error') : (lvl === 2 ? C('warning') : C('success'));
-      for (var i = 0; i < n; i++) r.ctx.plate(B(r.field.x + i * (segW + 4), r.field.y + r.field.h - 6, segW, 4),
-        { name: 'strength·' + (i + 1), fill: i < lvl ? colr : C('border'), radius: 2 });
-      r.ctx.text(['Weak', 'Fair', 'Good', 'Strong'][lvl - 1] || '', B(r.field.x, r.box.y + r.box.h - 14, r.field.w, 14), { size: 12, color: colr, align: 'left', valign: 'top' });
+      var footY = r.field.y + r.field.h + 4;
+      for (var i = 0; i < n; i++) r.ctx.plate(B(r.field.x + i * (segW + 4), footY, segW, 4),
+        { name: 'strength·' + (i + 1), fill: i < lvl ? colr : C('border'), radius: 'xs' });
+      r.ctx.text(['Weak', 'Fair', 'Good', 'Strong'][lvl - 1] || '', B(r.field.x, footY + 8, r.field.w, 14),
+        { size: 12, color: colr, align: 'left', valign: 'top', refit: false });
       await r.ctx.settle(); r.ctx.place();
     }
     return r.host;
@@ -954,7 +1222,9 @@ return (function () {
   CF.otpInput = async function (o) {
     o = o || {};
     var n = o.length || 6, bw = o.boxW || 44, bh = o.boxH || 52, gap = o.gap || 10, groupAfter = o.grouped === false ? 0 : 3;
-    var extra = (o.error ? 20 : 0) + (o.resend ? 24 : 0);
+    // Error/resend lines are 13px type → a 20px rendered line; a 20px slot left the error's bottom 4px outside the
+    // host (audit_layout out_of_bounds). Each slot is 24 = 4px gap + the real line.
+    var extra = (o.error ? 24 : 0) + (o.resend ? 24 : 0);
     var boxW = n * bw + (n - 1) * gap + (groupAfter && groupAfter < n ? 8 : 0);
     var box = B(o.x || 0, o.y || 0, max(boxW, o.w || boxW), bh + extra);
     var ctx = CF.build(CF.name('OTP', { size: n + 'D', state: o.error ? 'Error' : (o.state || 'default'), slot: o.resend ? 'Resend' : null }), box, { parent: o.parent });
@@ -962,15 +1232,35 @@ return (function () {
     for (var i = 0; i < n; i++) {
       var x = box.x + i * (bw + gap) + (groupAfter && i >= groupAfter ? 8 : 0);
       var b = B(x, box.y, bw, bh);
-      var active = !o.error && i === filled;
+      // A disabled code cannot be typed into: no caret, no accent border. The host name carries ·Disabled, so
+      // `place()` already fades the digits to .38; leaving the active cell lit drew a second, contradictory state.
+      var active = !o.error && o.state !== 'disabled' && i === filled;
       ctx.plate(b, { name: 'box·' + (i + 1), fill: C('surface'), stroke: o.error ? C('error') : (active ? C('primary') : C('border')),
         strokeW: active || o.error ? 2 : 1, radius: CF.radius('md') });
-      if (i < filled) ctx.text(o.hidden ? '•' : String(o.digits ? o.digits[i] : (i + 1) % 10), B(b.x, b.y, b.w, b.h - 2), { size: o.fs || 20, weight: 600, color: C('ink') });
-      if (active && !o.error) CF.spinner(ctx, B(b.x + b.w - 12, b.y + 6, 10, 10), C('primary'), 1.5);
+      // 16, not 20: a ≥20px text at the top of its own host board reads as a board header to audit_layout S4, and the
+      // digit boxes behind it then report header_collision. The ramp has no 18 step, so the digit sits on body-lg.
+      if (i < filled) ctx.text(o.hidden ? '•' : String(o.digits ? o.digits[i] : (i + 1) % 10), B(b.x, b.y, b.w, b.h - 2), { size: o.fs || 16, weight: 600, color: C('ink') });
+      // An idle OTP cell shows a caret, not a loading spinner: the spinner's arc on the cell border read as a
+      // broken ring in the exported screen. Loading is an explicit state (o.loading), and its spinner replaces the
+      // caret at the cell centre — a 10px spinner parked in the top-right corner read as a trailing icon and sat on
+      // the active cell's 2px border. The 16px glyph matches the md icon step; 2px stroke keeps the 260° arc legible.
+      if (active && !o.error) {
+        if (o.loading) {
+          var sp = Math.min(16, bh - 20);
+          CF.spinner(ctx, B(b.x + (b.w - sp) / 2, b.y + (bh - sp) / 2, sp, sp), C('primary'), 2);
+        } else {
+          ctx.plate(B(b.x + b.w / 2 - 1, b.y + (bh - 20) / 2, 2, 20), { name: 'caret', fill: C('ink'), radius: 'xs' });
+        }
+      }
     }
-    if (o.error) ctx.text(o.message || 'Code doesn’t match', B(box.x, box.y + bh + 4, box.w, 16), { size: 13, color: C('error'), align: 'left', valign: 'top' });
-    if (o.resend) ctx.text(iconOf(o.resend, 'Resend code in 0:30'), B(box.x, box.y + bh + (o.error ? 22 : 4), box.w, 16), { size: 13, color: C('muted'), align: 'left', valign: 'top' });
-    if (o.state === 'focus') ctx.ring(B(box.x + (bw + gap) * 0, box.y, bw, bh), { radius: CF.radius('md') });
+    if (o.error) ctx.text(o.message || 'Code doesn’t match', B(box.x, box.y + bh + 4, box.w, 20), { size: 13, color: C('error'), align: 'left', valign: 'top' });
+    if (o.resend) ctx.text(iconOf(o.resend, 'Resend code in 0:30'), B(box.x, box.y + bh + (o.error ? 28 : 4), box.w, 20), { size: 13, color: C('muted'), align: 'left', valign: 'top' });
+    // The focus ring belongs to the cell the caret sits in, not to box 1: a ring around the first cell while box 4 is
+    // active reads as two unrelated states (measured on `OTP·Spec`, row Focus).
+    if (o.state === 'focus') {
+      var fi = min(filled, n - 1);
+      ctx.ring(B(box.x + fi * (bw + gap) + (groupAfter && fi >= groupAfter ? 8 : 0), box.y, bw, bh), { radius: CF.radius('md') });
+    }
     await ctx.settle(); ctx.place();
     return ctx.host;
   };
@@ -984,7 +1274,10 @@ return (function () {
     var r = await CF.fieldBox('NumberField', Object.assign({}, o, {
       align: o.align || 'right', value: String(v) + (o.unit ? '' : ''),
       trail: attached ? false : (o.step === 'up' || v >= maxv ? false : true),
-      lead: attached ? false : o.lead, w: o.w || 140, suffix: o.unit
+      lead: attached ? false : o.lead, w: o.w || 140, suffix: o.unit,
+      // The steppers live in reserved gutters of the host, not outside it: a board's x-assignment carries its
+      // children in this Penpot build, so growing the frame leftwards cannot be done after the fact.
+      insetLeft: attached ? btnW : 0, insetRight: attached ? btnW : 0
     }));
     var f = r.field, ctx = r.ctx;
     if (attached) {
@@ -993,9 +1286,6 @@ return (function () {
         ctx.plate(t[0], { name: 'stepper', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: L.radius });
         ctx.glyph(t[1], t[0], { color: t[2] ? C('muted') : C('ink'), opacity: t[2] ? CF.STATE.disabledContent : 1 });
       });
-      // The host was sized for the field alone; slide its left edge over the − stepper and widen to cover both.
-      // (Board shell moves, absolute children stay — that is exactly the compensation we want here.)
-      try { ctx.host.x = N(dn.x); ctx.host.resize(N(f.w + btnW * 2), ctx.host.height); } catch (e) {}
     } else {
       var gh = B(f.x + f.w - 12 - 16, f.y + f.h / 2 - 16, 16, 16);
       ctx.glyph('chevronUp', gh, { color: C('muted') });
@@ -1012,15 +1302,17 @@ return (function () {
   function optionRow(ctx, r, o) {
     var L = CF.ladder(o.size || 'md'), padX = 12, icon = L.icon;
     if (o.group) { ctx.text(String(o.label).toUpperCase(), B(r.x + padX, r.y, r.w - padX * 2, r.h), { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false }); return; }
-    if (o.active) ctx.plate(r, { name: 'row·tint', fills: CF.fills(C('primary'), 'hover'), radius: 4 });
-    if (o.selected) ctx.plate(r, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 4 });
-    if (o.hover) ctx.plate(r, { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: 4 });
+    // The keyboard-active row is a wash of the brand, never solid brand: a system whose primary is a dark neutral
+    // (Rayo #161616) would paint an invisible plate under its own ink label and fail §3.3 at the factory.
+    if (o.active) ctx.plate(r, { name: 'row·tint', fills: CF.fills(C('primary'), 'focus', { tint: 1 }), radius: 'xs' });
+    if (o.selected) ctx.plate(r, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 'xs' });
+    if (o.hover) ctx.plate(r, { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: 'xs' });
     if (o.lead) ctx.glyph(o.lead, B(r.x + padX, r.y + (r.h - icon) / 2, icon, icon), { color: o.selected ? C('primary') : C('muted') });
     ctx.text(String(o.label), B(r.x + padX + (o.lead ? icon + 8 : 0), r.y, r.w - padX * 2 - (o.lead ? icon + 8 : 0) - (o.selected ? icon + 4 : 0) - (o.right ? CF.estW(String(o.right), 12) + 12 : 0), r.h),
       { size: L.fs, color: o.selected ? C('primary') : C('ink'), weight: o.selected ? 600 : 400, opacity: o.disabled ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle' });
     if (o.right) ctx.text(String(o.right), B(r.x + r.w - padX - CF.estW(String(o.right), 12) - 4, r.y, CF.estW(String(o.right), 12) + 4, r.h), { size: 12, color: C('muted'), align: 'right', valign: 'middle' });
     if (o.selected) ctx.glyph('check', B(r.x + r.w - padX - icon, r.y + (r.h - icon) / 2, icon, icon), { color: C('primary') });
-    if (o.skeleton) ctx.plate(B(r.x + padX, r.y + (r.h - 12) / 2, r.w * 0.6, 12), { name: 'skeleton·bar', fill: C('surfaceAlt'), radius: 4 });
+    if (o.skeleton) ctx.plate(B(r.x + padX, r.y + (r.h - 12) / 2, r.w * 0.6, 12), { name: 'skeleton·bar', fill: C('surfaceAlt'), radius: 'xs' });
     if (o.divider) ctx.plate(B(r.x + 8, r.y, r.w - 16, 1), { name: 'divider', fill: C('border') });
   }
   /** A menu/select option list inside a host. `rows` = [{label,selected,hover,disabled,group,right,lead,divider,skeleton}]. */
@@ -1045,19 +1337,24 @@ return (function () {
     var pw = o.panelW || max(o.w || 240, 220);
     var list = opts.filter(function (r) { return typeof r === 'string' ? true : !r.group; }).length;
     var heads = opts.length - list;
-    var ph = 8 + list * rowH + heads * 26;
+    // 8 top + 8 bottom, plus the 40px filter strip when the panel is searchable — leaving the search row out of `ph`
+    // is what pushed the last option label below the panel and the host.
+    var ph = 16 + list * rowH + heads * 26 + (o.search ? 40 : 0);
     var base = await CF.fieldBox('Select', Object.assign({ trail: 'caretDown', state: 'focus', value: o.value, placeholder: o.placeholder }, o));
     var ctx = base.ctx, f = base.field, host = base.host;
     var pbox = B(f.x, f.y + f.h + 4, pw, ph);
+    // Growth is a SIZE, not a world coordinate: `pbox.bottom - host.bottom` (the DatePicker form). Reading it as
+    // `panelTop + panelHeight - hostHeight` inflates every open panel by however far down the page the cell sits.
     var nb = N(pbox.x + pbox.w - (host.x + host.width));
-    var hb = N(f.y + f.h + 4 + ph - host.height);
+    var hb = N(pbox.y + pbox.h - (host.y + host.height));
     if (nb > 0 || hb > 0) { host.resize(N(host.width + max(0, nb)), N(host.height + max(0, hb))); base.box = B(host.x, host.y, host.width, host.height); }
     panelPlate(ctx, pbox, {});
-    if (o.search) ctx.plate(B(pbox.x + 4, pbox.y + 4, pbox.w - 8, 32), { name: 'panel·search', fill: C('surfaceAlt'), radius: 4 });
+    if (o.search) ctx.plate(B(pbox.x + 4, pbox.y + 4, pbox.w - 8, 32), { name: 'panel·search', fill: C('surfaceAlt'), radius: 'xs' });
     var y0 = pbox.y + 4 + (o.search ? 40 : 4);
     var avail = pbox.h - (y0 - pbox.y) - 4;
-    var shown = Math.min(rowH ? Math.floor(avail / rowH) : 5, opts.length);
-    var res = await CF.optionList(ctx, B(pbox.x, y0, pbox.w, avail), opts.map(function (r) { return typeof r === 'string' ? { label: r } : r; }), { size: o.size, rowH: rowH });
+    var rows = opts.map(function (r) { return typeof r === 'string' ? { label: r } : r; });
+    if (o.maxRows && rows.length > o.maxRows) rows = rows.slice(0, o.maxRows);   // a capped panel scrolls; it never spills
+    var res = await CF.optionList(ctx, B(pbox.x, y0, pbox.w, avail), rows, { size: o.size, rowH: rowH });
     if (o.empty) { ctx.text('No matches', B(pbox.x + 12, y0, pbox.w - 24, 40), { size: 13, color: C('muted') }); await ctx.settle(); ctx.place(); return host; }
     if (o.loading) CF.spinner(ctx, B(pbox.x + pbox.w - 28, y0, 16, 16), C('muted'));
     await ctx.settle(); ctx.place();
@@ -1090,14 +1387,19 @@ return (function () {
       xs.push({ v: v, x: x, w: cw, row: rowsN - 1 }); x += cw + 4;
     });
     var fh = max(L.h, rowsN * (chipH + 4) + 8);
-    var base = await CF.fieldBox('MultiSelect', Object.assign({ h: fh, value: undefined, placeholder: overflow ? null : 'Add tags…', trail: 'caretDown' }, o));
+    // The placeholder is the empty-field affordance: with chips already inside, fieldBox's left-aligned placeholder
+    // painted straight through them (audit_layout text_overlap).
+    var base = await CF.fieldBox('MultiSelect', Object.assign({ h: fh, value: undefined, placeholder: vals.length ? null : (o.placeholder || 'Add tags…'), trail: 'caretDown' }, o));
     var ctx = base.ctx, f = base.field;
     var yOff = (f.h - rowsN * (chipH + 4)) / 2;
     xs.forEach(function (c) {
       var cb = B(f.x + 12 + c.x, f.y + yOff + c.row * (chipH + 4), c.w, chipH);
       var isMore = c.v[0] === '+';
-      ctx.plate(cb, { name: isMore ? 'chip·overflow' : 'chip', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: cb.h / 2 });
-      ctx.text(c.v, B(cb.x + (isMore ? 0 : 4), cb.y, cb.w - (isMore ? 0 : 4 + (o.removable === false ? 0 : 14)), cb.h), { size: L.fs - 1, color: C('ink') });
+      ctx.plate(cb, { name: isMore ? 'chip·overflow' : 'chip', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 'control' });
+      // Only a removable chip reserves a right zone for the ✕; a read-only chip centers its label in the full pill
+      // (insetting it by the fixed 4px left pad leaves a 2.5px off-center residue against the plate).
+      var inset = !isMore && o.removable !== false;
+      ctx.text(c.v, B(inset ? cb.x + 4 : cb.x, cb.y, inset ? cb.w - 18 : cb.w, cb.h), { size: L.fs - 1, color: C('ink') });
       if (!isMore && o.removable !== false) ctx.glyph('close', B(cb.x + cb.w - 16, cb.y + (cb.h - 12) / 2, 12, 12), { color: C('muted'), strokeW: 1.5 });
     });
     await ctx.settle(); ctx.place();
@@ -1131,10 +1433,10 @@ return (function () {
       var dnum = i - first + 1, out = dnum < 1 || dnum > (o.daysInMonth || 31);
       var shown = out ? (dnum < 1 ? (o.daysInMonth || 31) + dnum : dnum - (o.daysInMonth || 31)) : dnum;
       var inRange = rng && dnum >= rng.start && dnum <= (rng.hoverEnd || rng.end);
-      if (inRange) ctx.plate(B(cell.x, cell.y + 4, cell.w, cell.h - 8), { name: 'range·fill', fill: C('primary'), opacity: CF.STATE.selected, radius: 0 });
+      if (inRange) ctx.plate(B(cell.x, cell.y + 4, cell.w, cell.h - 8), { name: 'range·fill', fill: C('primary'), opacity: CF.STATE.selected, radius: 'none' });
       var isSel = rng ? (dnum === rng.start || dnum === (rng.hoverEnd || rng.end)) : dnum === o.selected;
       if (isSel) ctx.ellipse(B(cell.x + (cell.w - 32) / 2, cell.y + (cell.h - 32) / 2, 32, 32), { name: 'day·selected', fill: C('primary') });
-      else if (dnum === today) ctx.plate(B(cell.x + (cell.w - 32) / 2, cell.y + (cell.h - 32) / 2, 32, 32), { name: 'day·today', stroke: C('primary'), strokeW: 1.5, radius: 16 });
+      else if (dnum === today) ctx.plate(B(cell.x + (cell.w - 32) / 2, cell.y + (cell.h - 32) / 2, 32, 32), { name: 'day·today', stroke: C('primary'), strokeW: 1.5, radius: 'control' });
       ctx.text(String(shown), B(cell.x, cell.y, cell.w, cell.h), { size: 14, color: out ? C('muted') : (isSel ? '#FFFFFF' : C('ink')),
         opacity: (o.min && dnum < o.min && !out) ? CF.STATE.disabledContent : 1, weight: isSel ? 600 : 400 });
     }
@@ -1148,7 +1450,7 @@ return (function () {
       var fy2 = gy + weeks * day;
       ['Today', '7 days', '30 days'].forEach(function (p, i) {
         var pb = B(pbox.x + pad + i * 74, fy2 + 4, 70, 26);
-        ctx.plate(pb, { name: 'preset', fill: C('surfaceAlt'), radius: 13 });
+        ctx.plate(pb, { name: 'preset', fill: C('surfaceAlt'), radius: 'control' });
         ctx.text(p, pb, { size: 12, color: C('ink') });
       });
       ctx.text('Cancel', B(pbox.x + pad, fy2 + 38, 60, 30), { size: 13, color: C('muted'), align: 'left' });
@@ -1177,7 +1479,10 @@ return (function () {
     var labelH = beside ? 0 : 20, helpH = helper ? 18 : 0, gap = 6;
     var total = L.h + labelH + helpH + (labelH ? gap : 0) + (helpH ? 4 : 0);
     var box = B(o.x || 0, o.y || 0, o.w || max(240, CF.estW(label, 14) + 24), total);
-    var ctx = CF.build(CF.name('Field', { state: o.error ? 'Error' : (o.success ? 'Success' : (o.state || 'default')), slot: beside ? 'LabelBeside' : null }), box, { parent: o.parent });
+    // §G12: the icon/addon/counter slots below the label are the *field's* slots — the sub-control inherits them, so
+    // the wrapper host must carry them in its own name or `variant_sparse` reads a composed Field as one flat variant.
+    var slot = [beside ? 'LabelBeside' : null, slotName(o)].filter(Boolean).join('-') || null;
+    var ctx = CF.build(CF.name('Field', { state: o.error ? 'Error' : (o.success ? 'Success' : (o.state || 'default')), slot: slot }), box, { parent: o.parent });
     var labBox = beside ? B(box.x, box.y, min(280, box.w * 0.3), L.h) : B(box.x, box.y, box.w, labelH);
     var labAl = (o.state === 'disabled') ? CF.STATE.disabledContent : 1;
     ctx.text(label, labBox, { size: 13, color: C(o.state === 'disabled' ? 'muted' : 'ink'), weight: 500, opacity: labAl,
@@ -1205,15 +1510,16 @@ return (function () {
     var on = !!o.checked, S = o.state || 'default';
     var pressed = S === 'pressed';
     var hw = m3 ? (on ? (pressed ? 28 : 24) : 16) : (m3 ? 24 : (pressed ? th - 2 : th - 4));
-    var box = B(o.x || 0, o.y || 0, tw + (o.label ? 8 + CF.estW(String(o.label), 14) : 0), max(th, 20));
-    var ctx = CF.build(CF.name('Switch', { size: sm ? 'Sm' : 'Md', state: S, slot: [on ? 'On' : 'Off', slotName({ lead: o.innerIcon ? true : null, loading: o.loading })].filter(Boolean).join('-') }), box, { parent: o.parent });
+    var box = B(o.x || 0, o.y || 0, tw + (o.label ? CF.labelW(o.label, 14) : 0), max(th, 20));
+    var swSlot = [on ? 'On' : 'Off', slotName({ lead: o.innerIcon ? true : null, loading: o.loading }), o.label ? 'Label' : null].filter(Boolean).join('-');
+    var ctx = CF.build(CF.name('Switch', { size: sm ? 'Sm' : 'Md', state: S, slot: swSlot }), box, { parent: o.parent });
     var tr = B(box.x, box.y + (box.h - th) / 2, tw, th);
     ctx.hitPad(tr, o.hit || (m3 ? 40 : 32));                    // bottom-most: the 40dp state layer / touch target
     var tfill = on ? C('primary') : (m3 ? C('surface') : C('ink'));
     var tf = [{ fillColor: tfill, fillOpacity: on ? 1 : (m3 ? 1 : 0.28) }];
     var ov = (S === 'hover' || S === 'pressed' || S === 'selected') ? CF.STATE[S] : (S === 'disabled' ? CF.STATE.disabledContainer : 0);
     if (ov) tf.push({ fillColor: on ? '#FFFFFF' : C('ink'), fillOpacity: ov });
-    var tplate = ctx.plate(tr, { name: 'track', radius: th / 2, fills: tf });
+    var tplate = ctx.plate(tr, { name: 'track', radius: 'control', fills: tf });
     if (!on && m3) ctx._stroke(tplate, C('borderStrong'), 2);
     var hx = on ? tr.x + tr.w - hw - (m3 ? 4 : 2) : (m3 ? tr.x + (tr.w - hw) / 2 : tr.x + 2);
     var hy = tr.y + (tr.h - hw) / 2;
@@ -1224,7 +1530,7 @@ return (function () {
     if (o.label) ctx.text(String(o.label), B(tr.x + tr.w + 8, box.y, box.w - tr.w - 8, box.h),
       { size: 14, color: S === 'disabled' ? C('muted') : C('ink'), opacity: stateAlpha(S), align: 'left' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(tr, { radius: th / 2 });
+    if (S === 'focus') ctx.ring(tr, { radius: 'control' });
     return ctx.host;
   };
 
@@ -1232,22 +1538,28 @@ return (function () {
   CF.checkbox = async function (o) {
     o = o || {};
     var bs = o.boxSize || 18, S = o.state || 'default', on = o.indeterminate ? 'mixed' : (o.checked ? 'on' : 'off');
-    var labelW = o.label === undefined ? 0 : CF.estW(String(o.label), 14) + 8;
-    var box = B(o.x || 0, o.y || 0, max(bs + labelW, bs), o.h || max(bs, 20));
-    var ctx = CF.build(CF.name('Checkbox', { size: o.size, state: S, slot: on === 'mixed' ? 'Indeterminate' : (on === 'on' ? 'Checked' : null) }), box, { parent: o.parent });
+    var labelW = o.label === undefined ? 0 : CF.labelW(o.label, 14);
+    // The label's rendered line is taller than the 18px box (14px type → 21px line): sizing the host to max(bs,20)
+    // clipped the label's bottom 2px out of the host — the large-height-overlap class, seen by auditPage as out_of_bounds.
+    var lh = o.label ? CF.lineH(14) : 0;
+    var box = B(o.x || 0, o.y || 0, max(bs + labelW, bs), o.h || max(bs, 20, lh));
+    // A label is a slot, not a decoration: a bare Checkbox master has no text child, and a component copy refuses
+    // structural edits. Naming the labelled composition `…·Label` gives it its own master, so instances can carry copy.
+    var cbsSlot = [on === 'mixed' ? 'Indeterminate' : (on === 'on' ? 'Checked' : null), o.label ? 'Label' : null].filter(Boolean).join('-');
+    var ctx = CF.build(CF.name('Checkbox', { size: o.size, state: S, slot: cbsSlot }), box, { parent: o.parent });
     var bb = B(box.x, box.y + (box.h - bs) / 2, bs, bs);
-    if (S === 'hover' || S === 'focus' || o.layer) ctx.plate(B(bb.x - (40 - bs) / 2, bb.y - (40 - bs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 20 });
+    if (S === 'hover' || S === 'focus' || o.layer) ctx.plate(B(bb.x - (40 - bs) / 2, bb.y - (40 - bs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 'control' });
     ctx.plate(bb, { name: 'box', fill: (on === 'off') ? C('surface') : (S === 'disabled' ? C('ink') : C('primary')),
       fills: on === 'off' ? CF.fills(C('surface'), S === 'hover' ? 'hover' : null) : CF.fills(on === 'off' ? C('surface') : C('primary'), S === 'disabled' ? 'disabled' : null, { onDark: on !== 'off' }),
-      stroke: on === 'off' ? (S === 'disabled' ? C('ink') : C('borderStrong')) : null, strokeW: 2, radius: 4, strokeOpacity: 1 });
+      stroke: on === 'off' ? (S === 'disabled' ? C('ink') : C('borderStrong')) : null, strokeW: 2, radius: 'xs', strokeOpacity: 1 });
     if (on === 'off') ctx._stroke(ctx.host.children[ctx.host.children.length - 1], o.checked ? C('primary') : C('borderStrong'), 2);
     if (o.checked || o.indeterminate) {
-      if (o.indeterminate) ctx.plate(B(bb.x + 3, bb.y + bs / 2 - 1, bs - 6, 2.5), { name: 'dash', fill: '#FFFFFF', radius: 1.5 });
+      if (o.indeterminate) ctx.plate(B(bb.x + 3, bb.y + bs / 2 - 1, bs - 6, 2.5), { name: 'dash', fill: '#FFFFFF', radius: 'xs' });
       else ctx.glyph('check', B(bb.x - 2, bb.y - 2, bs + 4, bs + 4), { color: '#FFFFFF', strokeW: max(2, bs * 0.16) });
     }
     if (o.label) ctx.text(String(o.label), B(bb.x + bs + 8, box.y, labelW, box.h), { size: 14, color: C('ink'), opacity: stateAlpha(S), align: 'left' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(bb, { radius: 4 });
+    if (S === 'focus') ctx.ring(bb, { radius: 'xs' });
     ctx.hitPad(bb, o.hit || 32);
     return ctx.host;
   };
@@ -1259,16 +1571,17 @@ return (function () {
     if (o.asButton) return CF.segmented({ x: o.x, y: o.y, size: o.size, items: o.options || ['A', 'B', 'C'], active: o.checkedIndex || 0, state: S, parent: o.parent, itemW: o.itemW });
     if (o.card) return CF.card(Object.assign({ x: o.x, y: o.y, w: o.w || 240, h: o.h || 96, selectable: true, checked: on, state: S, parent: o.parent,
       title: o.title || 'Card option', body: o.meta || 'Supporting line, one line, ellipsised' }));
-    var rs = o.ring || 20, labelW = o.label === undefined ? 0 : CF.estW(String(o.label), 14) + 8;
+    var rs = o.ring || 20, labelW = o.label === undefined ? 0 : CF.labelW(o.label, 14);
     var box = B(o.x || 0, o.y || 0, max(rs + labelW, rs), o.h || 24);
-    var ctx = CF.build(CF.name('Radio', { state: S, slot: on ? 'Checked' : null }), box, { parent: o.parent });
+    var rdoSlot = [on ? 'Checked' : null, o.label ? 'Label' : null].filter(Boolean).join('-') || null;
+    var ctx = CF.build(CF.name('Radio', { state: S, slot: rdoSlot }), box, { parent: o.parent });
     var rb = B(box.x, box.y + (box.h - rs) / 2, rs, rs);
-    if (S === 'hover' || S === 'focus') ctx.plate(B(rb.x - (40 - rs) / 2, rb.y - (40 - rs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 20 });
+    if (S === 'hover' || S === 'focus') ctx.plate(B(rb.x - (40 - rs) / 2, rb.y - (40 - rs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 'control' });
     ctx.ellipse(rb, { name: 'ring', fill: C('surface'), stroke: on ? C('primary') : (S === 'disabled' ? C('muted') : C('borderStrong')), strokeW: on ? 2 : 1.5 });
     if (on) ctx.ellipse(B(rb.x + (rs - 10) / 2, rb.y + (rs - 10) / 2, 10, 10), { name: 'dot', fill: S === 'disabled' ? C('muted') : C('primary') });
     if (o.label) ctx.text(String(o.label), B(rb.x + rs + 8, box.y, labelW, box.h), { size: 14, color: C('ink'), opacity: stateAlpha(S), align: 'left' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(rb, { radius: rs / 2 });
+    if (S === 'focus') ctx.ring(rb, { radius: 'control' });
     ctx.hitPad(rb, o.hit || 32);
     return ctx.host;
   };
@@ -1294,20 +1607,20 @@ return (function () {
     var railY = vert ? box.y + len / 2 : box.y + topPad + 20;
     var trackBox = vert ? B(box.x + (box.w - bubW - th) / 2, box.y + hs / 2, th, len - hs)
       : B(box.x + hs / 2, railY - th / 2, len - hs, th);
-    ctx.plate(trackBox, { name: 'track', fills: [{ fillColor: C('ink'), fillOpacity: 0.12 }], radius: th / 2 });
+    ctx.plate(trackBox, { name: 'track', fills: [{ fillColor: C('ink'), fillOpacity: 0.12 }], radius: 'control' });
     var span = vert ? { a: trackBox.y, b: trackBox.y + trackBox.h, axis: 'y' } : { a: trackBox.x, b: trackBox.x + trackBox.w, axis: 'x' };
     var posOf = function (p) { return span.a + (span.b - span.a) * p; };
     var seg = function (pa, pb) {
       var a0 = posOf(min(pa, pb)), a1 = posOf(max(pa, pb));
       return vert ? B(trackBox.x, a0, trackBox.w, a1 - a0) : B(a0, trackBox.y, a1 - a0, trackBox.h);
     };
-    ctx.plate(o.range ? seg(v, v2) : seg(0, v), { name: 'track·active', fill: o.state === 'disabled' ? C('muted') : C('primary'), radius: th / 2 });
+    ctx.plate(o.range ? seg(v, v2) : seg(0, v), { name: 'track·active', fill: o.state === 'disabled' ? C('muted') : C('primary'), radius: 'control' });
     var handle = function (p) {
       var c = posOf(p);
       var b = vert ? B(trackBox.x + trackBox.w / 2 - hs / 2, c - hs / 2, hs, hs) : B(c - hs / 2, railY - hs / 2, hs, hs);
       if (o.state === 'hover' || o.state === 'dragged' || o.state === 'focus' || o.state === 'pressed')
         ctx.ellipse(B(b.x - 10, b.y - 10, hs + 20, hs + 20), { name: 'state·layer', fill: C('primary'), opacity: CF.STATE[o.state] });
-      if (o.state === 'focus') ctx.ring(B(b.x - 10, b.y - 10, hs + 20, hs + 20), { offset: 0, radius: (hs + 20) / 2, color: C('primary') });
+      if (o.state === 'focus') ctx.ring(B(b.x - 10, b.y - 10, hs + 20, hs + 20), { offset: 0, radius: 'control', color: C('primary') });
       ctx.ellipse(b, { name: 'handle', fill: o.state === 'disabled' ? C('muted') : C('surface'), stroke: o.state === 'disabled' ? C('border') : C('primary'), strokeW: 2, shadow: 1 });
       return b;
     };
@@ -1319,14 +1632,17 @@ return (function () {
         var p = norm(m);
         var c = posOf(p);
         var t = vert ? B(trackBox.x + trackBox.w + 4, c - 1.5, 8, 3) : B(c - 1.5, railY + th / 2 + 5, 3, 8);
-        ctx.plate(t, { name: 'mark', fill: C('borderStrong') });
+        // An 11px label is drawn with its box **bottom** on the requested y (Penpot auto-height anchoring), so a labelled
+        // tick puts the 3×8 stub straight through the glyph — and the stub then *is* the label's background: #585858 on
+        // #7C7C7C measures 1.70:1. The number already carries the position, so when labels are on, the stub is dropped.
+        if (!labels) ctx.plate(t, { name: 'mark', fill: C('borderStrong') });
         if (labels) ctx.text(String(o.labels ? o.labels[i] : Math.round(m)), vert ? B(t.x + 12, c - 7, 36, 14) : B(c - 18, railY + th / 2 + 15, 36, 14),
           { size: 11, role: 'axis', color: C('muted'), refit: false });
       });
     }
     if (o.state === 'dragged' || o.valueLabel) {
       var lb = vert ? B(h1.x + hs + 6, h1.y - 11, 40, 22) : B(h1.x + hs / 2 - 20, box.y, 40, 22);
-      ctx.plate(lb, { name: 'value·bubble', fill: C('ink'), radius: 4 });
+      ctx.plate(lb, { name: 'value·bubble', fill: C('ink'), radius: 'xs' });
       ctx.text(String(Math.round(raw)), lb, { size: 12, color: '#FFFFFF', weight: 600, refit: false });
     }
     await ctx.settle(); ctx.place();
@@ -1337,20 +1653,28 @@ return (function () {
   CF.rating = async function (o) {
     o = o || {};
     var n = o.count || 5, sz = o.star || 18, gap = o.gap === undefined ? 4 : o.gap, val = o.value === undefined ? 3.5 : Number(o.value);
+    // §G12: hover/pressed preview the next whole star (that is what a click would commit), disabled dims the glyphs.
+    var S = o.state || 'default';
+    var shown = (S === 'hover' || S === 'pressed') ? Math.ceil(val) : val;
+    var dim = stateAlpha(S === 'disabled' ? 'disabled' : null);
     var box = B(o.x || 0, o.y || 0, n * sz + (n - 1) * gap + (o.readonly ? 8 + CF.estW(String(val), 12) : 0), max(sz, 20));
-    var ctx = CF.build(CF.name('Rating', { size: o.size, state: o.state || 'default', slot: o.readonly ? 'Readonly' : (val % 1 ? 'Half' : null) }), box, { parent: o.parent });
+    var ctx = CF.build(CF.name('Rating', { size: o.size, state: S,
+      slot: [o.readonly ? 'Readonly' : (val % 1 ? 'Half' : null), o.character ? 'Character' : null].filter(Boolean).join('-') || null }), box, { parent: o.parent });
     for (var i = 0; i < n; i++) {
       var sb = B(box.x + i * (sz + gap), box.y + (box.h - sz) / 2, sz, sz);
-      var full = val >= i + 1, half = !full && val > i;
-      ctx.glyph('starOutline', sb, { color: C('warning'), opacity: (full || half) ? 1 : 0.45 });
-      if (full) ctx.glyph('star', sb, { color: C('warning') });
+      var full = shown >= i + 1, half = !full && shown > i;
+      // §G12: a custom character (AntD `character`) has no outline sibling in the glyph set, so the empty state is the
+      // same glyph faded — that is the third variant axis the coverage audit needs besides Half and base.
+      var emptyKind = o.character || 'starOutline', fillKind = o.character || 'star';
+      ctx.glyph(emptyKind, sb, { color: C('warning'), opacity: ((full || half) ? 1 : 0.45) * dim });
+      if (full) ctx.glyph(fillKind, sb, { color: C('warning'), opacity: dim });
       if (half) {
         var cl = ctx.clip(B(sb.x, sb.y, sz / 2, sz), { name: 'clip·half' });
-        cl.glyph('star', sb, { color: C('warning') });
+        cl.glyph(fillKind, sb, { color: C('warning') });
       }
     }
-    if (o.readonly) ctx.text(String(val), B(box.x + box.w - CF.estW(String(val), 12) - 4, box.y, CF.estW(String(val), 12) + 4, box.h), { size: 12, color: C('muted'), align: 'right' });
-    if (o.state === 'focus') ctx.ring(B(box.x - 4, box.y - 4, box.w + 8, box.h + 8), { radius: 6 });
+    if (o.readonly) ctx.text(String(val), B(box.x + box.w - CF.estW(String(val), 12) - 4, box.y, CF.estW(String(val), 12) + 4, box.h), { size: 12, color: C('muted'), align: 'right', opacity: dim });
+    if (o.state === 'focus') ctx.ring(B(box.x - 4, box.y - 4, box.w + 8, box.h + 8), { radius: 'sm' });
     await ctx.settle(); ctx.place();
     return ctx.host;
   };
@@ -1358,33 +1682,38 @@ return (function () {
   /** Color picker: swatch trigger + hex field; panel = 8×6 preset grid of 24px swatches + 12×200 hue bar + input row. */
   CF.colorPicker = async function (o) {
     o = o || {};
-    var L = CF.ladder(o.size || 'md'), sw = 20;
+    var L = CF.ladder(o.size || 'md'), sw = 20, S = o.state || 'default';
+    // §G12: the trigger is a control (hover/focus/disabled) and the open panel is a third draw of the same family, so the
+    // host names both — without these tokens a ColorPicker sheet reads as one flat variant to the coverage audit.
     if (!o.open) {
-      var box = B(o.x || 0, o.y || 0, o.w || 180, L.h);
-      var ctx = CF.build(CF.name('ColorPicker', { state: o.state || 'default' }), box, { parent: o.parent, fill: C('surface'), stroke: C('border'), strokeW: 1, radius: L.radius });
-      ctx.plate(B(box.x + 4, box.y + 4, sw, sw), { name: 'swatch', fill: o.color || '#2563EB', radius: 4 });
-      ctx.text((o.color || '#2563EB').toUpperCase(), B(box.x + 4 + sw + 8, box.y, box.w - sw - 20, box.h), { size: 13, color: C('ink'), align: 'left' });
+      var box = B(o.x || 0, o.y || 0, o.w || (o.showHex === false ? 44 : 180), L.h);
+      var ctx = CF.build(CF.name('ColorPicker', { size: o.size, state: S, slot: o.showHex === false ? 'Swatch' : 'Hex' }), box, { parent: o.parent, fill: C('surface'), stroke: S === 'hover' ? C('borderStrong') : C('border'), strokeW: 1, radius: L.radius });
+      ctx.plate(B(box.x + 4, box.y + (L.h - sw) / 2, sw, sw), { name: 'swatch', fill: o.color || '#2563EB', radius: 'xs',
+        opacity: S === 'disabled' ? CF.STATE.disabledContent : 1 });
+      if (S === 'pressed') ctx.plate(CF.inset(box, 1), { name: 'state·layer', fills: CF.fills(null, 'pressed'), radius: L.radius });
+      if (o.showHex !== false) ctx.text((o.color || '#2563EB').toUpperCase(), B(box.x + 4 + sw + 8, box.y, box.w - sw - 20, box.h), { size: 13, color: C('ink'), align: 'left' });
       await ctx.settle(); ctx.place();
+      if (S === 'focus') ctx.ring(box, { radius: L.radius });
       return ctx.host;
     }
     var pw = o.panelW || 216, gridH = 6 * (sw + 4) + 4;
     var box2 = B(o.x || 0, o.y || 0, pw, gridH + 268);
-    var ctx2 = CF.build(CF.name('ColorPicker', { state: 'Open' }), box2, { parent: o.parent });
+    var ctx2 = CF.build(CF.name('ColorPicker', { size: o.size, state: 'open', slot: 'Panel' }), box2, { parent: o.parent });
     panelPlate(ctx2, box2, { name: 'panel' });
     var hues = ['#EF4444', '#F97316', '#FACC15', '#22C55E', '#14B8A6', '#3B82F6'];
     for (var i = 0; i < 42; i++) {
       var cx2 = i % 7, cy2 = Math.floor(i / 7);
-      ctx2.plate(B(box2.x + 8 + cx2 * (sw + 4), box2.y + 8 + cy2 * (sw + 4), sw, sw), { name: 'swatch·' + i, fill: hues[cx2], opacity: 1 - cy2 * 0.13, radius: 4, stroke: i === 0 ? C('ink') : null, strokeW: 2 });
+      ctx2.plate(B(box2.x + 8 + cx2 * (sw + 4), box2.y + 8 + cy2 * (sw + 4), sw, sw), { name: 'swatch·' + i, fill: hues[cx2], opacity: 1 - cy2 * 0.13, radius: 'xs', stroke: i === 0 ? C('ink') : null, strokeW: 2 });
     }
     var hy = box2.y + 8 + 6 * (sw + 4) + 8;
     ctx2.path(' M ' + (box2.x + 8) + ' ' + (hy + 4) + ' L ' + (box2.x + 8) + ' ' + (hy + 200) + ' L ' + (box2.x + 20) + ' ' + (hy + 200) + ' L ' + (box2.x + 20) + ' ' + (hy + 4) + ' Z', { name: 'hue·bar', fill: C('primary'), opacity: 0.2 });
-    for (var k = 0; k < 6; k++) ctx2.plate(B(box2.x + 8, hy + k * 34, 12, 34), { name: 'hue·step·' + k, fill: hues[k], radius: 0 });
+    for (var k = 0; k < 6; k++) ctx2.plate(B(box2.x + 8, hy + k * 34, 12, 34), { name: 'hue·step·' + k, fill: hues[k], radius: 'none' });
     ctx2.ellipse(B(box2.x + 6, hy + 60, 16, 16), { name: 'hue·handle', fill: C('surface'), stroke: C('ink'), strokeW: 2 });
     var hb = B(box2.x + 32, hy, pw - 40, 32);
-    ctx2.plate(hb, { name: 'hex·field', fill: C('surface'), stroke: C('border'), strokeW: 1, radius: 6 });
+    ctx2.plate(hb, { name: 'hex·field', fill: C('surface'), stroke: C('border'), strokeW: 1, radius: 'sm' });
     ctx2.text((o.color || '#2563EB').toUpperCase(), B(hb.x + 8, hb.y, hb.w - 16, hb.h), { size: 13, color: C('ink'), align: 'left' });
     await ctx2.settle(); ctx2.place();
-    if (o.state === 'focus') ctx2.ring(box2, { radius: 8 });
+    if (o.state === 'focus') ctx2.ring(box2, { radius: 'sm' });
     return ctx2.host;
   };
 
@@ -1394,13 +1723,18 @@ return (function () {
     var L = CF.ladder(o.size || 'md');
     if (o.dropzone !== false && !(o.files || []).length && !o.grid) {
       var box = B(o.x || 0, o.y || 0, o.w || 360, o.h || 168);
-      var ctx = CF.build(CF.name('Upload', { state: o.dragging ? 'Pressed' : (o.state || 'default'), slot: 'Dropzone' }), box, { parent: o.parent, radius: 12, dashed: true, stroke: o.dragging ? C('primary') : C('borderStrong'), strokeW: 2 });
-      ctx.host.fills = CF.fills(C('surface'), o.dragging ? 'selected' : 'hover');
-      ctx.glyph('upload', B(box.x + box.w / 2 - 20, box.y + 32, 40, 40), { color: o.dragging ? C('primary') : C('muted') });
-      ctx.text(o.dragging ? 'Drop to upload' : 'Drag files here or browse', B(box.x + 16, box.y + 88, box.w - 32, 22), { size: 14, weight: 500, color: C('ink') });
-      ctx.text('PNG, JPG or PDF up to 20 MB', B(box.x + 16, box.y + 112, box.w - 32, 18), { size: 12, color: C('muted') });
+      // §G12: every state the ladder names must be drawn — the wash used to be hard-coded to `hover`, so a Default
+      // dropzone looked pressed and a Disabled one looked live.
+      var US = o.dragging ? 'pressed' : (o.state || 'default');
+      var wash = o.dragging ? 'selected' : (US === 'hover' ? 'hover' : (US === 'disabled' ? 'disabled' : null));
+      var ctx = CF.build(CF.name('Upload', { state: o.dragging ? 'Pressed' : (o.state || 'default'), slot: 'Dropzone' }), box, { parent: o.parent, radius: 'sm', dashed: true, stroke: o.dragging ? C('primary') : C('borderStrong'), strokeW: 2 });
+      ctx.host.fills = CF.fills(C('surface'), wash);
+      var dim = stateAlpha(US === 'disabled' ? 'disabled' : null);
+      ctx.glyph('upload', B(box.x + box.w / 2 - 20, box.y + 32, 40, 40), { color: o.dragging ? C('primary') : C('muted'), opacity: dim });
+      ctx.text(o.dragging ? 'Drop to upload' : 'Drag files here or browse', B(box.x + 16, box.y + 88, box.w - 32, 22), { size: 14, weight: 500, color: C('ink'), opacity: dim });
+      ctx.text('PNG, JPG or PDF up to 20 MB', B(box.x + 16, box.y + 112, box.w - 32, 18), { size: 12, color: C('muted'), opacity: dim });
       await ctx.settle(); ctx.place();
-      if (o.state === 'focus') ctx.ring(box, { radius: 12 });
+      if (o.state === 'focus') ctx.ring(box, { radius: 'sm' });
       return ctx.host;
     }
     if (o.grid) {
@@ -1411,7 +1745,7 @@ return (function () {
         var c2 = i % cols, r2 = Math.floor(i / cols);
         var tb = B(gb.x + c2 * (ts + gp), gb.y + r2 * (ts + gp), ts, ts);
         var add = i >= ((o.filled || 5));
-        gc.plate(tb, { name: add ? 'thumb·add' : 'thumb', fill: add ? null : C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 8, clip: true });
+        gc.plate(tb, { name: add ? 'thumb·add' : 'thumb', fill: add ? null : C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 'sm', clip: true });
         if (add) gc.glyph('plus', tb, { color: C('muted') });
         else gc.glyph('image', B(tb.x + 8, tb.y + 8, ts - 16, ts - 16), { color: C('muted') });
       }
@@ -1424,14 +1758,14 @@ return (function () {
     var fc = CF.build(CF.name('Upload', { slot: 'FileList' }), fb, { parent: o.parent });
     files.forEach(function (f, i) {
       var rb = B(fb.x + 4, fb.y + 4 + i * rowH, fb.w - 8, rowH - 8);
-      fc.plate(rb, { name: 'row·' + (i + 1), fill: C('surfaceAlt'), radius: 8 });
+      fc.plate(rb, { name: 'row·' + (i + 1), fill: C('surfaceAlt'), radius: 'sm' });
       fc.glyph('file', B(rb.x + 12, rb.y + (rb.h - 24) / 2, 24, 24), { color: f.status === 'error' ? C('error') : C('muted') });
       fc.text(f.name, B(rb.x + 48, rb.y + 8, rb.w - 120, 18), { size: 14, color: C('ink'), align: 'left', valign: 'top', refit: false });
       fc.text(f.size || '', B(rb.x + 48, rb.y + 26, 100, 16), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
       if (f.status === 'up') {
         var pw2 = rb.w - 160;
-        fc.plate(B(rb.x + 48, rb.y + rb.h - 10, pw2, 4), { name: 'progress·track', fills: [{ fillColor: C('ink'), fillOpacity: 0.12 }], radius: 2 });
-        fc.plate(B(rb.x + 48, rb.y + rb.h - 10, pw2 * (f.pct || 0.5), 4), { name: 'progress·fill', fill: C('primary'), radius: 2 });
+        fc.plate(B(rb.x + 48, rb.y + rb.h - 10, pw2, 4), { name: 'progress·track', fills: [{ fillColor: C('ink'), fillOpacity: 0.12 }], radius: 'xs' });
+        fc.plate(B(rb.x + 48, rb.y + rb.h - 10, pw2 * (f.pct || 0.5), 4), { name: 'progress·fill', fill: C('primary'), radius: 'xs' });
       }
       var st = f.status === 'error' ? 'error' : (f.status === 'done' ? 'success' : null);
       if (st) fc.glyph(st, B(rb.x + rb.w - 92, rb.y + (rb.h - 18) / 2, 18, 18), { color: f.status === 'error' ? C('error') : C('success') });
@@ -1445,41 +1779,52 @@ return (function () {
   /** Transfer: two 240-280×320 panels, header 40 (count + select-all), rows 36-40, 32-40 middle buttons vertical. */
   CF.transfer = async function (o) {
     o = o || {};
-    var pw = o.panelW || 260, ph = o.panelH || 320, mid = 48, rowH = 38;
+    // §G12: a transfer panel is focusable/hoverable/disabled as a whole (the row it points at lights up), so the host
+    // carries the state token — a spec ladder must be able to show all five without inventing a second factory.
+    var S = o.state || 'default';
+    var pw = o.panelW || 260, ph = o.panelH || 320, mid = 48;
+    var rowH = o.rowH || (o.size === 'sm' ? 32 : (o.size === 'lg' ? 44 : 38));
+    var showCheck = o.checkable !== false;
     var box = B(o.x || 0, o.y || 0, pw * 2 + mid, ph);
-    var ctx = CF.build(CF.name('Transfer', { slot: o.withSearch ? 'Search' : null }), box, { parent: o.parent });
+    var ctx = CF.build(CF.name('Transfer', { size: o.size, state: S,
+      slot: [o.withSearch ? 'Search' : null, o.oneWay ? 'OneWay' : null, showCheck ? null : 'NoCheck'].filter(Boolean).join('-') || null }), box, { parent: o.parent });
     var left = o.left || ['Ann', 'Bo', 'Cy'], right = o.right || ['Di', 'Ed'];
     var subs = [];
     [[0, left], [1, right]].forEach(function (pair) {
       var px = box.x + pair[0] * (pw + mid), pb = B(px, box.y, pw, ph);
       panelPlate(ctx, pb, { name: 'panel·' + (pair[0] ? 'right' : 'left'), shadow: 0, outline: true });
-      ctx.plate(B(pb.x + 1, pb.y + 1, pb.w - 2, 40), { name: 'header·' + pair[0], fill: C('surfaceAlt'), radius: 8 });
-      subs.push(CF.checkbox({ x: pb.x + 12, y: pb.y + 12, h: 16, size: 'xs', parent: ctx.host,
+      ctx.plate(B(pb.x + 1, pb.y + 1, pb.w - 2, 40), { name: 'header·' + pair[0], fill: C('surfaceAlt'), radius: 'sm' });
+      if (showCheck) subs.push(CF.checkbox({ x: pb.x + 12, y: pb.y + 12, h: 16, size: 'xs', parent: ctx.host,
         indeterminate: pair[0] ? false : true, checked: pair[0] === 1 }));
-      ctx.text(pair[1].length + ' / ' + (o.total || 12), B(pb.x + 40, pb.y, 70, 40), { size: 12, color: C('muted') });
+      ctx.text(pair[1].length + ' / ' + (o.total || 12), B(pb.x + (showCheck ? 40 : 12), pb.y, 90, 40), { size: 12, color: C('muted') });
       var y = pb.y + 40 + (o.withSearch ? 44 : 4);
-      if (o.withSearch) ctx.plate(B(pb.x + 8, pb.y + 44, pb.w - 16, 32), { name: 'search', fill: C('surfaceAlt'), radius: 6 });
+      if (o.withSearch) ctx.plate(B(pb.x + 8, pb.y + 44, pb.w - 16, 32), { name: 'search', fill: C('surfaceAlt'), radius: 'sm' });
       pair[1].forEach(function (nm, i) {
         var rb = B(pb.x + 4, y + i * rowH, pb.w - 8, rowH - 2);
-        if (i === 0) ctx.plate(rb, { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: 4 });
-        if (i === (pair[0] ? 1 : 1) && o.selected !== false) ctx.plate(rb, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 4 });
-        subs.push(CF.checkbox({ x: rb.x + 8, y: rb.y + (rb.h - 16) / 2, h: 16, size: 'xs', boxSize: 16, checked: i === 1, parent: ctx.host }));
-        ctx.text(nm, B(rb.x + 34, rb.y, rb.w - 42, rb.h), { size: 14, color: i === 3 ? C('muted') : C('ink'), opacity: i === 3 ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle' });
+        if (i === 0 && (S === 'hover' || S === 'pressed')) ctx.plate(rb, { name: 'row·' + (S === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, S), radius: 'xs' });
+        if (i === (pair[0] ? 1 : 1) && o.selected !== false) ctx.plate(rb, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 'xs' });
+        if (showCheck) subs.push(CF.checkbox({ x: rb.x + 8, y: rb.y + (rb.h - 16) / 2, h: 16, size: 'xs', boxSize: 16, checked: i === 1, parent: ctx.host }));
+        ctx.text(nm, B(rb.x + (showCheck ? 34 : 12), rb.y, rb.w - (showCheck ? 42 : 20), rb.h), { size: 14, color: i === 3 ? C('muted') : C('ink'), opacity: i === 3 ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle' });
       });
     });
     [['chevronRight', box.x + pw + 8, box.y + ph / 2 - 40], ['chevronLeft', box.x + pw + 8, box.y + ph / 2 + 4]].forEach(function (b, i) {
+      if (i && o.oneWay) return;                                  // one-way transfer moves left → right only
       var bb2 = B(b[1], b[2], 32, 32);
-      ctx.plate(bb2, { name: 'button·' + i, fill: i ? C('surface') : C('primary'), stroke: i ? C('border') : null, strokeW: 1, radius: 6 });
+      ctx.plate(bb2, { name: 'button·' + i, fill: i ? C('surface') : C('primary'), stroke: i ? C('border') : null, strokeW: 1, radius: 'sm' });
+      if (i && S === 'pressed') ctx.plate(bb2, { name: 'button·pressed', fills: CF.fills(null, 'pressed'), radius: 'sm' });
       ctx.glyph(b[0], bb2, { color: i ? C('ink') : C('onPrimary') });
     });
     await ctx.settle(); ctx.place(); await Promise.all(subs);
+    if (S === 'focus') ctx.ring(B(box.x, box.y, pw, ph), { radius: 'sm' });
     return ctx.host;
   };
 
   /** Tree / tree-select: row 32-36, indent 16/level, chevron 16, checkbox 18, guide lines, parent indeterminate. */
   CF.tree = async function (o) {
     o = o || {};
-    var rowH = o.rowH || 32, nodes = o.nodes || [
+    var S = o.state || 'default';
+    var rowH = o.rowH || (o.size === 'sm' ? 28 : (o.size === 'lg' ? 40 : 32));
+    var nodes = o.nodes || [
       { label: 'src', level: 0, expanded: true, checkable: o.checkable, indeterminate: true },
       { label: 'core', level: 1, expanded: true, checkable: o.checkable, checked: true },
       { label: 'layout.cljs', level: 2, checkable: o.checkable, checked: true, leaf: true },
@@ -1487,13 +1832,17 @@ return (function () {
       { label: 'dist', level: 0, collapsed: true, checkable: o.checkable }
     ];
     var box = B(o.x || 0, o.y || 0, o.w || 260, nodes.length * rowH + 4);
-    var ctx = CF.build(CF.name('Tree', { slot: o.checkable ? 'Checkable' : (o.async ? 'Async' : null) }), box, { parent: o.parent });
+    var ctx = CF.build(CF.name('Tree', { size: o.size, state: S,
+      slot: [o.checkable ? 'Checkable' : null, o.async ? 'Async' : null, o.guides ? 'Guides' : null].filter(Boolean).join('-') || null }), box, { parent: o.parent });
     var subs = [];
     nodes.forEach(function (n, i) {
       var gut = 6 + n.level * 16;                       // gutter grows with depth, chevron always inside the host
       var rb = B(box.x, box.y + 2 + i * rowH, box.w, rowH - 2);
-      if (n.active) ctx.plate(B(rb.x + 4, rb.y, rb.w - 8, rb.h), { name: 'row·active', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 4 });
-      else if (n.hover) ctx.plate(B(rb.x + 4, rb.y, rb.w - 8, rb.h), { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: 4 });
+      var cur = i === (o.cursor === undefined ? 0 : Number(o.cursor));
+      if (n.active) ctx.plate(B(rb.x + 4, rb.y, rb.w - 8, rb.h), { name: 'row·active', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 'xs' });
+      else if (n.hover || (cur && (S === 'hover' || S === 'pressed'))) ctx.plate(B(rb.x + 4, rb.y, rb.w - 8, rb.h),
+        { name: 'row·' + (S === 'pressed' && !n.hover ? 'pressed' : 'hover'), fills: CF.fills(null, S === 'pressed' && !n.hover ? 'pressed' : 'hover'), radius: 'xs' });
+      else if (cur && S === 'selected') ctx.plate(B(rb.x + 4, rb.y, rb.w - 8, rb.h), { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 'xs' });
       if (!n.leaf) ctx.glyph(n.expanded ? 'chevronDown' : 'chevronRight', B(rb.x + gut, rb.y + (rb.h - 14) / 2, 14, 14), { color: C('muted'), strokeW: 1.6 });
       var tx = rb.x + gut + 18;
       if (o.checkable || n.checkable) {
@@ -1504,10 +1853,14 @@ return (function () {
       if (n.loading) CF.spinner(ctx, B(tx, rb.y + (rb.h - 14) / 2, 14, 14), C('muted'), 1.5);
       else ctx.glyph(n.leaf ? 'file' : 'folder', B(tx, rb.y + (rb.h - 16) / 2, 16, 16), { color: C('muted') });
       tx += 22;
-      ctx.text(n.label, B(tx, rb.y, max(20, rb.x + rb.w - tx - 8), rb.h), { size: 14, color: C('ink'), align: 'left', valign: 'middle', refit: false });
+      ctx.text(n.label, B(tx, rb.y, max(20, rb.x + rb.w - tx - 8), rb.h), { size: 14, color: C('ink'), align: 'left', valign: 'middle', refit: false, opacity: stateAlpha(S === 'disabled' ? 'disabled' : null) });
       if (o.guides && n.level) ctx.plate(B(rb.x + 6 + (n.level - 1) * 16 + 6, rb.y, 1, rb.h), { name: 'guide', fill: C('border') });
     });
     await ctx.settle(); ctx.place(); await Promise.all(subs);
+    if (S === 'focus') {
+      var fr = B(box.x + 4, box.y + 2 + (o.cursor === undefined ? 0 : Number(o.cursor)) * rowH, box.w - 8, rowH - 2);
+      ctx.ring(fr, { radius: 'xs' });
+    }
     return ctx.host;
   };
 
@@ -1537,7 +1890,7 @@ return (function () {
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('Badge', { type: dot ? 'Dot' : (o.status ? 'Status' : 'Count'), tone: tone, state: o.state }), box, { parent: o.parent });
     ctx.host.fills = [{ fillColor: bg, fillOpacity: 1 }];
-    ctx.host.borderRadius = h / 2;
+    ctx.host.borderRadius = CF.radius('control');
     if (o.standalone || o.ring) ctx.host.strokes = [{ strokeColor: C('surface'), strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner', strokeStyle: 'solid' }];
     if (txt) ctx.text(txt, box, { size: 12, color: ink, weight: 700 });
     await ctx.settle(); ctx.place();
@@ -1567,9 +1920,14 @@ return (function () {
     var trailW = (o.removable ? ic + 4 : 0) + (o.trail ? ic + 4 : 0) + (o.count ? CF.estW(String(o.count), CF.countFs(L)) + 6 : 0);
     var box = B(o.x || 0, o.y || 0, o.w || (padX * 2 + leadW + CF.estW(label, L.fs) + trailW), h);
     var ctx = CF.build(CF.name('Chip', { type: kind, size: o.size, state: S, slot: slotName(o), tone: tone }), box,
-      { parent: o.parent, radius: kind === 'tag' ? CF.radius('sm') : h / 2 });
+      { parent: o.parent, radius: kind === 'tag' ? 'sm' : 'control' });
     var soft = TONEMAP[tone] || TONEMAP.neutral;
-    var bgc = kind === 'link' || kind === 'actionable' ? (on ? C('primary') : C('surface')) : (on ? C(soft[0]) : C('surface'));
+    // A link chip is CF.link with a pill outline, not a filled pill: its hue lives in the copy + underline, so the
+    // host stays empty at rest. Giving it the base fill too made the copy primary-on-primary — invisible whenever the
+    // brand hue is dark (Rayo's primary is #161616), and §3.3 fails on the drawing, not on paper.
+    var bgc = kind === 'link' ? null
+      : kind === 'actionable' ? (on ? C('primary') : C('surface'))
+      : (on ? C(soft[0]) : C('surface'));
     ctx.host.fills = CF.fills(bgc, S === 'default' ? null : (S === 'disabled' ? 'disabled' : S), { onDark: kind !== 'link' && on && tone === 'accent' });
     if (kind !== 'chip' && kind !== 'link') ctx._stroke(ctx.host, on ? C(soft[1]) : C('border'), tone === 'neutral' ? 1 : 1, S === 'disabled' ? 0.4 : (on ? 0.5 : 1));
     else if (kind === 'chip' && !on) ctx._stroke(ctx.host, C('borderStrong'), 1);
@@ -1588,7 +1946,7 @@ return (function () {
     if (o.trail) { x -= ic + 4; ctx.glyph(iconOf(o.trail, 'chevronDown'), B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, anchor: 'right' }); }
     if (o.removable) { x -= ic + 4; ctx.glyph('close', B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 1.6, anchor: 'right' }); }
     await ctx.settle(); ctx.place(); ctx.refit(padX);
-    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: h / 2 });
+    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: 'control' });
     if (o.hit) ctx.hitPad(B(ctx.host.x, ctx.host.y, ctx.host.width, h), o.hit);
     return ctx.host;
   };
@@ -1601,7 +1959,7 @@ return (function () {
     var fs = s >= 64 ? 20 : (s >= 48 ? 16 : (s >= 32 ? 13 : 12));   // §3.2 ramp: an avatar's initials are copy, not a glyph
     var box = B(o.x || 0, o.y || 0, s, s);
     var ctx = CF.build(CF.name('Avatar', { size: o.size || s, slot: o.status ? ('Status·' + o.status) : (o.content === 'initials' ? 'Initials' : (o.editable ? 'Editable' : null)) }), box,
-      { parent: o.parent, radius: o.shape === 'square' ? 0 : (o.shape === 'rounded' ? CF.radius('md') : s / 2), clip: s < 999 });
+      { parent: o.parent, radius: o.shape === 'square' ? 'none' : (o.shape === 'rounded' ? 'sm' : 'control'), clip: s < 999 });
     ctx.host.fills = [{ fillColor: C('surfaceAlt'), fillOpacity: 1 }];
     if (o.image) {
       ctx.host.fills = [{ fillColor: C('border'), fillOpacity: 1 }];
@@ -1622,7 +1980,7 @@ return (function () {
       ctx.plate(B(box.x, box.y + s - s * 0.4, s, s * 0.4), { name: 'editable·scrim', fill: C('ink'), opacity: 0.55 });
       ctx.glyph('camera', B(box.x + s / 2 - s * 0.15, box.y + s - s * 0.32, s * 0.3, s * 0.3), { color: '#FFFFFF' });
     }
-    if (o.ring) ctx.ring(box, { radius: box._r || s / 2, offset: 2, width: 2 });
+    if (o.ring) ctx.ring(box, { radius: 'control', offset: 2, width: 2 });
     await ctx.settle(); ctx.place();
     return ctx.host;
   };
@@ -1659,9 +2017,13 @@ return (function () {
     if (S === 'hover' && tone !== 'elevated') ctx.host.fills = CF.fills(C('surface'), 'hover');
     var y = box.y;
     if (o.cover) {
-      ctx.plate(B(box.x, y, box.w, coverH), { name: 'cover', fill: C(o.coverTone || 'border'), stroke: null });
+      // the outlined host carries its border on its own box, and a board paints children over that stroke: a flush cover
+      // plate erases the card's L/T/R border (stroke_covered). Inset it on the three bordered sides only — the cover's
+      // bottom edge is interior, so it may run to the full height.
+      var ci = tone === 'outlined' ? 1 : 0;
+      ctx.plate(B(box.x + ci, y + ci, box.w - ci * 2, coverH - ci), { name: 'cover', fill: C(o.coverTone || 'border'), stroke: null });
       ctx.glyph('image', B(box.x + box.w / 2 - 24, y + coverH / 2 - 24, 48, 48), { color: C('muted') });
-      if (o.coverLabel) ctx.text(String(o.coverLabel), B(box.x + 12, y + coverH - 32, box.w - 24, 24), { size: 12, color: '#FFFFFF', align: 'left' });
+      if (o.coverLabel) ctx.text(String(o.coverLabel), B(box.x + 12, y + coverH - 32, box.w - 24, 24), { size: 12, color: CF.onTone(o.coverTone || 'border'), align: 'left' });
       y += coverH;
     }
     if (o.selectable) {
@@ -1681,13 +2043,17 @@ return (function () {
       y += headerH;
     }
     if (o.body) ctx.text(String(o.body), B(contentX, y, contentW, bodyH), { size: 13, color: C('ink'), opacity: 0.85, align: 'left', valign: 'top', refit: false });
-    if (o.mediaLeft) { ctx.plate(B(box.x + pad, y + 2, o.mediaW || 88, bodyH - 6), { name: 'media', fill: C('border'), radius: 6 }); }
+    if (o.mediaLeft) { ctx.plate(B(box.x + pad, y + 2, o.mediaW || 88, bodyH - 6), { name: 'media', fill: C('border'), radius: 'sm' }); }
     y += bodyH;
     if (footerH) {
       ctx.plate(B(box.x + pad, y + 8, box.w - pad * 2, 1), { name: 'hairline', fill: C('border') });
       if (o.actions) {
-        var aw = (box.w - pad * 2) / o.actions.length;
-        o.actions.forEach(function (a, i) {
+        // `actions: true` is the shorthand the spec tables use for "show me an action row"; only an array of labels can
+        // be rendered, and reading `.length` off a boolean threw mid-factory, leaving a host that no row owned (the
+        // orphan was never centred, so it sat on top of the next row).
+        var acts = o.actions === true ? ['Details', 'Share'] : o.actions;
+        var aw = (box.w - pad * 2) / acts.length;
+        acts.forEach(function (a, i) {
           if (i) ctx.plate(B(box.x + pad + i * aw, y + 8, 1, footerH - 8), { name: 'divider', fill: C('border'), opacity: 0.7 });
           ctx.text(String(a), B(box.x + pad + i * aw, y + 8, aw, footerH - 8), { size: 14, color: C('primary'), weight: 500 });
         });
@@ -1702,7 +2068,7 @@ return (function () {
         }
       }
     }
-    if (o.loading) { ctx.plate(B(contentX, box.y + pad + (coverH || 0) + 4, contentW, 12), { name: 'skeleton·line', fill: C('border'), radius: 4 }); }
+    if (o.loading) { ctx.plate(B(contentX, box.y + pad + (coverH || 0) + 4, contentW, 12), { name: 'skeleton·line', fill: C('border'), radius: 'xs' }); }
     await ctx.settle(); ctx.place();
     if (S === 'focus') ctx.ring(box, { radius: CF.radius(o.radius || 'md') });
     return ctx.host;
@@ -1738,9 +2104,11 @@ return (function () {
       var pts = data.map(function (v, i) { return [sx + sw * i / (data.length - 1), sy + sh - sh * (v - mn) / rng]; });
       var d = 'M ' + f(pts[0][0]) + ' ' + f(pts[0][1]);
       pts.forEach(function (p, i) { if (i) d += ' L ' + f(p[0]) + ' ' + f(p[1]); });
-      ctx.path(d, { name: 'sparkline', stroke: C('primary'), strokeW: 2 });
+      // area first, line second: ctx.path appends, so a later sibling paints over the earlier one and an area drawn
+      // on top of its own polyline flattens the spark into a tint block (stroke_covered).
       ctx.path(d + ' L ' + f(pts[pts.length - 1][0]) + ' ' + f(sy + sh) + ' L ' + f(pts[0][0]) + ' ' + f(sy + sh) + ' Z',
         { name: 'sparkline·area', fill: C('primary'), opacity: 0.10 });
+      ctx.path(d, { name: 'sparkline', stroke: C('primary'), strokeW: 2 });
     }
     await ctx.settle(); ctx.place();
     return ctx.host;
@@ -1769,16 +2137,16 @@ return (function () {
     if (type === 'steps') {
       var n = o.steps || 5, cellW = 20, box2 = B(o.x || 0, o.y || 0, n * cellW + (n - 1) * 2, th + 4);
       var c2 = CF.build(CF.name('Progress', { type: 'steps', state: st }), box2, { parent: o.parent });
-      for (var i = 0; i < n; i++) c2.plate(B(box2.x + i * (cellW + 2), box2.y + 2, cellW, th), { name: 'cell·' + (i + 1), fill: i < p * n ? col : C('ink'), opacity: i < p * n ? 1 : 0.12, radius: th / 2 });
+      for (var i = 0; i < n; i++) c2.plate(B(box2.x + i * (cellW + 2), box2.y + 2, cellW, th), { name: 'cell·' + (i + 1), fill: i < p * n ? col : C('ink'), opacity: i < p * n ? 1 : 0.12, radius: 'control' });
       return c2.host;
     }
     var w = o.w || 240, showLabel = o.format !== false && !o.hideLabel, labW = showLabel ? 42 : 0;
     var box3 = B(o.x || 0, o.y || 0, w, max(th, 16));
     var ctx3 = CF.build(CF.name('Progress', { type: 'line', state: st, slot: o.indeterminate ? 'Indeterminate' : null }), box3, { parent: o.parent });
-    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, box3.w - labW, th), { name: 'track', fill: C('ink'), opacity: 0.12, radius: th / 2 });
+    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, box3.w - labW, th), { name: 'track', fill: C('ink'), opacity: 0.12, radius: 'control' });
     var fw = o.indeterminate ? (box3.w - labW) * 0.34 : (box3.w - labW) * p;
-    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, max(2, fw), th), { name: 'bar', fill: col, radius: th / 2 });
-    if (o.indeterminate) ctx3.plate(B(box3.x + max(2, fw) - 12, box3.y + (box3.h - th) / 2, 12, th), { name: 'bar·shimmer', fill: '#FFFFFF', opacity: 0.55, radius: 2 });
+    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, max(2, fw), th), { name: 'bar', fill: col, radius: 'control' });
+    if (o.indeterminate) ctx3.plate(B(box3.x + max(2, fw) - 12, box3.y + (box3.h - th) / 2, 12, th), { name: 'bar·shimmer', fill: '#FFFFFF', opacity: 0.55, radius: 'xs' });
     if (showLabel) ctx3.text(st === 'success' ? 'Done' : Math.round(p * 100) + '%', B(box3.x + box3.w - labW, box3.y, labW, box3.h),
       { size: 12, color: st === 'normal' ? C('ink') : col, align: 'right' });
     await ctx3.settle(); ctx3.place();
@@ -1795,7 +2163,7 @@ return (function () {
       var d = o.size || 40; box = B(o.x || 0, o.y || 0, d, d);
       ctx = CF.build(CF.name('Skeleton', { type: 'circle' }), box, { parent: o.parent });
       ctx.ellipse(box, { name: 'sk·circle', fill: tint });
-      if (o.withText) { ctx.plate(B(box.x + d + 12, box.y + 4, w - d, bh), { name: 'sk·line', fill: tint, radius: 4 }); ctx.plate(B(box.x + d + 12, box.y + 4 + bh + 6, (w - d) * 0.6, bh), { name: 'sk·line', fill: tint, radius: 4 }); box = B(box.x, box.y, w + d + 12, box.h); ctx.host.resize(N(w + d + 12), box.h); }
+      if (o.withText) { ctx.plate(B(box.x + d + 12, box.y + 4, w - d, bh), { name: 'sk·line', fill: tint, radius: 'xs' }); ctx.plate(B(box.x + d + 12, box.y + 4 + bh + 6, (w - d) * 0.6, bh), { name: 'sk·line', fill: tint, radius: 'xs' }); box = B(box.x, box.y, w + d + 12, box.h); ctx.host.resize(N(w + d + 12), box.h); }
     } else if (v === 'rect' || v === 'image') {
       box = B(o.x || 0, o.y || 0, w, o.h || 120);
       ctx = CF.build(CF.name('Skeleton', { type: 'rect' }), box, { parent: o.parent, radius: CF.radius('sm') });
@@ -1810,19 +2178,19 @@ return (function () {
       for (var r = 0; r < rows; r++) {
         var yy = box.y + r * rowH + (rowH - bh * 2 - 6) / 2;
         ctx.ellipse(B(box.x, yy, 32, 32 > rowH - 8 ? rowH - 8 : 32), { name: 'sk·media', fill: tint });
-        ctx.plate(B(box.x + 44, yy + 2, w * (r % 2 ? 0.5 : 0.68), bh), { name: 'sk·title', fill: tint, radius: 4 });
-        ctx.plate(B(box.x + 44, yy + 2 + bh + 6, w * 0.4, bh), { name: 'sk·sub', fill: tint, opacity: 0.7, radius: 4 });
+        ctx.plate(B(box.x + 44, yy + 2, w * (r % 2 ? 0.5 : 0.68), bh), { name: 'sk·title', fill: tint, radius: 'xs' });
+        ctx.plate(B(box.x + 44, yy + 2 + bh + 6, w * 0.4, bh), { name: 'sk·sub', fill: tint, opacity: 0.7, radius: 'xs' });
         if (r) ctx.plate(B(box.x + 44, box.y + r * rowH - 1, w - 44, 1), { name: 'sk·divider', fill: C('border'), opacity: 0.6 });
       }
     } else {
       box = B(o.x || 0, o.y || 0, w, lines * bh + (lines - 1) * gap);
       ctx = CF.build(CF.name('Skeleton', { type: 'text' }), box, { parent: o.parent });
       for (var i = 0; i < lines; i++)
-        ctx.plate(B(box.x, box.y + i * (bh + gap), i === lines - 1 ? w * 0.62 : w, bh), { name: 'sk·line·' + (i + 1), fill: tint, radius: 4 });
+        ctx.plate(B(box.x, box.y + i * (bh + gap), i === lines - 1 ? w * 0.62 : w, bh), { name: 'sk·line·' + (i + 1), fill: tint, radius: 'xs' });
     }
     if (o.animated !== false) {
       var sh = B(box.x + box.w * 0.28, box.y, box.w * 0.24, box.h);
-      ctx.plate(sh, { name: 'sk·shimmer', fill: '#FFFFFF', opacity: 0.35, radius: 4 });
+      ctx.plate(sh, { name: 'sk·shimmer', fill: '#FFFFFF', opacity: 0.35, radius: 'xs' });
     }
     await ctx.settle(); ctx.place();
     return ctx.host;
@@ -1902,7 +2270,7 @@ return (function () {
       try { ctx.host.resize(box.w, box.h + childH); } catch (e) {}
     }
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(B(box.x, box.y, box.w, box.h), { radius: 0, offset: 0, width: 2 });
+    if (S === 'focus') ctx.ring(B(box.x, box.y, box.w, box.h), { radius: 'none', offset: 0, width: 2 });
     return ctx.host;
   };
 
@@ -1923,16 +2291,16 @@ return (function () {
       return CF.emptyState(Object.assign({ x: o.x, y: o.y, w: w, h: o.h || 220, kind: kind === 'noPermission' ? '403' : 'no-data' }, o));
     var box2 = B(o.x || 0, o.y || 0, w, n * rowH + 40);
     var c2 = CF.build(CF.name('Table', { slot: 'Loading' }), box2, { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border') });
-    c2.plate(B(box2.x + 1, box2.y + 1, box2.w - 2, 40), { name: 'header', fill: C('surfaceAlt'), radius: 0 });
+    c2.plate(B(box2.x + 1, box2.y + 1, box2.w - 2, 40), { name: 'header', fill: C('surfaceAlt'), radius: 'none' });
     [0.16, 0.28, 0.2, 0.2].forEach(function (f, i) {
       var xx = box2.x + 16 + [0, 0.34, 0.6, 0.8][i] * (box2.w - 32);
-      c2.plate(B(xx, box2.y + 14, (box2.w - 32) * f * (i ? 0.6 : 1), 12), { name: 'sk·head', fill: C('border'), radius: 4 });
+      c2.plate(B(xx, box2.y + 14, (box2.w - 32) * f * (i ? 0.6 : 1), 12), { name: 'sk·head', fill: C('border'), radius: 'xs' });
     });
     for (var r = 0; r < n; r++) {
       var yy = box2.y + 40 + r * rowH;
-      c2.plate(B(box2.x + 16, yy + (rowH - 12) / 2, (box2.w - 32) * 0.3, 12), { name: 'sk·cell', fill: C('border'), radius: 4 });
-      c2.plate(B(box2.x + 16 + (box2.w - 32) * 0.36, yy + (rowH - 12) / 2, (box2.w - 32) * 0.16, 12), { name: 'sk·cell', fill: C('border'), radius: 4 });
-      c2.plate(B(box2.x + 16 + (box2.w - 32) * 0.6, yy + (rowH - 12) / 2, (box2.w - 32) * 0.12, 12), { name: 'sk·cell', fill: C('border'), opacity: 0.7, radius: 4 });
+      c2.plate(B(box2.x + 16, yy + (rowH - 12) / 2, (box2.w - 32) * 0.3, 12), { name: 'sk·cell', fill: C('border'), radius: 'xs' });
+      c2.plate(B(box2.x + 16 + (box2.w - 32) * 0.36, yy + (rowH - 12) / 2, (box2.w - 32) * 0.16, 12), { name: 'sk·cell', fill: C('border'), radius: 'xs' });
+      c2.plate(B(box2.x + 16 + (box2.w - 32) * 0.6, yy + (rowH - 12) / 2, (box2.w - 32) * 0.12, 12), { name: 'sk·cell', fill: C('border'), opacity: 0.7, radius: 'xs' });
       if (r) c2.plate(B(box2.x + 16, yy - 1, box2.w - 32, 1), { name: 'hairline', fill: C('border') });
     }
     return c2.host;
@@ -1986,8 +2354,16 @@ return (function () {
     var items = o.items || [{ label: 'Owner', value: 'Ada Liu' }, { label: 'Created', value: '2026-10-12 09:14' },
                            { label: 'Status', value: 'Published' }, { label: 'Region', value: 'eu-central-1' }];
     var cols = o.columns || 2, lw = o.labelW || 160, padX = 16, rowH = o.rowH || 44, cgap = 28;
-    var w = o.w || (padX * 2 + cols * ((lw + 8) + 160) - cgap);
+    // §G12: a column must hold its label + the widest single-span value it is given, or the value runs into the next
+    // column's label (the audit's text_overlap). A container narrower than that shrinks the LABEL column, never the
+    // value: truncated copy is a defect, a tight gutter is not.
+    var valW = items.reduce(function (a, it) {
+      return (it.span || 1) === 1 ? max(a, CF.estW(String(it.value === undefined ? '—' : it.value), 14) + 4) : a;
+    }, 0);
+    var need = lw + 8 + valW;
+    var w = o.w || (padX * 2 + cols * need + cgap * (cols - 1));
     var cw = (w - padX * 2 - cgap * (cols - 1)) / cols;
+    if (cw < need) lw = max(56, cw - 8 - valW);
     var rowsUsed = items.reduce(function (a, it) { return a + (it.span || 1); }, 0);
     var rowCount = 0, acc = 0;
     items.forEach(function (it) { acc += (it.span || 1); if (acc >= cols) { rowCount++; acc = 0; } });
@@ -2003,11 +2379,12 @@ return (function () {
       var cx = box.x + padX + col * (cw + cgap);
       var cellW = cw * span + (span > 1 ? cgap * (span - 1) : 0);
       if (o.bordered) {
-        ctx.plate(B(cx - 8, ry, cellW + 16, rowH - 4), { name: 'cell·' + i, fill: null, stroke: C('border'), strokeW: 1, radius: 0 });
-        ctx.plate(B(cx - 8, ry, lw + 16, rowH - 4), { name: 'cell·label·' + i, fill: C('surfaceAlt'), radius: 0 });
+        ctx.plate(B(cx - 8, ry, cellW + 16, rowH - 4), { name: 'cell·' + i, fill: null, stroke: C('border'), strokeW: 1, radius: 'none' });
+        // the tint is drawn after the bordered cell, so a flush box would paint over its 1px border (stroke_covered).
+        ctx.plate(CF.inset(B(cx - 8, ry, lw + 16, rowH - 4), 1), { name: 'cell·label·' + i, fill: C('surfaceAlt'), radius: 'none' });
       }
       ctx.text(String(it.label), B(cx, ry + 4, lw, rowH - 12), { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
-      ctx.text(String(it.value === undefined ? '—' : it.value), B(cx + lw + 8, ry + 4, max(40, cellW - lw - 16), rowH - 12),
+      ctx.text(String(it.value === undefined ? '—' : it.value), B(cx + lw + 8, ry + 4, max(valW, cellW - lw - 8), rowH - 12),
         { size: 14, color: C('ink'), align: 'left', valign: 'top', refit: false });
       col += span;
       if (col >= cols) { col = 0; ry += rowH; }
@@ -2065,25 +2442,41 @@ return (function () {
     var w = o.w || 360, h = 0;
     items.forEach(function (it) { h += headH + (it.open && !o.collapsedAll ? bodyH : 0); });
     var box = B(o.x || 0, o.y || 0, w, max(headH, h));
-    var ctx = CF.build(CF.name('Accordion', { type: o.ghost ? 'Ghost' : 'Bordered', slot: o.accordion ? 'Single' : 'Multi' }), box,
+    var ST = o.state || 'default';
+    // `name` lets a screen ship a content-specific composition (Accordion·FAQ·Multi) instead of drawing the registered
+    // master's anatomy again under the master's name, which the design gate reads as not_component.
+    var ctx = CF.build(o.name || CF.name('Accordion', { type: o.ghost ? 'Ghost' : 'Bordered', state: ST, slot: o.accordion ? 'Single' : 'Multi' }), box,
       { parent: o.parent, fill: o.ghost ? null : C('surface'), radius: CF.radius('md'), stroke: o.ghost ? null : C('border') });
     var y = box.y;
     for (var i = 0; i < items.length; i++) {
       var it = items[i], S = it.disabled ? 'disabled' : (it.open ? 'open' : 'default');
+      if (i === (o.cursor === undefined ? 0 : Number(o.cursor)) && (ST === 'hover' || ST === 'pressed'))
+        ctx.plate(B(box.x + 1, y, w - 2, headH), { name: 'header·' + (ST === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, ST), radius: CF.radius('sm') });
       ctx.text(String(it.title), B(box.x + padX + (o.icon ? 24 : 0), y, w - padX * 2 - 24 - (o.chip ? 90 : 0) - (o.icon ? 24 : 0), headH),
         { size: 14, color: it.disabled ? C('muted') : C('ink'), weight: 500, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
       ctx.glyph(it.open ? 'chevronUp' : 'chevronDown', B(box.x + w - padX - 16, y + (headH - 16) / 2, 16, 16), { color: it.disabled ? C('muted') : C('ink'), opacity: stateAlpha(S) });
       if (o.icon) ctx.glyph(iconOf(o.icon, 'tag'), B(box.x + padX, y + (headH - 18) / 2, 18, 18), { color: C('muted') });
       if (o.chip && it.chip) await CF.chip({ parent: ctx.host, x: box.x + w - padX - 96, y: y + (headH - 24) / 2, label: it.chip, size: 'sm', kind: 'tag', tone: it.chipTone || 'success' });
       if (it.open) {
-        ctx.text(String(it.body || ''), B(box.x + padX + (o.icon ? 24 : 0), y + headH, w - padX * 2 - 24, bodyH - 8),
-          { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
+        // A Penpot text grows to its measured width — it does not reflow inside the box — so an unwrapped answer
+        // paints one 700px line and the host crops it mid-sentence. Wrap to the body width and mark the overflow.
+        var bws = CF.wrap(String(it.body || ''), w - padX * 2 - 24, 13), blh = 20;
+        var maxLines = Math.max(1, Math.floor((bodyH - 4) / blh));
+        if (bws.length > maxLines) {
+          bws = bws.slice(0, maxLines);
+          bws[bws.length - 1] = bws[bws.length - 1].replace(/[\s,.;:]+$/, '') + ' …';
+        }
+        bws.forEach(function (ln, li) {
+          ctx.text(ln, B(box.x + padX + (o.icon ? 24 : 0), y + headH + li * blh, w - padX * 2 - 24, blh),
+            { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
+        });
       }
       y += headH + (it.open ? bodyH : 0);
       if (i < items.length - 1) ctx.plate(B(box.x, y - 1, w, 1), { name: 'divider', fill: C('border') });
     }
     try { ctx.host.resize(w, N(y - box.y)); } catch (e) {}
     await ctx.settle(); ctx.place();
+    if (ST === 'focus') ctx.ring(B(box.x, box.y, w, headH), { radius: CF.radius('md') });
     return ctx.host;
   };
 
@@ -2127,17 +2520,20 @@ return (function () {
     var peek = o.peek === undefined ? 24 : o.peek, gap = o.gap || 16, dotsH = 28;
     var visible = tw * tiles + gap * (tiles - 1) + peek;
     var box = B(o.x || 0, o.y || 0, visible, th + dotsH + 8);
-    var ctx = CF.build(CF.name('Carousel', { slot: o.arrows ? 'Arrows' : 'Dots' }), box, { parent: o.parent });
+    var ST = o.state || 'default';
+    var ctx = CF.build(CF.name('Carousel', { state: ST, slot: [o.arrows ? 'Arrows' : 'Dots', o.captions ? 'Caption' : null].filter(Boolean).join('-') }), box, { parent: o.parent });
     var active = o.active === undefined ? 0 : o.active;
+    var hov = o.hover === undefined ? ((ST === 'hover' || ST === 'pressed') ? active : -1) : o.hover;
     for (var i = 0; i < tiles + 1; i++) {
       var x = box.x + i * (tw + gap), visW = min(tw, box.x + box.w - x);
       // a peek tile is drawn as the sliver that would survive clipContent, so nothing escapes the host
       if (visW < 8) continue;
-      if (visW < tw - 2) { ctx.plate(B(x, box.y, visW, th), { name: 'tile·peek', fill: C(i === active ? 'primarySoft' : 'surfaceAlt'), radius: 0 }); continue; }
-      var st = i === (o.hover === undefined ? -1 : o.hover) ? 'hover' : 'default';
+      if (visW < tw - 2) { ctx.plate(B(x, box.y, visW, th), { name: 'tile·peek', fill: C(i === active ? 'primarySoft' : 'surfaceAlt'), radius: 'none' }); continue; }
+      var st = i === hov ? 'hover' : 'default';
       ctx.plate(B(x, box.y, tw, th), { name: 'tile·' + (i + 1), fill: C(i === active ? 'primarySoft' : 'surfaceAlt'),
         radius: CF.radius('md'), stroke: st === 'hover' ? C('borderStrong') : null, strokeW: 1, shadow: st === 'hover' ? 2 : 0 });
       ctx.glyph('image', B(x + tw / 2 - 20, box.y + th / 2 - 20, 40, 40), { color: C('muted') });
+      if (ST === 'pressed' && i === hov) ctx.plate(B(x, box.y, tw, th), { name: 'tile·pressed', fills: CF.fills(null, 'pressed'), radius: CF.radius('md') });
       if (o.captions) ctx.text(String(o.captions[i]), B(x + 12, box.y + th - 30, tw - 24, 20), { size: 13, color: C('ink'), weight: 500, align: 'left', valign: 'bottom', refit: false });
     }
     var dy = box.y + th + 10, n = o.count || tiles + 2, act = o.active === undefined ? 0 : o.active;
@@ -2145,7 +2541,7 @@ return (function () {
     var dx0 = box.x + (visible - totalW) / 2;
     for (var d = 0; d < n; d++) {
       var isOn = d === act;
-      ctx.plate(B(dx0, dy, isOn ? 16 : 8, 8), { name: 'dot·' + (d + 1), fill: isOn ? C('primary') : C('borderStrong'), radius: 4 });
+      ctx.plate(B(dx0, dy, isOn ? 16 : 8, 8), { name: 'dot·' + (d + 1), fill: isOn ? C('primary') : C('borderStrong'), radius: 'xs' });
       dx0 += (isOn ? 16 : 8) + 8;
     }
     if (o.arrows) {
@@ -2154,8 +2550,10 @@ return (function () {
       ctx.glyph('chevronLeft', B(box.x + 16, ay + 8, 24, 24), { color: C('ink') });
       ctx.ellipse(B(box.x + visible - peek - 48, ay, 40, 40), { name: 'arrow·next', fill: C('surface'), stroke: C('border'), strokeW: 1, shadow: 2 });
       ctx.glyph('chevronRight', B(box.x + visible - peek - 40, ay + 8, 24, 24), { color: C('ink') });
+      if (ST === 'pressed') ctx.ellipse(B(box.x + visible - peek - 48, ay, 40, 40), { name: 'arrow·pressed', fills: CF.fills(null, 'pressed') });
     }
     await ctx.settle(); ctx.place();
+    if (ST === 'focus') ctx.ring(box, { radius: CF.radius('md') });
     return ctx.host;
   };
 
@@ -2168,7 +2566,9 @@ return (function () {
     var w = o.w || (7 * (cell + gap) - gap + padX * 2);
     var h = o.h || (headH + weekH + rows * (cell + gap) - gap + padB);
     var box = B(o.x || 0, o.y || 0, w, h);
-    var ctx = CF.build(CF.name('MiniCalendar', { size: cell + 'cell', slot: o.range ? 'Range' : null }), box,
+    var ST = o.state || 'default';
+    var ctx = CF.build(CF.name('MiniCalendar', { size: cell + 'cell', state: ST,
+      slot: [o.range ? 'Range' : null, o.events === false ? 'NoEvents' : null].filter(Boolean).join('-') || null }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border'), strokeW: 1 });
     if (!LY) return ctx.host;
     var grid = LY.grid(B(box.x + padX, box.y + headH + weekH, w - padX * 2, rows * (cell + gap) - gap), 7, gap);
@@ -2191,16 +2591,19 @@ return (function () {
       var muted = o.weekendMuted && col >= 5;
       var isSel = Array.isArray(sel) ? (dnum === sel[0] || dnum === sel[1]) : dnum === sel;
       var inRange = Array.isArray(sel) && dnum > sel[0] && dnum < sel[1];
-      if (inRange) ctx.plate(B(r.x, r.y + (cell - 24) / 2, cell, 24), { name: 'range·' + dnum, fills: CF.fills(C('primarySoft'), null), radius: 0 });
-      if (isSel) ctx.plate(B(r.x, r.y, cell, cell), { name: 'sel·' + dnum, fill: C('primary'), radius: cell / 2 });
-      else if (dnum === today) ctx.plate(B(r.x + 1, r.y + 1, cell - 2, cell - 2), { name: 'today·' + dnum, fill: null, stroke: C('primary'), strokeW: 1.5, radius: cell / 2 });
+      if (inRange) ctx.plate(B(r.x, r.y + (cell - 24) / 2, cell, 24), { name: 'range·' + dnum, fills: CF.fills(C('primarySoft'), null), radius: 'none' });
+      if (isSel) ctx.plate(B(r.x, r.y, cell, cell), { name: 'sel·' + dnum, fill: C('primary'), radius: 'control' });
+      else if (dnum === today) ctx.plate(B(r.x + 1, r.y + 1, cell - 2, cell - 2), { name: 'today·' + dnum, fill: null, stroke: C('primary'), strokeW: 1.5, radius: 'control' });
+      if (!isSel && dnum === (o.hoverDay === undefined ? today : o.hoverDay) && (ST === 'hover' || ST === 'pressed'))
+        ctx.plate(B(r.x, r.y, cell, cell), { name: 'day·' + (ST === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, ST), radius: 'control' });
       ctx.text(String(dnum), r, { size: 12, weight: isSel || dnum === today ? 600 : 400,
         color: isSel ? C('onPrimary') : (dnum === today ? C('primary') : (muted ? C('muted') : C('ink'))), align: 'center', valign: 'middle', refit: false });
-      if (events.indexOf(dnum) >= 0 && !isSel) ctx.plate(B(r.x + cell / 2 - 2, r.y + cell - 6, 4, 4), { name: 'dot·' + dnum, fill: C('primary'), radius: 2 });
+      if (events.indexOf(dnum) >= 0 && !isSel) ctx.plate(B(r.x + cell / 2 - 2, r.y + cell - 6, 4, 4), { name: 'dot·' + dnum, fill: C('primary'), radius: 'xs' });
       if (o.hit) ctx.hitPad(r, o.hit);                          // 32 cells are a desktop sidebar affordance; touch tiers pass 44
       if (o.marks && o.marks[dnum]) ctx.text(String(o.marks[dnum]), B(r.x, r.y + 1, cell, 12), { size: 11, role: 'axis', color: C('muted'), align: 'center', valign: 'top', refit: false });
     }
     await ctx.settle(); ctx.place();
+    if (ST === 'focus') ctx.ring(box, { radius: CF.radius('md') });
     return ctx.host;
   };
 
@@ -2223,16 +2626,22 @@ return (function () {
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('NavItem', { type: group ? 'Group' : (rail ? 'Rail' : null), size: o.size, state: S,
              slot: [o.selected ? 'Selected' : null, slotName({ lead: hasIcon ? true : null, badge: badge ? true : null, submenu: o.submenu })].filter(Boolean).join('-') || null }), box,
-      { parent: o.parent, radius: rail ? h / 2 : CF.radius('md') });
+      { parent: o.parent, radius: rail ? 'control' : 'md' });
     if (group) {
       ctx.text(label.toUpperCase(), B(box.x + padX, box.y, box.w - padX * 2, box.h),
-        { size: 12, color: C('muted'), weight: 600, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
+        { size: 12, color: o.onDark ? C('mutedOnInk') : C('muted'), weight: 600, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
       await ctx.settle(); ctx.place();
       return ctx.host;
     }
     var sel = !!o.selected;
-    ctx.host.fills = sel ? CF.fills(C('primarySoft'), S === 'default' ? null : S) : CF.fills(null, S === 'default' ? null : S);
-    var ink = S === 'disabled' ? C('muted') : (sel ? C('primary') : C('ink'));
+    // A nav row mounted on an ink shell (`o.onDark`, set by CF.sideNav for its dark variant) has to lift its copy: the
+    // palette ink is the same #161616 as the panel (1.00:1) and the palette muted is 2.54:1. The light `primarySoft`
+    // selection wash would also invert the panel polarity, so a dark row selects with a white state layer instead and
+    // lets the accent bar carry the brand.
+    ctx.host.fills = sel && !o.onDark ? CF.fills(C('primarySoft'), S === 'default' ? null : S)
+      : CF.fills(null, S === 'default' ? null : S, o.onDark ? { onDark: true } : undefined);
+    var ink = o.onDark ? (S === 'disabled' ? C('mutedOnInk') : TONE.onDark.ink)
+      : (S === 'disabled' ? C('muted') : (sel ? C('primary') : C('ink')));
     var x = box.x + padX;
     if (hasIcon) {
       if (rail) ctx.glyph(iconOf(o.icon, 'home'), B(box.x + (w - ic) / 2, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 2 });
@@ -2240,14 +2649,14 @@ return (function () {
     }
     if (sel && o.indicator !== false)
       ctx.plate(rail ? B(box.x + w - 3, box.y + (h - 20) / 2, 3, 20) : B(box.x, box.y + (h - 20) / 2, 3, 20),
-        { name: 'accent·bar', fill: C('primary'), radius: 1.5 });
+        { name: 'accent·bar', fill: C('primary'), radius: 'xs' });
     if (!rail) {
       ctx.text(label, B(x, box.y, box.w - (x - box.x) - padX - badgeW - subW, h),
         { size: L.fs, color: ink, weight: sel ? 500 : 400, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
       var rx = box.x + box.w - padX;
-      if (o.submenu) { rx -= 16; ctx.glyph(o.expanded ? 'chevronUp' : 'chevronRight', B(rx, box.y + (h - 16) / 2, 16, 16), { color: C('muted'), anchor: 'right' }); rx -= 8; }
+      if (o.submenu) { rx -= 16; ctx.glyph(o.expanded ? 'chevronUp' : 'chevronRight', B(rx, box.y + (h - 16) / 2, 16, 16), { color: o.onDark ? C('mutedOnInk') : C('muted'), anchor: 'right' }); rx -= 8; }
       if (badge) {
-        ctx.plate(B(rx - badgeW, box.y + (h - 18) / 2, badgeW, 18), { name: 'count', fill: sel ? C('primary') : C('surfaceAlt'), radius: 9 });
+        ctx.plate(B(rx - badgeW, box.y + (h - 18) / 2, badgeW, 18), { name: 'count', fill: sel ? C('primary') : C('surfaceAlt'), radius: 'control' });
         ctx.text(badge, B(rx - badgeW, box.y, badgeW, h), { size: 12, color: sel ? C('onPrimary') : C('muted'), weight: 600, refit: false });
       }
     }
@@ -2274,7 +2683,7 @@ return (function () {
     var box = B(o.x || 0, o.y || 0, vert ? (o.w || 140) : w, h);
     var ctx = CF.build(CF.name('Tabs', { type: type, size: o.size, state: S,
              slot: [sel ? 'Selected' : null, slotName({ lead: ic ? true : null, count: countW ? true : null, closable: o.closable })].filter(Boolean).join('-') || null }), box,
-      { parent: o.parent, radius: type === 'pill' ? h / 2 : (type === 'card' ? CF.radius('sm') : 0) });
+      { parent: o.parent, radius: type === 'pill' ? 'control' : (type === 'card' ? 'sm' : 'none') });
     if (type === 'pill') ctx.host.fills = sel ? CF.fills(C('primarySoft'), S === 'default' ? null : S) : CF.fills(null, S === 'default' ? null : S);
     else if (type === 'enclosed' || type === 'card') ctx.host.fills = CF.fills(sel && type === 'enclosed' ? C('surface') : null, S === 'default' ? null : S);
     else ctx.host.fills = CF.fills(null, S === 'default' ? null : S);
@@ -2283,7 +2692,7 @@ return (function () {
       ctx.plate(B(box.x, box.y + box.h - blH, box.w, blH), { name: 'base·line', fill: sel ? C('primary') : C('border') });
     }
     else if (sel) ctx.plate(vert ? B(box.x, box.y + 6, 3, box.h - 12) : B(box.x + (type === 'line' ? padX * 0.4 : 0), box.y + box.h - 2, box.w - (type === 'line' ? padX * 0.8 : 0), 2),
-      { name: 'ink·bar', fill: C('primary'), radius: 1 });
+      { name: 'ink·bar', fill: C('primary'), radius: 'xs' });
     var ink = S === 'disabled' ? C('muted') : (sel ? C('primary') : C('ink'));
     var x = box.x + padX;
     if (ic) { ctx.glyph(iconOf(o.icon, 'grid'), B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 1.8 }); x += ic + 8; }
@@ -2291,7 +2700,7 @@ return (function () {
       { size: L.fs, color: ink, weight: sel ? 500 : 400, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
     var rx = box.x + box.w - padX;
     if (o.closable) { rx -= 14; ctx.glyph('close', B(rx, box.y + (h - 14) / 2, 14, 14), { color: C('muted'), strokeW: 1.6, anchor: 'right' }); }
-    if (countW) { rx -= countW; ctx.plate(B(rx, box.y + (h - 18) / 2, countW, 18), { name: 'count', fill: C('surfaceAlt'), radius: 9 });
+    if (countW) { rx -= countW; ctx.plate(B(rx, box.y + (h - 18) / 2, countW, 18), { name: 'count', fill: C('surfaceAlt'), radius: 'control' });
       ctx.text(String(o.count), B(rx, box.y, countW, h), { size: 12, color: C('muted'), weight: 600, refit: false }); }
     await ctx.settle(); ctx.place();
     if (!o.w) ctx.refit(padX);
@@ -2343,13 +2752,14 @@ return (function () {
     cells.forEach(function (c, i) { total += CF.estW(c.menu ? '…' : c.label, fs) + (c.glyph ? 18 : 0) + (c.menu ? 16 : 0) + (i < cells.length - 1 ? sepW : 0); });
     var box = B(o.x || 0, o.y || 0, o.w || max(64, total), h);
     var ctx = CF.build(CF.name('Breadcrumb', { type: o.back ? 'Back' : null, size: o.size, state: o.state, slot: o.truncated ? 'Truncated' : null }), box, { parent: o.parent });
-    var x = box.x;
+    var x = box.x, focusB = null;
     if (o.back) { ctx.glyph('arrowLeft', B(x, box.y + (h - 16) / 2, 16, 16), { color: C('ink'), strokeW: 1.8 }); x += 24 + 8; }
     cells.forEach(function (c, i) {
       var txt = c.menu ? '…' : c.label;
       var tw = CF.estW(txt, fs) + (c.menu ? 16 : 0);
       var cellBox = B(x, box.y, max(8, tw), h);
       var isLink = !c.last && !c.menu;
+      if (isLink && !focusB) focusB = cellBox;
       var tint = c.menu ? 'selected' : (i === o.hover ? 'hover' : null);
       if (tint) ctx.plate(B(cellBox.x, cellBox.y, cellBox.w, cellBox.h), { name: 'tint·' + i, fills: CF.fills(C('surfaceAlt'), tint), radius: CF.radius('xs') });
       else if (i === o.hover) ctx.plate(B(cellBox.x, cellBox.y, cellBox.w, cellBox.h), { name: 'tint·' + i, fills: CF.fills(null, 'hover'), radius: CF.radius('xs') });
@@ -2360,12 +2770,14 @@ return (function () {
       x += tw;
       if (c.menu) { ctx.glyph('dots', B(x - 14, box.y + (h - 12) / 2, 12, 12), { color: C('muted'), fill: C('muted'), anchor: 'right' }); }
       if (i < cells.length - 1) {
-        if (sepKind === 'slash') ctx.text('/', B(x + 1, box.y, 8, h), { size: fs, color: C('borderStrong'), align: 'left', valign: 'middle', refit: false });
+        // A slash is copy, so it owes 4.5:1; borderStrong is a line tone and only graphics may wear it.
+        if (sepKind === 'slash') ctx.text('/', B(x + 1, box.y, 8, h), { size: fs, color: o.onDark ? C('onPrimary') : C('muted'), align: 'left', valign: 'middle', refit: false });
         else ctx.glyph('chevronRight', B(x + 4, box.y + (h - 16) / 2, 16, 16), { color: C('borderStrong'), strokeW: 1.6 });
         x += sepW;
       }
     });
     await ctx.settle(); ctx.place();
+    if (o.state === 'focus') ctx.ring(focusB || B(box.x, box.y, box.w, h), { radius: CF.radius('xs') });
     return ctx.host;
   };
 
@@ -2457,7 +2869,7 @@ return (function () {
     var colW = function (c) { return max((labelRight ? cs + 12 : 0) + contentW(c), 40); };
     var tail = o.tail === undefined ? 56 : Number(o.tail);
     var hasDesc = cells.some(function (c) { return !!c.desc; });
-    var bodyH = labelRight ? max(cs, fs + 10) : cs + 8 + fs + 6 + (hasDesc ? 18 : 0);
+    var bodyH = labelRight ? max(cs, CF.lineH(fs)) : cs + 8 + CF.lineH(fs) + (hasDesc ? 8 + CF.lineH(dfs) : 0);
     var vrow = o.vRowH || max(48, bodyH + (labelRight ? 8 : 12));
     var padX = vert ? 0 : 8;
     var h = vert ? cells.length * vrow : max(bodyH, cs + 8);
@@ -2465,10 +2877,15 @@ return (function () {
                  : (cells.reduce(function (a, c, i) { return a + colW(c) + (i ? tail + tailGap * 2 : 0); }, 0) + stepGap * (cells.length - 1) + padX * 2);
     if (o.w) w = o.w;
     var box = B(o.x || 0, o.y || 0, max(cs + 8, w), h);
+    var ST = o.state || 'default';
     var ctx = CF.build(CF.name('Steps', { type: dot ? 'Dot' : (vert ? 'Vertical' : (labelRight ? 'Horizontal' : 'Bottom')), size: o.size,
-             state: errAt >= 0 ? 'Error' : null, slot: o.progressLine ? 'Progress' : null }), box, { parent: o.parent });
+             state: errAt >= 0 ? 'Error' : ST, slot: o.progressLine ? 'Progress' : null }), box, { parent: o.parent });
+    var cursor = o.cursor === undefined ? (ST === 'focus' ? cur : -1) : Number(o.cursor), focusBox = null;
     var node = function (nx, ny, c, idx) {
       var st = c.status, active = st === 'process' || st === 'finish';
+      // §G12: a clickable stepper lights the node the pointer is on, so hover/pressed/disabled are drawn on the node, not invented.
+      if (idx === cursor && (ST === 'hover' || ST === 'pressed')) ctx.ellipse(B(nx - 5, ny - 5, cs + 10, cs + 10), { name: 'node·' + ST, fills: CF.fills(null, ST) });
+      if (idx === cursor) focusBox = B(nx - 3, ny - 3, cs + 6, cs + 6);
       if (dot) {
         ctx.ellipse(B(nx, ny, cs, cs), { name: 'node·' + st, fill: st === 'process' ? C('primary') : (st === 'error' ? C('error') : (st === 'finish' ? C('primary') : C('surface'))),
           stroke: st === 'wait' ? C('borderStrong') : null, strokeW: 2 });
@@ -2493,10 +2910,11 @@ return (function () {
             { name: 'tail·' + i, fill: c.status === 'finish' ? C('primary') : C('border') });
         }
         var tx = box.x + cs + 12;
-        var ty = labelRight ? ny + (cs - (fs + 6)) / 2 : ny;
-        ctx.text(c.title, B(tx, ty, box.w - cs - 16, fs + 6),
+        var tLH = CF.lineH(fs, c.status === 'process' ? 600 : 400), dLH = CF.lineH(dfs);
+        var ty = labelRight ? ny + (cs - tLH) / 2 : ny;
+        ctx.text(c.title, B(tx, ty, box.w - cs - 16, tLH),
           { size: fs, color: c.status === 'wait' ? C('muted') : C('ink'), weight: c.status === 'process' ? 600 : 400, align: 'left', valign: 'top', refit: false });
-        if (c.desc) ctx.text(c.desc, B(tx, labelRight ? ty : ny + fs + 10, box.w - cs - 16, dfs + 6), { size: dfs, color: C('muted'), align: 'left', valign: 'top', refit: false });
+        if (c.desc) ctx.text(c.desc, B(tx, labelRight ? ty : ny + tLH + 8, box.w - cs - 16, dLH), { size: dfs, color: C('muted'), align: 'left', valign: 'top', refit: false });
       });
     } else {
       var xx = box.x + padX, ny0 = box.y + max(0, (h - bodyH) / 2);
@@ -2504,26 +2922,28 @@ return (function () {
         var cw2 = colW(c), nx = labelRight ? xx : xx + (cw2 - cs) / 2, ny = ny0;
         node(nx, ny, c, i);
         var inkc = c.status === 'wait' ? C('muted') : C('ink');
+        var tLH = CF.lineH(fs, c.status === 'process' ? 600 : 400), dLH = CF.lineH(dfs);
         if (labelRight) {
-          ctx.text(c.title, B(xx + cs + 12, ny, titleW(c), max(cs, fs + 10)), { size: fs, color: inkc,
+          ctx.text(c.title, B(xx + cs + 12, ny, titleW(c), max(cs, tLH)), { size: fs, color: inkc,
             weight: c.status === 'process' ? 600 : 400, align: 'left', valign: 'middle', refit: false });
-          if (c.desc) ctx.text(c.desc, B(xx + cs + 12 + titleW(c), ny, descW(c), max(cs, dfs + 10)), { size: dfs, color: C('muted'), align: 'left', valign: 'middle', refit: false });
+          if (c.desc) ctx.text(c.desc, B(xx + cs + 12 + titleW(c), ny, descW(c), max(cs, dLH)), { size: dfs, color: C('muted'), align: 'left', valign: 'middle', refit: false });
         } else {
-          ctx.text(c.title, B(xx, ny + cs + 8, cw2, fs + 6), { size: fs, color: inkc,
+          ctx.text(c.title, B(xx, ny + cs + 8, cw2, tLH), { size: fs, color: inkc,
             weight: c.status === 'process' ? 600 : 400, valign: 'top', refit: false });
-          if (c.desc) ctx.text(c.desc, B(xx, ny + cs + 8 + fs + 10, cw2, dfs + 6), { size: dfs, color: C('muted'), valign: 'top', refit: false });
+          if (c.desc) ctx.text(c.desc, B(xx, ny + cs + 8 + tLH + 8, cw2, dLH), { size: dfs, color: C('muted'), valign: 'top', refit: false });
         }
         if (i < cells.length - 1) {
-          var tStart = xx + cw2 + tailGap, ty2 = labelRight ? ny + max(cs, fs + 10) / 2 : ny + cs / 2;
+          var tStart = xx + cw2 + tailGap, ty2 = labelRight ? ny + max(cs, tLH) / 2 : ny + cs / 2;
           var th2 = o.progressLine ? 4 : 2;
-          ctx.plate(B(tStart, N(ty2 - th2 / 2), max(8, tail), th2), { name: 'tail·bg·' + i, fill: C('border'), radius: 2 });
-          if (o.progressLine && c.status === 'finish') ctx.plate(B(tStart, N(ty2 - 2), max(8, tail), 4), { name: 'tail·fill·' + i, fill: C('primary'), radius: 2 });
-          else if (o.progressLine && c.status === 'process') ctx.plate(B(tStart, N(ty2 - 2), max(8, tail) * 0.5, 4), { name: 'tail·fill·half', fill: C('primary'), radius: 2 });
+          ctx.plate(B(tStart, N(ty2 - th2 / 2), max(8, tail), th2), { name: 'tail·bg·' + i, fill: C('border'), radius: 'xs' });
+          if (o.progressLine && c.status === 'finish') ctx.plate(B(tStart, N(ty2 - 2), max(8, tail), 4), { name: 'tail·fill·' + i, fill: C('primary'), radius: 'xs' });
+          else if (o.progressLine && c.status === 'process') ctx.plate(B(tStart, N(ty2 - 2), max(8, tail) * 0.5, 4), { name: 'tail·fill·half', fill: C('primary'), radius: 'xs' });
         }
         xx += cw2 + (i < cells.length - 1 ? tail + tailGap * 2 + stepGap : 0);
       });
     }
     await ctx.settle(); ctx.place();
+    if (ST === 'focus' && focusBox) ctx.ring(focusBox, { radius: 'control' });
     return ctx.host;
   };
 
@@ -2542,10 +2962,15 @@ return (function () {
     var h = padV * 2;
     rows.forEach(function (r) { h += r.kind === 'divider' ? 9 : (r.kind === 'group' ? 24 : itemH); });
     var box = B(o.x || 0, o.y || 0, w, h);
-    var ctx = CF.build(CF.name('Menu', { type: o.variant === 'submenu' ? 'Submenu' : (o.selectable ? 'Selectable' : null), state: o.state, slot: hasKeys ? 'Shortcuts' : null }), box,
+    var ctx = CF.build(CF.name('Menu', { type: o.variant === 'submenu' ? 'Submenu' : (o.selectable ? 'Selectable' : null), state: o.state,
+      // the leading 16px glyph column IS the menu's icon slot, so the host name has to say so (§4 coverage reads names).
+      slot: [hasKeys ? 'Shortcuts' : null, hasIcons ? 'IconStart' : 'NoIcon'].filter(Boolean).join('-') || null }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border'), strokeW: 1, shadow: o.flat ? 0 : 3 });
     var y = box.y + padV;
-    var act = o.active === undefined ? -1 : Number(o.active);
+    var firstItem = -1;
+    for (var fi = 0; fi < rows.length; fi++) { if (rows[fi].kind === 'item') { firstItem = fi; break; } }
+    var act = o.active === undefined ? (o.state === 'focus' || o.state === 'hover' || o.state === 'pressed' ? firstItem : -1) : Number(o.active);
+    var rowB = null;
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (r.kind === 'divider') { ctx.plate(B(box.x + 1, y + 4, box.w - 2, 1), { name: 'divider', fill: C('border') }); y += 9; continue; }
@@ -2554,14 +2979,15 @@ return (function () {
           { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
         y += 24; continue;
       }
-      var dis = !!r.disabled, S = dis ? 'disabled' : (i === act ? 'hover' : (r.selected || o.selected === i ? 'selected' : 'default'));
-      var on = S === 'hover' || S === 'selected';
+      var dis = !!r.disabled, S = dis ? 'disabled' : (i === act ? (o.state === 'focus' ? 'focus' : 'hover') : (r.selected || o.selected === i ? 'selected' : 'default'));
+      var on = S === 'hover' || S === 'selected' || S === 'focus';
+      if (i === act) rowB = B(box.x + 4, y, box.w - 8, itemH);
       if (on) ctx.plate(B(box.x + 4, y, box.w - 8, itemH), { name: 'row·' + i, fills: CF.fills(S === 'selected' ? C('primarySoft') : null, S), radius: CF.radius('sm') });
       var ink = r.danger ? C('error') : (S === 'selected' ? C('primary') : C('ink'));
       var x = box.x + padX;
       if (hasIcons || o.selectable) {
         if (o.selectable && !r.glyph) {
-          ctx.plate(B(x, y + (itemH - 16) / 2, 16, 16), { name: 'check·box', fill: null, stroke: r.selected ? C('primary') : C('borderStrong'), strokeW: 1.5, radius: 3 });
+          ctx.plate(B(x, y + (itemH - 16) / 2, 16, 16), { name: 'check·box', fill: null, stroke: r.selected ? C('primary') : C('borderStrong'), strokeW: 1.5, radius: 'xs' });
           if (r.selected) ctx.glyph('check', B(x + 2, y + (itemH - 12) / 2, 12, 12), { color: C('primary'), strokeW: 2 });
         } else if (hasIcons) ctx.glyph(iconOf(r.glyph, 'edit'), B(x, y + (itemH - 16) / 2, 16, 16), { color: dis ? C('muted') : ink, strokeW: 1.6 });
         x += 16 + 10;
@@ -2573,12 +2999,13 @@ return (function () {
       var rx = box.x + box.w - padX;
       if (r.submenu) { rx -= 16; ctx.glyph('chevronRight', B(rx, y + (itemH - 16) / 2, 16, 16), { color: C('muted'), anchor: 'right' }); rx -= 8; }
       if (keyW) {
-        ctx.plate(B(rx - keyW, y + (itemH - 20) / 2, keyW, 20), { name: 'kbd·' + i, fill: C('surfaceAlt'), radius: 4, stroke: C('border'), strokeW: 1 });
+        ctx.plate(B(rx - keyW, y + (itemH - 20) / 2, keyW, 20), { name: 'kbd·' + i, fill: C('surfaceAlt'), radius: 'xs', stroke: C('border'), strokeW: 1 });
         ctx.text(String(r.key), B(rx - keyW, y, keyW, itemH), { size: 11, role: 'kbd', color: C('muted'), weight: 500, refit: false });
       }
       y += itemH;
     }
     await ctx.settle(); ctx.place();
+    if (o.state === 'focus') ctx.ring(rowB || B(box.x + 4, box.y + padV, box.w - 8, itemH), { radius: CF.radius('sm') });
     return ctx.host;
   };
 
@@ -2597,11 +3024,18 @@ return (function () {
     var ctx = CF.build(CF.name('CommandPalette', { slot: o.preview ? 'Preview' : null, state: o.state }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('lg'), stroke: C('border'), strokeW: 1, shadow: o.flat ? 0 : 5 });
     var sb = B(box.x + pad, box.y + pad, box.w - pad * 2, searchH);
+    // `preview` is a documented slot of this family, so the factory has to draw it: a spec row labelled "160 right pane"
+    // that renders a plain list is the "documented but unbuilt" failure the engine exists to prevent. The list column
+    // shrinks by the pane, so a row's kbd chip never ends up painted under it.
+    var pvW = o.preview ? (o.previewW || 160) : 0;
+    var rowW = box.w - pvW, rowR = box.x + rowW;
     ctx.plate(sb, { name: 'search·field', fill: C('surfaceAlt'), radius: CF.radius('md') });
     ctx.glyph('search', B(sb.x + 14, sb.y + (searchH - 20) / 2, 20, 20), { color: C('muted'), strokeW: 2 });
-    ctx.text(String(o.query === undefined ? (o.placeholder || 'Type a command or search…') : o.query),
-      B(sb.x + 42, sb.y, sb.w - 42 - 62, searchH), { size: 14, color: o.query === undefined ? C('muted') : C('ink'), align: 'left', valign: 'middle', refit: false });
-    ctx.plate(B(sb.x + sb.w - 52, sb.y + (searchH - 22) / 2, 44, 22), { name: 'kbd·hint', fill: C('surface'), radius: 5, stroke: C('border'), strokeW: 1 });
+    // An idle palette shows the placeholder, not an empty string: `query: ''` means "nothing typed yet".
+    var typed = (o.query === undefined || o.query === null || String(o.query) === '') ? null : String(o.query);
+    ctx.text(typed === null ? String(o.placeholder || 'Type a command or search…') : typed,
+      B(sb.x + 42, sb.y, sb.w - 42 - 62, searchH), { size: 14, color: typed === null ? C('muted') : C('ink'), align: 'left', valign: 'middle', refit: false });
+    ctx.plate(B(sb.x + sb.w - 52, sb.y + (searchH - 22) / 2, 44, 22), { name: 'kbd·hint', fill: C('surface'), radius: 'xs', stroke: C('border'), strokeW: 1 });
     ctx.text('Ctrl K', B(sb.x + sb.w - 52, sb.y, 44, searchH), { size: 11, role: 'kbd', color: C('muted'), weight: 600, refit: false });
     var y = sb.y + searchH + 9;
     ctx.plate(B(box.x + 1, y - 5, box.w - 2, 1), { name: 'hairline', fill: C('border') });
@@ -2611,27 +3045,39 @@ return (function () {
     var act = o.active === undefined ? 0 : Number(o.active), seen = 0;
     flat.forEach(function (r) {
       if (r.kind === 'group') {
-        ctx.text(String(r.label).toUpperCase(), B(box.x + pad + 8, y, box.w - pad * 2 - 16, groupH),
+        ctx.text(String(r.label).toUpperCase(), B(box.x + pad + 8, y, rowW - pad * 2 - 16, groupH),
           { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
         y += groupH; return;
       }
       var on = seen === act; seen++;
-      if (on) ctx.plate(B(box.x + pad, y, box.w - pad * 2, rowH), { name: 'row·active', fills: CF.fills(C('primarySoft'), null), radius: CF.radius('sm') });
+      if (on) ctx.plate(B(box.x + pad, y, rowW - pad * 2, rowH), { name: 'row·active', fills: CF.fills(C('primarySoft'), null), radius: CF.radius('sm') });
       var it = r.it, x = box.x + pad + 8;
-      ctx.plate(B(x, y + (rowH - 24) / 2, 24, 24), { name: 'row·icon·wrap', fill: C('surfaceAlt'), radius: 6 });
+      ctx.plate(B(x, y + (rowH - 24) / 2, 24, 24), { name: 'row·icon·wrap', fill: C('surfaceAlt'), radius: 'sm' });
       ctx.glyph(iconOf(it.glyph, 'command'), B(x + 3, y + (rowH - 18) / 2, 18, 18), { color: on ? C('primary') : C('muted'), strokeW: 1.6 });
       x += 24 + 12;
       var keyW = it.key ? CF.estW(String(it.key), 12) + 14 : 0;
-      ctx.text(String(it.title), B(x, y, box.w - (x - box.x) - pad - keyW - 120, rowH - (it.hint ? 6 : 0)),
+      ctx.text(String(it.title), B(x, y, rowW - (x - box.x) - pad - keyW - 120, rowH - (it.hint ? 6 : 0)),
         { size: 14, color: C('ink'), weight: on ? 500 : 400, align: 'left', valign: it.hint ? 'top' : 'middle', refit: false,
           dy: it.hint ? 6 : 0 });
-      if (it.hint) ctx.text(String(it.hint), B(x, y + 20, box.w - (x - box.x) - pad - keyW - 12, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+      if (it.hint) ctx.text(String(it.hint), B(x, y + 20, rowW - (x - box.x) - pad - keyW - 12, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
       if (keyW) {
-        ctx.plate(B(box.x + box.w - pad - 8 - keyW, y + (rowH - 20) / 2, keyW, 20), { name: 'kbd·row', fill: C('surfaceAlt'), radius: 4, stroke: C('border'), strokeW: 1 });
-        ctx.text(String(it.key), B(box.x + box.w - pad - 8 - keyW, y, keyW, rowH), { size: 11, role: 'kbd', color: C('muted'), weight: 600, refit: false });
+        ctx.plate(B(box.x + rowW - pad - 8 - keyW, y + (rowH - 20) / 2, keyW, 20), { name: 'kbd·row', fill: C('surfaceAlt'), radius: 'xs', stroke: C('border'), strokeW: 1 });
+        ctx.text(String(it.key), B(box.x + rowW - pad - 8 - keyW, y, keyW, rowH), { size: 11, role: 'kbd', color: C('muted'), weight: 600, refit: false });
       }
       y += rowH;
     });
+    if (pvW) {
+      var pt = sb.y + searchH + 13, pbot = box.y + box.h - pad - footH;
+      ctx.plate(B(rowR, pt - 8, 1, pbot - pt + 8), { name: 'preview·divider', fill: C('border') });
+      ctx.plate(B(rowR + 10, pt, pvW - 20, 84), { name: 'preview·thumb', fill: C('surfaceAlt'), radius: CF.radius('sm') });
+      ctx.glyph('file', B(rowR + pvW / 2 - 12, pt + 30, 24, 24), { color: C('muted') });
+      ctx.text(String(o.previewTitle || 'New file'), B(rowR + 10, pt + 92, pvW - 20, 18),
+        { size: 13, color: C('ink'), weight: 600, align: 'left', valign: 'top', refit: false });
+      var pnote = CF.wrap(String(o.previewNote || 'Creates a file in the current project'), pvW - 20, 12);
+      pnote.slice(0, 3).forEach(function (ln, i) {
+        ctx.text(ln, B(rowR + 10, pt + 112 + i * 16, pvW - 20, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+      });
+    }
     if (footH) {
       var fy = box.y + box.h - pad - footH + 6;
       ctx.plate(B(box.x + 1, fy - 6, box.w - 2, 1), { name: 'hairline·footer', fill: C('border') });
@@ -2652,11 +3098,14 @@ return (function () {
     var w = o.w || max(120, 4 + railW + 20 + items.reduce(function (a, it) { return max(a, (it.level || 0) * indent + CF.estW(String(it.label), fs) + 24); }, 0));
     var h = items.length * rowH;
     var box = B(o.x || 0, o.y || 0, w, h);
-    var ctx = CF.build(CF.name('Anchor', { type: o.dots ? 'Dots' : 'Rail', slot: o.counters ? 'Counters' : null }), box, { parent: o.parent });
+    var ST = o.state || 'default';
+    var ctx = CF.build(CF.name('Anchor', { type: o.dots ? 'Dots' : 'Rail', state: ST, slot: o.counters ? 'Counters' : null }), box, { parent: o.parent });
     var railX = box.x + 4;
     ctx.plate(B(railX, box.y + 2, railW, box.h - 4), { name: 'rail', fill: C('ink'), opacity: 0.10 });
     var act = o.active === undefined ? 1 : Number(o.active);
     if (act >= 0) ctx.plate(B(railX, box.y + act * rowH + 2, railW, rowH - 4), { name: 'rail·active', fill: C('primary') });
+    if (act >= 0 && (ST === 'hover' || ST === 'pressed')) ctx.plate(B(box.x + 4, box.y + act * rowH, box.w - 8, rowH),
+      { name: 'row·' + (ST === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, ST), radius: 'xs' });
     items.forEach(function (it, i) {
       var on = i === act, ly = box.y + i * rowH;
       if (o.dots) { var dd = on ? 10 : 8; ctx.ellipse(B(railX + railW / 2 - dd / 2, ly + rowH / 2 - dd / 2, dd, dd), { name: 'dot·' + i, fill: on ? C('primary') : C('borderStrong') }); }
@@ -2668,6 +3117,7 @@ return (function () {
         { size: 12, color: C('muted'), align: 'right', valign: 'middle', refit: false });
     });
     await ctx.settle(); ctx.place();
+    if (ST === 'focus') ctx.ring(B(box.x + 4, box.y + (act >= 0 ? act * rowH : 0), box.w - 8, rowH), { radius: 'xs' });
     return ctx.host;
   };
 
@@ -2742,7 +3192,9 @@ return (function () {
     var pad = o.pad === undefined ? 16 : o.pad, fs = 14, dfs = 13;
     var iconW = o.icon === false ? 0 : 20 + 12, closeW = o.closable === false ? 0 : 16 + 8;
     var contentW = max(CF.estW(title, fs), CF.estW(desc, dfs));
-    var w = o.w || (pad * 2 + iconW + closeW + contentW), h = pad * 2 + fs + 6 + dfs + 6;
+    // An action gets its own bottom row: drawn at the copy column it landed on top of the description (text_overlap_x).
+    var actionH = o.action ? 36 : 0, actionW = o.action ? CF.estW(String(o.action), 14) + 24 : 0;
+    var w = o.w || (pad * 2 + iconW + closeW + max(contentW, actionW)), h = pad * 2 + fs + 6 + dfs + 6 + actionH;
     var box = B(o.x || 0, o.y || 0, max(280, w), h);
     var ctx = CF.build(CF.name('Notification', { tone: tone, slot: o.action ? 'Action' : null, state: o.state }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border'), strokeW: 1, shadow: o.flat ? 0 : 5 });
@@ -2752,7 +3204,8 @@ return (function () {
     ctx.text(desc, B(x, box.y + pad + fs + 6, contentW, dfs + 8), { size: dfs, color: C('muted'), align: 'left', valign: 'top', refit: false });
     if (o.closable !== false) ctx.glyph('close', B(box.x + box.w - pad - 16, box.y + pad, 16, 16), { color: C('muted'), strokeW: 1.6, anchor: 'right' });
     if (o.action) {
-      await CF.button({ parent: ctx.host, x: x, y: box.y + box.h - pad - 28, label: String(o.action), size: 'xs', type: 'default' });
+      await CF.button({ parent: ctx.host, x: box.x + box.w - pad - actionW, y: box.y + box.h - pad - 24,
+        label: String(o.action), size: 'xs', type: 'default' });
     }
     await ctx.settle(); ctx.place();
     return ctx.host;
@@ -3022,7 +3475,7 @@ return (function () {
     var ctx = CF.build(CF.name('Sheet', { type: title ? 'Title' : 'Options', slot: o.cancel ? 'Cancel' : null }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('xl'), shadow: o.flat ? 0 : 5 });
     var y = box.y;
-    if (grabber) { ctx.plate(B(box.x + w / 2 - 16, y + 8, 32, 4), { name: 'grabber', fill: C('borderStrong'), radius: 2 }); y += 12; }
+    if (grabber) { ctx.plate(B(box.x + w / 2 - 16, y + 8, 32, 4), { name: 'grabber', fill: C('borderStrong'), radius: 'xs' }); y += 12; }
     if (title) {
       ctx.text(title, B(box.x + pad, y, box.w - pad * 2, 40), { size: 16, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
       if (o.closable) ctx.glyph('close', B(box.x + box.w - pad - 20, y + 10, 20, 20), { color: C('muted'), strokeW: 1.8 });
@@ -3068,12 +3521,12 @@ return (function () {
     var searchW = o.searchW === undefined ? (narrow ? 0 : undefined) : o.searchW;
     var slot = LY && LY.slots.appBar ? LY.slots.appBar(rect, { actions: nActs, searchW: searchW, logoW: narrow ? 104 : undefined }) : null;
     var ctx = CF.build(CF.name('AppBar', { type: o.dark ? 'Dark' : (o.tier || 'web'), state: o.state, slot: o.sticky ? 'Sticky' : null }), rect,
-      { parent: o.parent, fill: o.dark ? C('ink') : C('surface'), radius: 0 });
+      { parent: o.parent, fill: o.dark ? C('ink') : C('surface'), radius: 'none' });
     if (o.shadow !== false && !o.dark) ctx.plate(B(rect.x, rect.y + rect.h - 1, rect.w, 1), { name: 'hairline', fill: C('border') });
     if (!slot) return ctx.host;
     var ink = o.dark ? '#FFFFFF' : C('ink'), sub = o.dark ? '#FFFFFF' : C('muted');
     var lg = slot.logo;
-    ctx.plate(B(lg.x, lg.y + (lg.h - 28) / 2, 28, 28), { name: 'logo·mark', fill: C('primary'), radius: 8 });
+    ctx.plate(B(lg.x, lg.y + (lg.h - 28) / 2, 28, 28), { name: 'logo·mark', fill: C('primary'), radius: 'sm' });
     ctx.glyph(o.mark === 'hex' ? 'layers' : 'command', B(lg.x + 5, lg.y + (lg.h - 18) / 2, 18, 18), { color: C('onPrimary'), strokeW: 2 });
     ctx.text(String(o.name === undefined ? 'Atlas' : o.name), B(lg.x + 36, lg.y, max(40, lg.w - 36), lg.h),
       { size: 16, color: ink, weight: 700, align: 'left', valign: 'middle', refit: false });
@@ -3088,7 +3541,7 @@ return (function () {
       if (on) ctx.plate(B(lx - 6, slot.links.y, lw + 8, slot.links.h), { name: 'link·' + i, fills: CF.fills(null, 'hover'), radius: CF.radius('sm') });
       ctx.text(String(items[i]), B(lx, slot.links.y, lw, slot.links.h),
         { size: 14, color: on ? ink : sub, weight: on ? 600 : 400, opacity: on ? 1 : (o.dark ? 0.78 : 0.86), align: 'left', valign: 'middle', refit: false });
-      if (on) ctx.plate(B(lx + lw / 2 - 10, slot.links.y + slot.links.h - 4, 20, 2), { name: 'indicator·' + i, fill: C('primary'), radius: 1 });
+      if (on) ctx.plate(B(lx + lw / 2 - 10, slot.links.y + slot.links.h - 4, 20, 2), { name: 'indicator·' + i, fill: C('primary'), radius: 'xs' });
       lx += lw + gap;
     }
     if (slot.search.w > 200) {
@@ -3108,6 +3561,9 @@ return (function () {
   /** Side navigation — 240-280 expanded · 64-88 rail · brand + CTA · group labels + items · footer user row. Regions from LY.slots.sideNav. */
   CF.sideNav = async function (o) {
     o = o || {};
+    // `user` is a name, not a switch: callers wrote `user: h > 520` and the footer rendered the string "true"
+    // as the account holder (measured on the dashboard screen). One caller's boolean is a name here.
+    if (o.user === true) o.user = 'Ana Rayo';
     var rect = o.rect || B(o.x || 0, o.y || 0, o.w || (o.rail ? 72 : 256), o.h || 720);
     var groups = o.groups || [{ label: 'Workspace', items: ['Overview', 'Projects', 'Assets'] }, { label: 'Team', items: ['Members', 'Settings'] }];
     var plan = [], slotGroups = [], railMode = !!o.rail;
@@ -3122,7 +3578,7 @@ return (function () {
       : null;
     var rail = !!(slot ? slot.rail : railMode);
     var ctx = CF.build(CF.name('SideNav', { type: rail ? 'Rail' : 'Expanded', state: o.state, slot: o.cta ? 'Cta' : (o.user ? 'User' : null) }), rect,
-      { parent: o.parent, fill: o.dark ? C('ink') : C('surfaceAlt'), radius: 0 });
+      { parent: o.parent, fill: o.dark ? C('ink') : C('surfaceAlt'), radius: 'none' });
     ctx.plate(B(rect.x + rect.w - 1, rect.y, 1, rect.h), { name: 'hairline', fill: o.dark ? '#FFFFFF' : C('border'), opacity: o.dark ? 0.12 : 1 });
     if (!slot) return ctx.host;
     var ink = o.dark ? '#FFFFFF' : C('ink');
@@ -3143,11 +3599,11 @@ return (function () {
     for (var i = 0; i < plan.length; i++) {
       var p = plan[i], r = slot.items[i] ? slot.items[i].rect : null;
       if (!r || r.y + r.h > listBottom + 0.5) break;      // the pane owns a scroll area: rows past it are not drawn
-      if (p.group) await CF.navItem({ parent: ctx.host, x: N(r.x), y: N(r.y), w: N(r.w), h: r.h, group: 1, label: p.group });
+      if (p.group) await CF.navItem({ parent: ctx.host, x: N(r.x), y: N(r.y), w: N(r.w), h: r.h, group: 1, label: p.group, onDark: !!o.dark });
       else {
         await CF.navItem({ parent: ctx.host, x: N(r.x), y: N(r.y), w: N(r.w), h: r.h, rail: rail, label: p.item,
           icon: icons[seen % icons.length], selected: seen === (o.active === undefined ? 1 : o.active),
-          badge: o.badges && o.badges[seen], state: o.disabledItem === seen ? 'disabled' : 'default' });
+          badge: o.badges && o.badges[seen], state: o.disabledItem === seen ? 'disabled' : 'default', onDark: !!o.dark });
         seen++;
       }
     }
@@ -3218,7 +3674,10 @@ return (function () {
       ? LY.slots.pageTitle(B(rect.x + padX, rect.y, rect.w - padX * 2, o.tabs ? rect.h - 44 : rect.h)) : null;
     var ctx = CF.build(CF.name('PageTitle', { size: rect.h + 'h', slot: o.tabs ? 'WithTabs' : (o.badge ? 'Badge' : null) }), rect, { parent: o.parent });
     if (!slot) return ctx.host;
-    var t = slot.title, fs = o.fs || 24;   // ramp §3.2: page title is the 24 step, not an in-between 26
+    // `CF.titleFs` is the skin hook for the page-title step (same mechanism as CF.tier): 24 is the DEFAULT kit ramp,
+    // but a target whose declared ramp has no 24 step fails design-guide §3.2 `off_ramp_size`, so the theme file
+    // re-points the band at its own heading step instead of every call site passing fs.
+    var t = slot.title, fs = o.fs || CF.titleFs || 24;
     var title = String(o.title === undefined ? 'Payments reconciliation' : o.title);
     ctx.text(title, B(t.x, t.y, min(t.w, rect.w - padX * 2), min(40, fs + 8)),
       { size: fs, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
@@ -3260,7 +3719,7 @@ return (function () {
     var dark = o.dark !== false, padX = o.padX === undefined ? 64 : o.padX, padT = o.padT === undefined ? 56 : o.padT;
     var slot = LY && LY.slots.footer ? LY.slots.footer(rect, { cols: cols.length + 1, padX: padX, padT: padT }) : null;
     var ctx = CF.build(CF.name('Footer', { type: dark ? 'Dark' : 'Light', size: cols.length + 'col', slot: o.newsletter ? 'Newsletter' : null }), rect,
-      { parent: o.parent, fill: dark ? C('ink') : C('surfaceAlt'), radius: 0 });
+      { parent: o.parent, fill: dark ? C('ink') : C('surfaceAlt'), radius: 'none' });
     if (!slot) return ctx.host;
     var ink = dark ? '#FFFFFF' : C('ink'), sub = dark ? '#FFFFFF' : C('muted');
     ctx.plate(B(rect.x, rect.y, rect.w, 1), { name: 'hairline', fill: dark ? '#FFFFFF' : C('border'), opacity: dark ? 0.12 : 1 });
@@ -3313,7 +3772,7 @@ return (function () {
     var h = o.h || C4(pos === 'bottom' ? (o.labels === false ? 49 : 56) + safe : 56);
     var rect = o.rect || B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('MobileBar', { type: pos === 'bottom' ? 'Tab' : 'Top', size: items.length + 'up', slot: o.centerAction ? 'CenterAction' : null }), rect,
-      { parent: o.parent, fill: C('surface'), radius: 0 });
+      { parent: o.parent, fill: C('surface'), radius: 'none' });
     ctx.plate(B(rect.x, pos === 'bottom' ? rect.y : rect.y + rect.h - 1, rect.w, 1), { name: 'hairline', fill: C('border') });
     if (pos === 'top') {
       ctx.glyph('chevronLeft', B(rect.x + 16, rect.y + (rect.h - safe - 22) / 2, 22, 22), { color: C('ink'), strokeW: 2 });
@@ -3341,7 +3800,7 @@ return (function () {
       }
       ctx.hitPad(B(cx - cellW / 2, rect.y, cellW, barH), 44);
     }
-    if (safe) ctx.plate(B(rect.x + rect.w / 2 - 68, rect.y + rect.h - 12, 136, 5), { name: 'home·indicator', fill: C('ink'), radius: 3 });
+    if (safe) ctx.plate(B(rect.x + rect.w / 2 - 68, rect.y + rect.h - 12, 136, 5), { name: 'home·indicator', fill: C('ink'), radius: 'xs' });
     await ctx.settle(); ctx.place();
     return ctx.host;
   };
@@ -3362,8 +3821,12 @@ return (function () {
     var padX = o.padX === undefined ? 24 : o.padX, padY = o.padY === undefined ? 24 : o.padY;
     var labelW = o.labelW === undefined ? 168 : o.labelW, gapX = o.gapX === undefined ? 16 : o.gapX, gapY = o.gapY === undefined ? 16 : o.gapY;
     var pitch = o.colW || 136, cellH = o.cellH || 40, w = o.w || 1000;
+    // A row may raise its own cell height (`row.cellH`) — an open panel and a 32px field share one sheet without
+    // forcing every row to the tallest cell.
+    var rowH = function (r) { return N((r && r.cellH) || cellH); };
+    var bodyH = rows.reduce(function (a, r) { return a + rowH(r) + gapY; }, 0);
     var headH = o.title === false ? 0 : 40, stateRowH = axes.length > 1 ? 28 : 0;
-    var h = padY * 2 + headH + stateRowH + rows.length * (cellH + gapY) + (o.notes ? 44 : 0);
+    var h = padY * 2 + headH + stateRowH + bodyH + (o.notes ? 44 : 0);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name(o.family || 'Component', { slot: 'Spec' }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('lg'), stroke: C('border'), strokeW: 1 });
@@ -3374,44 +3837,85 @@ return (function () {
     }
     var hairlines = [];
     var top = box.y + padY + headH;
-    var axisRight = 0;
-    if (stateRowH) {
-      var hx = box.x + padX + labelW + gapX;
-      axes.forEach(function (a, i) {
-        ctx.text(String(a), B(hx, top, pitch - 8, stateRowH - 6), { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
-        axisRight = max(axisRight, hx + CF.estW(String(a), 11));
-        hx += pitch;
-      });
-      top += stateRowH;
-      hairlines.push(B(box.x + padX, top - 8, 1, 1));
-    }
-    var y = top + 4, maxRight = box.x + padX + labelW;
+    var axisX = box.x + padX + labelW + gapX, axisRight = 0;
+    var y = top + stateRowH + 4, maxRight = box.x + padX + labelW;
+    // `maxW` is the band the shelf can grant. A matrix is fitted to its content, so without a hard right edge one wide
+    // row (five-node Steps under five state columns = 5 829px) grows past the page root and every audit calls it
+    // out_of_bounds. Cells that no longer fit fold into a second line of the SAME row: the sheet stays band-sized.
+    var budgetR = o.maxW ? box.x + o.maxW - padX : Infinity, lineGap = 8, folded = false;
     for (var r = 0; r < rows.length; r++) {
-      var row = rows[r], midY = y + cellH / 2;
-      ctx.text(String(row.label === undefined ? row.factory : row.label), B(box.x + padX, y, labelW, cellH),
-        { size: 13, color: C('ink'), weight: 500, align: 'left', valign: 'middle', refit: false });
-      if (row.note) ctx.text(String(row.note), B(box.x + padX, y + cellH, labelW, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
-      var cx = box.x + padX + labelW + gapX;
+      var row = rows[r], rh = rowH(row), lineTop = y, startX = axisX, cx = startX;
+      // A row reserves the height of the TALLEST cell it actually produced, not the declared `cellH`. Cells are centred
+      // on the row midline, so advancing the cursor by `rh` alone made a 200px Card on a 40px row bleed 80px into the
+      // row below and the two overlapped — the reported "大号按钮 / 竖直排列的按钮叠在一起". The horizontal axis already
+      // measured its cells (`max(pitch, host.width + gapX)`); height was the one axis still trusted to an estimate.
+      var lines = [], line = { top: lineTop, h: rh, hosts: [] };
+      lines.push(line);
+      var closeLine = function (ln) {
+        ln.hosts.forEach(function (hh) { CF.move(hh.host, hh.x, N(ln.top + ln.h / 2 - hh.host.height / 2)); });
+      };
       var cells = row.cells && row.cells.length ? row.cells : [{}];
       for (var c = 0; c < cells.length; c++) {
         var opts = Object.assign({}, row.props || {}, cells[c] || {});
         if (!opts.size) opts.size = 'md';
-        opts.parent = ctx.host; opts.x = N(cx); opts.y = N(midY);
+        opts.parent = ctx.host; opts.x = N(cx); opts.y = N(line.top + line.h / 2);
         var fn = CF[row.factory];
         if (!fn) { matrixWarn(row.factory); cx += pitch; continue; }
         var host;
-        try { host = await fn(opts); } catch (e) { matrixWarn(row.factory + ' threw ' + e.message); continue; }
+        var kidCount = ctx.host.children ? Array.from(ctx.host.children).length : 0;
+        try { host = await fn(opts); } catch (e) {
+          matrixWarn(row.factory + ' threw ' + e.message);
+          // A factory creates its host before it draws content, so a throw half-way leaves an orphan: it is owned by no
+          // row, never centred on the row midline, and lands on top of the next row (audit_layout stroke_covered).
+          var kids = Array.from(ctx.host.children || []);
+          for (var k = kidCount; k < kids.length; k++) { try { kids[k].remove(); } catch (e2) {} }
+          continue;
+        }
         if (!host) { matrixWarn(row.factory + ' returned null'); continue; }
-        CF.move(host, N(cx), N(midY - host.height / 2));
+        if (cx + host.width > budgetR && cx > startX + 1) {
+          folded = true; closeLine(line);
+          lineTop = line.top + line.h + lineGap; line = { top: lineTop, h: rh, hosts: [] }; lines.push(line); cx = startX;
+        }
+        line.hosts.push({ host: host, x: N(cx) });
+        line.h = max(line.h, N(host.height));
         maxRight = max(maxRight, cx + host.width);
         cx += axes.length > 1 ? max(pitch, host.width + gapX) : (host.width + gapX);
       }
-      y += cellH + gapY;
+      closeLine(line);
+      y = line.top + line.h + gapY;
+      // The label is drawn after the cells because it has to span the row's *reserved* block: a folded or tall row is
+      // three lines deep, and a label centred on the declared 40px row sits at the top of a 200px band.
+      var blockH = N(y - gapY - lines[0].top);
+      ctx.text(String(row.label === undefined ? row.factory : row.label), B(box.x + padX, lines[0].top, labelW, blockH),
+        { size: 13, color: C('ink'), weight: 500, align: 'left', valign: 'middle', refit: false });
+      if (row.note) ctx.text(String(row.note), B(box.x + padX, lines[0].top + blockH, labelW, 14),
+        { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
       if (r < rows.length - 1) hairlines.push(B(box.x + padX, y - gapY / 2, 1, 1));
     }
-    var need = max(maxRight + padX, axisRight + 8, box.x + padX + CF.estW(titleText, 18) + 8) - box.x;
+    // The axis line is drawn LAST because only now is it known whether the columns stayed on one line: a folded sheet
+    // has no fixed column set, so it gets the reading order as a caption instead of five headers over nothing.
+    if (stateRowH) {
+      if (!folded) {
+        axes.forEach(function (a, i) {
+          ctx.text(String(a), B(axisX + i * pitch, top, pitch - 8, stateRowH - 6), { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
+          axisRight = max(axisRight, axisX + i * pitch + CF.estW(String(a), 11));
+        });
+      } else {
+        ctx.text('columns fold: ' + axes.join('  ·  ') + ' — each row reads left to right, top line first',
+          B(axisX, top, max(160, min(720, budgetR - axisX)), stateRowH - 6),
+          { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
+      }
+      hairlines.push(B(box.x + padX, top + stateRowH - 8, 1, 1));
+    }
+    // The header line holds title (20px) + right-aligned subtitle (13px): the fitted width must carry BOTH, or the
+    // title renders past the shrunk board and lands on the subtitle (audit_layout text_overlap).
+    var titleW = CF.estW(titleText, 20);
+    var subW = (headH && o.subtitle) ? CF.estW(String(o.subtitle), 13) + 24 : 0;
+    var need = max(maxRight + padX, axisRight + 8, box.x + padX + titleW + 8 + subW) - box.x;
     var fitW = N(o.shrink === false ? box.w : max(need, 160));   // a spec board is exactly as wide as its content, even past o.w
-    if (fitW !== box.w) { try { ctx.host.resize(fitW, box.h); } catch (e) {} }
+    if (o.maxW) fitW = min(fitW, N(o.maxW));
+    var fitH = N(box.h + (y - (top + stateRowH + 4)) - bodyH);    // the fold grew the body; the board has to grow with it
+    if (fitW !== box.w || fitH !== box.h) { try { ctx.host.resize(fitW, fitH); } catch (e) {} }
     var innerW = max(1, N(fitW - padX * 2));
     if (headH && o.subtitle) ctx.text(String(o.subtitle), B(box.x + fitW - padX - 320, box.y + padY + 6, min(320, innerW), 20),
       { size: 13, color: C('muted'), align: 'right', valign: 'middle', refit: false });
@@ -3451,6 +3955,61 @@ return (function () {
   };
   /** "register" reads better at the call site; same operation. */
   CF.register = function (host, name) { return CF.component(host, name || (host && host.name)); };
+
+  /** How many records the local library holds — the number gate G10 reports. */
+  CF.libraryCount = function () {
+    try { return (penpot.library.local.components || []).length; } catch (e) { return -1; }
+  };
+
+  /**
+   * CF.autoRegister(o) → promote every CF control host in a scope to a Penpot **main component**, so a screen places an
+   * instance of a real control instead of re-running a factory or, worse, grouping shapes (a group has no variants, no
+   * swap, no single place to fix a defect). Idempotent: a name already in the library is counted, not re-created.
+   *   o = { roots: [board…]  — default: the current page's top-level boards,
+   *         states: false     — only the Default state of a family·type·size becomes a master unless true,
+   *         dry: false, limit: 40, page: 'NN · Name' }
+   * `limit` + `truncated` exist because execute_code stops at ~30s and createComponent is one platform call per host:
+   * run it again until it reports `truncated:false`.
+   * Returns { scanned, registered[], already[], skipped[], truncated, library }.
+   */
+  CF.autoRegister = function (o) {
+    o = o || {};
+    var map = CF.map(), known = {};
+    Object.keys(map).forEach(function (g) { if (g !== 'composer') map[g].forEach(function (k) { known[k] = 1; }); });
+    var STATE = /·(Hover|Focus|Pressed|Selected|Disabled|Loading|Error)/;
+    var roots = o.roots;
+    if (!roots) {
+      try { var pg = o.page ? storage.pg(o.page) : null; var r = (pg && pg.root) || penpot.currentPage.root; roots = Array.from((r && r.children) || []); }
+      catch (e) { return { err: 'autoRegister: no roots — ' + String(e).slice(0, 80) }; }
+    }
+    var limit = o.limit || 40;
+    var out = { scanned: 0, registered: [], already: [], skipped: [], dry: !!o.dry, truncated: false };
+    var seen = {};
+    var famKey = function (nm) { var s = String(nm || '').split('·')[0] || ''; return s.charAt(0).toLowerCase() + s.slice(1); };
+    function visit(n, depth) {
+      if (!n || depth > 28 || out.truncated) return;
+      var nm = ''; try { nm = String(n.name || ''); } catch (e) {}
+      var t = ''; try { t = n.type; } catch (e) {}
+      if (t === 'board' && /^([A-Za-z]+)·/.test(nm) && known[famKey(nm)] === 1 && !/·Spec(·|$)/.test(nm)) {
+        out.scanned++;
+        if (seen[nm]) return;
+        seen[nm] = 1;
+        if (CF.get(nm)) { out.already.push(nm); return; }
+        if (STATE.test(nm) && !o.states) { out.skipped.push(nm); return; }
+        if (out.registered.length >= limit) { out.truncated = true; return; }
+        if (o.dry) { out.registered.push(nm); return; }
+        var res = CF.component(n, nm);
+        if (res && res.ok) out.registered.push(nm); else out.skipped.push(nm + ' → ' + (res && res.err || 'failed'));
+        return;                                   // a host's internals belong to the master, never to the library
+      }
+      var kids = [];
+      try { kids = Array.from(n.children || []); } catch (e) {}
+      for (var i = 0; i < kids.length; i++) visit(kids[i], depth + 1);
+    }
+    Array.from(roots || []).forEach(function (b) { visit(b, 0); });
+    out.library = CF.libraryCount();
+    return out;
+  };
 
   /**
    * CF.instance(name, o) → place a **real instance** of a registered control (C2), instead of re-running a factory.
@@ -3589,7 +4148,8 @@ return (function () {
     var color = o.color;
     if (color) {
       var paint = function (sh) {
-        try { if (sh.strokes && sh.strokes.length) sh.strokes = [{ strokeColor: color, strokeOpacity: 1, strokeWidth: (sh.strokes[0] && sh.strokes[0].strokeWidth) || 2 }]; } catch (e) {}
+        // keep the incoming stroke object: a fresh literal drops strokeAlignment, and null exports as center (§3)
+        try { if (sh.strokes && sh.strokes.length) sh.strokes = [Object.assign({}, sh.strokes[0], { strokeColor: color, strokeOpacity: 1, strokeAlignment: sh.strokes[0].strokeAlignment || 'center', strokeWidth: (sh.strokes[0] && sh.strokes[0].strokeWidth) || 2 })]; } catch (e) {}
         try { if (sh.fills && sh.fills.length && sh.fills[0].fillColor) sh.fills = [{ fillColor: color, fillOpacity: sh.fills[0].fillOpacity === undefined ? 1 : sh.fills[0].fillOpacity }]; } catch (e) {}
         Array.from(sh.children || []).forEach(paint);
       };

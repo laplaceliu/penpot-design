@@ -13,7 +13,7 @@
 
 | Layer | Pages | Derivation rule |
 |---|---|---|
-| **L0 Identity & foundations** | `00`–`02` | the token groups of DESIGN.md, drawn once per token family |
+| **L0 Identity & foundations** | `00`–`02` | the token groups of DESIGN.md. `01`/`02` are **projected** by `storage.FN` from `TK.declared()` records — one `FN.project({page,kind})` call per board, never drawn by hand (gate G16); `00` is the identity sheet |
 | **L1 Components** | `03`–`09` | one page per group of `storage.CF.map()` (`actions` · `forms` split into fields/pickers · `data` split into lists/metrics · `navigation` · `feedback`) |
 | **L2 Layout** | `10`–`12` | `CF.map().shell` + `LY.slots` (chrome) · `LY.TIERS` (grid) · `LY.keys()` (recipes) |
 | **L3 Delivery** | `13`–`17` | the component registry, then the screen recipes split by **scroll idiom**, then the optional imitation page |
@@ -26,7 +26,9 @@ Three consequences that make the contract checkable instead of aspirational:
 2. **Every page declares its audit scope** (last column of §2). `storage.designGate({ … })` is run with exactly that
    scope, so "page 14 is clean" is a statement with a definition, not an opinion.
 3. **Page count never grows with the number of components.** A 40th Button variant is a row in an existing
-   `Button·Spec` board; a 30th recipe is a board in `LY.pack()`'s next shelf row.
+   `Button·Spec` board; a 30th recipe is a board in `LY.pack()`'s next shelf row. (§2.3 is the one deliberate
+   exception: the *chapter* pages may be paginated one board per page, which multiplies page count without ever adding
+   a board that the engines cannot produce.)
 
 ## 1. File-level conventions
 
@@ -51,8 +53,8 @@ Three consequences that make the contract checkable instead of aspirational:
 | # | Page | Required boards | Scope |
 |---|---|---|---|
 | **L0** | `00 · Cover` | 1 identity board (name, version+date, style-keyword chips, the 6 tone ramps as wash/hue/ink triples, the 18-page table of contents) | default |
-| | `01 · Foundations` | 8 boards: `Palette` (every `CF.P` key, dual polarity when a dark scheme exists) · `Type ramp` (one line per step of the declared ramp — `storage.T.fontRamp` when the system overrides it, else design-guide §3.2 `[11,12,13,14,16,20,24,32,40,56,64]` — each with its role) · `Spacing` (`LY.SPACE` bars) · `Grid` (12/8/4 diagrams) · `Radius` · `Elevation` · `Icons` (`CF.glyphKinds` on `CF.iconSquare` pitches) · `Strokes & dividers` | default |
-| | `02 · Color in use` | 5 boards: `Semantic roles` (tone → wash / hue / **ink**, design-guide §4) · `State layers` (the `CF.STATE` alphas drawn on one base) · `Contrast matrix` (every text/background pair the kit can produce, WCAG ratio + verdict) · `Light vs dark` · `Data colors` (categorical ramp) | default |
+| | `01 · Foundations` | 8 boards — **one `01.MM` page each, each projected by `storage.FN` and carrying the durable `nl:fn=<kind>` stamp (gate G16; `designCoverage()` judges the chapter across pages, engines.md §7)**: `Palette` (every declared colour token, dual polarity when a dark scheme exists) · `Type ramp` (one line per **`TK.declared().types`** step — `storage.T.fontRamp` only when the system overrides it, else design-guide §3.2 `[11,12,13,14,16,20,24,32,40,56,64]` — each with its role) · `Spacing` (`LY.SPACE` bars) · `Grid` (12/8/4 diagrams) · `Radius` · `Elevation` · `Icons` (`CF.glyphKinds` on `CF.iconSquare` pitches; the one **declared exemption** `FN.EXEMPT['01']`, it draws a catalog) · `Strokes & dividers`. **No board here takes a height argument**: the value comes from the hug sum | default |
+| | `02 · Color in use` | 5 boards: `Semantic roles` (tone → wash / hue / **ink**, the triples derived from token *names*, design-guide §4) · `State layers` (the `CF.STATE` alphas drawn on one base) · `Contrast matrix` (every text/background pair the kit can produce, WCAG ratio + verdict **computed** from the palette) · `Light vs dark` (scheme boards only, §2.2) · `Data colors` (categorical ramp). All but `Light vs dark` are `FN` projections | default |
 | **L1** | `03 · Actions` | one `Family·Spec` per `CF.map().actions` (button, iconButton, buttonGroup, splitButton, fab, link, segmented) | default |
 | | `04 · Text fields` | `CF.map().forms` ∩ fields: field, fieldBox, input, textarea, searchField, passwordField, maskedInput, otpInput, numberField, upload, colorPicker | default |
 | | `05 · Selection & pickers` | the rest of `CF.map().forms`: select, combobox, multiSelect, datePicker, timePicker, switch, checkbox, radio, slider, rating, transfer, tree — plus the shared `OptionList` composite they mount (judged inside its own board, §4.1) | default |
@@ -69,7 +71,7 @@ Three consequences that make the contract checkable instead of aspirational:
 | | `16 · Screens · mobile` | the mobile tier's own set: `mobileFeed`, `mobileListDetail`, plus every 14/15 recipe that survives at 375 (`settings`, `heroCenter`, `blogArticle`, `cart`, `authCard`, `otp`) drawn at 375 and labelled `@375`. `eventPopover` belongs to page 09 (it is an overlay over its host); `commandPalette` to page 10 | `{ tier: 'mobile' }` |
 | | `17 · Reference imitation` | *optional*: side-by-side of the recreation target and the produced screen + the delta list. Omit it and say so in DESIGN.md `omitted` | default |
 
-All 29 `LY.keys()` recipes have a home above (11 + 14 + `mobileFeed` + `mobileListDetail` + `eventPopover` +
+All 30 `LY.keys()` recipes have a home above (11 + 14 + `mobileFeed` + `mobileListDetail` + `eventPopover` +
 `commandPalette`), which is what makes "the screen pages are complete" checkable: `LY.keys()` minus the board names on
 14–16 must be empty. **Refused tier × recipe pairs are not gaps** — page 12's tier-gate table records the `{ err, use }`
 pointer each refusal returns, and that table is the delivery answer for "why is there no mobile three-pane email".
@@ -104,12 +106,57 @@ Asked in the **same round-trip**, written into DESIGN.md `## Colors`. Definition
 - `Light + dark` → `· Core` (all tokens) then `· Dark` (only the overriding same-named tokens, **Core first**), plus a
   `Scheme` theme group with `Light = {Core}` and `Dark = {Core, Dark}`; Penpot enforces the group's mutual exclusion.
 - Artifact impact — bounded on purpose, so a second scheme costs a page, not the file:
-  - `01 Palette` and `02 Color in use` show both polarities side by side (the contrast matrix is **doubled**: dark is
-    not the inverse of light).
+  - `01 · Palette` and `02 · Color in use` show both polarities by being **projected once per token set**
+    (`FN.project({page, kind, set:'<system> · Dark'})` — the dark table is a record read, so it cannot drift from the
+    theme; the `Contrast matrix` is doubled the same way). `Light vs dark` stays composed as `FN.EXEMPT['02']`.
   - `03–09` spec boards keep one polarity (the one the system starts in) plus the `onDark` state rows where `CF` draws
     them; they are not duplicated.
   - `14–16` add **one dark twin per demo page** (the recipe that best shows the scheme), not one per board.
   - `11 Grid & breakpoints` and `12 Screen recipes` are unaffected: layout is orthogonal to color.
+
+### 2.3 Block-per-page pagination (the fine-grained variant of the same contract)
+
+The 18-page list is the **chapter** contract. A chapter may be paginated to **one board per page** without changing
+anything else in this file: page `07 · Display & metrics` becomes `07.01 · Display & metrics · Card·Spec`,
+`07.02 · … · Kpi·Spec`, … The grammar is fixed:
+
+```
+NN.MM · <chapter name> · <board name>        07.03 · Display & metrics · Card·Spec
+```
+
+`NN` is still the chapter of §2 (so layer, ordering and the footer nav are unchanged), `MM` is the 1-based index of the
+board inside that chapter, and the block suffix is **the board's own name verbatim** — the page is addressable by the
+thing it contains, which is the whole point: a defect report, a repair call and a human sentence all name the same
+unit, and no repair ever has to "find the card spec somewhere on page 07".
+
+- **When to use it**: whenever a chapter carries more than a couple of boards and the task involves repair loops or
+  per-board delivery. One board per page makes `designPage`/`auditPage` scope trivially small, keeps each page's
+  PageRoot short (a 12-board chapter page is a 12 000px scroll), and makes the block addressable in a URL/selection.
+- **When NOT to paginate**: pages **14/15/16** and **17**. Prototype links are page-local — a `navigate-to` whose
+  destination lives on another page persists with a **null destination** (measured 2026-10-21: the interaction survives,
+  reads back fine, and does nothing in the viewer). Screens must therefore stay on one page with their flow partners.
+- **Page anatomy per block page** is §3 verbatim: `<NN.MM>-PageRoot` (1920) + `-Header` + `-Footer` + exactly **one**
+  content board at `x=80, y=208`. The header's description line is the chapter description; the token line is the
+  board's own token reference.
+- **Scope for the gates** is inherited from the chapter row of §2 (`default`, `{families:[…]}`, `{tier}`), so
+  "page 07.03 is clean" has the same definition as before.
+- **Three derived artifacts must be rebuilt last**, because they read the page list: the `00` cover's table of contents
+  (chapter → block-page range), the `13` component index (families × the pages that host them), and the prototype
+  flows. All three are engine-derived — never hand-edit a TOC.
+- **`FN` boards paginate the same way.** `FN.project({page: '01.09 · Foundations · Palette', kind: 'palette'})` writes into
+  whatever page you name: `FN.pageRoot` resolves that page's `<NN.MM>-PageRoot`, and a one-board page is simply a shelf with
+  one entry (the board lands at the shelf's first slot). Because a chapter is now spread over ~9 pages, **coverage is a file
+  question**: `FN.chapterPages()` lists the `NN[.MM]` pages whose chapter is in `FN.CHAPTER`, `FN.coverage()` (and the
+  auditor's `storage.designCoverage()`) checks each chapter kind is projected *somewhere* and that no chapter board is
+  un-stamped, and `FN.offChapter` reports a projected board parked on the wrong chapter's page without blocking it.
+  `FN.boards(page)` returns a page's content boards (the scaffold's `-PageRoot`/`-Header`/`-Footer` excluded) and
+  `FN.stampOf(board)` the `nl:fn` proof; `FN.projected(page)` still recognises a board by its **`FN.KINDS` display name**,
+  so the block suffix of the page name and the board name are the same string — which is exactly the §2.3 rule.
+  Under pagination `FN.reflow`/`fitRoot` become no-ops on a one-board page, and `FN.check(page)` scopes to that board.
+- **Deleting a page is not a cosmetic act.** It destroys the component masters hosted on it (measured: 275 → 0) and it
+  wipes every flow and interaction in the file. After any page deletion: re-register masters (`CF.autoRegister` per
+  page), re-create the named flows **before** re-wiring links (otherwise Penpot invents `Flow N`), and re-author links
+  from a name-based spec, because ids do not survive a rebuild.
 
 ## 3. Page anatomy (per-page contract)
 
@@ -122,14 +169,14 @@ NN-PageRoot (1920 × used height, clipContent = false)
 │   ├── one-line description      14px secondary, x=80, y=88
 │   ├── token reference line      "tokens · …" 12px, x=80, y=120
 │   └── version + date            12px, right-aligned so its measured width ends at x=1840
-├── <content column>  x ∈ [80, 1840] (1760 wide), starting at y=240
+├── <content column>  x ∈ [80, 1840] (1760 wide), starting at y=208
 └── NN-Footer    1920×80 at y = used content bottom + 32
     ├── footerTokens   "tokens · …"  12px, x=80
     └── footerNav      "prev · NN · Page name      next · NN · Page name"  12px, right-aligned
 ```
 
 `scaffold_structure.js` owns this geometry — the constants are `CANVAS_W 1920 · CONTENT_X 80 · CONTENT_R 1840 ·
-HEADER_H 160 · FOOTER_H 80 · CONTENT_Y 240` and its `PAGES` table **is** §2 (page name + header description + token
+HEADER_H 160 · FOOTER_H 80 · CONTENT_Y 208` and its `PAGES` table **is** §2 (page name + header description + token
 line), so the doc and the scaffolder can be diffed mechanically. `storage.scaffoldContract()` returns the page names.
 The script is a 3-phase queue runner, re-runnable at any time: phase 1 creates the missing pages (6 per call), phase 2
 builds one PageRoot+Header+Footer per page (idempotent), phase 3 **fits** every root to its used height and moves the
@@ -148,8 +195,11 @@ Hard rules:
 
 ## 4. Spec-board anatomy (what `CF.matrix` draws)
 
-`CF.matrix({ family, axes, rows, parent, x, y })` returns one board named `Family·Spec`, exactly as wide as its
-content (it shrinks to fit; `shrink:false` keeps the requested width):
+`CF.matrix({ family, axes, rows, parent, x, y, maxW })` returns one board named `Family·Spec`, as wide as its content
+but **never wider than `maxW`** (the band the shelf can grant, FULL = 1760): cells that no longer fit fold onto a second
+line of their own row, the board grows in height, and the state-axis header is replaced by a `columns fold: …` caption
+(a folded sheet has no fixed column set — the host names still carry the state, and `designPage` reads those).
+`shrink:false` keeps the requested width.
 
 ```
 Button·Spec (measuredW × padY·2 + 40 + 28 + rows·(cellH+gapY))
@@ -199,7 +249,7 @@ Every visual component's primitives live in **exactly one** container:
 |---|---|---|---|
 | **component** | reused: in the 13 index, or in ≥ 2 places on 14–16 | assemble into a group → `CF.component(group)`; on a screen, **place an instance** with `CF.instance(CF.name(…))` and switch states with `CF.swap` (instancing is scriptable — api-pitfalls §6, capabilities §5); a `CF` factory re-call is the fallback when no master exists. Never copy loose primitives into a screen | `Family·Type·Size·State` |
 | **group** | single-use primitive set: a matrix cell, an anatomy illustration, a KPI card | `penpot.group([host, …members])` in the same parent | host name |
-| **board** | page partition, spec board, screen board, overlay container | `storage.mkAbsBoard` (approach C), not a group host | see §2 |
+| **board** | page partition, spec board, screen board, overlay container | a Foundations/Color board is **projected** (`FN.project`, G16 — never `mkAbsBoard`); the `03–09` spec boards, screens and overlays are `storage.mkAbsBoard`/`NL` (approach C), not a group host | see §2 |
 
 - Unsure group-or-component → **group first**; `CF.component(group)` upgrades it with zero rework.
 - Only decorative singles (divider, hairline, caption) and primitives **inside** a host may stay loose.
@@ -216,11 +266,13 @@ Every visual component's primitives live in **exactly one** container:
 |---|---|
 | PageRoot width | **1920** (pages 00–13, 17) |
 | Content column | x ∈ [80, 1840] → 1760 wide |
-| Spec-board shelf | `LY.pack({x:80,y:240,w:1760}, widths, { gapX: 32, gapY: 32 })` — wrap at the column edge, never overlap, `out.height` gives the used height |
+| Spec-board shelf | `LY.pack({x:80,y:208,w:1760}, widths, { gapX: 32, gapY: 32 })` — wrap at the column edge, never overlap, `out.height` gives the used height |
+| Foundations shelf (`FN`, pages 01–02) | two lanes off the same column (`FN.lanes(page)`), advance = `round(h) + gap×2` **exactly** — the page is re-read at the start of every call and `FN.reflow` re-shelves from **live** heights, because a board's height is provisional inside the call that built it (measured: 726 → 1052). `FN.fitRoot` then fits the root. This shelf is not `LY.pack`: `LY.pack` plans from widths known up front, `FN` shelves from heights that only exist after a layout pass |
 | Max spec-board width | 1760 (a board wider than the shelf is clamped by `LY.pack`, not allowed to bleed) |
 | Screen boards | one per row when the board is ≥ 900 wide (app/content); 4 × 375 boards per row on page 16 (`LY.pack` with `gapX: 24`) |
-| Vertical rhythm on a page | 32 between spec boards, **64** between screen boards (they are the deliverable) |
-| Header / footer | 160 / 80, content starts at y = 240 |
+| Vertical rhythm on a page | **The page root is one band stack** (`Header` → boards → `Footer` are all full-width bands): 48 chrome→content, 32 between spec boards, 32 content→footer — every gap within one `LY.SPACE` step or rule 14 `rhythm_inconsistent` fires. **64** between screen boards (they are the deliverable) |
+| Long-board fold marker | any **baseline-width screen/recipe board** ≥ 2000 tall carries `LY.fold(host, tier)`; a `NN-PageRoot` is a canvas (1920 wide), not a screen and carries none — `LY.fold` refuses a root, because its 1440-wide outline annotated empty page space and crossed the header |
+| Header / footer | 160 / 80, content starts at y = 208 (header bottom + 48, one step from the 32 board rhythm) |
 | Tier viewport height (fold marker) | web 900 · pad 1112 · mobile 812 (`LY.viewportHeight(tier)`) |
 | Screen board width | web 1440 · pad 834 · mobile 375/390 — **never** 1920 (that is the canvas, §1) |
 | Touch floor | mobile/pad ≥ 44, web ≥ 32, incl. `hitpad·` (`CF.minHit()` reads `CF.tier`) |
@@ -235,8 +287,9 @@ This is where amateur output is most visible, so the rules are explicit:
 1. **Height comes from the bands, never from a canvas habit.** Build with `LY.recipe(key, { w, tier })` (app screens)
    or `LY.flow()` (content pages) and resize the screen board to `totalH`. A marketing board shorter than 1600 at 1440
    wide, or an app board locked to exactly 1080 with an empty bottom, fails `viewport_locked`.
-2. **Every screen board carries a fold marker**: `LY.fold(board, tier)` draws the dashed viewport outline labelled
-   `fold·<tier>` so a reviewer sees what the first screen contains. A board taller than 2000 without one is flagged.
+2. **Every screen board carries a fold marker**: `LY.fold(board, tier)` draws the 2px accent viewport outline labelled
+   `fold·<tier>` so a reviewer sees what the first screen contains. A **baseline-width** board taller than 2000 without
+   one is flagged (a PageRoot is a canvas, not a screen, and carries none).
 3. **Only the extent the agent chose is judged.** Grid, scale, rhythm, split ratio, viewport and control-cap rules
    apply to the sections and boxes you placed; geometry *inside* a `CF` host or a `·Spec` board is not grid-audited,
    because an auto-width chip is 97px wide when its label is 97px wide.
@@ -261,15 +314,44 @@ This is where amateur output is most visible, so the rules are explicit:
 ## 8. Delivery self-check
 
 - [ ] 18 pages present, named and ordered per §2 (17 optional, declared in DESIGN.md `omitted`).
+- [ ] **If §2.3 pagination is used**: every chapter page is replaced by `NN.MM · Chapter · Block` pages, one board each,
+      `MM` contiguous from 01 inside each chapter; 14/15/16/17 stay grouped; the cover TOC, the `13` index and the
+      prototype flows were regenerated **after** the last page add/delete; every flow is named (no `Flow N`); a
+      destination readback of `null` on any interaction is a defect, not a formatting quirk.
 - [ ] One PageRoot per page with Header/Footer in place, `clipContent=false`, root height = used height (§3).
+- [ ] **No empty page**: enumerate `penpot.currentFile.pages` and assert each page's PageRoot has ≥ 1 child board.
+      A page-split leaves the old `NN · Chapter` shells behind with an empty root — both auditors pass them (they scope to
+      the PageRoot subtree), so the only thing that catches them is this enumeration. Remove them with
+      `storage.pg(name).remove()` (there is no `penpot.deletePage`), re-checking `root.children.length` per page inside the loop.
 - [ ] Pages 03–09: one `Family·Spec` per family of `CF.map()`, packed by `LY.pack`, names in
       `Family·Type·Size·State·Slot` form, no `/`.
 - [ ] Coverage per §4.1: `variant_sparse`, `state_coverage`, `focus_ring_missing`, `disabled_wrong` all **0**.
 - [ ] Assembly ownership per §4.3: `loose_assembly` = 0; screens re-call the `CF` factories, never re-draw loose primitives.
 - [ ] Tokens: `storage.TK.audit().ok === true` and every name/value pair matches DESIGN.md.
+- [ ] **Corners come from the `borderRadius` set and nowhere else**: `radius_off_ladder` (35), `radius_unbound` (36) and
+      `ring_off_host` (37) are **0** on every page, and `designNext`'s `out.radius` adoption reads `shapes === onLadder === bound`.
+      Repair an existing file with `TK.radiusStart()` + `TK.radiusSweep()` (ladder) until `done: true`, then
+      `TK.roleStart()` + `TK.roleSweep()` (role: pill-family hosts and every `ring·*` → its host's corner, masters **and**
+      placed copies) until `done: true` — one commit yield per page, see `api-pitfalls.md §17` — then **re-read in dry mode**
+      before claiming it. Note what the rules cannot see: a host with **no** corner passes vacuously, and a family DESIGN.md
+      does not pin to one step reads CLEAN at the wrong step, so also read the masters (`design-guide.md §5.1`) and re-drive any
+      spec board whose host corner contradicts the role its factory declares.
+- [ ] **Foundations chapters come from `FN` and can prove it (G16 — the only way those pages are built)**:
+      `storage.designCoverage()` reads **CLEAN** (every `FN.CHAPTER` kind projected on some `NN.MM` page of its chapter,
+      `missing: []`, `foreign: []`), `await storage.FN.check(page)` reads design CLEAN + layout CLEAN with `unbound: []`
+      and `g16: 'CLEAN'`, and each board carries the durable `nl:fn=<kind>` pluginData that rule 31 (`not_projected`)
+      reads. `storage.FN.audit()` then lists every kind this session projected with `gate: CLEAN`, `needsRepair: []`,
+      `flowBroken: []`. A board produced by a typed height array or a `storage.T` hex mirror is a G16 violation **even
+      when it gates CLEAN** — the gate proves the board, the stamp proves the producer (engines.md §7). Only `Icons`
+      (01) and `Light vs dark` (02) may be composed, and only because `FN.EXEMPT` says so.
 - [ ] Pages 14–16: one board per recipe × selected tier, each sized by `LY` (never by a typed height), each with a
       `fold·` marker; every board audited with its own `{ tier }`.
 - [ ] Color scheme implemented as declared (§2.2), including the doubled contrast matrix on 02 when a dark scheme exists.
 - [ ] `storage.designGate({ … })` **CLEAN for every page scope in §2**, and `storage.auditPage()` CLEAN for positioning
       (the two auditors are independent: this file's rules say nothing about overlap, and vice versa).
+- [ ] **Whitespace is the separation device on every page** (rules 32–34, inside gate G13): `storage.designGate().design.breath`
+      reads `onLadder === containers` — every flow gap is a `LY.BREATH` level, not a typed number — and `cramped_gap` / `hierarchy_gap` / `text_cramped` are **0**.
+      A finding that survives must be one of the three declared exemptions (attached-control row, repeated run, `FN`-projected state
+      board) and must be named as such. Text carries the ramp's declared leading and a wrapped paragraph gets ≥ one line of air
+      (design-guide §2.1/§3.2); the repair is `storage.breathe()` — dry-run first, then `{apply:true}`, then re-gate.
 - [ ] `export_shape` PNG per page accepted: no 100×100 degradation, no clipping, no offset; CJK renders with Noto Sans SC.

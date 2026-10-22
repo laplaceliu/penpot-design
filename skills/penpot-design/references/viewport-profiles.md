@@ -25,7 +25,7 @@ Device chrome each tier carries (`TIERS[tier].chrome`, consumed by `LY.frame`):
 
 - **The baseline width is the width of a *board*, never of a page.** PageRoot stays 1920 on every page; a screen mock is
   a 1440/834/375-wide board placed inside it (`penpot-structure.md §1, §5`).
-- Height is a **fold marker, not a size limit**: `LY.fold(board, tier)` draws the dashed viewport outline, and the board
+- Height is a **fold marker, not a size limit**: `LY.fold(board, tier)` draws the 2px accent viewport outline, and the board
   itself is as tall as its bands (`LY.flow` → `totalH`). Screens are long documents; the fold is what the reviewer checks.
 - Tiers **share one set of tokens and one component library**; they differ only in grid, margins, touch floor and board width.
 
@@ -59,7 +59,9 @@ phone-only control.
 ## 3. DESIGN.md and design-to-code
 
 - The Layout section records `targetProfiles: [web|pad|mobile]`, and the tokens adjust: spacing scale (mobile 4/8/12,
-  web 8/16/24/32), touch floor (≥44 → token `touchMin`), grid description written **per tier**, never one width assumed.
+  web 8/16/24/32), the **whitespace ladder** `LY.BREATH[tier]` — same levels per tier, only the `page` level drops 96 → 64 on
+  mobile, and `NL.frame({breath})` resolves it from the board's tier (layout-library §1.1) — touch floor (≥44 → token `touchMin`),
+  grid description written **per tier**, never one width assumed.
 - Code implements the responsiveness per selected tier (CSS media queries / Qt layout adaptation); at acceptance the
   viewport width = that tier's baseline, screenshotted and compared tier by tier against the `14–16` boards.
 - One tier → fix that width. Multiple tiers → produce and compare per tier; a tier with no board is a missing deliverable,

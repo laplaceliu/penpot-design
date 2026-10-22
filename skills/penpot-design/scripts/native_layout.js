@@ -33,7 +33,7 @@
 
 return (function () {
   if (!storage.mkText) return { err: 'run seed_storage.js first (needs mkText/sleep)' };
-  const NL = {};
+  const NL = {}, PREV = storage.NL || null;
   storage.NL = NL;
   // Sibling engines are reached through `storage` **at call time**, never captured here: NL may be seeded before LY/CF
   // (the seed order in engines.md puts it last, but a post-crash supplement run often does not know that yet).
@@ -45,7 +45,10 @@ return (function () {
   // **Shape proxies are not extensible**: `shape._x = 1` throws `Cannot add property _x, object is not extensible`
   // (measured). So every note NL takes about a board lives here, keyed by shape id, and survives across execute_code
   // calls because storage.NL itself survives.
-  NL._reg = {};
+  // An ENGINE reload must not erase it: re-seeding native_layout.js is the documented repair path, and a fresh `_reg`
+  // silently turns every `declaredAbsolute` CF mount into an `absolute_child` finding (the audit loses the note that
+  // said "this child was pinned on purpose"). Carry the registry across the reload instead.
+  NL._reg = (PREV && PREV._reg) || {};
   NL._note = function (shape, patch) {
     const k = String(shape.id);
     NL._reg[k] = Object.assign(NL._reg[k] || { name: shape.name }, patch);
@@ -164,9 +167,11 @@ return (function () {
   // ---------- flow boards ----------
   /**
    * NL.frame(name, o) → a board that lays its children out.
-   * o: { x,y,w,h, fill, radius, dir:'row'|'column', gap | rowGap/columnGap, pad (see _padSpec),
-   *      align, justify, wrap, sizing:'fix'|'auto' | {h,v}, clip, guides:{cols,margin,gutter},
+   * o: { x,y,w,h, fill, radius, dir:'row'|'column', gap | rowGap/columnGap | **breath:'inline|row|block|group|section|band|page'**,
+   *      pad (see _padSpec), tier, align, justify, wrap, sizing:'fix'|'auto' | {h,v}, clip, guides:{cols,margin,gutter},
    *      strokes, shadow, parent, absolute (mount as absolute inside a flow parent), name }
+   * `breath` is the whitespace-first default: it takes the gap from `LY.BREATH[level]` at the board's tier, so a content
+   * stack never has to invent a number and `off_scale_gap`/`cramped_gap` cannot fire on it.
    * `sizing:'auto'` hugs; measured: a column of 3×52 + 2×16 + 2×24 padding grew 188 → 236 when padding was applied.
    */
   NL.frame = function (name, o) {
@@ -177,11 +182,25 @@ return (function () {
     try { b.resize(o.w || 100, o.h || 100); } catch (e) {}
     if (o.fill) b.fills = [{ fillColor: o.fill, fillOpacity: o.fillOpacity === undefined ? 1 : o.fillOpacity }];
     else b.fills = [];
-    if (o.radius) b.borderRadius = o.radius;
-    if (o.strokes) b.strokes = o.strokes;
+    if (o.radius) b.borderRadius = storage.CF.radius(o.radius);
+    // A stroke written without `strokeAlignment` reads back null, and null exports as `center`: half the band falls
+    // outside the shape and a clipped ancestor eats it (the "border shows only part of itself" class). Closed shapes
+    // are inner by contract (api-pitfalls §3), so the default is applied here rather than left to each caller.
+    if (o.strokes) b.strokes = o.strokes.map((s) => Object.assign({ strokeStyle: 'solid', strokeOpacity: 1, strokeAlignment: 'inner' }, s));
     if (o.shadow && storage.CF && storage.CF.shadow) { try { b.shadows = storage.CF.shadow(o.shadow); } catch (e) {} }
     b.addFlexLayout();
     const spec = { dir: o.dir || 'column' };
+    // 留白 is the DEFAULT separation device, and the omission path used to be its opposite: a frame with no `gap` gets
+    // Penpot's flex default of **0**, so "I did not think about spacing" renders as "the blocks touch". `breath` names
+    // the hierarchy level instead of a number and resolves it from `LY.BREATH` (single source: the auditor reads the
+    // same table, so a declared breath can never be off-scale). An explicit `gap`/`rowGap`/`columnGap` still wins —
+    // control anatomy is tight by contract (§2 `inline` 8: icon↔label), and this is why the ladder is opt-IN per frame
+    // while the *requirement* is opt-OUT (designGate `cramped_gap`), never a silent rewrite of every factory.
+    if (o.breath && storage.LY && storage.LY.breath) {
+      const bg = storage.LY.breath(o.breath === true ? 'block' : o.breath,
+                                  o.tier || (storage.CF && storage.CF.tier) || 'web');
+      spec.rowGap = bg; spec.columnGap = bg;
+    }
     if (o.gap !== undefined) { spec.rowGap = o.gap; spec.columnGap = o.gap; }
     if (o.rowGap !== undefined) spec.rowGap = o.rowGap;
     if (o.columnGap !== undefined) spec.columnGap = o.columnGap;
@@ -194,7 +213,17 @@ return (function () {
     if (typeof sz === 'string') { spec.horizontalSizing = sz; spec.verticalSizing = sz; }
     else { if (sz.h) spec.horizontalSizing = sz.h; if (sz.v) spec.verticalSizing = sz.v; }
     const flex = NL.applyFlex(b, spec);
-    if (o.clip !== undefined) { try { b.clipContent = !!o.clip; } catch (e) {} }
+    if (o.clip !== undefined) {
+      try {
+        b.clipContent = !!o.clip;
+        // Register as a DELIBERATE crop only when the caller says so (`o.keepClip`). A blanket registration here
+        // made every clip:true control host (pill-corner ButtonGroup, Segmented, Tabs…) a keep-clip, which defeats
+        // fitToClip's release in ctx.ring — the focus ring then mounts OUTSIDE the host, the audit reads
+        // `focus_ring_missing`, and siblings cover the stray ring (`stroke_covered`). Measured 2026-10-21 on
+        // 03.03 ButtonGroup after the block-page rebuild; CF.keepClip remains the explicit registry.
+        if (o.clip && o.keepClip) (storage._clipKeep || (storage._clipKeep = {}))[b.id] = 1;
+      } catch (e) {}
+    }
     if (o.guides) NL.guide(b, o.guides);
     NL._note(b, { rejected: flex.rejected, kind: 'frame',
                   // only a size the caller actually chose is an expectation; the 100×100 default would report size_stale
@@ -245,7 +274,7 @@ return (function () {
     b.name = name; b.x = o.x || 0; b.y = o.y || 0;
     try { b.resize(o.w || 100, o.h || 100); } catch (e) {}
     if (o.fill) b.fills = [{ fillColor: o.fill, fillOpacity: 1 }]; else b.fills = [];
-    if (o.radius) b.borderRadius = o.radius;
+    if (o.radius) b.borderRadius = storage.CF.radius(o.radius);
     b.addGridLayout();
     const g = b.grid, err = [];
     (o.cols || []).forEach((t) => { try { g.addColumn(t[0], t[1] === undefined ? 1 : t[1]); } catch (e) { err.push('col ' + t.join(':') + ' → ' + String(e).slice(0, 60)); } });
@@ -307,7 +336,7 @@ return (function () {
     const r = o.shape === 'ellipse' ? penpot.createEllipse() : penpot.createRectangle();
     r.name = name;
     try { r.resize(o.w || 100, o.h || 100); } catch (e) {}
-    if (o.radius && r.borderRadius !== undefined) r.borderRadius = o.radius;
+    if (o.radius && r.borderRadius !== undefined) r.borderRadius = storage.CF.radius(o.radius);
     r.fills = o.fill ? [{ fillColor: o.fill, fillOpacity: o.opacity === undefined ? 1 : o.opacity }] : [];
     if (o.stroke) r.strokes = [{ strokeColor: o.stroke, strokeOpacity: o.strokeOpacity === undefined ? 1 : o.strokeOpacity, strokeWidth: o.strokeW || 1, strokeAlignment: 'inner' }];
     return r;
@@ -324,18 +353,51 @@ return (function () {
   };
 
   // ---------- native guides (replaces invisible column rectangles) ----------
-  /** capabilities §4: measured round-trip. This is how the tier column grid should exist on a screen board. */
+  /**
+   * Put a real Penpot layout guide on a board. Measured 2026-10-20 on 2.17.0:
+   *   `board.guides` is a WRITABLE array and only the whole array can be re-assigned (there is no push API);
+   *   an entry is `{ type:'column'|'row', display:bool, params:{ color:{color,opacity}, type, margin, gutter } }`;
+   *   `params.type` accepts **only** 'stretch' (margin + gutter) and 'center' (size + gutter) — 'auto', 'manual' and
+   *   'fr' are rejected with "Value not valid: […]. Code: :guides";
+   *   `count` is dropped on write, so the column count is the platform's own division of the board width — asking for
+   *   "12 columns" is expressed as the margin/gutter pair that produces them at that tier width.
+   * A guide is not a drawing: it is what a designer snaps to, and what the audit reads as proof the board was built on
+   * a grid at all (page 11 used to paste `mkRect` column plates, which look like a grid and snap to nothing).
+   */
   NL.guide = function (board, spec) {
-    const cols = spec.cols || 12, margin = spec.margin === undefined ? 32 : spec.margin, gutter = spec.gutter === undefined ? 24 : spec.gutter;
-    const g = { type: 'column', display: spec.display === false ? false : true,
-      params: { color: { color: spec.color || '#8b5cf6', opacity: spec.opacity === undefined ? 0.5 : spec.opacity },
-                type: spec.fillType || 'stretch', margin: margin, gutter: gutter, count: spec.count } };
-    try { board.guides = (Array.from(board.guides || [])).concat([g]); return { guides: Array.from(board.guides).length, margin: board.guides[0].params.margin }; }
+    spec = spec || {};
+    const axis = spec.axis || spec.type || 'column';
+    const mode = spec.mode || spec.fillType || 'stretch';
+    const params = { color: { color: spec.color || '#8B5CF6', opacity: spec.opacity === undefined ? 0.35 : spec.opacity }, type: mode };
+    if (mode === 'center') { params.size = spec.size === undefined ? 80 : spec.size; params.gutter = spec.gutter === undefined ? 24 : spec.gutter; }
+    else { params.margin = spec.margin === undefined ? 32 : spec.margin; params.gutter = spec.gutter === undefined ? 24 : spec.gutter; }
+    const g = { type: axis, display: spec.display === false ? false : true, params: params };
+    let list = [];
+    try { list = Array.from(board.guides || []); } catch (e) { list = []; }
+    // Same-axis rewrite replaces instead of duplicating: a rebuilt board must not accumulate two column grids.
+    list = list.filter((x) => !(x && x.type === axis));
+    try { board.guides = list.concat([g]); }
+    catch (e) { return { err: String(e).slice(0, 140) }; }
+    const back = Array.from(board.guides || []);
+    return { guides: back.length, readback: back.map((x) => ({ type: x.type, mode: x.params && x.params.type, margin: x.params && x.params.margin, gutter: x.params && x.params.gutter, size: x.params && x.params.size })) };
+  };
+  /** Ruler guide. Measured: the signature is POSITIONAL `addRulerGuide(orientation, position)`, orientation
+   *  'vertical' | 'horizontal'. The object form throws "Value not a safe number. Code: :addRulerGuide" for every key
+   *  permutation tried. Reads back on `board.rulerGuides` — a DIFFERENT collection from `board.guides` — as
+   *  `{orientation, position, color}`, with no id. */
+  NL.rulerGuide = function (host, position, orientation) {
+    try {
+      const g = host.addRulerGuide(orientation || 'horizontal', N(position));
+      return { ok: true, orientation: g && g.orientation, position: g && g.position, ruler: Array.from(host.rulerGuides || []).length };
+    }
     catch (e) { return { err: String(e).slice(0, 120) }; }
   };
-  NL.rulerGuide = function (host, position, direction, color) {
-    try { const g = host.addRulerGuide({ position: position, direction: direction || 'vertical', color: color || '#2563EB' }); return { ok: true, id: g && g.id }; }
-    catch (e) { return { err: String(e).slice(0, 120) }; }
+  /** What an audit asks of a board: does it carry the grid it claims to have been built on? */
+  NL.guideCount = function (board) {
+    let g = 0, r = 0;
+    try { g = Array.from(board.guides || []).filter((x) => x && x.display !== false).length; } catch (e) {}
+    try { r = Array.from(board.rulerGuides || []).length; } catch (e) {}
+    return { guides: g, ruler: r };
   };
 
   // ---------- in-file provenance (C10) ----------
@@ -421,7 +483,11 @@ return (function () {
    *                       or flex-less drawing boards: their children have no layoutChild *by nature* (an SVG import
    *                       inside a row reported 3 of them before this rule)
    *   absolute_child      a child pinned inside a flow board **and the engine did not declare it**. Skipped when every
-   *                       sibling is absolute: that is a drawing host, which is what CF control interiors are (§9)
+   *                       content sibling is absolute: that is a drawing host, which is what CF control interiors (§9)
+   *                       and an LY region plan (a 2-D arrangement of pinned controls) both are. `fold·` annotation
+   *                       children are exempt, exactly as in the other two auditors' ANNO rule.
+   *   no_flow_children    an engine-declared flow board whose content children are all absolute → either the region is
+   *                       a drawing host (skipped) or a flow board lost its flow children (reported).
    *   sizing_dropped      declared sizing != readback → R5 (a resize() after the declaration) or R6 hug-vs-fill
    *                       normalization; both are silent, so this engine is the only thing that catches them
    *   padding_ignored     a start-aligned flow board's first child is not at the padding edge → padding written under
@@ -431,6 +497,11 @@ return (function () {
    *   fill_in_hug_parent  main-axis `fill` inside a hug parent → the platform computes 0 (capabilities §1), a design bug
    *   main_axis_overflow  the fixed flow children already exceed the content box → the fill child computes 0 and the
    *                       board overflows (measured: content 52, one 80 sibling, gap 16 → free −44 → h 0)
+   *   fixed_overflow      a `fix`-axis flow with no fill child whose children already exceed the content box → the last
+   *                       child is drawn past the host (measured: 99 of content in a 96 cell)
+   *   hug_frozen          a hug frame that does NOT equal pad + Σchildren + gaps → the layout pass never re-ran after a
+   *                       child grew, so the content overflows the frame on canvas (measured: `row·head` h=6 over texts
+   *                       of 44 + 4 + 20, caught only by the PNG export until this signature existed). Repair: FN.relayout
    *   flex_rejected       NL.frame recorded rejected flex/pad keys at build time
    *
    * The fill expectation is axis-aware, because `fill` is not one number (both measured in the connected build):
@@ -438,6 +509,7 @@ return (function () {
    *   main axis   → the **free space left by the non-filling flow siblings**, split evenly between filling kids
    *                 (row, content 552, gap 16, one 160 sibling → the fill child is 376, *not* 552)
    * Skipped when the parent hugs on the axis being checked (the expectation would be circular) or when the row wraps.
+   * That exemption covers `fill` only — `hug_frozen` above is the non-circular expectation for a hugging frame.
    */
   NL.auditFlow = function (board, depth, o) {
     o = o || {};
@@ -469,10 +541,18 @@ return (function () {
         kids.forEach((c) => { if (c.children && c.children.length) walk(c, d + 1); });
         return;
       }
-      // a board whose children are ALL absolute is a drawing host (CF control interiors are absolute by design —
-      // native-layout §9), unless this engine explicitly declared it as a flow region.
-      const drawingHost = !meta.kind && !meta.reflowed && kids.length > 0
-        && kids.every((c) => c.layoutChild && c.layoutChild.absolute);
+      // A board whose children are ALL absolute is a drawing host: CF control interiors are absolute by design
+      // (native-layout §9), and so is an LY region plan, whose whole point is a 2-D arrangement of pinned controls
+      // inside a board that still carries flex metadata for sizing. The old `!meta.kind` exemption knew only the
+      // first case, so every region whose controls were all pinned (region·table with 4 TableHeader copies, region·facets
+      // with 10 checkboxes, region·sidebar with its Menu, …) reported `absolute_child` on every CF mount — 26 screens
+      // were never auditable as CLEAN even though nothing was flowing in those regions. A board that really flows has
+      // at least one non-absolute child, which makes this test false and keeps the signature alive for that case.
+      // `fold·` is not content: it is the viewport annotation LY.fold overlays on a screen, exempt in both other
+      // auditors (audit_layout/audit_design ANNO) and exempt here for the same reason.
+      const contentKids = kids.filter((c) => !/^fold·/.test(c.name || ''));
+      const drawingHost = contentKids.length > 0
+        && contentKids.every((c) => c.layoutChild && c.layoutChild.absolute);
       const padL = fx ? fx.leftPadding : 0, padT = fx ? fx.topPadding : 0;
       const gap = fx ? fx.rowGap : 0;
       const isCol = !fx || fx.dir !== 'row';
@@ -483,7 +563,7 @@ return (function () {
       const contentH = fx ? N(b.height) - N(fx.topPadding) - N(fx.bottomPadding) : N(b.height);
       const ownH = b.horizontalSizing, ownV = b.verticalSizing;
       // main-axis fill budget: absolute kids take no space, so they are excluded from the sibling sum.
-      const flowKids = kids.filter((c) => c.layoutChild && !c.layoutChild.absolute);
+      const flowKids = contentKids.filter((c) => c.layoutChild && !c.layoutChild.absolute);
       const gapMain = fx ? (isCol ? fx.rowGap : fx.columnGap) : 0;
       const fillers = flowKids.filter((c) => (isCol ? c.layoutChild.verticalSizing : c.layoutChild.horizontalSizing) === 'fill');
       const mainUsed = flowKids.filter((c) => fillers.indexOf(c) < 0)
@@ -495,6 +575,32 @@ return (function () {
       // the engine has not positioned this board's children yet → say so once, and skip the geometry expectations
       const stale = NL.unlaid(b);
       if (stale) push('not_settled', b.name, 'flow child “' + stale.name + '” still sits at doc 0,0 → NL.whenSettled() before trusting any geometry finding here');
+      // A FIXED-axis flow with no fill child still has a budget, and nothing used to check it: when the fixed children
+      // plus their gaps exceed the content box the last child is drawn past the host, and the only signal was
+      // audit_layout reporting `out_of_bounds` two pixels lower down (measured 2026-10-20, Palette: swatch 48 + label 19
+      // + axis 16 + 2×8 gaps = 99 inside a 96 cell ×40 times). This is the tall-element class the shelf cannot see.
+      if (!stale && fx && !b.grid && !wrapping && !fillers.length && flowKids.length && mainOwn !== 'auto' && mainFree < -1) {
+        push('fixed_overflow', b.name, (isCol ? 'h' : 'w') + ' content ' + (isCol ? contentH : contentW) + ' < ' + mainUsed +
+          ' of children + gap ' + gapMain + '×' + Math.max(0, flowKids.length - 1) + ' (free=' + mainFree +
+          ') → grow the host (FX.fitBoardHeight) / wrap the row / drop a child; a 13px label is 19 tall at leading 1.4, not 15');
+      }
+      // The mirror of `fixed_overflow`, and the check this engine was missing: a HUG frame must equal
+      // pad + Σ children + gaps on its main axis. Measured 2026-10-21 on the FN probe — `row·head` rendered 6 tall over
+      // two texts of 44 and 20 (the PNG export shows the caption printed on top of the title) and `auditFlow` reported
+      // CLEAN, because every axis expectation it holds is skipped for a hug parent as "circular". It is only circular
+      // when the children are stale too; once they are laid out the sum is a fact. A miss means the layout engine never
+      // re-ran this frame after a child grew (the font application during token binding does exactly that).
+      // Repair: write any flex property on the frame, bottom-up (storage.FN.relayout).
+      if (!stale && fx && !b.grid && !wrapping && !fillers.length && flowKids.length && mainOwn === 'auto') {
+        const padMain = isCol ? N(fx.topPadding) + N(fx.bottomPadding) : N(fx.leftPadding) + N(fx.rightPadding);
+        const wantHug = mainUsed + gapMain * Math.max(0, flowKids.length - 1) + padMain;
+        const gotHug = isCol ? N(b.height) : N(b.width);
+        if (Math.abs(gotHug - wantHug) > 2) {
+          push('hug_frozen', b.name, (isCol ? 'h=' : 'w=') + gotHug + ' but ' + wantHug + ' = ' + mainUsed + ' of ' +
+            flowKids.length + ' child(ren) + gap ' + gapMain + '×' + Math.max(0, flowKids.length - 1) + ' + padding ' + padMain +
+            ' → the layout pass never re-ran after a child grew; the content overflows this frame on canvas. Repair: FN.relayout(board)');
+        }
+      }
       // the board's OWN hug can be silently normalized by a main-axis fill child (R6)
       if (fx && meta.declaredSizing) {
         const own = [];
@@ -503,7 +609,7 @@ return (function () {
         if (own.length) push('sizing_dropped', b.name, own.join(', ') + ' → the board no longer behaves as NL.frame declared it (R6: a main-axis fill child normalizes a hug parent back to fix)');
       }
       let flow = 0, prev = null, declAbs = 0;
-      kids.forEach((c) => {
+      contentKids.forEach((c) => {
         const lc = c.layoutChild;
         if (!lc) { push('no_layoutChild', b.name + ' › ' + c.name, 'parent has no flex/grid (R2)'); return; }
         const cm = NL._meta(c) || {};
@@ -558,7 +664,7 @@ return (function () {
         prev = { y: N(c.parentY), h: N(c.height) };
         if (c.children && c.children.length) walk(c, d + 1);
       });
-      if (!flow && kids.length && !declAbs) push('no_flow_children', b.name, kids.length + ' children, none in flow');
+      if (!flow && contentKids.length && !declAbs && !drawingHost) push('no_flow_children', b.name, contentKids.length + ' children, none in flow');
     };
     walk(board, 0);
     return { board: board.name, findings: findings, verdict: findings.length ? 'NEEDS_REPAIR' : 'CLEAN' };
@@ -608,6 +714,11 @@ return (function () {
     try { penpotUtils.addFlexLayout(board, o.dir || (board.flex && board.flex.dir) || 'column'); }
     catch (e) { res.err = String(e).slice(0, 140); }
     const spec = { dir: o.dir || 'column' };
+    if (o.breath && storage.LY && storage.LY.breath) {
+      const bg = storage.LY.breath(o.breath === true ? 'block' : o.breath,
+                                  o.tier || (storage.CF && storage.CF.tier) || 'web');
+      spec.rowGap = bg; spec.columnGap = bg;
+    }
     if (o.gap !== undefined) { spec.rowGap = o.gap; spec.columnGap = o.gap; }
     if (o.pad !== undefined) spec.pad = o.pad;
     if (o.align) spec.alignItems = o.align;
@@ -663,20 +774,42 @@ return (function () {
     const out = {};
     names.forEach((name) => {
       const r = boxes[name].rect;
-      const b = NL.frame('region·' + name, { x: r.x, y: r.y, w: r.w, h: r.h, fill: o.fill || null, radius: o.radius || 0,
-        dir: 'column', gap: o.gap === undefined ? 16 : o.gap, pad: o.regionPad === undefined ? 24 : o.regionPad,
+      // A region's gap comes from the breath ladder unless the caller names a level or a number: 16 was already the
+      // measured rhythm of this file, so the ladder is what the default always was — now it is declared, not typed.
+      const tier = plan.tier || o.tier || 'web';
+      const bg = o.gap !== undefined ? o.gap
+        : (LY.breath ? LY.breath(o.breath === undefined ? 'block' : o.breath, tier) : 16);
+      const b = NL.frame('region·' + name, { x: r.x, y: r.y, w: r.w, h: r.h, fill: o.fill || null, radius: o.radius || 'none',
+        dir: 'column', gap: bg, pad: o.regionPad === undefined ? (LY.breath ? LY.breath('group', tier) : 24) : o.regionPad,
         sizing: 'fix', parent: o.parent, absolute: o.parent ? { x: r.x, y: r.y } : null });
       NL.stamp(b, { recipe: key, region: name, kind: boxes[name].kind, tier: plan.tier || o.tier || 'web' });
       out[name] = b;
     });
+    // Pane vs band, decided from the boards that now exist (not from the recipe's plan object): a region whose box
+    // contains another region is a **pane** — a column, a document body, a scroll area. Filling it is the measured
+    // `dashboard.content` defect: the paragraph runs underneath every child band. A recipe may ship flat sibling
+    // regions (docsLayout content/body, checkout form/contact/shipping/payment, authSplit formPane/form), so the check
+    // is geometric, not hierarchical — and it is computed here because a consumer holding an older `storage.LY`
+    // reference (`p.LY`) would silently miss a newly added helper and skip every pane (measured: 65 cross-parent
+    // text collisions on pages 14/15 after the LY.leaves guard was added).
+    const geo = {};
+    names.forEach((n) => { const b = out[n]; geo[n] = { x: N(b.x), y: N(b.y), w: N(b.width), h: N(b.height) }; });
+    const inside = (a, b) => b.x >= a.x - 1 && b.y >= a.y - 1 && b.x + b.w <= a.x + a.w + 1 &&
+      b.y + b.h <= a.y + a.h + 1 && (b.w * b.h) < (a.w * a.h);
+    const contains = {};
+    names.forEach((a) => { contains[a] = names.filter((b) => b !== a && inside(geo[a], geo[b])); });
+    const panes = names.filter((n) => contains[n].length > 0);
+    const leaves = names.filter((n) => contains[n].length === 0);
     return { recipe: key, tier: plan.tier, frame: plan.frame, notes: plan.notes, regions: out, keys: names,
+             panes, leaves, contains,
              bands: names.length && boxes[names[0]].kind === 'band' ? out : undefined, totalH: plan.totalH };
   };
 
   return { seeded: 'NL', version: NL.VERSION,
     fns: ['settle', 'settleDeep', 'whenSettled', 'unlaid', 'applyFlex', 'sizing', 'fill', 'fix', 'hug', 'alignSelf',
           'zIndex', 'margin', 'frame', 'row', 'col', 'mount', 'add', 'gridFrame', 'cell', 'cellAuto', 'label', 'plate',
-          'line', 'guide', 'rulerGuide', 'stamp', 'readStamp', 'report', 'auditFlow', 'declare', 'nudge', 'reflow', 'fromRecipe'],
+          'line', 'guide', 'rulerGuide', 'guideCount', 'stamp', 'readStamp', 'report', 'auditFlow', 'declare', 'nudge', 'reflow', 'fromRecipe'],
+    regCarried: Object.keys(NL._reg).length,
     flexKeys: NL.FLEX_KEYS,
-    note: 'R1 pad names topPadding|… (pad:{top,x,t} accepted, unknown keys rejected) ; R2 layoutChild after append + sizing last ; R3 settle before measuring → NL.whenSettled() polls, auditFlow reports not_settled instead of a cascade ; R4 grid cells are 1-based ; R5 resize() downgrades a flow child to fix → declare after the last resize, repair with NL.nudge ; R6 fill = content box on the cross axis, leftover space on the main axis, and it silently un-hugs its parent' };
+    note: 'R1 pad names topPadding|… (pad:{top,x,t} accepted, unknown keys rejected) ; R2 layoutChild after append + sizing last ; R3 settle before measuring → NL.whenSettled() polls, auditFlow reports not_settled instead of a cascade ; R4 grid cells are 1-based ; R5 resize() downgrades a flow child to fix → declare after the last resize, repair with NL.nudge ; R6 fill = content box on the cross axis, leftover space on the main axis, and it silently un-hugs its parent ; R7 an undeclared gap is 0, i.e. blocks touch — author the separation: frame({breath:"block"}) takes it from LY.BREATH at the board tier (designGate 32/33 judge the same table)' };
 })();

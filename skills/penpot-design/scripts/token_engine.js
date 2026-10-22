@@ -92,6 +92,7 @@ return (function () {
     }
     try {
       const t = s.addToken({ type: type, name: name, value: value });
+      TK._ci = null; TK._ti = null; TK._si = null; TK._declared = null;
       return { name: name, type: t.type, action: old ? 'replaced' : 'added' };
     } catch (e) {
       return { name: name, err: String(e).slice(0, 140) };
@@ -252,5 +253,863 @@ return (function () {
     return a;
   };
 
-  return { seeded: true, fns: ['TK.seed', 'TK.ensureSet', 'TK.put', 'TK.find', 'TK.apply', 'TK.unbindFill', 'TK.unbindStroke', 'TK.paint', 'TK.changed', 'TK.audit', 'TK.assert', 'TK.theme', 'TK.ensureTheme', 'TK.activateTheme', 'TK.activeSets'] };
+  // ---------- indexes: the "no raw hex, no ad-hoc type" contract ----------
+  // storage.T / CF.P (the JS palette the engines paint with) and the Penpot token set must carry the same values.
+  // These indexes are the read side of that contract: hex → color token, type step → typography token.
+  // A token's *name* is the semantic claim, so the same hex may belong to several tokens (#161616 is `primary`,
+  // `inverse` and `text-bright`): copy paints bind to the text/on-* candidate, surface paints to the rest.
+  TK.normHex = function (v) {
+    if (!v) return null;
+    const s = String(v).trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(s) ? s : null;
+  };
+  TK.isCopyName = function (n) { return /^color\.(text-|on-)/.test(String(n)); };
+
+  TK.activeTokens = function (type) {
+    const out = [];
+    Array.from(cat().sets).filter((s) => s.active).forEach((s) => {
+      Array.from(s.tokens).forEach((t) => { if (!type || t.type === type) out.push({ set: s.name, name: t.name, token: t }); });
+    });
+    return out;
+  };
+
+  TK.colorIndex = function (force) {
+    if (TK._ci && !force) return TK._ci;
+    const byHex = {};
+    const list = TK.activeTokens('color');
+    list.forEach((e) => {
+      let v = null; try { v = e.token.value; } catch (err) {}
+      const hex = TK.normHex(typeof v === 'string' ? v : (v && v.color));
+      if (!hex) return;
+      const r = byHex[hex] || (byHex[hex] = { all: [], copy: null, surface: null });
+      r.all.push(e.name);
+      if (TK.isCopyName(e.name)) { if (!r.copy) r.copy = e.name; }
+      else if (!r.surface) r.surface = e.name;
+    });
+    Object.keys(byHex).forEach((h) => { const r = byHex[h]; if (!r.copy) r.copy = r.surface; if (!r.surface) r.surface = r.copy; });
+    const dupes = Object.keys(byHex).filter((h) => byHex[h].all.length > 1);
+    TK._ci = { byHex: byHex, tokens: list.length, hexes: Object.keys(byHex).length,
+               dupes: dupes.map((h) => h + ' ← ' + byHex[h].all.join(', ')) };
+    return TK._ci;
+  };
+
+  // The nearest declared colour for a literal that misses the index. Used by `CF`'s palette chokepoint to repair a
+  // hand-typed hex *before* it lands on the canvas: `d` is the largest single-channel distance, and only a near miss
+  // (default ≤ 12/255) is snapped — a genuinely different colour is reported instead, because silently re-drawing a
+  // data-visualisation hue as the nearest brand tone would destroy the content the gate already exempts.
+  TK.nearestHex = function (hex, maxD) {
+    const h = TK.normHex(hex);
+    const ci = TK.colorIndex();
+    if (!h || !ci.hexes) return null;
+    const rgb = (x) => [parseInt(x.slice(1, 3), 16), parseInt(x.slice(3, 5), 16), parseInt(x.slice(5, 7), 16)];
+    const a = rgb(h);
+    let best = null, bd = Infinity;
+    Object.keys(ci.byHex).forEach(function (k) {
+      const b = rgb(k);
+      const d = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+      if (d < bd) { bd = d; best = k; }
+    });
+    const rec = best && ci.byHex[best];
+    return { hex: best, d: bd, name: rec ? (rec.surface || rec.all[0]) : null,
+             near: best !== null && bd <= (maxD === undefined ? 12 : maxD) };
+  };
+
+  // A typography token's value: `value` on the record, `resolvedValue` as the fallback (measured: the composite
+  // resolves through a one-element array whose keys are the pluralized names).
+  TK.tokenValue = function (t) {
+    let v = null;
+    try { v = t.value; } catch (e) {}
+    if (v && v.fontSize) return v;
+    try { const rv = t.resolvedValue; const c = Array.isArray(rv) ? rv[0] : rv; if (c && (c.fontSize || c['font-size'])) v = c.fontSize ? c : { fontSize: c['font-size'], fontWeight: c['font-weight'], lineHeight: c['line-height'], fontFamily: c['font-family'], letterSpacing: c['letter-spacing'] }; } catch (e) {}
+    return v || {};
+  };
+  const num = (x) => { const n = parseFloat(x); return isNaN(n) ? null : n; };
+  const fam = (f) => Array.isArray(f) ? String(f[0] || '').toLowerCase() : String(f || '').toLowerCase();
+  TK.typeKey = function (family, size, weight, leading) {
+    return [fam(family), num(size), num(weight), num(leading)].join('|');
+  };
+  TK.shapeTypeKey = function (sh) {
+    let f, s, w, l;
+    try { f = sh.fontFamily; s = sh.fontSize; w = sh.fontWeight; l = sh.lineHeight; } catch (e) {}
+    return TK.typeKey(f, s, w, l);
+  };
+
+  TK.typeIndex = function (force) {
+    if (TK._ti && !force) return TK._ti;
+    const exact = {}, step = {}, ramp = [];
+    TK.activeTokens('typography').forEach((e) => {
+      const v = TK.tokenValue(e.token);
+      const k = TK.typeKey(v.fontFamily, v.fontSize, v.fontWeight, v.lineHeight);
+      if (!exact[k]) exact[k] = e.name;
+      const sk = num(v.fontSize) + '|' + num(v.fontWeight);
+      (step[sk] = step[sk] || []).push({ name: e.name, family: fam(v.fontFamily), leading: num(v.lineHeight) });
+      ramp.push({ name: e.name, family: fam(v.fontFamily), size: num(v.fontSize), weight: num(v.fontWeight),
+                  leading: num(v.lineHeight), tracking: num(v.letterSpacing) });
+    });
+    TK._ti = { exact: exact, step: step, ramp: ramp, count: ramp.length };
+    return TK._ti;
+  };
+
+  // The declared step for a drawn (size, weight) pair. A size/weight can legitimately exist twice in a ramp (22/600 is
+  // both `type.h6` at 1.2 and `type.button` at 1.5), so the tie-break is: same family first, then the nearest leading.
+  // The winner's own values are what the binding writes, so the ramp — not the drawn shape — stays authoritative.
+  TK.stepFor = function (size, weight, family, leading) {
+    const list = TK.typeIndex().step[num(size) + '|' + num(weight)];
+    if (!list || !list.length) return null;
+    const wantF = fam(family), wantL = num(leading);
+    let best = null, score = Infinity;
+    list.forEach(function (c) {
+      let s = (c.family === wantF ? 0 : 10) + (wantL === null || c.leading === null ? 0 : Math.abs(c.leading - wantL));
+      if (s < score) { score = s; best = c.name; }
+    });
+    return best;
+  };
+
+  // ---------- creation-side enforcement ----------
+  // `TK.stepFor` is the after-the-fact repair (bindBoard retunes what is already on the canvas). `snapType` is the
+  // prevention: `storage.mkText` asks it before writing a size, so a text layer can never be born with a step the
+  // token set does not name. Same-family only — the family is the builder's visible choice, and silently swapping
+  // body copy into the display face is not what "snap onto the ramp" should mean.
+  TK.snapType = function (family, size, weight, leading) {
+    const ti = TK.typeIndex();
+    if (!ti.count) return null;
+    const f = fam(family), s = num(size), w = num(weight), l = num(leading);
+    const pick = function (entry) {
+      const v = entry && entry.r ? entry.r : entry;
+      return { name: v.name, family: v.family, size: v.size, weight: v.weight, leading: v.leading,
+               tracking: v.tracking, snapped: v.size !== s || v.weight !== w };
+    };
+    const exact = ti.exact[TK.typeKey(f, s, w, l)];
+    if (exact) {
+      const hit = ti.ramp.filter(function (r) { return r.name === exact; })[0];
+      return hit ? { name: hit.name, family: hit.family, size: hit.size, weight: hit.weight,
+                     leading: hit.leading, tracking: hit.tracking, snapped: false } : null;
+    }
+    const same = ti.ramp.filter(function (r) { return r.family === f; });
+    const pool = same.length ? same : ti.ramp;
+    let best = null, score = Infinity;
+    pool.forEach(function (r) {
+      const ds = r.size === null || s === null ? 0 : Math.abs(r.size - s);
+      const dw = r.weight === null || w === null ? 0 : Math.abs(r.weight - w) / 100;
+      const dl = r.leading === null || l === null ? 0 : Math.abs(r.leading - l) / 4;
+      const sc = ds + dw + dl;
+      if (sc < score) { score = sc; best = r; }
+    });
+    return best ? pick(best) : null;
+  };
+
+  // ---------- the space scale as an index (point: gaps and padding are tokens too) ----------
+  // The props a `spacing` token can be bound to on a flow/grid container. Named explicitly because `spacing` has no
+  // default property (design-tokens §6). Vertical/horizontal shorthand is NOT listed: Penpot stores the four sides,
+  // and writing a shorthand through a token binding reads back on the wrong key.
+  const LAYOUT_PROPS = ['rowGap', 'columnGap', 'topPadding', 'rightPadding', 'bottomPadding', 'leftPadding'];
+  TK.LAYOUT_PROPS = LAYOUT_PROPS;
+  TK.spaceIndex = function (force) {
+    if (TK._si && !force) return TK._si;
+    const byVal = {};
+    TK.activeTokens('spacing').forEach((e) => {
+      let v = null; try { v = e.token.value; } catch (err) {}
+      const n = num(typeof v === 'string' ? v : (v && v.value));
+      if (n !== null && byVal[n] === undefined) byVal[n] = e.name;
+    });
+    TK._si = { byVal: byVal, count: Object.keys(byVal).length };
+    return TK._si;
+  };
+  /** The repair twin of `snapType`: pull a typed value onto the declared scale (a builder that wrote 6 has to be
+      retuned by the rule the factory follows). Nearest wins, ties go up because a scale is a rhythm, not a ceiling. */
+  TK.snapSpace = function (v) {
+    const byVal = TK.spaceIndex().byVal;
+    const vals = Object.keys(byVal).map(Number).sort((a, b) => a - b);
+    if (!vals.length) return null;
+    let best = vals[0];
+    vals.forEach((x) => { if (Math.abs(x - v) < Math.abs(best - v) || (Math.abs(x - v) === Math.abs(best - v) && x > best)) best = x; });
+    return { value: best, name: byVal[best], delta: best - v };
+  };
+  // Only the two gap props take a token binding. Measured 2026-10-20: `applyToShapes(shapes, ['topPadding'])` is
+  // refused by the server (`should be a set of strings` — the spacing token's property enum has no padding), so
+  // padding is retuned onto the scale and reported, never bound.
+  const GAP_PROPS = ['rowGap', 'columnGap'];
+  TK.GAP_PROPS = GAP_PROPS;
+
+  // The four corner props a `borderRadius` token owns. Measured 2026-10-21: `applyToShapes(shapes, CORNER_PROPS)` binds
+  // ALL FOUR at once, writes `shape.tokens.borderRadiusTopLeft…BottomLeft`, and REWRITES the shape's own value to the
+  // token's (r20 → 9999, r12 → 26) — so binding an off-ladder corner is NOT a visual no-op, it is the retune. Passing a
+  // single corner leaves a partial map, which the gate still indicts on the three the call did not write.
+  const CORNER_PROPS = ['borderRadiusTopLeft', 'borderRadiusTopRight', 'borderRadiusBottomRight', 'borderRadiusBottomLeft'];
+  TK.CORNER_PROPS = CORNER_PROPS;
+
+  /** The declared corner ladder, by rounded value: { byVal, byName, steps(asc), count }. */
+  TK.radiusIndex = function (force) {
+    if (TK._ri && !force) return TK._ri;
+    const byVal = {}, byName = {};
+    TK.activeTokens('borderRadius').forEach((e) => {
+      let v = null; try { v = e.token.value; } catch (err) {}
+      const n = num(typeof v === 'string' ? v : (v && v.value));
+      if (n === null) return;
+      if (byVal[Math.round(n)] === undefined) byVal[Math.round(n)] = e.name;
+      byName[e.name] = n;
+    });
+    const steps = Object.keys(byVal).map(Number).sort((a, b) => a - b);
+    TK._ri = { byVal: byVal, byName: byName, steps: steps, count: steps.length };
+    return TK._ri;
+  };
+
+  /** Which token a DRAWN corner belongs to — the decision the retro pass and `TK.bindBoard` share, and the only place
+      that may pick a step for a value that has none. Three cases, in order:
+        already declared        → bind as drawn;
+        `min(w,h)/2` or larger  → it IS a pill. The old factories derived `h/2` per size and minted 722 one-off numbers,
+                                  and DESIGN.md §Shapes says every control is a pill at any height, so the token is
+                                  `radius.full` (9999 renders clamped: measured a 320×32 and a 320×8 both export as
+                                  clean pills) — NOT the nearest small step, which would square off a switch;
+        anything else           → the nearest declared step, ties going up (the rule `snapSpace` follows).
+      `null` = the shape has no corner to bind (0 is the absence of a decision), or the file declares no radius tokens,
+      in which case a caller must refuse rather than invent a ladder. */
+  TK.radiusFor = function (value, side) {
+    const ri = TK.radiusIndex();
+    if (!ri.count) return null;
+    const v = Math.round(Number(value) || 0);
+    if (!v) return null;
+    if (ri.byVal[v]) return { name: ri.byVal[v], value: v, exact: true };
+    if (side && v >= Math.round(side / 2) - 1) {
+      const full = ri.byName['radius.full'] !== undefined ? Math.round(ri.byName['radius.full']) : ri.steps[ri.steps.length - 1];
+      return { name: ri.byVal[full], value: full, pill: true, from: v };
+    }
+    let best = ri.steps[0];
+    ri.steps.forEach((x) => { if (Math.abs(x - v) < Math.abs(best - v) || (Math.abs(x - v) === Math.abs(best - v) && x > best)) best = x; });
+    return { name: ri.byVal[best], value: best, snapped: true, from: v };
+  };
+
+  /** The four corners of a shape as numbers (a symmetric shape stores a scalar; an asymmetric one stores the map). */
+  TK.cornersOf = function (sh) {
+    let b = null; try { b = sh.borderRadius; } catch (e) { return null; }
+    if (b === null || b === undefined) return null;
+    if (typeof b === 'number') return [b, b, b, b];
+    if (typeof b === 'object') return CORNER_PROPS.map((p) => Number(b[p]) || 0);
+    return null;
+  };
+
+  // ---------- the read side for spec-sheet builders ----------
+  /** Every value a Foundations / Color board may draw, read out of the LIVE token records in one pass.
+      This exists so documentation boards never need `storage.T` or `CF.P`: both are JS mirrors, and a mirror that
+      drifts paints a hex no token names (`paint_off_palette`) or — measured — silently falls back to a default.
+      A projector reads this and REFUSES a missing kind instead of inventing a value. */
+  TK.declared = function (force) {
+    if (TK._declared && !force) return TK._declared;
+    const nv = (x) => { const n = parseFloat(x); return isNaN(n) ? null : n; };
+    const raw = (t) => { try { return t.value; } catch (e) { return null; } };
+    const out = { sets: TK.activeSets(), colors: [], types: [], spaces: [], radii: [], dims: [], shadows: [] };
+    TK.activeTokens('color').forEach((e) => {
+      const v = raw(e.token);
+      const hex = TK.normHex(typeof v === 'string' ? v : (v && v.color));
+      if (hex) out.colors.push({ name: e.name, hex: hex, copy: TK.isCopyName(e.name), set: e.set });
+    });
+    out.types = TK.typeIndex().ramp.slice();
+    const si = TK.spaceIndex();
+    Object.keys(si.byVal).map(Number).sort((a, b) => a - b).forEach((n) => out.spaces.push({ value: n, name: si.byVal[n] }));
+    TK.activeTokens('borderRadius').forEach((e) => {
+      const n = nv(raw(e.token)); if (n !== null) out.radii.push({ name: e.name, value: n });
+    });
+    TK.activeTokens('dimension').forEach((e) => {
+      const n = nv(raw(e.token)); if (n !== null) out.dims.push({ name: e.name, value: n });
+    });
+    TK.activeTokens('shadow').forEach((e) => {
+      const v = raw(e.token); const s = Array.isArray(v) ? v[0] : (v && (v.shadow || v.value)) || v;
+      if (s) out.shadows.push({ name: e.name, value: s });
+    });
+    out.radii.sort((a, b) => a.value - b.value);
+    out.dims.sort((a, b) => a.value - b.value);
+    out.counts = ['colors', 'types', 'spaces', 'radii', 'dims', 'shadows'].reduce((m, k) => (m[k] = out[k].length, m), {});
+    out.missing = Object.keys(out.counts).filter((k) => !out.counts[k]);
+    out.ok = out.missing.length === 0;
+    // a hex claimed by several names (#161616 is primary, inverse and text-bright) — the board captions the FIRST
+    // declaring name, so the label is stable across re-seeds rather than depending on record iteration order.
+    out.hexOwner = {};
+    out.colors.forEach((c) => { if (!out.hexOwner[c.hex]) out.hexOwner[c.hex] = c.name; });
+    TK._declared = out;
+    return out;
+  };
+
+  // ---------- subtree walk ----------
+  TK.walk = function (node, fn, depth) {
+    if (!node || (depth || 0) > 48) return 0;
+    let n = 0;
+    try { fn(node, depth || 0); n++; } catch (e) { return n; }
+    let kids = [];
+    try { kids = Array.from(node.children || []); } catch (e) {}
+    for (let i = 0; i < kids.length; i++) n += TK.walk(kids[i], fn, (depth || 0) + 1);
+    return n;
+  };
+
+  // ---------- bind what the engines already painted correctly ----------
+  // Every fill/stroke whose hex IS a declared token color, and every text whose type step IS declared, gets bound.
+  // Because the lookup is by the value actually in use, binding is a visual no-op — which is what makes it safe to
+  // run on a board that is already gated. `dry` turns it into the audit read (findings only, no writes).
+  // `retune` goes one step further: a text at a declared (size, weight) with a *different* leading is re-bound to
+  // the declared step, i.e. the ramp wins over what was drawn. Off by default — it changes text height.
+  TK.bindBoard = async function (board, o) {
+    o = o || {};
+    if (!board) return { err: 'bindBoard: no board' };
+    // Phase timeline, pushed into the caller's array so a call that dies in the `execute_code` ceiling still says
+    // which phase it died in (a 30s stall with no trace is a guess; with a trace it is one line of output).
+    const tr = o.trace || null;
+    let _tm = Date.now();
+    const mark = function (s, n) { if (tr) { const now = Date.now(); tr.push(s + ' +' + (now - _tm) + 'ms' + (n === undefined ? '' : ' n=' + n)); _tm = now; } };
+    const ci = TK.colorIndex(), ti = TK.typeIndex(), si = TK.spaceIndex();
+    mark('indexes');
+    const buckets = {}, order = [];
+    const push = function (tokenName, prop, sh) {
+      const k = tokenName + '::' + prop;
+      let b = buckets[k];
+      if (!b) { b = buckets[k] = { token: tokenName, prop: prop, shapes: [] }; order.push(k); }
+      b.shapes.push(sh);
+    };
+    const miss = { color: {}, typography: {}, stroke: {}, spacing: {}, radius: {} };
+    const skipped = { alpha: 0, multi: 0, gradient: 0, ref: 0, otherPaint: 0 };
+    const already = { fill: 0, strokeColor: 0, typography: 0, borderRadius: 0 };
+    let scanned = 0, retuned = 0, retunedSpace = 0, retunedRadius = 0, pillRadius = 0, onScalePadding = 0;
+    // `only` narrows the pass to ONE token class. A corner sweep must not re-bind fills or re-retune text on a page
+    // that was already gated for them: those branches write, and a write outside the class under review is a change
+    // nobody asked for. Without `only` every class runs, as before.
+    const want = function (cls) { return !o.only || o.only === cls; };
+
+    const visit = function (sh) {
+      scanned++;
+      let tk = {};
+      try { tk = sh.tokens || {}; } catch (e) {}
+      // ---- fills (a token fill binding replaces fill[0] with the token color and keeps no ref, so the only
+      //      proof a paint is token-bound is `tokens.fill` — `fillColorRefId` stays null, measured 2026-10-20)
+      let fills = [];
+      try { fills = Array.from(sh.fills || []); } catch (e) {}
+      if (fills.length && want('fill')) {
+        const f0 = fills[0];
+        if (tk.fill) already.fill++;
+        else if (f0.fillColorRefId) skipped.ref++;
+        else if (f0.fillImage || f0.fillColorGradient) skipped.gradient++;
+        else if (fills.length > 1) skipped.multi++;
+        else if (num(f0.fillOpacity) !== null && num(f0.fillOpacity) < 1) skipped.alpha++;
+        else {
+          const hex = TK.normHex(f0.fillColor);
+          const e = hex && ci.byHex[hex];
+          if (!e) { const raw = String(f0.fillColor || '').toLowerCase(); miss.color[raw] = (miss.color[raw] || 0) + 1; }
+          else push(sh.type === 'text' ? e.copy : e.surface, 'fill', sh);
+        }
+      }
+      // ---- strokes
+      let strokes = [];
+      try { strokes = Array.from(sh.strokes || []); } catch (e) {}
+      if (strokes.length && want('fill')) {
+        const s0 = strokes[0];
+        if (tk.strokeColor) already.strokeColor++;
+        else if (s0.strokeColorRefId) skipped.ref++;
+        else if (strokes.length > 1) skipped.multi++;
+        else if (num(s0.strokeOpacity) !== null && num(s0.strokeOpacity) < 1) skipped.alpha++;
+        else {
+          const hex = TK.normHex(s0.strokeColor);
+          const e = hex && ci.byHex[hex];
+          if (!e) { const raw = String(s0.strokeColor || '').toLowerCase(); miss.stroke[raw] = (miss.stroke[raw] || 0) + 1; }
+          else push(e.surface, 'strokeColor', sh);
+        }
+      }
+      // ---- layout spacing: a flex/grid container's gap and padding are values the space scale owns.
+      // `spacing` tokens have **no default property** (design-tokens §6: omitting props is a no-op), so each prop
+      // is named. 0 is skipped: "no gap" is the absence of a decision, not the 4px step.
+      // Only rowGap/columnGap are bound (GAP_PROPS): the spacing token's property enum rejects the four padding
+      // props, measured 2026-10-20, so padding is judged for scale membership (and retuned with `snapSpace`) but
+      // reported as `padOnScale`, never as a binding.
+      let fx = null, gr = null;
+      try { fx = sh.flex; } catch (e) {}
+      try { gr = sh.grid; } catch (e) {}
+      const src = fx || gr;
+      if (src && want('space')) {
+        LAYOUT_PROPS.forEach(function (p) {
+          let val = null;
+          try { val = num(src[p]); } catch (e) {}
+          if (val === null || val <= 0) return;
+          let name = si.byVal[val];
+          // `snapSpace: true` (opt-in: unlike a binding, this moves geometry) retunes an off-scale gap/padding onto
+          // the declared steps, then binds what can be bound. Without it the value is only reported as offSpace.
+          if (!name && o.snapSpace && sh.type === 'board') {
+            const snap = TK.snapSpace(val);
+            if (snap && snap.value > 0) {
+              try { src[p] = snap.value; val = snap.value; name = snap.name; retunedSpace++; } catch (e) {}
+            }
+          }
+          if (!name) { miss.spacing[val] = (miss.spacing[val] || 0) + 1; return; }
+          if (GAP_PROPS.indexOf(p) < 0) { onScalePadding++; return; }
+          if (tk[p]) { already[p] = (already[p] || 0) + 1; return; }
+          push(name, p, sh);
+        });
+      }
+      // ---- corners (rules 35/36 · the `borderRadius` token set is the ONLY source of a corner)
+      // Opt-OUT, not opt-in: `radius: false` is the only way to keep a board's corners untouched, because a run that
+      // leaves an orphan number on the canvas is the defect this pass exists to remove. Binding rewrites the drawn
+      // value onto the ladder (measured), so `retunedRadius` counts how many corners moved and `pillRadius` how many
+      // were derived `h/2` pills that became `radius.full`.
+      if (want('radius') && o.radius !== false) {
+        const cs = TK.cornersOf(sh);
+        if (cs) {
+          const v = Math.max.apply(null, cs);
+          if (v > 0) {
+            const r = TK.radiusFor(v, Math.min(num(sh.width) || 0, num(sh.height) || 0));
+            if (!r) miss.radius[v] = (miss.radius[v] || 0) + 1;
+            else {
+              if (r.pill) pillRadius++;
+              if (r.pill || r.snapped) retunedRadius++;
+              if (CORNER_PROPS.every((p) => tk[p] === r.name)) already.borderRadius++;
+              else push(r.name, 'borderRadius', sh);
+            }
+          }
+        }
+      }
+      // ---- typography
+      if (sh.type === 'text' && want('type')) {
+        if (tk.typography) { already.typography++; return; }
+        const k = TK.shapeTypeKey(sh);
+        let name = ti.exact[k];
+        if (!name && o.retune !== false) {
+          const alt = TK.stepFor(sh.fontSize, sh.fontWeight, sh.fontFamily, sh.lineHeight);
+          if (alt) { name = alt; retuned++; }
+        }
+        if (name) push(name, 'typography', sh);
+        else miss.typography[k] = (miss.typography[k] || 0) + 1;
+      }
+    };
+    if (o.self) visit(board); else TK.walk(board, visit);
+    mark('visit', scanned);
+
+    const applied = [], failed = [];
+    let fillBound = 0, strokeBound = 0, typeBound = 0, spaceBound = 0, radiusBound = 0, shapes = 0;
+    order.forEach(function (k) {
+      const b = buckets[k];
+      if (o.dry) { applied.push({ token: b.token, prop: b.prop, n: b.shapes.length }); return; }
+      const t = TK.find(b.token);
+      if (!t) { failed.push({ token: b.token, err: 'not found / set inactive' }); return; }
+      try {
+        if (b.prop === 'typography') t.applyToShapes(b.shapes, ['typography']);
+        else if (b.prop === 'borderRadius') t.applyToShapes(b.shapes, CORNER_PROPS);
+        else t.applyToShapes(b.shapes, [b.prop]);
+        applied.push({ token: b.token, prop: b.prop, n: b.shapes.length });
+        shapes += b.shapes.length;
+        if (b.prop === 'fill') fillBound += b.shapes.length;
+        else if (b.prop === 'strokeColor') strokeBound += b.shapes.length;
+        else if (b.prop === 'typography') typeBound += b.shapes.length;
+        else if (b.prop === 'borderRadius') radiusBound += b.shapes.length;
+        else { spaceBound += b.shapes.length; if (LAYOUT_PROPS.indexOf(b.prop) < 0) failed.push({ token: b.token, prop: b.prop, err: 'not a layout prop' }); }
+      } catch (e) { failed.push({ token: b.token, prop: b.prop, err: String(e).slice(0, 120) }); }
+    });
+    mark('apply', applied.length);
+    // The settle wait is a timer, and a timer is NOT safe in the middle of a file pass: measured 2026-10-22, a
+    // `bindBoard` that wrote four corner bindings on `Screen·gallery·Web` reached `apply +539ms` and then never got
+    // out of `await nap(500)` — the render thread was busy re-laying the page and the plugin sandbox stopped firing
+    // timers. `settle: 0` skips the promise entirely; the writes are already in the model, and the authoritative read
+    // is the later dry pass (`radiusSweep({dry:true})`), which needs no timer.
+    const settle = o.settle === undefined ? 500 : o.settle;
+    if (!o.dry && order.length && settle > 0) await nap(settle);
+    mark('settle');
+
+    // readback: proof over a sample, because applyToShapes succeeds silently on an inactive set.
+    // One bucket PER PROP is sampled (not the first six of whatever order came in), so a pass that bound 400 fills and
+    // silently dropped its corners cannot read back as proven.
+    let bound = 0, sample = 0;
+    const probe = [];
+    const seenProp = {};
+    const sampleKeys = order.filter(function (k) {
+      const pr = buckets[k].prop;
+      if (seenProp[pr]) return false;
+      seenProp[pr] = 1; return true;
+    }).slice(0, 8);
+    if (!o.dry && settle > 0) sampleKeys.forEach(function (k) {
+      const b = buckets[k];
+      b.shapes.slice(0, 3).forEach(function (sh) {
+        sample++;
+        let ok = false;
+        try {
+          ok = b.prop === 'borderRadius'
+            ? CORNER_PROPS.every((p) => (sh.tokens || {})[p] === b.token)
+            : (sh.tokens || {})[b.prop] === b.token;
+        } catch (e) {}
+        if (ok) bound++; else if (probe.length < 6) probe.push({ shape: sh.name, want: b.token, got: JSON.stringify(sh.tokens || {}) });
+      });
+    });
+
+    mark('readback', bound);
+    return {
+      board: board.name, dry: !!o.dry, scanned: scanned, retuned: retuned, retunedSpace: retunedSpace,
+      retunedRadius: retunedRadius, pillRadius: pillRadius,
+      padOnScale: onScalePadding,
+      fillBound: fillBound, strokeBound: strokeBound, typeBound: typeBound, spaceBound: spaceBound, radiusBound: radiusBound,
+      already: already, skipped: skipped, batches: applied.length,
+      offPalette: Object.keys(miss.color).map((h) => h + '×' + miss.color[h]),
+      offStroke: Object.keys(miss.stroke).map((h) => h + '×' + miss.stroke[h]),
+      offSpace: Object.keys(miss.spacing).sort((a, b) => miss.spacing[b] - miss.spacing[a]).map((k) => k + '×' + miss.spacing[k]),
+      offRamp: Object.keys(miss.typography).sort((a, b) => miss.typography[b] - miss.typography[a]).map((k) => k + '×' + miss.typography[k]),
+      offRadius: Object.keys(miss.radius).sort((a, b) => miss.radius[b] - miss.radius[a]).map((k) => k + '×' + miss.radius[k]),
+      proof: (o.dry || settle === 0) ? null : { sampled: sample, bound: bound, misses: probe }
+    };
+  };
+
+  // ---------- page / file batch runner (execute_code has a 30s ceiling, so this is resumable) ----------
+  // Measured 2026-10-20: `penpot.pages` is **undefined** in the plugin build — the page list is on the file
+  // (`penpot.currentFile.pages`), so a default that iterated `penpot.pages` threw instead of queueing the file.
+  TK.pageNames = function () {
+    try { const f = penpot.currentFile; if (f && f.pages) return Array.from(f.pages).map((p) => p.name); } catch (e) {}
+    try { return Array.from(penpot.pages || []).map((p) => p.name); } catch (e) { return []; }
+  };
+  TK.bindStart = function (names) {
+    TK._bindQueue = (names || TK.pageNames()).slice();
+    TK._bindReport = {};
+    return { queued: TK._bindQueue.length };
+  };
+  // Binds the top-level boards of a page (one call per board keeps each write batch small and interruptible).
+  TK.bindPage = async function (name, o) {
+    o = o || {};
+    const page = (typeof name === 'string') ? penpotUtils.getPageByName(name) : name;
+    if (!page) return { err: 'no page ' + name };
+    if (penpot.currentPage.name !== page.name) {
+      // `openPage` resolves once the page is loaded (measured: root readable 42ms after the call), so awaiting it
+      // replaces the fixed 600ms timer — and a timer is the one thing this pass cannot rely on after a write.
+      try { await penpot.openPage(page.id); } catch (e) {}
+      await nap(120);
+    }
+    // `currentPage.children` is empty until the page object is re-read: the root lives on `page.root` (capabilities §2).
+    let root = null;
+    try { root = page.root || (Array.from(penpot.currentPage.children || []))[0] || null; } catch (e) {}
+    // A big page keeps its root unhydrated for a moment after `openPage` (measured 2026-10-22 on `15 · Screens ·
+    // content`: read back with `root = null` right after the open, 17 boards a second later). Re-reading by name turns a
+    // cold page into a retry instead of a `page has no root`.
+    for (let i = 0; !root && i < 6; i++) {
+      await nap(250);
+      try { const rp = penpotUtils.getPageByName(page.name); root = (rp && rp.root) || null; } catch (e) {}
+    }
+    if (!root) return { page: page.name, err: 'page has no root' };
+    // The fixed structure shelves every board inside one `<page> · PageRoot` board (penpot-structure §3), so that board's
+    // children are the page's units of work — and the PageRoot's own paint (the page ground) is bound separately.
+    const named = Array.from(root.children || []).find((k) => /-PageRoot$/.test(String(k.name || '')));
+    const container = named || root;
+    const kids = Array.from(container.children || []).filter((k) => k.type === 'board');
+    if (named) await TK.bindBoard(named, Object.assign({}, o, { self: true }));
+    // The page chrome ( `<n>-Header` / `<n>-Footer`) are SIBLINGS of the PageRoot, so a sweep that only walks the
+    // PageRoot leaves their paint and type unbound — `paint_unbound` on every page. Bound them in the same pass.
+    let chrome = [];
+    if (named) {
+      try { chrome = Array.from(root.children || []).filter((k) => k.type === 'board' && k !== named); } catch (e) { chrome = []; }
+    }
+    for (let i = 0; i < chrome.length; i++) await TK.bindBoard(chrome[i], o);
+    const rows = [];
+    const from = o.from || 0, to = Math.min(kids.length, from + (o.count || kids.length));
+    for (let i = from; i < to; i++) {
+      const r = await TK.bindBoard(kids[i], o);
+      rows.push(r);
+    }
+    const sum = (f) => rows.reduce((a, r) => a + (f(r) || 0), 0);
+    // One yield per PAGE commits everything that page's boards queued: the binding is not in the file until the event
+    // loop gets the turn back, and a per-board wait costs 0.7s × 12 boards for the same result 0.7s × 1 gives.
+    if (o.pageSettle && rows.reduce((a, r) => a + (r.batches || 0), 0) > 0) await nap(o.pageSettle);
+    return {
+      page: page.name, boards: rows.length, of: kids.length, from: from,
+      scanned: sum((r) => r.scanned), fill: sum((r) => r.fillBound), stroke: sum((r) => r.strokeBound), type: sum((r) => r.typeBound),
+      alreadyType: sum((r) => r.already.typography),
+      skipped: { alpha: sum((r) => r.skipped.alpha), multi: sum((r) => r.skipped.multi), gradient: sum((r) => r.skipped.gradient), ref: sum((r) => r.skipped.ref) },
+      offPalette: rows.reduce((a, r) => a.concat(r.offPalette), []),
+      offStroke: rows.reduce((a, r) => a.concat(r.offStroke), []),
+      offRamp: rows.reduce((a, r) => { r.offRamp.forEach((k) => { const p = k.split('×'); a[p[0]] = (a[p[0]] || 0) + Number(p[1]); }); return a; }, {}),
+      offSpace: rows.reduce((a, r) => { r.offSpace.forEach((k) => { const p = k.split('×'); a[p[0]] = (a[p[0]] || 0) + Number(p[1]); }); return a; }, {}),
+      space: sum((r) => r.spaceBound), padOnScale: sum((r) => r.padOnScale),
+      radius: sum((r) => r.radiusBound), alreadyRadius: sum((r) => (r.already || {}).borderRadius),
+      retunedRadius: sum((r) => r.retunedRadius), pillRadius: sum((r) => r.pillRadius),
+      offRadius: rows.reduce((a, r) => { (r.offRadius || []).forEach((k) => { const p = k.split('×'); a[p[0]] = (a[p[0]] || 0) + Number(p[1]); }); return a; }, {}),
+      retuned: sum((r) => r.retuned), retunedSpace: sum((r) => r.retunedSpace)
+    };
+  };
+  TK.bindNext = async function (o) {
+    o = o || {};
+    if (!TK._bindQueue) TK.bindStart();
+    if (!TK._bindQueue.length) return { done: true, report: TK._bindReport };
+    const n = TK._bindQueue[0];
+    const r = await TK.bindPage(n, o);
+    if (r.err && /page has no root/.test(r.err)) { TK._bindReport[n] = r; TK._bindQueue.shift(); return r; }
+    TK._bindReport[n] = r;
+    TK._bindQueue.shift();
+    return { page: n, boards: r.boards, fill: r.fill, stroke: r.stroke, type: r.type, radius: r.radius,
+      offPalette: (r.offPalette || []).length, remaining: TK._bindQueue.length };
+  };
+
+  // ---------- file-wide corner sweep (rules 35/36 · resume-safe) ----------
+  // `execute_code` has a ~30s ceiling, so a file pass must stop itself and be called again. The queue lives in
+  // `storage`, so a dropped call costs the in-flight page, never the progress already written — and because the pass
+  // reads each shape's own value and re-binds only what is not already at the target token, re-running over a page
+  // that was already swept is a no-op rather than a second edit.
+  TK.radiusStart = function (names, o) {
+    o = o || {};
+    TK._radQueue = (names || TK.pageNames()).slice();
+    TK._radReport = {};
+    TK._radAt = 0;
+    // The tally lives in `storage`, not in the call: an `execute_code` timeout discards the response but not the
+    // writes or the cursor, so a dropped call must not discard the count of what was already done.
+    if (!TK._radAgg || o.reset !== false) {
+      TK._radAgg = { mode: o.dry ? 'dry' : 'apply', calls: 0, pages: 0, boards: 0, scanned: 0, bound: 0, already: 0, retuned: 0, pill: 0, off: 0, offValues: {}, errs: [] };
+    }
+    return { queued: TK._radQueue.length };
+  };
+  // A page is chunked, not taken whole: `bindPage` has no deadline of its own, and one 40-board screens page would
+  // blow the ~30s `execute_code` ceiling from inside a single call (measured 2026-10-22: page 14 = 13 boards ≈ 4s, so
+  // 4 boards per chunk keeps every call well under it).
+  TK.radiusSweep = async function (o) {
+    o = o || {};
+    if (!TK._radQueue || !TK._radQueue.length) TK.radiusStart(null, { dry: o.dry });
+    if (!TK._radAgg) TK.radiusStart(TK._radQueue, { dry: o.dry });
+    const budget = o.budget === undefined ? 18000 : o.budget;
+    const chunk = o.chunk === undefined ? 4 : o.chunk;
+    // A corner binding is only in the file once the event loop has been given back: measured 2026-10-22, a sweep run
+    // with no yield reported 3,465 corners bound while a later independent dry read still found them unbound, and the
+    // same page with one 800ms yield read back 365/365 bound. The write is queued, the flush happens on the yield, so
+    // the wait is not a courtesy pause for a readback — it IS the commit. It is paid once per PAGE (`pageSettle`), not
+    // once per board, and `radiusPages()` is the read that says which pages still owe it.
+    const settle = o.dry ? undefined : (o.settle === undefined ? 800 : o.settle);
+    const t0 = Date.now();
+    const agg = TK._radAgg;
+    const anomalies = [];
+    let chunks = 0;
+    agg.calls++; agg.mode = o.dry ? 'dry' : 'apply';
+    while (TK._radQueue.length && Date.now() - t0 < budget) {
+      const n = TK._radQueue[0];
+      const r = await TK.bindPage(n, {
+        only: 'radius', dry: !!o.dry, from: TK._radAt, count: chunk,
+        settle: o.dry ? undefined : 0, pageSettle: o.dry ? undefined : settle,
+      });
+      chunks++;
+      if (r.err) { anomalies.push({ page: n, err: r.err }); agg.errs.push({ page: n, err: r.err }); TK._radQueue.shift(); TK._radAt = 0; continue; }
+      agg.boards += r.boards || 0; agg.scanned += r.scanned || 0;
+      agg.bound += r.radius || 0; agg.already += r.alreadyRadius || 0;
+      agg.retuned += r.retunedRadius || 0; agg.pill += r.pillRadius || 0;
+      Object.keys(r.offRadius || {}).forEach(function (k) {
+        const p = k.split('×');
+        agg.offValues[p[0]] = (agg.offValues[p[0]] || 0) + Number(p[1] || 1);
+        agg.off += Number(p[1] || 1);
+      });
+      const rep = TK._radReport[n];
+      if (!rep) { TK._radReport[n] = { boards: r.boards, of: r.of, scanned: r.scanned, bound: r.radius, already: r.alreadyRadius, retuned: r.retunedRadius, pill: r.pillRadius, offRadius: r.offRadius }; agg.pages++; }
+      else {
+        rep.boards += r.boards; rep.scanned += r.scanned; rep.bound += r.radius; rep.already += r.alreadyRadius;
+        rep.retuned += r.retunedRadius; rep.pill += r.pillRadius;
+      }
+      TK._radAt += r.boards;
+      // A chunk that processed nothing must still move the cursor: `from` cannot advance past a page whose boards all
+      // failed, and a queue that never empties is a driver bug, not a design.
+      if (!r.boards) { TK._radQueue.shift(); TK._radAt = 0; }
+      else if (TK._radAt >= (r.of || 0)) { TK._radQueue.shift(); TK._radAt = 0; }
+    }
+    return {
+      chunks: chunks, ms: Date.now() - t0, remaining: TK._radQueue.length, at: TK._radAt,
+      done: TK._radQueue.length === 0, anomalies: anomalies.slice(0, 8),
+      total: { pages: agg.pages, boards: agg.boards, scanned: agg.scanned, bound: agg.bound, already: agg.already, retuned: agg.retuned, pill: agg.pill, off: agg.off },
+      offValues: agg.offValues
+    };
+  };
+  // The per-page table the delivery read needs: which pages carried an off-ladder corner or had corners to move.
+  TK.radiusPages = function (o) {
+    o = o || {};
+    const rows = Object.keys(TK._radReport || {}).map(function (n) {
+      const r = TK._radReport[n];
+      return { page: n, scanned: r.scanned, bound: r.bound, already: r.already, retuned: r.retuned, pill: r.pill, off: Object.keys(r.offRadius || {}).length };
+    });
+    return {
+      pages: rows.length,
+      withCorners: rows.filter((r) => r.retuned > 0 || r.bound > 0 || r.already > 0).length,
+      withOffLadder: rows.filter((r) => r.off > 0).length,
+      worst: rows.slice().sort((a, b) => b.retuned - a.retuned).slice(0, o.top || 12)
+    };
+  };
+
+  // ---------- the step a HOST must carry (DESIGN.md's decision, not the factory's memory) ----------
+  // Rules 35/36 judge corners that exist, so a control host drawn square by an older generation of the factory passes
+  // vacuously — measured 2026-10-22, when the `Button·Spec` export showed square bodies behind pill focus rings. The
+  // authority for which step a host takes is DESIGN.md's component list, and Rayo binds every button, tag, chip and
+  // badge variant to `{rounded.full}`; these are the families that says something about, in the name `CF` uses.
+  // A family absent from this table is NOT judged — the auditor never invents a step the source did not declare.
+  // Measured 2026-10-22 on the live file: `Button·Primary·MD·Focus·Pill` reports `isComponentInstance() === true` AND
+  // `isComponentMainInstance() === isComponentRoot() === isComponentHead() === true` — in Penpot a component IS its main
+  // instance, so skipping "instances" would skip every master and fix nothing. Only a COPY is a consumer whose interior
+  // belongs to the master (`isComponentCopyInstance()`); repairing the master is what propagates to the copies.
+  TK.PILL_FAMS = { button: 1, iconbutton: 1, splitbutton: 1, fab: 1, chip: 1, badge: 1, tag: 1 };
+  // The second half of the same contract: `CF.ROLE.ring = 'host'` — a ring is a derived outline, so its corner is the
+  // host's corner. A ring at 10 around a host at 0 (or 9999) is the defect the user pointed at on `Button·Primary·MD·Focus·Pill`.
+  TK.roleStart = function (names, o) {
+    o = o || {};
+    TK._roleQueue = (names || TK.pageNames()).slice();
+    TK._roleReport = {};
+    if (!TK._roleAgg || o.reset !== false) {
+      TK._roleAgg = { mode: o.dry ? 'dry' : 'apply', calls: 0, pages: 0, hosts: 0, masters: 0, copies: 0, rings: 0, bound: 0, already: 0, errs: [] };
+    }
+    return { queued: TK._roleQueue.length };
+  };
+  TK.roleSweep = async function (o) {
+    o = o || {};
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (!TK._roleQueue || !TK._roleQueue.length) TK.roleStart(null, o);
+    if (!TK._roleAgg) TK.roleStart(TK._roleQueue, o);
+    const agg = TK._roleAgg; agg.calls++; agg.mode = o.dry ? 'dry' : 'apply';
+    if (agg.copies === undefined) agg.copies = 0;    // an agg from a call made before this counter existed must not go NaN
+    let FULL = 9999; try { if (storage.CF && storage.CF.radius) FULL = storage.CF.radius('control'); } catch (e) {}
+    const budget = o.budget === undefined ? 18000 : o.budget;
+    const settle = o.dry ? 0 : (o.settle === undefined ? 800 : o.settle);
+    // Reading a page's `root` needs the page OPEN even for a dry count (a non-current Page exposes only id/name), so the
+    // open is not optional here — keep its settle wait short when nothing is being written.
+    const openNap = o.dry ? 60 : 150;
+    const t0 = Date.now(); const anomalies = []; let chunks = 0;
+    const isInst = (s) => { try { return typeof s.isComponentInstance === 'function' && s.isComponentInstance(); } catch (e) { return false; } };
+    const isCopy = (s) => { try { return typeof s.isComponentCopyInstance === 'function' && s.isComponentCopyInstance(); } catch (e) { return isInst(s); } };
+    const isMaster = (s) => { try { return typeof s.isComponentMainInstance === 'function' && s.isComponentMainInstance(); } catch (e) { return false; } };
+    const maxC = (s) => { const cs = TK.cornersOf(s); return cs ? Math.max.apply(null, cs) : null; };
+    while (TK._roleQueue.length && Date.now() - t0 < budget) {
+      const n = TK._roleQueue.shift(); chunks++;
+      let page = null; try { page = penpotUtils.getPageByName(n); } catch (e) {}
+      if (!page) { anomalies.push({ page: n, err: 'no page' }); continue; }
+      // Writes need the page OPEN (api-pitfalls §14); reads do not, but this pass writes.
+      if (penpot.currentPage.name !== n) { try { await penpot.openPage(page.id); } catch (e) { anomalies.push({ page: n, err: 'open failed' }); continue; } await nap(openNap); }
+      let root = null; try { root = penpot.currentPage.root; } catch (e) {}
+      for (let i = 0; !root && i < 6; i++) { await nap(o.dry ? 80 : 200); try { const rp = penpotUtils.getPageByName(n); root = rp && rp.root; } catch (e) {} }
+      if (!root) { anomalies.push({ page: n, err: 'no root (cold page)' }); TK._roleQueue.unshift(n); break; }
+      let hosts = 0, rings = 0, masters = 0, copies = 0;
+      (function walk(s, host) {
+        // Measured 2026-10-22: writing `borderRadius` on a component's MAIN INSTANCE fixes the master and every FRESH
+        // instance, but the copies already placed in the file keep their own geometry — `Button·SM` on `14 · Screens ·
+        // app` still read 0 after its master was set to 9999, and re-opening the page did not refresh it. So a copy is
+        // visited too, and only with these two rules (host step + ring follows host): nothing else about a copy is ours
+        // to rewrite, and `resetOverrides()` would also revert the label and paint a screen deliberately set.
+        const nm = String(s.name || '');
+        const isCop = isCopy(s);
+        let h = host;
+        if (/^ring·/.test(nm)) {
+          if (host) {
+            const hv = maxC(host), rv = maxC(s);
+            if (hv !== null && rv !== null && hv !== rv) { rings++; if (!o.dry) { try { s.borderRadius = hv; } catch (e) { rings--; } } }
+          }
+        } else if (String(s.type) === 'board') {
+          h = s;
+          const base = nm.split('·')[0].toLowerCase();
+          if (TK.PILL_FAMS[base] && !/·Spec$|-PageRoot$|-Header$|-Footer$/.test(nm)) {
+            const v = maxC(s);
+            if (v !== null && v !== FULL) {
+              hosts++;
+              if (isCop) copies++; else if (isMaster(s)) masters++;
+              if (!o.dry) { try { s.borderRadius = FULL; } catch (e) { hosts--; if (isCop) copies--; else if (isMaster(s)) masters--; } }
+            }
+          }
+        }
+        let ks = []; try { ks = Array.from(s.children || []); } catch (e) {}
+        ks.forEach((k) => walk(k, h));
+      })(root, null);
+      // The values are now on the ladder; bind them. `TK.bindPage` walks every board's corners and yields once per page,
+      // and that yield IS the commit (api-pitfalls §17) — a sweep that skips it has written nothing.
+      let bind = { radius: 0, alreadyRadius: 0 };
+      if (!o.dry) bind = await TK.bindPage(n, { only: 'radius', settle: 0, pageSettle: settle });
+      agg.pages++; agg.hosts += hosts; agg.rings += rings; agg.masters += masters; agg.copies += copies;
+      agg.bound += bind.radius || 0; agg.already += bind.alreadyRadius || 0;
+      TK._roleReport[n] = { hosts: hosts, masters: masters, copies: copies, rings: rings, bound: bind.radius || 0, already: bind.alreadyRadius || 0 };
+      if (bind.err) anomalies.push({ page: n, err: bind.err });
+    }
+    return {
+      chunks: chunks, ms: Date.now() - t0, remaining: TK._roleQueue.length, done: TK._roleQueue.length === 0,
+      anomalies: anomalies.slice(0, 8),
+      total: { pages: agg.pages, hosts: agg.hosts, masters: agg.masters, copies: agg.copies, rings: agg.rings, bound: agg.bound, already: agg.already }
+    };
+  };
+  TK.rolePages = function () {
+    return Object.keys(TK._roleReport || {}).filter((n) => TK._roleReport[n].hosts || TK._roleReport[n].rings)
+      .map((n) => Object.assign({ page: n }, TK._roleReport[n]));
+  };
+
+  // ---------- library typography styles: the 素材 → 排版 list ----------
+  // Measured 2026-10-21: a file can hold 40 *active* `typography` tokens and still show an **empty** Typography
+  // panel, because that panel lists `penpot.library.local.typographies` (the style records) — a different subsystem
+  // from `tokens.sets`. `createTypography()` takes NO argument (same ignore-the-args behaviour as `createColor`,
+  // capabilities §7) and returns a `LibraryTypography` with writable name/fontFamily/fontSize/fontWeight/lineHeight/
+  // letterSpacing plus `applyToText(shape)`. A token *declares* the ramp; a style is what a consumer can pick,
+  // so a delivered file needs both — audit_design rule 30 (`no_type_styles`) fails a text-bearing board whose
+  // library has styles = 0.
+  const TP = storage.TP = {};
+  TP.all = function () { try { return Array.from(penpot.library.local.typographies); } catch (e) { return []; } };
+  TP.get = function (name) { const n = String(name); return TP.all().find((t) => String(t.name) === n) || null; };
+  TP.read = function (t) {
+    const o = {};
+    ['name', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing'].forEach((k) => {
+      try { o[k] = t[k]; } catch (e) { o[k] = undefined; }
+    });
+    return o;
+  };
+
+  // Idempotent: one style per declared token, named **exactly like the token**, so `type.prose-lg` on a shape means
+  // the same thing in the token set, in the panel and in the auditor. `rewrite: true` re-writes an existing record.
+  TP.seed = function (o) {
+    o = o || {};
+    const list = TK.activeTokens('typography');
+    const have = {};
+    TP.all().forEach((t) => { have[String(t.name)] = t; });
+    const made = [], kept = [], drift = [], failed = [];
+    list.forEach(function (e) {
+      const v = TK.tokenValue(e.token);
+      const famName = Array.isArray(v.fontFamily) ? String(v.fontFamily[0] || '') : String(v.fontFamily || '');
+      let t = have[e.name];
+      if (t && !o.rewrite) { kept.push(e.name); return; }
+      if (!t) {
+        try { t = penpot.library.local.createTypography(); } catch (err) { failed.push(e.name + ' ← create: ' + String(err && err.message || err).slice(0, 48)); return; }
+        made.push(e.name);
+      }
+      try { t.name = e.name; } catch (err) {}
+      const f = famName ? penpot.fonts.findByName(famName) : null;
+      const wantW = String(v.fontWeight || '400');
+      if (f) {
+        const variant = f.variants.find((x) => String(x.fontWeight) === wantW)
+          || f.variants.find((x) => String(x.fontWeight) === '400') || f.variants[0];
+        // setFont, not fontFamily= : the style record must carry a real fontId/variantId or the panel shows a family
+        // the renderer cannot load. Weight/size after it, because setFont also writes the weight it resolved.
+        try { t.setFont(f, variant); } catch (err) { failed.push(e.name + ' ← setFont: ' + String(err && err.message || err).slice(0, 48)); }
+      } else if (famName) { failed.push(e.name + ' ← font "' + famName + '" not installed'); }
+      const want = { fontSize: v.fontSize, lineHeight: v.lineHeight, letterSpacing: v.letterSpacing, fontWeight: v.fontWeight };
+      Object.keys(want).forEach((k) => {
+        if (want[k] === null || want[k] === undefined || want[k] === '') return;
+        try { t[k] = String(want[k]); } catch (err) {}
+      });
+      const bad = [];
+      Object.keys(want).forEach((k) => {
+        if (want[k] === null || want[k] === undefined || want[k] === '') return;
+        let got; try { got = t[k]; } catch (err) {}
+        if (num(got) === null || num(got) !== num(want[k])) bad.push(k + '=' + String(got) + ' ≠ ' + String(want[k]));
+      });
+      if (bad.length) drift.push(e.name + ' ← ' + bad.join(', '));
+    });
+    return { ramp: list.length, made: made.length, kept: kept.length, styles: TP.all().length,
+      madeNames: made.slice(0, 8), drift: drift.slice(0, 8), failed: failed.slice(0, 8) };
+  };
+
+  // The inventory the gate reads: every declared step must have a style, and a style with no token is a lie in the panel.
+  TP.audit = function () {
+    const ramp = TK.typeIndex().ramp;
+    const names = TP.all().map((t) => String(t.name));
+    const missing = ramp.filter((r) => names.indexOf(r.name) < 0).map((r) => r.name);
+    const fileOnly = names.filter((n) => !ramp.some((r) => r.name === n));
+    return { tokens: ramp.length, styles: names.length, missing: missing.slice(0, 12), fileOnly: fileOnly.slice(0, 12) };
+  };
+
+  // Apply the declared style to a text shape and report the readback (this is the panel's own "apply", so a style
+  // that cannot be applied is worth nothing — measure it, do not assume it).
+  TP.apply = function (shape) {
+    let fam = null, fs = null, fw = null, lh = null;
+    try { fam = shape.fontFamily; fs = shape.fontSize; fw = shape.fontWeight; lh = shape.lineHeight; } catch (e) {}
+    const name = TK.stepFor(fs, fw, fam, lh);
+    if (!name) return { err: 'this step is not in the ramp', shape: String(shape.name || '').slice(0, 30) };
+    const st = TP.get(name);
+    if (!st) return { err: 'no style named ' + name, step: name };
+    const before = TP.read(shape);
+    try { st.applyToText(shape); } catch (e) { return { err: String(e && e.message || e).slice(0, 60), step: name }; }
+    // Measured 2026-10-21: `applyToText` transmits family/size/weight/tracking but rewrites **lineHeight to 1.2**
+    // whatever the record holds (1.05 → 1.2, 1.4 → 1.2), so the leading is re-asserted from the style here — otherwise
+    // applying a style silently flattens the ramp's rhythm.
+    let styleLh = null; try { styleLh = st.lineHeight; } catch (e) {}
+    if (styleLh !== null && styleLh !== undefined && String(styleLh) !== '') { try { shape.lineHeight = String(styleLh); } catch (e) {} }
+    return { step: name, changed: JSON.stringify(before) !== JSON.stringify(TP.read(shape)), after: TP.read(shape) };
+  };
+
+  return { seeded: true, fns: ['TK.seed', 'TK.ensureSet', 'TK.put', 'TK.find', 'TK.apply', 'TK.unbindFill', 'TK.unbindStroke', 'TK.paint', 'TK.changed', 'TK.audit', 'TK.assert', 'TK.theme', 'TK.ensureTheme', 'TK.activateTheme', 'TK.activeSets', 'TK.colorIndex', 'TK.typeIndex', 'TK.stepFor', 'TK.snapType', 'TK.nearestHex', 'TK.spaceIndex', 'TK.snapSpace', 'TK.declared', 'TK.walk', 'TK.bindBoard', 'TK.bindPage', 'TK.bindStart', 'TK.bindNext', 'TP.seed', 'TP.audit', 'TP.apply', 'TP.get', 'TP.read'] };
 })();

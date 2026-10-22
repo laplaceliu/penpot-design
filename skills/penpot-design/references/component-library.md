@@ -24,6 +24,11 @@
    a `·` separated name (`Button·Primary·Md·Hover`), never `/` in a component name.
 5. **State layers are tints over the base color, not different hex values** (§1.2). A hover that changes the fill hue fails
    `state_coverage` even if it looks plausible.
+6. **A control with a master is placed, not redrawn.** `CF.autoRegister` promotes the first host of each name and
+   `CF.componentize` swaps matching copies in place; any later host whose name already has a master and was drawn by hand signals
+   `not_component` (rule 27, gate G13). Place with `CF.instance(name, {parent, text})` (§5.2). Copies accept size/position/
+   text/fill overrides but **reject structural edits** — when a variant needs a child the master lacks (a label slot, a status
+   chip), add the slot in the factory so it gets its own master; never bolt siblings onto an instance.
 
 ## 1. State model
 
@@ -57,18 +62,35 @@ so the reviewer can see that hover is not a different blue.
 
 | Key | Height | Font | Pad-X | Icon | Radius | Gap icon↔label | Where it is the default |
 |---|---|---|---|---|---|---|---|
-| `xs` | **24** | 12 | 8 | 14–16 | 4 | 4 | dense table cell actions, inline edit, chips |
-| `sm` | **28–32** | 13 | 10–12 | 16 | 6 | 6 | secondary toolbar buttons, filters [spec AntD `controlHeightSM` 24, Primer sm 28] |
-| `md` | **32** | 14 | 12–16 | 16–18 | 6–8 | 8 | **the web default** [spec AntD `controlHeight` 32, Carbon S/M, shadcn h-8] |
-| `lg` | **40** | 14–15 | 16–24 | 18–20 | 8 | 8 | forms, marketing CTAs [spec AntD `controlHeightLG` 40, M3 button 40dp] |
-| `xl` | **44–48** | 15–16 | 20–24 | 20 | 8–12 | 8 | touch-first primary actions [spec WCAG 2.5.5 AAA 44, mobile 48dp] |
-| `2xl` | **56** | 16–18 | 24–32 | 24 | 12 | 12 | hero CTA, checkout button |
+| `xs` | **24** | 12 | 8 | 14–16 | `control` | 4 | dense table cell actions, inline edit, chips |
+| `sm` | **28–32** | 13 | 10–12 | 16 | `control` | 6 | secondary toolbar buttons, filters [spec AntD `controlHeightSM` 24, Primer sm 28] |
+| `md` | **32** | 14 | 12–16 | 16–18 | `control` | 8 | **the web default** [spec AntD `controlHeight` 32, Carbon S/M, shadcn h-8] |
+| `lg` | **40** | 14–15 | 16–24 | 18–20 | `control` | 8 | forms, marketing CTAs [spec AntD `controlHeightLG` 40, M3 button 40dp] |
+| `xl` | **44–48** | 15–16 | 20–24 | 20 | `control` | 8 | touch-first primary actions [spec WCAG 2.5.5 AAA 44, mobile 48dp] |
+| `2xl` | **56** | 16–18 | 24–32 | 24 | `control` | 12 | hero CTA, checkout button |
 
+- **The Radius column is a role, not a number (HARD).** `CF.ladder(size).radius` returns `'control'`, and `CF.radius('control')`
+  resolves it against the **declared `borderRadius` token set** (`CF.ROLE`: control→`full`, box→`xs`, tile/badge→`sm`,
+  card/field/panel→`md`, slab/inverse→`lg`, hero→`xl`, flat→`none`, **ring→`host`** — a ring is a derived outline and takes
+  the corner of the control it surrounds, never a ladder step of its own). Hand-writing `radius: 8` or `radius: h / 2` is what
+  produced the orphan corners this rule removes: every writer path (`ctx.plate`, `ctx.ring`, `ctx.clip`, `CF.build`,
+  `NL.frame`, `NL.plate`, `storage.mkAbsBoard`, `storage.mkRect`) passes through `CF.radius()`, which snaps an off-ladder
+  number to the nearest step and records the coercion in `CF.coerced`. A drawn control is therefore **always** a token
+  corner, and gate rules 35/36/37 (`radius_off_ladder`, `radius_unbound`, `ring_off_host`) are the machine check. For a file
+  drawn before the roles existed, `TK.roleSweep()` is the repair: it forces every pill-family host (`TK.PILL_FAMS`) to
+  `CF.radius('control')` and every `ring·*` plate to its host's corner — on masters **and** placed copies, because a write
+  to a master does not re-sync the copies already in the file.
 - **Touch floors (HARD)**: mobile/pad target **≥44×44** (AAA 44 [spec WCAG 2.5.5], M3 state layer 40dp, iOS 44pt); web ≥32 with
   spacing exception. A 24px `xs` control is legal on a dense desktop table row **only** when its hit pad makes the target 32+.
 - Icon-only buttons are **square**: 28 / 40 / 52 with icon 16–18 / 24 / 28 [obs MUI IconButton paddings 5/8/12].
 - Text buttons keep the same height as their solid siblings; only padding and fill change.
 - `CF.ladder('md')` returns `{h,fs,padX,icon,radius,gap}` — factories must take size from here, never inline a height.
+- **A control's interior is the declared exception to whitespace-first** (design-guide §2.1, gate rules 32–34). Its gaps are
+  *anatomy*, fixed by the ladder above at the `inline` level (icon↔label 8, label↔affix 4), and `gap 0` is **correct** for an
+  attached control (ButtonGroup, Segmented, table row of chips) — those separate with a hairline, not with air. The auditor knows
+  this: rules 32/33 bind a row only when its members stack into cards or already tried to separate them, and a shape inside an
+  instance is never walked. What is **not** exempt is how controls sit next to each other and next to text: that is composition,
+  and composition breathes at `LY.breath('block' | 'group', tier)`.
 
 ## 3. Families
 
@@ -111,7 +133,7 @@ The **input family is where thin component systems show up first**. A bare round
 | **Addon input** | attached segments: addon h = field h, pad-X 12, bg filled-neutral, inner radius 0, outer radius kept (e.g. `https://` · `+86` · `.pdf` · unit `kg`) [spec AntD `addonBefore/addonAfter`] | prefix-addon · suffix-addon · both | `https://` + field, field + `kg`, select-as-addon | `CF.input` (`addonBefore`/`addonAfter`) |
 | **Password** | field + **eye toggle** 20–24 trailing (hit 32), masked dots use `•` at 2px letterspacing, reveal keeps the caret | `reveal`, `strength` | masked · revealed · **with strength bar** (4–6 h, 4 segments, labels 12) | `CF.passwordField` |
 | **Masked / formatted** | placeholder shows the mask (`(555) 123‑4567`, `4242 4242 4242 4242`, `12/31/24`), digits grouped by the mask, brand marks 20–24 trailing for card | `mask` (phone · card · date · currency · custom) | phone, card **with brand icon**, currency with unit prefix | `CF.maskedInput` |
-| **OTP / code** | **6 boxes 44–48 × 56–64**, gap 8–12, extra group gap after the 3rd, one hidden input; active box = 2px accent; filled boxes = dot or digit centered; error = red border on all + 13px message | `length` (4–8), `grouped`, `dashes` | 6-box grouped, 4-box, error state, one **with resend timer** | `CF.otpInput` |
+| **OTP / code** | **6 boxes 44–48 × 56–64**, gap 8–12, extra group gap after the 3rd, one hidden input; active box = 2px accent + centred caret, disabled has neither (loading = centred 16px spinner, never a corner badge); filled boxes = dot or digit centered; error = red border on all + 13px message | `length` (4–8), `grouped`, `dashes`, `loading` | 6-box grouped, 4-box, error state, one **with resend timer** | `CF.otpInput` |
 | **Search field** | h 32–40, radius 6–8 **or** full (pick one system-wide), leading 16–18, trailing clear + optional `⌘K` kbd chip 20–24 h, mono 11 | `inline` vs `overlay`, `shortcutHint`, `withButton` (AntD search = field + attached primary button) | field-only, field+clear, field+**attached button**, with kbd hint | `CF.searchField` |
 | **Textarea** | min-h = 3 lines (rows×lineHeight + pad-Y 8–12), max-h with internal scroll, resize handle 14 bottom-right or `none`, counter bottom-right outside | `autosize` (min/max rows), `resize` (none · vertical), `count` | empty, filled with 4 lines, **autosized to content**, max-height with scroll | `CF.textarea` |
 | **Number stepper** | field + attached − / + 32×32 buttons (or hover-revealed up/down 16 arrows in a 24 gutter), value right-aligned, unit as suffix addon, min/max clamps shown by disabled arrows | `attached` vs `hover-reveal`, `unit`, `precision` | default, one arrow **disabled at min**, with unit, with value right-aligned | `CF.numberField` |
@@ -130,6 +152,13 @@ The **input family is where thin component systems show up first**. A bare round
 | **Transfer** | two panels 240–280 × 320, header 40 with count + select-all checkbox, list rows 36–40, middle buttons 32–40 vertical | `withSearch`, `pagination` | both panels populated, one item selected each, disabled item | `CF.transfer` |
 | **Tree select** | node row 32–36, indent **16/level**, guide lines 1px optional, chevron 16, checkbox 18, icon 16–20 | `checkable`, `directory`, `async` | 3 levels with one expanded, **checkable with parent indeterminate**, async node with spinner | `CF.tree` |
 
+**A label is a slot, not a decoration** (`Checkbox` / `Radio` / `Switch`). A bare master has no text child, and a component
+copy **refuses structural edits**, so a labelled row built from the bare master could not carry its copy. These three factories
+therefore name the labelled composition with a `Label` slot — `Checkbox·Md·Checked·Checked-Label`, `Radio·Md·Selected·Selected-Label`,
+`Switch·Md·On·On-Label` — which registers a **separate master** that owns the text. Place the `…·Label` name when label and
+control ship as one host; keep the label as a sibling only when the copy differs per row (facet filters are the measured case) —
+that is a deliberate group, not a component row, and must not be counted as one in coverage.
+
 ### 3.3 C · Data display
 
 | Component | Anatomy (numbers) | Variant axes | Min variant set | CF key |
@@ -141,7 +170,7 @@ The **input family is where thin component systems show up first**. A bare round
 | **Card** | pad **24** (16 compact, 20–24 dense), radius 8–12, header 56 (title 16/600 + subtitle 13 + extra 24–32), body, footer 64 (actions right, hairline top), cover media full-bleed, `actions` row 48–56 icons 24 equal-split [spec AntD card] | `tone` (outlined · filled · elevated) × `media` (none · top · inline-left) × `header` × `footer` × `selectable` × `loading` | outlined, elevated (level 1), **with cover**, with header+extra, **with action row**, **selectable (checked)** , skeleton card | `CF.card` |
 | **Statistic / KPI** | label 12–13 muted, value **28–36/1.0 tabular**, delta 13 + arrow 12–16 (success/error color **plus** sign — never color alone), sparkline 60–80×24, pad 20–24, h 120–160 | `sparkline`, `delta`, `prefix/suffix`, `compact` | full KPI (label+value+delta+spark), compact (label+value), **negative delta**, value-only | `CF.kpi` |
 | **Tag / chip** | h **24 small / 32 default** [spec M3 chip 32, icon 18, avatar 24], radius 4 (tag) or full (chip), pad-X 8–12, dot 6–8 leading, icon 14–16, ✕ 14–16 at gap 4 | `kind` (**status tag · filter chip · input chip · actionable chip · link**) × `tone` (neutral · accent · success · warning · danger) × `removable` | tag per tone (4), filter chip selected/unselected, input chip with avatar, removable on hover, **`+N` overflow chip**, small 24 counter tag | `CF.chip` |
-| **Badge** | dot **6** / pill **h 20 min-w 20**, width = measured label + 12 (pad-X 6 each side), font **12/700** (10–11 would fail the ramp minimum, design-guide §3.2), radius = h/2, offset −4 to −8 onto its host, overflow **99+**, optional `surface` ring 2 | `dot` vs `count` vs `status(text+dot)`, `standalone`, `soft`, `ribbon`, `showZero` | count on icon, **dot only**, `99+` overflow, status list (success/processing/default/error), ribbon corner, standalone | `CF.badge` |
+| **Badge** | dot **6** / pill **h 20 min-w 20**, width = measured label + 12 (pad-X 6 each side), font **12/700** (10–11 would fail the ramp minimum, design-guide §3.2), radius `full` (a pill binds the token, never `h/2`), offset −4 to −8 onto its host, overflow **99+**, optional `surface` ring 2 | `dot` vs `count` vs `status(text+dot)`, `standalone`, `soft`, `ribbon`, `showZero` | count on icon, **dot only**, `99+` overflow, status list (success/processing/default/error), ribbon corner, standalone | `CF.badge` |
 | **Avatar** | **24 / 32 / 40 / 48 / 64 / 96**, circle or radius 6, initials 12–14/600, fallback = initials then icon then broken-image, presence dot 8–10 with 2px surface ring [spec AntD sizes] | `shape` (circle · rounded · square), `size`, `content` (image · initials · icon), `status`, `group`, `editable` | 3 sizes with image, **initials fallback**, **group of 4 with `+2` overflow**, presence dot, square, **editable (camera on hover)** | `CF.avatar`, `CF.avatarGroup` |
 | **Status text** | dot **8** + gap 4 + label 12–13; dot colour carries the tone and the label repeats it in words (never colour alone); optional right meta 12 muted; host width = 12 + measured label | `tone` (neutral · accent · info · success · warning · danger), `size`, `pulse` | one row per tone, with right meta, muted label for a neutral state | `CF.statusText` |
 | **Progress** | linear h **4–8** radius full, track 12% ink, fill accent, label 12 right or above · circular **48** (stroke 4 [spec M3]) · dashboard = 270° arc · steps = segmented bar n cells gap 2 | `type` (line · circle · steps · dashboard), `status` (normal · success · exception), `indeterminate`, `format` | line determinate with %, **line indeterminate**, line success + error, circular 48 with value, **segmented steps** | `CF.progress` |
@@ -257,7 +286,12 @@ CF.swap(a, CF.name('Button', { type: 'primary', size: 'md', state: 'hover' })); 
 * **never** declare `'auto'` on an instance or control host — a board's `auto` is *hug* and it collapses to the label
   (measured 160×52 → 41×17). `CF.instance` defaults to `'fix'/'fix'`;
 * deleting a main instance's shape removes its record (and `isComponentInstance()` is true for **mains** too), so batch
-  cleanups must not filter on it; `inst.detach()` on a main leaves an unremovable ghost (capabilities §5).
+  cleanups must not filter on it; `inst.detach()` on a main leaves an unremovable ghost (capabilities §5);
+* **retrofitting** a screen built from hand-drawn controls: `CF.componentize({page, apply:true})` replaces same-size copies
+  in place (text overrides copied by layer name). Its **size guard** (`misfit`, ±2px) exists because a factory interior is
+  absolute — `instance.resize()` does not reflow it; its **anatomy guard** (`anatomy`) refuses a copy with more descendants
+  than the master, because the swap would silently drop them. Clear both before claiming the screen uses components, and give
+  a deliberately richer composition its own name (`Accordion·FAQ·Multi`) instead of reusing the master's.
 
 ## 6. Icon rules for component slots
 
@@ -269,7 +303,9 @@ CF.swap(a, CF.name('Button', { type: 'primary', size: 'md', state: 'hover' })); 
 - **Default renderer: `CF.glyph(ctx, kind, box, o)`** — the built-in 24-grid path set (chevron, check, search, close, …),
   drawn as fill/stroke paths with the control's palette color, so it inherits tone and state automatically.
 - **Catalog / imported vectors: `IC.place(name, {parent, color, size})`** (embedded Lucide set, `storage.IC`, one line
-  per icon from `assets/icons/lucide.jsonl`) and **`IC.grid({names, x, y, …})`** for the `01 · Foundations` icon sheet;
+  per icon from `assets/icons/lucide.jsonl`) and **`IC.grid({names, x, y, …})`** for the `01 · Foundations` icon sheet
+  (that board is one of the **two declared exemptions** of gate G16, `FN.EXEMPT['01']` — alongside `Light vs dark` on
+  `02`; every other 01/02 board is an `FN.project` projection);
   **`CF.svgIcon(svg, {parent, color, size})`** for the target system's own icon file. The channel decision, licenses and
   the "why not a `.penpot` download" analysis are in `references/icons.md`. Never mix two sources inside one control,
   and never hand-draw an icon with loose rectangles.

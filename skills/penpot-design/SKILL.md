@@ -1,6 +1,6 @@
 ---
 name: penpot-design
-description: "Code to Design + Design to Code bidirectional design-system workflow, plus a practical Penpot MCP automation library. Two entry points (feed a URL or a set of images, or reuse an existing React/UI library source tree) produce DESIGN.md and a fixed-structure Penpot design system (18-page, 4-layer page/board/element contract). Layout is built in: a deterministic layout engine holds the spacing/type/grid scales and 29 screen recipes (app chrome — header, sidebar, footer, toolbar — plus business screens: email, calendar/week/month, event popover, dashboard, list, detail, settings, chat, kanban, hero, landing, blog, docs, e-commerce listing/PDP/cart/checkout, auth, OTP, pricing, wizard, gallery, print), a component factory produces maximals variant sets (plain text button and icon button, plain input and icon input and masked input and OTP, … with the five state axes), and a prescriptive design guide plus a design-rule linter enforce whitespace, rhythm, typography, contrast, touch targets and state layers. Through execute_code it batch-builds components/variants/dashboards/typical pages, batch-repairs alignment/stroke/cropping/flex-collapse/Chinese-garbled-text, registers library components, and exports for acceptance; it guides connecting the Penpot MCP and ships a ready-to-use deployment stack; it outputs code for any GUI tech stack (Qt4/5/6, React/Vue, LVGL, imgui, MAUI, Flutter…) from a Penpot design file, emphasizing image and icon asset references and component-indexed layered implementation, with PIL pixel-level verification aimed at pixel-perfect. Use when the user mentions \"generate a design system from a URL/images\", \"generate a Penpot design system\", \"use Penpot MCP to create pages/build components or dashboards\", \"recreate a UI library/design system\", \"built-in layouts / header footer sidebar / email calendar hero blog layouts\", \"component variants and states coverage\", \"design rules for whitespace, spacing or typography\", \"batch-repair alignment/style/render issues/Chinese-garbled-text on selected elements\", \"register library components\", \"enter/validate Penpot design tokens (17 TokenTypes / set activation / token references / themes)\", \"design to code\", \"convert a design into Qt/React/Vue code\", \"pixel-level restoration\", \"choose/specify a target width (Web/Pad/Mobile)\", \"generate/recreate phone or tablet UI\", \"specify/choose a tech stack (Qt/Web/LVGL/imgui/MAUI/Flutter…)\"; supports Web widescreen / tablet Pad / phone Mobile viewports, monochrome / light+dark dual color schemes, and any GUI tech stack; at startup it asks together about the target-width tier and the color mode (whether switchable light+dark themes are wanted), asks the target stack before design→code (to avoid defaulting to React), and constrains DESIGN.md and the build/acceptance accordingly."
+description: "Code to Design + Design to Code bidirectional design-system workflow, plus a practical Penpot MCP automation library. Two entry points (feed a URL or a set of images, or reuse an existing React/UI library source tree) produce DESIGN.md and a fixed-structure Penpot design system (18-page, 4-layer page/board/element contract). Layout is built in: a deterministic layout engine holds the spacing/type/grid scales and 30 screen recipes (app chrome — header, sidebar, footer, toolbar — plus business screens: email, calendar/week/month, event popover, dashboard, list, detail, settings, chat, kanban, hero, landing, blog, docs, e-commerce listing/PDP/cart/checkout, auth, OTP, pricing, wizard, gallery, print, contact), a component factory produces maximals variant sets (plain text button and icon button, plain input and icon input and masked input and OTP, … with the five state axes), and a prescriptive design guide plus a design-rule linter enforce whitespace, rhythm, typography, contrast, touch targets and state layers. Through execute_code it batch-builds components/variants/dashboards/typical pages, batch-repairs alignment/stroke/cropping/flex-collapse/Chinese-garbled-text, registers library components, and exports for acceptance; it guides connecting the Penpot MCP and ships a ready-to-use deployment stack; it outputs code for any GUI tech stack (Qt4/5/6, React/Vue, LVGL, imgui, MAUI, Flutter…) from a Penpot design file, emphasizing image and icon asset references and component-indexed layered implementation, with PIL pixel-level verification aimed at pixel-perfect. Use when the user mentions \"generate a design system from a URL/images\", \"generate a Penpot design system\", \"use Penpot MCP to create pages/build components or dashboards\", \"recreate a UI library/design system\", \"built-in layouts / header footer sidebar / email calendar hero blog layouts\", \"component variants and states coverage\", \"design rules for whitespace, spacing or typography\", \"batch-repair alignment/style/render issues/Chinese-garbled-text on selected elements\", \"register library components\", \"enter/validate Penpot design tokens (17 TokenTypes / set activation / token references / themes)\", \"design to code\", \"convert a design into Qt/React/Vue code\", \"pixel-level restoration\", \"choose/specify a target width (Web/Pad/Mobile)\", \"generate/recreate phone or tablet UI\", \"specify/choose a tech stack (Qt/Web/LVGL/imgui/MAUI/Flutter…)\"; supports Web widescreen / tablet Pad / phone Mobile viewports, monochrome / light+dark dual color schemes, and any GUI tech stack; at startup it asks together about the target-width tier and the color mode (whether switchable light+dark themes are wanted), asks the target stack before design→code (to avoid defaulting to React), and constrains DESIGN.md and the build/acceptance accordingly."
 version: 1.7.0
 license: MIT
 ---
@@ -18,15 +18,39 @@ Layout, components and design rules are **engines in this skill**, not prose you
 
 | Engine | Holds | Doc |
 |---|---|---|
-| `scripts/layout_engine.js` → `storage.LY` | the space scale (`LY.SPACE`), row ladder (`LY.ROWS`), type ramp, the three viewport tiers (`LY.TIERS`), region math for **29 screen recipes** (`LY.keys()`), shelf packing (`LY.pack`), fold marker (`LY.fold`) | `references/layout-library.md` |
+| `scripts/layout_engine.js` → `storage.LY` | the space scale (`LY.SPACE`), **the whitespace ladder (`LY.BREATH` / `LY.breath(level, tier)` — 7 named levels, every one a `SPACE` member)**, row ladder (`LY.ROWS`), type ramp, the three viewport tiers (`LY.TIERS`), region math for **30 screen recipes** (`LY.keys()`), shelf packing (`LY.pack`), fold marker (`LY.fold`) | `references/layout-library.md` |
 | `scripts/component_factory.js` → `storage.CF` | **74 control factories in 6 groups** (`CF.map()`: actions 7 · forms 23 · data 19 · navigation 9 · feedback 10 · shell 6; 106 `CF` functions in total once the drawing helpers are counted), each producing every variant × state of its family with named anatomy (`Button·IconStart·Md·Hover`), the size ladder (`CF.ladder`), the state alphas (`CF.STATE`), 85 glyphs (`CF.glyphKinds`), and `CF.missing()` as the registry diff | `references/component-library.md` |
+| `scripts/foundations_engine.js` → `storage.FN` | **the only way a Foundations/Color-in-use board exists**: 11 board kinds (`FN.kinds()`) projected from `TK.declared()` over **both gated chapters — `01` carries 7 kinds, `02 · Color in use` carries 4, one contract and one gate for both** — no hex mirror, no typed height; the editorial sentences are data (`FN.setContent`) and the sentences a board consumed are stamped back into the file (`nl:prose`), WCAG ratios and state washes are derived (`FN.ratio`/`FN.over`), the shelf position is re-derived from the live page each call (`FN.lanes`/`reflow`/`fitRoot`), every write path binds the page first and refuses if the switch did not settle (`FN.use`), every board is bound + gated by the same engine (`FN.bindNext`), and each mount carries the durable `nl:fn=<kind>` stamp that makes the gate checkable (`FN.CHAPTER`/`EXEMPT`/`coverage`, `engines.md` §7.1) | `engines.md` §7 / §7.2 |
 | `references/design-guide.md` | prescriptive rules: spacing scale and whitespace, typography ramp + roles, color tone steps (wash/hue/ink), elevation and state layers, control sizes and touch floors, alignment, iconography | read before writing DESIGN.md |
-| `scripts/audit_design.js` → `storage.designGate` | machine check of those rules (18 signatures) — the design-guide is not a wish list | `design-guide.md` §11 |
+| `scripts/audit_design.js` → `storage.designGate` | machine check of those rules (37 signatures, incl. token-binding, `not_component`, `caption_stale`, `empty_cell`, `no_type_styles`, `not_projected`, the **whitespace trio** `cramped_gap`/`hierarchy_gap`/`text_cramped`, the **radius pair** `radius_off_ladder`/`radius_unbound` and `ring_off_host` (a ring must take its host's corner)) — the design-guide is not a wish list | `design-guide.md` §11 |
 
 **Consequences**: a needed variant is produced by extending the factory (gate **G12**), a needed region by extending the
-recipe (gate **G11**), and delivery is blocked until `storage.designGate()` reads CLEAN (gate **G13**). Hand-written
-coordinates, hand-built one-off boards and "documented but unbuilt" rules are all the failure mode this structure
-replaces.
+recipe (gate **G11**), a Foundations/Color board by extending the projector (gate **G16**), and delivery is blocked until
+`storage.designGate()` reads CLEAN (gate **G13**). G16 is not self-declared: rule 31 `not_projected` fails any `01.xx`/`02.xx`
+board without the durable `nl:fn` stamp, and `storage.designCoverage()` fails a chapter whose kinds were never projected.
+Hand-written coordinates, hand-built one-off boards, hand-composed spec pages and "documented but unbuilt" rules are all
+the failure mode this structure replaces.
+
+**Whitespace is the default and preferred layout device (rules 32–34, inside gate **G13**)** — for *both* halves of the file: the gap
+between elements **and** the space inside and between blocks of text. Separation is bought in this order: whitespace →
+elevation/surface polarity → stroke or divider → alignment. The amounts are never typed at the call site: a content stack
+takes its gap from `LY.BREATH` (`NL.frame({ breath: 'block' })`), and a paragraph's leading plus the air between paragraphs
+come from the declared typography token, not from the call. What a builder writes and what the gate measures are the same
+table (`LY.breath()` + `storage.breathSpec`), and `storage.breathe()` is the idempotent repair twin. The three exemptions
+are declared, not improvised: a repeated run (a table is one group), abutting panes (§1.3), and a label↔field pair at 4–6.
+
+**A corner is taken from the `borderRadius` token set and nowhere else (rules 35–37, inside gate **G13**)** — an isolated
+`borderRadius` number is not a legal write in this skill. The ladder exists as tokens (`radius.none/xs/sm/md/lg/xl/full`,
+seeded from **DESIGN.md**, which for a recreation means *the source site's own* steps), and every writer — `ctx.plate`,
+`ctx.ring`, `ctx.clip`, `CF.build`, `NL.frame`, `NL.gridFrame`, `mkAbsBoard`, `mkRect` — goes through `CF.radius(role)`, which
+**snaps an off-ladder number to the nearest step and records the coercion in `CF.coerced`**, so the defect cannot be introduced
+at draw time. A control's corner is `radius.full` (a pill binds the token, never `height/2`); a ring takes **its host's** corner
+(`CF.ROLE.ring = 'host'`, rule 37 `ring_off_host` — a `r0` body under an `r9999` ring is one defect seen from two places); the gate
+judges the result against the live `TK.declared().radii`, and `TK.radiusSweep()` (ladder) / `TK.roleSweep()` (role: pill-family hosts
+and rings, **masters and placed copies**, because a master write does not re-sync copies) are the idempotent repairs for a file built
+before the rules. Read the remaining limit: 35/36 judge corners that *exist*, and none of the three can tell whether a family whose
+role DESIGN.md does not pin should be `sm` or `md` — `design-guide.md` §5.1 says what to measure instead of assuming a CLEAN gate means
+the contract is applied.
 
 ## Viewport tiers (required: asked at runtime)
 
@@ -42,7 +66,7 @@ This skill no longer handles only Web widescreen. Every task first confirms the 
   `11 · Grid & breakpoints`, and one screen board per **recipe × accepted tier** on `14–16 · Screens`. The design-system core
   (00–13, 17) is tier-independent: built once and shared across all tiers.
 - **Tier gate**: `LY.recipe(key, { tier })` *refuses* a recipe that has no definition at that tier and returns `{ err, use }`
-  (27/29 recipes run on web, 26/29 on pad, 9/29 on mobile). A three-pane app screen at 375 is replaced by `mobileListDetail`,
+  (28/30 recipes run on web, 26/30 on pad, 9/30 on mobile). A three-pane app screen at 375 is replaced by `mobileListDetail`,
   never squeezed. Set `CF.tier` to the board's tier **before** building it, or compact controls ship at 32px on a phone.
 
 Full definitions and artifact mapping are in `references/viewport-profiles.md` (read it first).
@@ -58,7 +82,8 @@ Full definitions and artifact mapping are in `references/viewport-profiles.md` (
   **do not** stuff it into a custom frontmatter key (testing shows it passes lint but gets ignored, i.e. ineffective).
 - **Scope** — bounded on purpose so a second scheme costs a page, not the file: token set/theme structure (two schemes →
   `· Core` + `· Dark` + Scheme group with two themes, **Core must come first**), the dual-polarity `Palette` board and the
-  doubled `Contrast matrix` on `02 · Color in use`, dark state rows inside the existing `03–09` spec boards (they are **not**
+  doubled `Contrast matrix` on `02 · Color in use` (both are **one more `FN.project({…, set})` per token set** — a dark
+  board is a record read of the dark set, never a hand-drawn second column; G16), dark state rows inside the existing `03–09` spec boards (they are **not**
   duplicated), dark-panel variants on `10`, one extra column on `13`, and **one dark twin per screen page 14/15/16 (+3 boards)**.
   `11` and `12` are unaffected: layout is orthogonal to color.
 - **Hard rule**: dark is **not** the inverse of light — each tone step is re-derived (the `*Ink` step must lift, see
@@ -95,19 +120,19 @@ Out of scope: general coding tasks unrelated to Penpot / design systems / design
 
 | File | Content |
 |---|---|
-| `references/design-guide.md` | **Prescriptive design rules**: base unit and spacing scale, whitespace/vertical rhythm, type ramp + roles + measure, tone triples (wash/hue/ink), elevation and state layers, control sizes and touch floors, alignment, iconography, the DEFAULT kit for unmeasured values, and the 18 HARD rules `audit_design.js` enforces (§11) |
-| `references/layout-library.md` | **Built-in layouts**: app chrome (appBar/sideNav/navRail/toolbar/footer/statusBar), the region vocabulary (`LY.slots`), the **29 screen recipes** (`LY.keys()`: dashboard, listCrud, detailRecord, settings, email3, chat, kanban, calMonth/calWeek, hero, landing, blog, docs, pricing, ecom, cart, checkout, auth, otp, wizard, gallery, commandPalette, mobile…), grid/breakpoints, collapse order, long-document band stacking |
+| `references/design-guide.md` | **Prescriptive design rules**: base unit and spacing scale, whitespace/vertical rhythm, type ramp + roles + measure, tone triples (wash/hue/ink), elevation and state layers, control sizes and touch floors, alignment, iconography, the DEFAULT kit for unmeasured values, and the 37 HARD rules `audit_design.js` enforces (§11, incl. §2.1 "whitespace is the first separation device" and §5.1 "a corner comes from the `borderRadius` set" + "a ring takes its host's corner") |
+| `references/layout-library.md` | **Built-in layouts**: app chrome (appBar/sideNav/navRail/toolbar/footer/statusBar), the region vocabulary (`LY.slots`), the **30 screen recipes** (`LY.keys()`: dashboard, listCrud, detailRecord, settings, email3, chat, kanban, calMonth/calWeek, hero, landing, blog, docs, pricing, ecom, cart, checkout, auth, otp, wizard, gallery, commandPalette, mobile…), grid/breakpoints, collapse order, long-document band stacking |
 | `references/component-library.md` | **Variant taxonomy and the minimum variant set per family**: the `Family·Type·Size·State·Slot·Tone` name grammar, required states per control class, icon/affix/clear/loading slots, and which `CF` factory owns each family |
 | `references/design-md-spec.md` | DESIGN.md spec (schema/rules/CLI/lint) and skeleton template |
-| `references/penpot-structure.md` | **Fixed-structure contract**: 18 pages in 4 layers, page anatomy, spec boards, coordinates, self-check list |
+| `references/penpot-structure.md` | **Fixed-structure contract**: 18 pages in 4 layers, the optional **block-per-page** pagination (`NN.MM · Chapter · Block`, screens exempt), page anatomy, spec boards, coordinates, self-check list |
 | `references/code-to-design.md` | Entry A (URL) / Entry B (images) / Entry C (library source) analysis + unified build pipeline |
 | `references/mcp-connection.md` | Connect Penpot MCP: deployment scripts, endpoint, client config, CA, verification |
 | `references/mcp-automation.md` | **execute_code practical handbook**: session discipline, three layout approaches, pitfall quick-ref, variants/components, recreating UI libraries, driving the build through `LY`/`CF`, acceptance discipline |
 | `references/api-pitfalls.md` | Detailed execute_code API pitfalls (coordinates/Path/stroke/crop/text/variants/sandbox/crash/export/layout) |
-| `references/positioning-audit.md` | **Positioning audit**: incident post-mortem, eleven positioning-failure signatures S1–S11 (out-of-bounds/centering residual incl. the stale-center fingerprint/size degradation/header collision/root stray/font/board overlap/text overlap/malformed text/alignment-not-applied/loose assembly), root-cause chains, preventive gates G1–G7, standard operation order |
+| `references/positioning-audit.md` | **Positioning audit**: incident post-mortem, the S1–S14 signature catalogue (out-of-bounds/centering residual incl. the stale-center fingerprint/size degradation/header collision/root stray/font/board overlap/text overlap incl. cross-parent S8b/malformed text/alignment-not-applied/loose assembly/stroke covered S12/stroke clipped S12b/duplicate board S13; S14 tall-copy reservation is a cause class), root-cause chains, preventive gates G1–G8, standard operation order |
 | `references/design-tokens.md` | **Authoritative Design Tokens usage** (tested locally): 17 TokenTypes, value formats, default-applied properties, active/themes/priority, 6 application pitfalls, unbinding details, 9 doc-vs-implementation discrepancies, and the theme-switch **paint proof** (§9.1) |
 | `references/penpot-capabilities.md` | **The authority on what may be claimed** — every Penpot API used by this skill with the exact call, the measured readback and the date: sizing/flex vocabulary, grid, components/variants (§5), tokens/themes (§6), library colors (§7), prototype interactions (§8), delivery/export/versions (§9), plus §12 "still unverified". Read this **before** believing a doc or designing against an API |
-| `references/native-layout.md` | **Native auto-layout authoring** (`storage.NL`): the four-layer division of labour (LY/CF/NL/absolute), seed + call shape, rules R1–R6, the sizing decision table and its six measured traps, screen build order, grid, construction aids, and `auditFlow`'s signature → repair table |
+| `references/native-layout.md` | **Native auto-layout authoring** (`storage.NL`): the four-layer division of labour (LY/CF/NL/absolute), seed + call shape, rules R1–R7, the sizing decision table and its six measured traps, screen build order, grid, construction aids, and `auditFlow`'s signature → repair table |
 | `references/icons.md` | **Icons**: which channel (`CF.glyph` in-control / `IC.place` / `CF.svgIcon`), the embedded Lucide catalog (1966 icons, ISC) and its JSONL contract, why a `.penpot` library download is not automatable, license table (Lucide/Material/FontAwesome/penpothub), extending the catalog, SVG constraints |
 | `references/engines.md` | Engines and recipes: seed order, repair-engine mechanics, factory templates, screen-assembly pattern, crash-rebuild checklist (code in scripts/) |
 | `references/design-to-code-generic.md` | **Generic codegen discipline** (shared across all stacks: layering/tokens/assets/five states/integer pixels/acceptance) |
@@ -121,16 +146,17 @@ Out of scope: general coding tasks unrelated to Penpot / design systems / design
 | `scripts/seed_storage.js` | execute_code seeding engine (**`storage.T` is only a JS-side color mirror, it does NOT create Penpot tokens** + `mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`; `ct()` is **async, measures real centering after render**, calls must `await`) |
 | `scripts/layout_engine.js` | **Layout engine** (`storage.LY`): `SPACE`/`ROWS`/ramp, `TIERS`, `slots`, `recipe(key,{tier,w,h,x0,y0})` → a frozen region plan read with `LY.rect(name)`, `snap`/`pack`/`fold`/`viewportHeight`, `keys()`, `missing()` |
 | `scripts/component_factory.js` | **Component factory** (`storage.CF`): 74 control factories over the 6 `CF.map()` groups (`ladder`/`P`/`STATE`/`fills`/`name`/`minHit`/`tier`/`matrix`/`map`/`missing`); every variant × state of a family drawn and **named** so coverage is decidable. Plus the **component layer**: `component`/`register` (master), `get`/`instance`/`swap` (place + switch a control on a screen), `variantSet`/`variants` (native variant container), `svgIcon` (SVG → editable vectors) |
-| `scripts/native_layout.js` | **Native auto-layout engine** (`storage.NL`): flow authoring with `frame`/`row`/`col`/`gridFrame`/`cell`, `sizing`/`fill`/`fix`/`hug`, whitelisted flex vocabulary (`applyFlex`, rules R1–R6), `guide`/`stamp`, **`whenSettled`** (polls the stale fingerprint), **`auditFlow`** (the flow lint: `not_settled`/`sizing_dropped`/`main_axis_overflow`/… ), `nudge`, `reflow`, `fromRecipe` — the editable half of every screen (native-layout.md) |
-| `scripts/audit_design.js` | **Design-rule lint engine** (read-only): `designPage` / `designStart`+`designNext` / `designGate` — the 18 HARD rules of `design-guide.md` §11, verdict `CLEAN`/`NEEDS_REPAIR` (gate G13) |
-| `scripts/token_engine.js` | **Design Tokens engine**: `TK.seed` (build set + record tokens, auto `active:true`) / `TK.apply` (apply + readback verify, catch silent failures) / `TK.paint`+`TK.changed` (theme-switch **paint** proof) / `TK.audit` (inactive/broken-reference health check) / `TK.unbindFill` |
+| `scripts/native_layout.js` | **Native auto-layout engine** (`storage.NL`): flow authoring with `frame`/`row`/`col`/`gridFrame`/`cell` — **`frame({breath:'block'})` takes the gap from `LY.BREATH`, the default-and-preferred whitespace path (omitting both `gap` and `breath` used to mean flex default 0)** — `sizing`/`fill`/`fix`/`hug`, whitelisted flex vocabulary (`applyFlex`, rules R1–R6), `guide`/`stamp`, **`whenSettled`** (polls the stale fingerprint), **`auditFlow`** (the flow lint: `not_settled`/`sizing_dropped`/`main_axis_overflow`/… ), `nudge`, `reflow`, `fromRecipe` — the editable half of every screen (native-layout.md) |
+| `scripts/audit_design.js` | **Design-rule lint engine** (read-only): `designPage` / `designStart`+`designNext` / `designGate` / `designCoverage` — the 36 HARD rules of `design-guide.md` §11 (token-binding, `not_component`, `caption_stale`, `empty_cell`, `no_type_styles`, the G16 provenance rule `not_projected` whose chapter table it reads from `storage.FN` instead of copying, the whitespace trio `cramped_gap`/`hierarchy_gap`/`text_cramped` whose amounts it reads from `LY.BREATH` and publishes to the repairer as `storage.breathSpec`, and the radius pair `radius_off_ladder`/`radius_unbound` whose ladder it reads from the live `TK.declared().radii` instead of `CF.RAD`, and `ring_off_host` which compares a `ring·*` plate to the control it outlines), **judging component masters, not only copies** (`isComponentCopyInstance`, never `isComponentInstance` — a master answers the latter), the per-page **adoption reads** `out.breath` + `out.radius` (how much of the file separates / rounds on a ladder level), verdict `CLEAN`/`NEEDS_REPAIR` (gate G13) |
+| `scripts/token_engine.js` | **Design Tokens engine**: `TK.seed` (build set + record tokens, auto `active:true`) / `TK.apply` (apply + readback verify, catch silent failures) / `TK.paint`+`TK.changed` (theme-switch **paint** proof) / `TK.audit` (inactive/broken-reference health check) / `TK.unbindFill`. Plus the **retro-apply driver** `TK.bindPage`/`TK.radiusStart`+`TK.radiusSweep`+`TK.radiusPages` — a resumable, class-scoped (`{only:'radius'}`) whole-file pass whose per-page yield **is the commit** (api-pitfalls §17). Plus the **role pass** `TK.roleStart`+`TK.roleSweep`+`TK.rolePages` — walks every page and forces the corner a **family** must carry: pill-family hosts (`TK.PILL_FAMS`: button/iconbutton/splitbutton/fab/chip/badge/tag) to `CF.radius('control')`, every `ring·*` plate to its host's corner (`CF.ROLE.ring = 'host'`), masters **and** placed copies (a master write does not re-sync copies), then binds what it wrote | Plus **`storage.TP`** — the library **typography styles** behind 素材 → 排版: `TP.seed` (one `LibraryTypography` per declared ramp step, named like its token, idempotent, readback-verified) / `TP.audit` (tokens ↔ styles diff) / `TP.apply` (measured: `applyToText` rewrites `lineHeight` to 1.2, so it re-asserts the style's leading) |
 | `scripts/palette_engine.js` | **Library-color engine** (`storage.LIB`): `LIB.seed`/`put` (idempotent create→rename→set, because `createColor` ignores its args) / `LIB.fill`·`LIB.stroke` (ref-bound paint, readback = `fillColorRefId`) / `LIB.audit` (three-channel inventory: library / token / raw) / `LIB.replace` (raw-hex swap) |
+| `scripts/foundations_engine.js` | **Foundations projector — the only producer of `01.xx`/`02.xx` boards** (`storage.FN`): `FN.setContent` (editorial sentences as data) / `FN.project({page,kind[,set]})` — build + shelf-place ONE of 11 boards from the token records (no height argument exists) and stamp it `nl:fn=<kind>` / `FN.bindNext({page})` — bind + gate the next unbound board, call until `allBound` / `FN.check(page)` (incl. `g16`) / `FN.audit()` (the cost report: it must show 0 repair rounds) / `FN.relayout`·`reflow`·`fitRoot` (the stale-hug and shelf repairs the projection needs) / the provenance side `FN.CHAPTER`·`EXEMPT`·`chapterPages`·`boards`·`stampOf`·`kindsOn`·`foreign`·`coverage`·`restamp` — the table the auditor reads, so G16 cannot drift |
 | `scripts/icon_engine.js` | **Icon catalog + import engine** (`storage.IC`): `seed`/`add` (JSONL or any SVG) / `get`·`search`·`missing` (alias + camel↔kebab lookup) / `svg` (currentColor substituted) / `place` (import through the origin throwaway; `x/y` = world, no `x/y` = flow) / `grid` (labeled sheet for `01 · Foundations`) — catalog `assets/icons/lucide.jsonl`, decision + licenses in `references/icons.md` |
 | `scripts/prototype_engine.js` | **Prototype + delivery engine** (`storage.PR`): `flow`/`ensureFlow`, `nav`/`overlay`/`close`/`url`/`delay`, `prototype(links,{flow})` (batch, self-verifying `dropped`), `read`/`clear`, `exports`/`bytes`, `checkpoint`/`versions`/`restore`, `ANIM` presets — rules P1–P4 in capabilities §8/§9 |
 | `scripts/repair_engines.js` | Repair engines (**fixStaleCenter** / **groupAssemblies** / **fixZOrder** / alignPage / vAlignPage / fixInner / unclip / cleanOrphans) |
 | `scripts/fix_layout.js` | flex-collapse batch repair engine (absRow + fixCol, two-round convergence) |
-| `scripts/audit_layout.js` | **Positioning audit engine** (read-only): `auditPage` / `auditAll`, **eleven signature classes** (out-of-bounds/centering residual (incl. **stale-center fingerprint**)/size degradation/header collision/root-level float/sibling board overlap/text overlap/font/**malformed text**/**alignment-not-applied**/**loose assembly loose_assembly**) + verdict `CLEAN`/`NEEDS_REPAIR` — independent of `audit_design.js`, which owns the 18 design rules |
-| `scripts/fix_geometry.js` | **Geometry repair engine** (all support dry-run): `fixColumnOffset` / `fitBoardHeight` / `fixOverflowRight` / **`reflowRows`** / `fitRootHeight` / `fixGeometryAll` / `moveSubtree` |
+| `scripts/audit_layout.js` | **Positioning audit engine** (read-only): `auditPage` / `auditAll`, **15 defect signatures + `text_centre_info`** (out-of-bounds/centering residual incl. **stale-center fingerprint**/size degradation/header collision/root-level float/sibling board overlap/text overlap incl. **cross-parent S8b**/**malformed text**/**alignment-not-applied**/**loose assembly**/**stroke covered S12**/**stroke clipped S12b**/**duplicate board S13**; S14 is the tall-copy cause class, caught by S1/S7/S8) + verdict `CLEAN`/`NEEDS_REPAIR` — independent of `audit_design.js`, which owns the 34 design rules |
+| `scripts/fix_geometry.js` | **Geometry repair engine** (all support dry-run): `fixColumnOffset` / `fitBoardHeight` / `fixOverflowRight` / **`reflowRows`** / `fitRootHeight` / **`breathe`** (the repair twin of rules 32–34: raises a cramped container to the next `LY.SPACE` member and re-binds a compressed paragraph to its declared leading, aiming at `storage.breathSpec` + `LY.BREATH` so it cannot disagree with the gate; idempotent) / `fixGeometryAll` / `moveSubtree` |
 | `scripts/scaffold_structure.js` | 18-page skeleton batch-build script (3-phase queue runner: create pages → PageRoot/Header/Footer → **fit** root height); its `PAGES` table **is** `penpot-structure.md` §2 and `storage.scaffoldContract()` returns it |
 | `scripts/pixel_diff.py` | PIL pixel-comparison tool (heatmap + JSON metrics) |
 | `assets/penpot-server/` | **Bundled deployment stack**: compose with 7 services + caddy/Caddyfile + 8 ops scripts + README (self-resolving paths, whole dir relocatable) |
@@ -154,7 +180,8 @@ Then (shared by both ways, details in `references/code-to-design.md`):
 0.5 **[Gate G1] Load the canonical scripts verbatim, in seed order**:
    `scripts/seed_storage.js` (`mkAbsBoard`/`absMount`/`mkText`/`mkRect`/`ct`) → `scripts/layout_engine.js` (`storage.LY`) →
    `scripts/component_factory.js` (`storage.CF`) → `scripts/native_layout.js` (`storage.NL`) → `scripts/token_engine.js` (`TK.*`) →
-   `scripts/audit_layout.js` (`auditPage`) → `scripts/audit_design.js` (`designPage`/`designGate`).
+   `scripts/audit_layout.js` (`auditPage`) → `scripts/audit_design.js` (`designPage`/`designGate`) →
+   `scripts/foundations_engine.js` (`storage.FN`, last: it refuses to seed unless `LY`+`CF`+`NL`+`TK` are all live).
    **"Load", not "paste": `execute_code` arguments are capped at ~21 KB**, so the big engines must be fetched from the
    skill's loopback server (`python3 scripts/serve_skill.py`) and built with
    `new Function('storage','penpot','penpotUtils', src)` — full recipe in engines.md §"Seeding without pasting"
@@ -181,6 +208,9 @@ Then (shared by both ways, details in `references/code-to-design.md`):
    **Immediately record Design Tokens [Gate G9]**: `storage.TK.seed(spec)`
    (spec generates 17 TokenTypes from DESIGN.md sections per the mapping in `references/design-tokens.md` §8) →
    `storage.TK.assert()` must PASS (no inactive set, no broken reference).
+   **Then `storage.TP.seed()`** — one library **typography style** per declared ramp step, named like its token, so
+   素材 → 排版 is not empty: a token set never fills `library.local.typographies`, and rule 30 (`no_type_styles`) fails
+   any text-bearing board whose library has 0 styles (design-tokens §5.5).
    ⚠️ Two must-knows: `addSet()` defaults to **`active:false`**, tokens in an inactive set **bind successfully but the value does not take effect (silent failure)**;
    `storage.T` in `seed_storage.js` is only a JS-side color mirror, **it does not create any Penpot token**. See `references/design-tokens.md`.
    For a light+dark answer, build `<system> · Core` + `<system> · Dark` + the `Scheme` group with two themes now — the
@@ -188,12 +218,28 @@ Then (shared by both ways, details in `references/code-to-design.md`):
    → settle → `TK.changed(before, …)` must report `changed ≥ 1` (design-tokens §9.1).
    **Also seed the library-color channel**: `storage.LIB.seed(spec)` from the same palette — `LIB.fill`/`LIB.stroke` bind
    refs that repaint on one `c.color` write, and `LIB.audit(shapes)` later tells you which channel each fill uses.
-4. **[Gate G2/G3] Pilot the first board, then batch**: build the first board of `01 · Foundations` → `storage.auditPage()` must have no
+4. **[Gate G2/G3] Pilot the first board, then batch**: project the first board of `01 · Foundations` **and of
+   `02 · Color in use`** (both are `FN.CHAPTER` chapters, so both are G16-gated the same way) → `storage.auditPage()` must have no
    `out_of_bounds` / `header_collision` → immediately export and eyeball that there is no overall offset → only then allow batch building.
    During batch, **run a single-board audit right after each board is built** (only this board's findings), do not copy the same offset into 100+ boards.
    Fill page by page, in contract order:
-   - `01 · Foundations` (palette / type ramp / spacing / grid / radius / elevation / icons / strokes) then `02 · Color in use`
-     (semantic roles, state layers, the contrast matrix, light-vs-dark, data colors) — later pages reference them.
+   - `01 · Foundations` (palette / type ramp / spacing / grid / radius / elevation / strokes) and `02 · Color in use`
+     (semantic roles, state layers, the contrast matrix, data colors) — later pages reference them.
+     **[Gate G16 · projection is the ONLY way a Foundations/Color board is built — there is no composed alternative]**
+     `storage.FN` is not an optimization suggestion: every board on the `01.xx` / `02.xx` pages is emitted by it, and the
+     skill ships no other path. Call shape: `FN.setContent({usage, rules, notes, …})` for the editorial sentences →
+     `FN.project({page, kind[, set]})` **one kind per call** → `FN.bindNext({page})` **until `allBound`** →
+     `FN.check(page)`. There is no height argument to pass and no hex to type: values come from `TK.declared()` and a
+     missing token kind is a **refusal**, while the board height is the hug sum Penpot itself computes. A second colour
+     scheme is one more projection with `set:` the dark token set, not a second builder.
+     **The gate is machine-read, in two scopes**: each projected board carries `nl:fn=<kind>` as pluginData *inside the
+     file*, auditor rule 31 **`not_projected`** fails any board on a chapter page without that stamp — including one
+     parked at the page root beside the `NN.MM-PageRoot` (`FN.strays`) — and
+     `storage.designCoverage()` fails the file when a chapter kind was never projected (pagination is block-per-page, so
+     coverage is a file question). `Icons` and `Light vs dark` are the two **declared** exemptions (`FN.EXEMPT`), because
+     neither is one record type; everything else that is hand-drawn is a defect — and if `storage.FN` is not seeded, the
+     rule *reports* rather than passing. When a board kind does not exist yet, **add the projector to `FN`**, never draw
+     the board inline. Full call shape, enforcement mechanics and measured cost in `engines.md` §7 / §7.1.
    - `03–09` component spec boards: **one `CF.matrix(...)` call per family of `CF.map()`**, shelves placed by `LY.pack`.
      **[Gate G12]** `CF.missing()` must be `[]` and each spec board must pass `state_coverage` / `variant_sparse` /
      `focus_ring_missing` — a variant nobody can produce is a missing factory, never a hand-drawn rectangle.
@@ -209,20 +255,49 @@ Then (shared by both ways, details in `references/code-to-design.md`):
      into a flex board (`NL.stamp` records recipe/region/tier), then `NL.add(region, control, 'fix','fix')` joins controls
      to the flow (**`fix`, never `auto`** — a board's `auto` is hug and collapses to the label), instances through
      `CF.instance`. Finish each screen with `await NL.whenSettled(host)` + `NL.auditFlow(host)` reading `CLEAN`.
-5. Register library components with `CF.component(host)` (masters conventionally collected in `AI Component Masters`;
-   **the tag must be a child element of the master board**, otherwise registration yields an empty-shell component;
-   `createComponent` does **not** copy — the host *becomes* the main instance).
+5. **[Gate G10 · components before groups — not just grouping]** Register the library as the spec pages are built:
+   `CF.autoRegister({ limit: N, states: false })` per spec page promotes every **default-state** control host to a real
+   Penpot main component (idempotent; returns `{registered, already, skipped, library}`). `CF.libraryCount() > 0` is the
+   proof the library exists — a gate that only inspects groups cannot distinguish a screen built from masters from one
+   built from copies. From then on, on any **composed** page a host whose name already has a master and is drawn again is
+   `not_component` (the redrawn copy cannot be fixed, swapped or variant-driven). Two ways to clear it: place
+   `CF.instance(name, {parent, absolute, resize, text})` at build time, or repair an existing file in place with
+   `storage.componentize({ apply: true })` (same parent/box/z, text overrides copied by text-layer name; flow children are
+   reported as `flow`, never silently re-laid). Spec boards are exempt by contract — they are where the masters live.
+   The master's own head is exempt (the gate compares ids), so registering never indicts the host it came from.
+   Manual registration remains `CF.component(host)` (**the tag must be a child element of the master board**, otherwise
+   registration yields an empty-shell component; `createComponent` does **not** copy — the host *becomes* the main instance).
 6. **[Gate G4] Finish page by page, fixed order**: `cleanOrphans()` → `fixStaleCenter()` → `alignPage()` → `vAlignPage()` → `fixInner()` → `unclip()` → `groupAssemblies()` → `fixZOrder()`;
    (`fixStaleCenter` fixes the large offset from "centering computed from the transient width/height at creation moment" baked into coordinates, must run before `alignPage`; text centering always `await storage.ct(...)` or `storage.centerIn(t, host)`, see positioning-audit.md S2)
-   **[Gate G10] Assembly ownership**: a complete set of primitives (base plate + label + icon) must be **grouped or made a component, no loose same-level stacking**
+   **[Gate G10b · assembly ownership]**: a complete set of primitives (base plate + label + icon) must be **grouped or made a component, no loose same-level stacking**
    — reuse/registration that enters the 13 index becomes a component (screens **place an instance**: `CF.instance(CF.name(…))`
    + `CF.swap` for state switches — instancing is scriptable, api-pitfalls §6; a `CF` factory re-call is the fallback when
    no master exists), one-off use `penpot.group(...)` groups them;
    judgment and naming contract in `penpot-structure.md` §4.3, audit signature `loose_assembly` (S11), repair engine `groupAssemblies()` (idempotent, at the end of the G4 chain).
    Record the repair log `[position, content, axis, offset]` for manual review, then restore deliberately non-centered elements per `engines.md` §1.
-7. **Recompute + accept [Gate G5 + G13]**: two independent auditors must both read CLEAN, per page, with the scope named in contract §2:
-   `storage.auditPage()` (positioning) and `storage.designGate({ tier | families })` (the 18 design rules — grid, scale, rhythm, ramp,
-   contrast, touch floor, split ratio, state/variant coverage, fold marker). A `designGate` that returns `{ err: 'run … first' }` is not a CLEAN.
+   **[Gate G14 · bind at birth]** no board is "done" when it is drawn: `runOne`-style builders must call
+   `TK.bindBoard(board, { snapSpace: true })` (or `TK.bindPage(page)`) **after the render pass and before the gate**, and
+   `TK` must be seeded *before* the first board (G9). A colour typed as hex is not a token: the gate reads
+   `tokens.fill` / `tokens.strokeColor` / `tokens.typography` / `tokens.rowGap`, never the hex. Backfill sweep:
+   `TK.bindPage(name, { snapSpace: true, from, count })`, batched — one page per call.
+   **[Gate G15 · guides at birth]** a board at a tier baseline width is a **screen**: give it native guides before the
+   audit sees it — `LY.guides(board, { tier })` (12/8/4 columns from `LY.TIERS` + a fold ruler). Never draw column
+   rectangles. Backfill: `storage.seedGuides({ apply: true, tier })` (idempotent, tier-width boards only); the gate
+   signature is `no_guides`.
+   **[G11 · fill leaves, not panes]** a region that *contains* another region is structure — fill `LY.leaves(plan.regions)`,
+   never the pane itself. Filling `dashboard.content` drew the article underneath the KPI row, the chart and the table
+   (`pane_filled`); the same trap exists in `readingPane`, `container`, `main` and every scroll area.
+   **[vertical reservations]** text height is `CF.lineH(fs)`, never `fs`: a text layer renders at `fs × ramp leading`
+   (body 1.5, display 1.15). Reserving `fs` for a wrapped label and then stepping by `fs + 6` is how tall (stacked) buttons
+   and step items grew past their host and overlapped the next one (S14).
+7. **Recompute + accept [Gate G5 + G13 + G16]**: two independent auditors must both read CLEAN, per page, with the scope named in contract §2:
+   `storage.auditPage()` (positioning) and `storage.designGate({ tier | families })` (the 34 design rules — grid, scale, rhythm, ramp,
+   contrast, touch floor, split ratio, state/variant coverage, fold marker, token binding, guides, pane fill, component use,
+   **the whitespace trio `cramped_gap`/`hierarchy_gap`/`text_cramped`** (§2.1: whitespace is the first separation device, for gaps
+   *and* for leading/paragraph air) **and the G16 provenance rule `not_projected`**; when `storage.FN` is seeded `designGate` also runs the file-level
+   `designCoverage()`, which is the only check that can see a chapter missing a board). A `designGate` that returns `{ err: 'run … first' }` is not a CLEAN.
+   Whitespace findings repair in place with `storage.breathe({ apply: true })` (dry-run first; idempotent; it raises the container
+   gap to the next `LY.SPACE` member and re-binds a compressed paragraph to its declared leading, then re-fits board and root heights).
    Every **screen** additionally carries `storage.NL.auditFlow(board) === 'CLEAN'` (flow authoring: settled, sized, no dropped declarations).
    Remaining findings must each be manually confirmed as deliberate. Then export PNG per board (or a contact sheet per page) and accept against the
    self-check list (pages 14–16 accepted per recipe × tier).

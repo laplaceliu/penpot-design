@@ -27,7 +27,7 @@ return (function () {
   storage.mkAbsBoard = function (name, x, y, w, h, fill, radius) {
     const b = penpot.createBoard();
     b.name = name; b.x = x; b.y = y; b.resize(w, h);
-    b.borderRadius = radius || 0;
+    b.borderRadius = storage.CF ? storage.CF.radius(radius === undefined ? 0 : radius) : (radius || 0);
     b.fills = fill ? [{ fillColor: fill, fillOpacity: 1 }] : [];
     b.addFlexLayout();
     b.flex.dir = 'column';
@@ -60,13 +60,43 @@ return (function () {
   const _display = penpot.fonts.findByName((T && T.displayFont) || 'Anton');
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
   storage.mkText = function (str, x, y, size, color, weight, fontRole) {
+    // `penpot.createText('')` returns null in 2.17 (measured 2026-10-20), so an empty label crashed on the very next
+    // line with "Cannot set properties of null (setting 'x')" — half-way through a factory, which then left an orphan
+    // host on the board. No text is the honest reading of an empty string.
+    if (str === null || str === undefined || String(str) === '') return null;
     const t = penpot.createText(str);
     t.x = x; t.y = y;
     const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str);
     // CJK first: display fonts usually have no CJK glyphs, Chinese always falls back to Noto
     const font = cjk ? _noto : (fontRole === 'display' && _display ? _display : _latin);
-    try { font.applyToText(t, _variant(font, weight || 400)); } catch (e) {}
-    if (size) { try { t.fontSize = String(size); } catch (e) {} }
+    const famName = cjk ? ((T && T.cjkFont) || 'Noto Sans SC')
+      : (fontRole === 'display' ? ((T && T.displayFont) || 'Anton') : ((T && T.bodyFont) || 'Nunito'));
+    // §3.2 enforcement at birth: a size the declared type ramp does not contain is snapped onto the nearest step of
+    // the SAME family before the font variant is applied, so the drawn shape can never hold an undeclared step.
+    // (audit_design `type_off_ramp` catches the same thing after the fact; TK.bindBoard then turns the snapped values
+    // into a real token binding — the batch is what binds, this is what makes the batch a no-op.)
+    const st = storage.mkText._stat = storage.mkText._stat || { texts: 0, snapped: 0, drift: {} };
+    let lh0 = null;
+    try { lh0 = parseFloat(t.lineHeight); if (isNaN(lh0)) lh0 = null; } catch (e) {}
+    let step = null;
+    if (size && storage.TK && storage.TK.snapType) {
+      try { step = storage.TK.snapType(famName, size, weight || 400, lh0); } catch (e) { step = null; }
+    }
+    const useWeight = step && step.weight ? step.weight : (weight || 400);
+    if (step && step.size !== null && (step.size !== parseFloat(size) || step.weight !== (weight || 400))) {
+      st.snapped++;
+      const k = famName + ' ' + size + '/' + (weight || 400) + ' → ' + step.name;
+      st.drift[k] = (st.drift[k] || 0) + 1;
+    }
+    if (step) st.texts++;
+    try { font.applyToText(t, _variant(font, useWeight)); } catch (e) {}
+    const fs = step && step.size !== null ? step.size : size;
+    if (fs) { try { t.fontSize = String(fs); } catch (e) {} }
+    if (step) {
+      // leading/tracking come from the token, never from the call: a ramp step defines the whole vertical rhythm.
+      if (step.leading !== null) { try { t.lineHeight = String(step.leading); } catch (e) {} }
+      if (step.tracking !== null) { try { t.letterSpacing = String(step.tracking); } catch (e) {} }
+    }
     if (color) { try { t.fills = [{ fillColor: color, fillOpacity: 1 }]; } catch (e) {} }
     return t;
   };
@@ -79,6 +109,7 @@ return (function () {
   storage.ct = async function (b, str, opts) {
     opts = opts || {};
     const t = storage.mkText(str, 0, 0, opts.size, opts.color, opts.weight);
+    if (!t) return null;
     await storage.sleep(120);                       // wait for the text to render real width/height
     storage.absMount(b, t, b.x + (b.width - t.width) / 2, b.y + (b.height - t.height) / 2);
     return t;
@@ -98,11 +129,12 @@ return (function () {
   storage.mkRect = function (name, x, y, w, h, fill, radius, stroke, strokeW) {
     const r = penpot.createRectangle();
     r.name = name; r.x = x; r.y = y; r.resize(w, h);
-    r.borderRadius = radius || 0;
+    r.borderRadius = storage.CF ? storage.CF.radius(radius === undefined ? 0 : radius) : (radius || 0);
     r.fills = fill ? [{ fillColor: fill, fillOpacity: 1 }] : [];
     if (stroke) {
-      r.strokes = [{ strokeColor: stroke, strokeOpacity: 1, strokeWidth: strokeW || 1 }];
-      try { r.strokeAlignment = 'inner'; } catch (e) {}   // closed shapes always inner
+      // strokeAlignment is a member of the STROKE object, not of the shape: `r.strokeAlignment = 'inner'` reads back
+      // undefined and changes nothing (measured 2026-10-20), so the old try/catch line was dead code.
+      r.strokes = [{ strokeColor: stroke, strokeOpacity: 1, strokeWidth: strokeW || 1, strokeAlignment: 'inner', strokeStyle: 'solid' }];
     }
     return r;
   };

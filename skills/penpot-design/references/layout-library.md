@@ -13,7 +13,8 @@
    and mount the region boards at those rects — the supported path is `NL.fromRecipe(key, {parent, x0, y0, …})`, which
    mounts each region **absolute at its `LY.rect` and gives it a flex interior**; fill that interior with `NL.add(region, control, 'fix','fix')`
    / `CF.instance(...)` (never `'auto'` on a board — it hugs and collapses to the label). `storage.absMount` remains correct
-   for spec boards, anatomy diagrams and pixel-exact overlays (native-layout §9). If a recipe is missing,
+   for the `03–09` spec boards, anatomy diagrams and pixel-exact overlays (native-layout §9) — never for a `01.xx`/`02.xx`
+   board, which `FN.project` emits (G16). If a recipe is missing,
    **add a recipe to `layout_engine.js` and document it here** — do not improvise numbers in `execute_code`.
 2. **Web screens are long documents, not one viewport.** Height comes from band stacking (`LY.flow`), not from a canvas habit. See §0.4.
 3. **Panes abut with a 1px hairline and 0 gap**; gaps live inside panes (design-guide §1.3).
@@ -27,7 +28,7 @@
 | **App screen** (dashboard, list, settings, email, chat…) | `1440 × max(viewport 900, contentH)` | bands sized by content; if `contentH < 900`, keep 900 and let the last region stretch (never leave dead space) |
 | **Marketing / content page** (landing, pricing, blog, docs article, PDP) | `1440 × 1600…4000+` | `LY.flow` sums band heights: hero 560–760 + logo strip 120–160 + feature band 400–560 + … + footer 320–480 |
 | **Mobile screen** | `375/390 × 812…(content)` | viewport chrome stack is fixed (§4.3), content flows; a feed page is 1600–2400 tall |
-| First-screen marker | drawn as a **dashed 1440×900 outline** labelled `fold` | reviewers must see what the fold contains; `LY.fold(board)` |
+| First-screen marker | drawn as a **2px accent (#F97316) 1440×900 outline** labelled `fold` | reviewers must see what the fold contains; `LY.fold(board)` |
 
 **HARD**: a marketing board shorter than 1600px tall at 1440 wide, or an app board locked to exactly 1080 with empty bottom, fails audit signature `viewport_locked`.
 
@@ -53,6 +54,33 @@ Two safety nets the agent must not route around:
 
 Canonical container widths: `1440 − 2×32 = 1376` full-bleed content; with a 240 nav → `1200 − 2×24 = 1152` inner [obs];
 Bootstrap max `1320`, VitePress layout max `1440` [spec] — so **1152–1200 inner is the web default**, 640–760 for prose (design-guide §3.4).
+
+### 1.1 Whitespace is a primitive, not a leftover: `LY.BREATH`
+
+Separation is authored the same way width and columns are: pick a **hierarchy level**, take its gap from the ladder, never type a number.
+
+```
+LY.BREATH[tier]                     → { inline 8, row 12, block 16, group 24, section 32, band 48, page 96 }  (mobile: page 64)
+LY.breath('block', 'web')           → 16        (unknown level/tier → the `block` level, never a crash)
+LY.breathLevels()                   → ['inline','row','block','group','section','band','page']  (the auditor maps these through
+                                          LY.breath(level,tier) to get the gap set a page is judged against)
+```
+
+| Level | What it separates | Who asks for it |
+|---|---|---|
+| `inline` | a label from its affix, text from an icon, a head's title from its subtitle | `NL.frame({breath:'inline'})`, `CF` control interiors |
+| `row` | one row of a list from the next | `row`/`cell` stacks |
+| `block` | two blocks inside one board (the file's default: 121 of 125 flow containers measure at 16) | `NL.frame({breath:'block'})` |
+| `group` | a stacked group from its sibling group | card rows, panel stacks |
+| `section` | a section from the next section | `section` frames, recipe regions |
+| `band` | a long-page band from the next band | `LY.flow({bands})` |
+| `page` | PageRoot margins, the top of a page | scaffold + `absMount` |
+
+Rules: every level is a `LY.SPACE` member, so `LY.onScale(gap)` and the ladder agree by construction — and `LY.breath` re-snaps any
+hand-edited entry that left the scale **upward**, because repairing a wrong number must never cost whitespace. A ladder that indicts
+the file it describes is the wrong ladder (the first draft skipped 16 and reported the built file as off-ladder — api-pitfalls §16).
+`designGate` judges adoption through `out.breath` (`containers` / `onLadder`), and rules 32–34 enforce it; the repair twin is
+`storage.breathe()` (`fix_geometry.js`). Device order and the typographic half (leading + paragraph air) live in design-guide §2.1.
 
 ## 2. App chrome primitives (page `10 · App shell & chrome` spec boards)
 
@@ -334,6 +362,22 @@ Sheets: grabber 32×4 (top inset 5–8), radius 10–16 (M3 top 28), **medium �
 Modals: **Cancel leading, Done trailing** [spec HIG]. Pull-to-refresh spinner 32 at −64. Sticky section header 28–32.
 **Mistakes**: 6–7 tabs · bottom bar without the 34 inset (tap dead zone) · 32px targets / 8px screen margins · spacing mix 4/6/10/14 · large title that never collapses (wastes 48px of scroll) · sheet with only "Done" · body text 11–12px "to fit".
 
+### 3.16 `contact` — the enquiry page (web only; `authCard` is its collapse)
+
+Bands @1440: nav 72 → intro 224 → form 560 → faq 400 → footer 320 = **1576** (`LY.recipe('contact')` → `regions` + `formFields` + `asideRows`).
+
+`inner` = container margin 40, maxW 1200 · **intro** 720 wide (the 66–75ch measure, §3.4) at y+48 ·
+**form pane 800 / aside 336, gutter 64 → 2.4:1** (§8 floor is 2.2:1: an even split has no hierarchy and a 640/480 pair
+reads as two columns of the same form).
+Form stack (`LY.rows`, gap 24): name+email pair (two 388 fields) 76 → subject 76 → message 148 (4 lines) → consent 44 →
+submit 56 = 496 of the 560 band, the slack trailing rather than distributed.
+Aside = four 336×116 rows (email, phone, studio, socials): a reader who will not type still has to reach someone.
+FAQ = two 568 columns, 64 apart, 272 tall inside the band's 64 top/bottom padding.
+
+**Mistakes**: a form at 1160 wide with 1160px inputs (measure applies to fields too) · both the submit button and a
+"book a call" link filled as primary in one region (§4) · contact details as a fifth field instead of the aside ·
+the two-pane at 1.3:1 · a 600-tall board with no fold marker on a 900 viewport.
+
 ## 4. Tier adaptations (how `LY` re-derives a recipe)
 
 ### 4.1 Breakpoints and grids (consensus)
@@ -373,7 +417,7 @@ Navigation choice follows width: **bottom bar → rail → drawer** (also how `L
 | back-office / admin / CRM / SaaS CRUD | `listCrud` + `detailRecord` + `settings` + `wizard` |
 | chat / collaboration / community | `chat` + `commandPalette` + `mobileFeed` (phone: `mobileListDetail`) |
 | project / task / agile | `kanban` + `detailRecord` + `dashboard` |
-| content / blog / docs / marketing | `heroCenter` + `heroSplit` + `blogArticle` + `docsLayout` + `pricing` + `landing` |
+| content / blog / docs / marketing | `heroCenter` + `heroSplit` + `blogArticle` + `docsLayout` + `pricing` + `landing` + `contact` |
 | store / commerce | `ecomListing` + `ecomPdp` + `cart` + `checkout` |
 | account / identity-heavy | `authCard` + `authSplit` + `otp` + `settings` |
 | files / media / DAM | `gallery` + `wizard` (+ `CF.emptyState` boards with `kind: '404' / '403' / 'error'`) |

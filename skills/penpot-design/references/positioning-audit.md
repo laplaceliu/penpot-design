@@ -32,7 +32,7 @@ All ~120 boards only exported 4 for acceptance before declaring done. **The boar
 
 The MCP connection dropped midway (`penpot.local:443` connect timeout), so the build queue and progress couldn't resume, and no one could take over for review.
 
-## II. Four typical signatures: how to "actively find"
+## II. Signature catalogue: how to "actively find"
 
 Eyeballing the export can only find "looks crooked". Below are four machine-decidable signatures, mapping to the four finding classes of `scripts/audit_layout.js`.
 
@@ -136,6 +136,17 @@ Eyeballing the export can only find "looks crooked". Below are four machine-deci
 - **Why only text-vs-text**: shape overlap is too noisy — scrim over panel, palette backing, background bar under title are all deliberate.
   Text overlapping each other is rarely design intent.
 
+### S8b `text_overlap_x` — prose over another parent's copy (cross-parent)
+
+- **Meaning**: two non-empty texts overlap by >60% **under different parents**, within the same top-level board. `auditPage()` reports the earlier one as `text_overlap_x`.
+- **Why S8 cannot see it**: S8 compares siblings only. The shipped defect on screens 14/15 was a `region·content` pane filled
+  with prose *on top of* its own filled child `region·body`, a form drawn both in `form` and in `contact/shipping/payment`,
+  and two `listBlock`s stacked under one pane. Different parents, sibling scan clean, both gates CLEAN, export showed overprinted copy.
+- **Rule that prevents it**: fill **leaves** (`LY.leaves(plan.regions)`), never a pane that contains regions
+  (`pane_filled`, design-guide §11 rule 26). The audit groups by the top-level board and sorts by `y` with a forward window,
+  so nav labels repeated on two screens are not a collision; ANNO text (`ann·` / `fold·` / notes) is exempt.
+- **Fix**: clear the copy from the pane (keep it on the leaf) or delete the accidental second drawing; do not nudge text apart.
+
 ### S9 `malformed_text` — malformed text left by helper-argument misalignment
 
 - **Form**: `characters` is **pure digits** (`/^\d{1,4}$/`) **and `height ≥ 200`**.
@@ -182,6 +193,51 @@ Eyeballing the export can only find "looks crooked". Below are four machine-deci
   structures like "a media rect inside a card as wide as the text box" (one false-hurt of 9).
   Tighten to **box width + box height both matching the base rect** (full stacking) to judge centered, tested zero false positives.
 
+### S12 `stroke_covered` — a bordered box's stroke hidden by an opaque layer
+
+- **Meaning**: an opaque (alpha ≥0.5) sibling or child covers ≥25% of one or more bands of a box's stroke. Penpot paints a shape's
+  own stroke **under its children**, and a later sibling over an earlier one, so a flush overlay erases the border for its whole length.
+  This is the reported "带边框的元素，边框只显示部分" (buttons showed one or two border sides).
+- **Fingerprint**: `detail` names the hiding shape and the sides (`L`, `R`, `T`, `B`). Two causes share the signature:
+  - **overlay inside the box** (label tint, state layer, fill plate) → inset it by the stroke width (`CF.inset(box, sw)`); a
+    factory that fills the full box must draw the fill *below* the stroke or inset it. Exported proof: Descriptions·Bordered,
+    where `cell·label·N` (#faf7f6, same box) hid L+T+B of `cell·N`'s 1px border.
+  - **sibling collision** (a later board pokes out of the box) → move the later board (`reflowRows`/`fitBoardHeight`); insetting
+    it would just bury the border differently.
+- **Exemptions**: `scrim` / `shadow` / `glow` / `fold·` layers are meant to cover; a coverer that redraws the same edge with its
+  own stroke (`sameEdge`) is tiling, not occlusion; path strokes are skipped because their bbox band is empty.
+- **Prevention**: `CF.inset` is the only allowed way to place a plate over a bordered host; never draw a flush overlay.
+
+### S12b `stroke_clipped` — a stroke cropped by an ancestor clip
+
+- **Meaning**: ≥25% of a stroke band lies outside the nearest clipped ancestor. A **board clips by default** (api-pitfalls §4), so any
+  layer a factory deliberately draws outside its host box (`ctx.ring` at box−2, `ctx.hitPad`) is cut on the leaving sides.
+  Measured on page 03: 56 `ring·focus` strokes cropped L/R/T/B by 1–2px, i.e. a focus ring rendered as disconnected segments.
+- **Fix**: keep the layer inside the host (`ctx.ring` clamps to the clip) or release the ancestor's `clipContent`; a ring must
+  never be drawn outside a clipping board.
+- **Note**: the page root reports `clipContent:true` at 0×0 in this build; the audit skips degenerate clip boxes, otherwise every
+  top-level board would read as cropped.
+
+### S13 `duplicate_board` — two boards with the same name on one page
+
+- **Meaning**: a rebuild drew a second board under a name that already exists on the page (the classic "old copy left behind").
+  `fold·` annotations are exempt: one marker per tall **baseline-width** board is legitimate; a page-wide outline is not
+  (a PageRoot is a canvas, and the old root marker annotated empty space).
+- **Fix**: compare the two boards (z-order, parent, content) and delete the stale one — never keep both "to be safe"; a duplicate
+  master or screen makes audit, export and prototype targets ambiguous.
+
+### S14 tall-copy reservation — text line-height, not font size
+
+This is a **cause class**, not a separate signature: the visible result is caught by S1 (`out_of_bounds`), S7 (`board_overlap`)
+or S8 (`text_overlap`).
+
+- **Meaning**: a factory reserves `fs` for a wrapped label and steps by `fs + gap`, but the rendered line is `fs × leading`
+  (body 1.5, display 1.15). Two stacked buttons, a step item or an accordion body then grows past its host and presses into the next one.
+- **Rule**: reserve `CF.lineH(fs)` for every text line, including `labelH`, `helpH`, row heights and accordion body lines.
+  `CF.lineH` reads the leading of the ramp step; `fs` is only the glyph size.
+- **Detection**: there is no dedicated signature — the geometry audit catches the overflow/overlap it produces. When a stack of
+  tall controls overlaps, check the producer's reserved height before moving anything.
+
 ## II·supplement, meta-lesson: audit must cover "the output space of the fix action"
 
 This is more important than any single signature; it's the common point of two incidents:
@@ -207,7 +263,7 @@ Comparison examples:
 > So when audit dimensions are incomplete, **"always CLEAN" ≠ "always correct"**, only "this dimension was never checked".
 
 **Landing rules**:
-1. **After changes, always check "adjacency"**: any fix that "moves / grows / re-hangs" must run S7 + S8 once.
+1. **After changes, always check "adjacency"**: any fix that "moves / grows / re-hangs" must run S7 + S8 + S8b once.
 2. **Every repair engine must state in SKILL "what defect it introduces, who covers it"**, otherwise it's a landmine for the next round.
 3. **Audit judgment dimensions must be orthogonal**: containment (in) / overlap / size / font / structure (stray).
    Containment alone is insufficient — in this system's two incidents, the user's perception problem came once from **containment**, once from **overlap**.
@@ -291,8 +347,12 @@ This is the costliest lesson of the two incidents: **when the audit covers only 
 | `reflowRows` re-rows gap | subtree misses translation → board moved but content didn't | S1 containment recompute |
 | `createVariantContainer` re-hangs master | label left outside container | S5 `root_stray` |
 | mid-way add param to helper | early/late batch inconsistency | S6 font histogram |
+| `CF.inset` a plate over a bordered host | plate clips the stroke on the sides it covers | S12 `stroke_covered` |
+| `componentize` swaps a copy for an instance | size mismatch / fewer descendants → host loses content | size + anatomy guards, `misfit` / `anatomy` counts |
+| `TK.bindBoard` | gap snaps to scale, unbound padding stays raw | rules 19–24 (`paint_unbound` / `space_unbound` / …) |
+| `LY.guides(board)` | guides are native board metadata, not shapes — nothing to contain or clip | rule 25 (`no_guides`) |
 
-- **After fixing, must rerun "adjacency" checks (S7/S8)**, not just recompute containment.
+- **After fixing, must rerun "adjacency" checks (S7/S8/S8b)**, not just recompute containment.
 - **Delivery-wording discipline**: `verdict: CLEAN` only means "this set of checks didn't hit". Phrase externally as
   "**passed N checks (list them)**", not "no problems".
   This system had one real delivery incident: reported "14/16 pages CLEAN", but the user still saw lots of misalignment on the Demo page —

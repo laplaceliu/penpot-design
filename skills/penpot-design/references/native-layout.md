@@ -12,7 +12,7 @@ hard division of labour:
 | `storage.LY` | the region **plan** — which boxes exist, at what size | pure math, no shapes (except `drawStart/drawStep`) | reproducibility: a typed coordinate is a defect (gate **G11**) |
 | `storage.CF` | one **control**, every variant/state | absolute *inside its own host*, by design | pixel-exact internals (underline, hit pad, ring) that flow cannot express |
 | `storage.NL` | the **flow** of a screen: padding, gap, sizing, grid | native flex/grid, no coordinates at all below the region level | editability: a designer changing copy re-wraps the row instead of breaking the rhythm |
-| `storage.mkAbsBoard`/`absMount` | spec boards, art, pixel-exact overlays | world coordinates, `layoutChild.absolute = true` | some things are drawings, not layouts |
+| `storage.mkAbsBoard`/`absMount` | the `03–09` spec boards, art, pixel-exact overlays — **never a `01.xx`/`02.xx` board**, those are `FN.project` projections (G16) | world coordinates, `layoutChild.absolute = true` | some things are drawings, not layouts |
 
 **A delivered screen is `LY` outside + `NL` inside + `CF` leaves.** Getting only one of the three is what produced the
 pre-NL deliverables: correct pixels, uneditable file.
@@ -25,6 +25,11 @@ seed_storage.js → layout_engine.js → component_factory.js → native_layout.
 
 `native_layout.js` refuses to seed without `storage.mkText` and reads `storage.LY` / `storage.CF` at call time
 (`fromRecipe` needs LY; `frame({shadow})` needs CF), so a partial seed degrades instead of throwing.
+
+**Re-seed ≠ re-bind.** A long build script that captured `var p = storage.R0.p` (or `R0.l2`, `R0.CF`) keeps the **old engine
+object** after a later seed replaces `storage.CF` / `storage.LY` / `storage.NL`. The symptom is a fix that is present in the
+source but absent in the output ("I fixed the factory, rebuilt, nothing changed"). Build scripts must refresh
+`storage.R0.p` (or read `storage.CF` at each call) after any re-seed; a stale snapshot is not a cache, it is a fork.
 
 Build → settle → measure in **one** call, because the harness awaits a returned Promise:
 
@@ -47,7 +52,7 @@ loop is not (that call timed out, and the tree it had already built stayed half-
 One exception to "one call is enough": a **recompute** the engine has to re-run — re-declaring `fill` after a
 `resize()` — only becomes visible in a **later call** (§7, R5). Write in one call, verify in the next.
 
-## 2. Six vocabulary rules (R1–R6)
+## 2. Seven vocabulary rules (R1–R7)
 
 | Rule | The measured fact | What `NL` does about it |
 |---|---|---|
@@ -57,6 +62,7 @@ One exception to "one call is enough": a **recompute** the engine has to re-run 
 | **R4** | `grid.appendChild(child, row, column)` is **1-based**, and `0` / out-of-range silently clamps to cell 1/1 | `NL.cell` validates against the track counts and refuses with the grid size in the message; `NL.cellAuto` is the no-index path |
 | **R5** | **`shape.resize()` on a flow child downgrades its declared sizing to `fix`** (a 252 px `fill` child resized to 70 reads `fix/fix`). Silent — the pixels look fine, the editability is gone. | `NL.sizing` records what it was asked to declare; `auditFlow` compares that against the readback and reports **`sizing_dropped`**. Declare sizing **after the last resize**; `NL.nudge()` is the repair (and re-declares the *parent's* sizing too, because the nudge resizes the parent) |
 | **R6** | `fill` is two different numbers: **cross axis** = the parent's content box; **main axis** = the free space left by the non-filling flow siblings (row content 552 − 160 sibling − 16 gap = **376**). A main-axis `fill` child also **un-hugs** its `auto` parent back to `fix`. | `auditFlow` computes the expectation per axis and prints its arithmetic in the finding; `NL.sizing` returns `warn:'hug_defeat'` at write time; `main_axis_overflow` names the case where the fixed siblings already exceed the content box (the fill child then computes **0** and the board overflows) |
+| **R7** | a flex container with **no** gap declared renders its children **touching** (`rowGap`/`columnGap` default to `0`). Silence is not neutrality: "I did not decide the spacing" and "these two blocks must touch" are the same pixels. | `NL.frame(name, {breath:'block'})` resolves the gap from `LY.BREATH[level]` at the board's tier (layout-library §1.1), so the default separation device is **authored whitespace**, and the ladder is the same table `designGate` judges against — a declared `breath` can never fire `off_scale_gap` or `cramped_gap` (rules 32/33). An explicit `gap` still wins, because control anatomy is tight by contract (`inline` 8: icon↔label) |
 
 ## 3. Sizing: what to declare where
 
@@ -90,9 +96,12 @@ Six traps, each measured:
 
 ```js
 // one call, one region-level skeleton. `host` = the page board LY already sized.
-const sk = NL.fromRecipe('dash3', { w: 1440, h, tier: 'web', parent: host, fill: null, gap: 16, regionPad: 24 });
+// No gap typed: fromRecipe takes `block` (16) for the region stack and `group` (24) for its padding from LY.BREATH.
+// Pass `breath: 'section'` to move a whole page one level up, or `gap:` / `regionPad:` only when the number is a
+// deliberate exception the auditor has to be told about.
+const sk = NL.fromRecipe('dash3', { w: 1440, h, tier: 'web', parent: host, fill: null });
 // sk.regions = { nav: Board, toolbar: Board, content: Board, … } — each is a flow board at its LY rect
-NL.guide(sk.regions.content, { cols: 12, margin: 24, gutter: 16 });        // native column grid, not invisible rects
+LY.guides(host, { tier: 'web' });   // native 12-col guides from LY.TIERS (margin 32, gutter 24), not invisible rects
 ```
 
 `NL.fromRecipe(key, o)` also accepts **band recipes** (`landing`, `blogArticle`, …): app recipes carry `regions`
@@ -146,6 +155,16 @@ Ordering rules that matter in practice:
   `NL.add(parent, cfHost, …)` must run **after** the `await CF.*` resolves — declaring `fill` and then letting the
   factory resize the host downgrades the sizing back to `fix` (R5), which is the exact bug the audit reports as
   `sizing_dropped`.
+* **A drawing host joins flow whole, never piece by piece.** `CF` interiors are absolute by design (§9); `NL.add` the
+  **host** and leave its children alone. Trying to flow a control's plate/label individually rebuilds the control's own
+  geometry with the wrong owner — the measured case is a board that carried one child at absolute and one in flow, which
+  `auditFlow` reports as `absolute_child`.
+* **Fill leaves, not panes.** `fromRecipe` returns both panes (`content`, `main`, `readingPane`, `container`) and their
+  leaf regions. A pane is structure — filling it with copy draws the text underneath every child region (the defect S8b
+  and `pane_filled` were added for). Fill `LY.leaves(plan.regions)`; a pane gets a background, never content.
+* **Reserve `CF.lineH(fs)`, not `fs`, for every text line.** A 14px body line renders ~21px (leading 1.5); reserving 14 and
+  stepping 14+6 is how stacked buttons, step items and accordion bodies grew past their host and overlapped the next row
+  (S14). The same arithmetic governs `labelH`, `helpH` and a wrapped-body line count.
 * **Text goes in through `NL.label`** (which is `storage.mkText`, so the CJK/display-font routing stays in one place) and
   is declared `'auto'/'auto'` — never hand-place a flow label; that is what makes it re-wrap.
 * **Stamp the provenance** (`NL.stamp(board, {recipe, tier, region})`) so the audit is re-runnable by whoever opens the
@@ -201,6 +220,8 @@ stuck on the shapes themselves).
 | `stale_or_manual_gap` | `py ≠ prev.py + prev.h + rowGap` | re-settle before believing it (R3); otherwise the child was moved manually |
 | `fill_not_stretched` | sizing says `fill` but the box ≠ the expectation **for that axis** — cross axis = content box, main axis = leftover after the non-filling siblings | the message prints the arithmetic; check the parent's own sizing on that axis, then whether a `resize()` (R5) or a wrap (`auditFlow` skips wrapped rows) explains it |
 | `main_axis_overflow` | the fixed flow children already exceed the content box, so the fill child computes **0** and the board overflows | give the board room (bigger `fix` axis, or `auto` + no fill children), shrink a sibling, or drop the `fill` on that axis |
+| `fixed_overflow` | a **`fix`**-axis flow with no fill child whose children already exceed the content box → the last child is drawn past the host (measured: 99 px of content in a 96 px cell, ×40 on one board). `audit_layout` only reported it as `out_of_bounds` two pixels lower down, which names the wrong object | grow the host (`FX.fitBoardHeight`), wrap the row, or drop a child. The finding prints the sum, and the trap inside it is leading: **a 13px label is 19 tall, not 15** |
+| `hug_frozen` | a **hug** frame whose box ≠ `pad + Σchildren + gaps` on its main axis. Every other geometry expectation here is skipped for a hug parent as circular — it is only circular while the children are stale too; once they are laid out the sum is a fact (measured: `row·head` rendered 6 tall over two texts of 44 and 20, `auditFlow` said CLEAN, and the PNG export showed the caption printed on top of the title) | `storage.FN.relayout(board)` — walk bottom-up and write any flex property (`s.flex.topPadding = s.flex.topPadding`), which re-runs the pass in the same call. The cause is almost always **font application during token binding**: the text grows after the frame's last layout pass, so bind → relayout → re-audit, in that order (engines.md §7) |
 | `fill_in_hug_parent` | a main-axis `fill` child inside a parent that still reads `auto` on that axis | same as `main_axis_overflow`; this one fires from sizing alone, so it survives an unsettled read |
 | `size_stale` | a `fix` axis no longer measures what the caller declared | settle and re-read; if it persists, something resized it — fix the producer, not the board. (Boards built without an explicit `w/h` record no expectation, so flow rows do not spam this.) |
 | `no_flow_children` | the board has children and none of them is in flow | run `NL.reflow` (§8) |
@@ -219,7 +240,7 @@ skeleton is genuinely flow-authored and settled, not that it obeys the design ru
 hand-placed coordinates. The migration is two steps, and `NL.reflow` performs both:
 
 ```js
-const res = NL.reflow(board, { dir: 'column', gap: 16, pad: 24 });   // addFlexLayout + clear each child's absolute
+const res = NL.reflow(board, { dir: 'column', breath: 'block', pad: 24 });   // addFlexLayout + clear each child's absolute
 await NL.whenSettled(board);
 return { released: res.released, audit: NL.auditFlow(board) };
 ```
@@ -231,11 +252,19 @@ and reports `fix` on both axes, so declare the sizing you want **after** the ref
 
 ## 9. When to stay absolute
 
-* Spec/diagram pages (`01 Foundations`, anatomy boards, the `11 · Layout` grid diagrams' own geometry) — those are
-  drawings with a fixed reading order.
+* Anatomy/diagram boards whose box *is* the drawing (`Slot·*·Anatomy`, the `11 · Grid & breakpoints` diagrams' own
+  geometry) — those have a fixed reading order. **Not** `01`/`02`: a Foundations board is a hug column of hug rows, the
+  most flow-native artifact in the file (G16, `engines.md` §7). The only thing the shelf pins absolutely is each
+  board's own top on the page, and that pin is declared (`FN.place` → `nl:shelf`).
 * Anything pixel-exact: focus rings at an offset, half-stars under a clip, art, decorative ellipses.
 * `CF` control internals: a control is absolute inside its own host and **that is correct** — the host is what joins flow.
 * Region boards themselves, when their coordinates come from `LY` (G11) — `fromRecipe` is deliberately absolute outside,
   flow inside.
 
 If a *screen's* content area is a pile of absolute boards, the deliverable is not editable and this is the file to fix.
+
+Staying absolute does **not** opt a board out of the whitespace contract. Rules 32/33 read `flex.gap`, so they cannot see an
+absolute stack, but the distance between two absolute sibling blocks is still judged by `off_scale_gap`, and the ladder is the
+same `LY.SPACE` scale underneath. `storage.breathe()` repairs the **flow** half (gaps + text leading); an absolute gap is a
+coordinate, so it is repaired where it was authored — `storage.reflowRows({gap})` re-shelves at a ladder level, `storage.moveSubtree`
+for one subtree. Whitespace is the separation device either way; flow is only how you *declare* it.

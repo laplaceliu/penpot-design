@@ -45,6 +45,9 @@ that is the same defect as a hand-drawn control (G12 spirit): it cannot be re-sk
   (`scaffold_structure.js` → `penpot-structure.md §2`), and the design→code side is specified to take **the same names**
   (SKILL.md), so the code icon set matches that board. Removing `G` rewrites a page of the fixed structure and the
   codegen naming agreement.
+* **The Icons board is `FN`'s only declared exemption on `01.xx`** (`FN.EXEMPT['01'] = ['Icons']`, gate G16): a catalog of
+  1966 glyphs is not one record type, so `IC.grid` composes it — still token-filled, still gated by all 30 other rules,
+  and `not_projected` skips it **by that name only**. Every other board on 01/02 must be projected.
 
 So the split is deliberate: `G` = the guaranteed, synchronous, palette-native marks *inside* controls; `IC` = the
 extensible catalog *outside* them. If one source is ever wanted, the viable path is **generated** data (Lucide →

@@ -29,13 +29,18 @@ Practical consequence: **30s per call is the real budget**, so every engine in `
 1. **Page switching is asynchronous**: after `penpot.openPage(pageObj)`, creating/modifying shapes in the same call may hit the old page. Two reliable patterns:
    - Step-wise: this call only switches page and returns `{switching:true}`, the next call does the work;
    - Queue runner: `if (penpot.currentPage.name !== q[0]) { penpot.openPage(storage.pg(q[0])); return {wait:true}; }` → `const pg = q.shift(); work; if (q.length) penpot.openPage(...)`. **Note the runner pre-switches the next page at its tail; before probing/repairing you must verify `penpot.currentPage.name`**.
-   - **Defensive verification at the start of every command**: `openPage(pg); await sleep(400); if (penpot.currentPage.name !== 'target page') return {err: currentPage.name};` — return immediately on mismatch, never run remove/create on the wrong page.
+   - **Defensive verification at the start of every command**: `openPage(pg); await sleep(400); if (penpot.currentPage.name !== 'target page') return {err: currentPage.name};` — return immediately on mismatch, never run remove/create on the wrong page. Measured 2026-10-21: **without the sleep the name never changes inside the call**, so three audits of "three pages" were three verdicts about the one page that was already open. The auditors now do this themselves (`designPage({page})` refuses, `FN.check` settles 700 ms and refuses on a name mismatch, `designNext` opens+waits+verifies).
 2. **Page object**: `openPage` only accepts a Page object or UUID. Helper `storage.pg = n => penpotUtils.getPageByName(n)`.
 3. **Storage is volatile**: lost after plugin reconnect / browser crash. Before each batch probe `storage.T / storage.mkText / storage.absMount`; if missing, re-seed (seed template: `scripts/seed_storage.js`, extend per project theme).
 4. **Batch size**: each call ≤8 primitives or ≤10 text; exceeding triggers the 30s eval timeout. A timed-out call may have partially taken effect — before retrying, probe residue to avoid duplicate creation. **When killed by timeout, openPage may not have committed**: the next command may land on the old page — switch page + verify before operating (lesson: once on the Foundations page a "remove all" was wrongly executed, wiping the whole page).
 5. **Crash-damage pattern**: canvas crash (lots of glow blur + large files + frequent page switching are triggers; a symptom is also MCP reporting "No plugin instance connected") degrades the **last batch created before the crash** of board/rect/ellipse to default 100×100 (text unaffected; position/fill/z-order preserved). Detection: non-text primitive size exactly 100×100. Fix = resize per design spec, **including the header board** (header-board degradation makes the export all black). Disabling WebGL significantly stabilizes; mild freeze self-heals after sleep 60~120s.
 6. **Return values**: only return raw values (number/string/flat array). Returning a function or complex object fails structuredClone (e.g. shape's makeMask).
-7. **Cross-page operations**: modifying/deleting a non-active page object reports "Cannot modify a page that is not currently active" → activate its owning page first.
+7. **Cross-page operations**: modifying/deleting a non-active page object reports "Cannot modify a page that is not currently active" → activate its owning page first. **Reading is exempt**: `pageRootOf(name)` walks a non-current page's tree fine (measured: 70 spec boards scanned in 2.8 s), so inventory/audit passes need no page switching — only writes do.
+8. **Self-budget long passes (`while (q.length && Date.now()-t0 < 21000)`)**: the 30 s ceiling kills the *response*, not the *work* — a "timed out" rebuild normally completed and placed its board seconds later, and a second blind rebuild is what stacks twins. So every driver returns `{done, left}`, is idempotent (skip-if-exists), and is followed by a stray sweep rather than a retry.
+9. **Repair in place before rebuilding.** An audit finding carries `board/shape/x/y/w/h`; a text label is writable
+   (`shape.characters = …`), an instance child is positionable (`child.x = …`) though not resizable
+   (`child.width = …` throws). The rebuild path is reserved for boards whose *structure* is wrong — a rebuild costs every
+   derived artifact that reads it (masters, flows, TOC, index, exports), and a repair costs none of that.
 
 ## 2. Building a new board: layout-approach decision
 
@@ -47,8 +52,10 @@ instead of `topPadding…`, both silently dropped, and a `resize()` that downgra
   (a designer changing copy re-wraps the row). Settle with `NL.whenSettled`, prove with `NL.auditFlow`.
 * **A bare board + world-coordinate appendChild** — simple one-offs only; re-check the whole-page export offset on the
   first board before batching (some environments show `-board.y` in export while readback looks right).
-* **C flex container + all absolute (`mkAbsBoard`/`absMount`)** — spec boards, anatomy diagrams, art and pixel-exact
-  overlays (native-layout §9): 33 components + 3 full pages with 0 rendering failures, and it bypasses reflow by design.
+* **C flex container + all absolute (`mkAbsBoard`/`absMount`)** — the `03–09` `CF` spec boards, anatomy diagrams, art and
+  pixel-exact overlays (native-layout §9): 33 components + 3 full pages with 0 rendering failures, and it bypasses reflow
+  by design. **Not `01.xx`/`02.xx`**: a Foundations board is a hug column of hug rows produced by `FN.project` (G16) — the
+  only thing approach C is used for there is the shelf pin, which `FN.place` declares (`nl:shelf`).
 
 Degrade only with evidence from an export: export offset → suspect A; a screen that no longer re-flows → it was authored
 absolute, re-build the interior with `NL`, not `fix_layout`. The measured table for all three is in api-pitfalls.md §10.
@@ -147,7 +154,11 @@ After reparent, the instance's internal child elements shift (e.g. +30,30) → r
 1. **Read the full source before acting**: each component's `.tsx` + `.module.less` must be read. Drawing from a one-line doc impression misses key structure (lesson: the Title doc only says "swallowtail ribbon", the source is actually a five-layer structure — clip-path fishtail swallowtail / folded-corner border triangle / rotateX(3deg) front / inner shadow / text layer, default green `#27d039` not the theme color, em units scale with font size).
 2. **Extract tokens**: CSS variables → storage.T (color/radius/spacing/shadow color), synced into `penpot.library.local.tokens` (addSet + addToken, type: 'color'/'borderRadius'/'dimension').
 3. **Font decision**: read less's font-family stack → `penpot.fonts.findByName` to probe availability → mkText auto-routes by CJK regex.
-4. **Build order**: `01 · Foundations` (palette / type ramp / spacing / radius / elevation / icons) → `02 · Color in use`
+4. **Build order**: `01 · Foundations` + `02 · Color in use` — **projected by `storage.FN`, one board kind per call; there
+   is no other producer** (`FN.project({page,kind[,set]})` → `FN.bindNext({page})` until `allBound`; no height array, no hex
+   mirror, engines.md §7). Gating those pages requires FN seeded first: rule 31 `not_projected` reads FN's chapter table
+   and the `nl:fn` stamp FN writes, and `storage.designCoverage()` answers the file-level question (block-per-page means
+   a chapter spans ~9 pages).
    → `03–09` one `Family·Spec` board per component family, produced by `CF.matrix` and packed by `LY.pack`
    → `10–12` chrome, grid, recipes → `13 · Component index` → register library components → `14–16` the screen recipes.
    When the recreated library has numbers of its own, they **override the consensus defaults** (they are the target);
@@ -171,12 +182,17 @@ const cell = storage.CF.instance(storage.CF.name('Button', { type: 'primary', si
 storage.NL.guide(sk.regions.content, { cols: 12, margin: 24, gutter: 16 });         // native grid
 await storage.NL.whenSettled(host);                       // poll the stale fingerprint, don't guess a sleep
 const flow = storage.NL.auditFlow(host);                  // must be CLEAN before the gates below
-storage.LY.fold(host, 'web');                             // the dashed first-viewport marker
+storage.LY.fold(host, 'web');                             // the 2px accent first-viewport marker
 ```
 
 - **Numbers enter the file only from `LY` (rects, spacing, tiers) or `CF` (control metrics)**. A coordinate typed into
   `execute_code` is gate **G11**; a control drawn without its factory is gate **G12** and will also fail `name_invalid`,
   because coverage is read from the `Family·Type·Size·State·Slot` name the factories emit.
+- **Gap: name the hierarchy level, not the number.** `NL.frame(name, {breath:'block'})` / `NL.reflow(board, {breath:'group'})`
+  resolve through `LY.breath(level, tier)`, the same table `designGate` judges, so a declared breath cannot fire `cramped_gap`
+  or `off_scale_gap` (rules 32/33, native-layout R7). A frame with neither `breath` nor `gap` gets flex's default **0** — two
+  blocks touching because nobody decided. Typographic air is the same contract: leading comes from the ramp (`CF.lineH(fs)`),
+  and a wrapped paragraph needs ≥ one line before the next block (rule 34).
 - **Sizing on a flow child is declared last, after every `resize()`** (native-layout R5): `resize()` downgrades a flow
   child's sizing to `fix` silently, and `NL.auditFlow` is the only thing that notices (`sizing_dropped`). Control hosts
   and instances take `'fix'/'fix'`; `'auto'` on a board means **hug** and collapses a button to its label.
@@ -211,6 +227,19 @@ the fix is in `LY`/`CF`/the palette, not in a one-off patch on the board — pat
 - **Export may capture layout transition states**: data readback all correct but rendering garbled — wait 1s+ and re-export before judging, don't immediately change code.
 - After fixing, export to the user, and ask the user to zoom in the editor to review.
 - Programmatic audit is preferred: derive expected positions from the standard grid / host, compare item by item and return an offset list, then batch-fix — more reliable than eyeballing screenshots.
+- **Batch export at delivery scale goes through a loopback receiver, not `export_shape`.** `export_shape` returns one
+  image to the model per call (fine for a spot check, hopeless for 30 boards); inside `execute_code`
+  `await shape.export({type:'png', scale:1})` yields a `Uint8Array` that can be `POST`ed to a local
+  `http://127.0.0.1:8778/png?name=…` sink, which writes it under `exports/` for PIL to measure and tile
+  (`assets`-side reference implementation: `export_receiver.py` + `tools/contact_sheet.py` in a task directory).
+  Budget ~3 s per full-screen board, so the loop self-budgets like any other long pass.
+- **A repair invalidates its page's exports.** After any change to a board, re-export that board before describing it as
+  accepted, and re-run the blank/flat check (grayscale `pstdev < 8` catches a tile that exported empty). Screenshots that
+  predate a repair are not evidence about the repaired file.
+- **A gate cannot see text.** `designGate`/`auditPage` judge paint, geometry and contrast of *rendered* copy; a caption
+  that *quotes* a token value (`wash #E7E1F9`, `7.34:1 …`) is plain text and stays silently stale when the swatch next to
+  it is token-bound and therefore correct. Boards that document values must be built **after** the theme overlay lands,
+  and when in doubt re-derive the caption from the sibling shape's own `fills[].fillColor` — then look at the export.
 
 ## 8. Building a design system (theme recipe)
 

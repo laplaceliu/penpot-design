@@ -308,6 +308,21 @@ variantError getPluginData/…`. **Absent**: `switchVariant` (instances have it,
 | `spacing` token `24` → flex board with `['rowGap','columnGap']` | `tokens === { rowGap: 'space.probe', columnGap: 'space.probe' }`, `flex.rowGap === 24`, `flex.columnGap === 24` |
 | alias `{color.probe.primary}` | `resolvedValueString === '#2563EB'` |
 
+**Two subsystems, and only one of them feeds the 素材 → 排版 panel** (measured 2026-10-21; `storage.TP` now lives in
+`scripts/token_engine.js`):
+
+| Action | Readback |
+|---|---|
+| `penpot.library.local.createTypography()` | takes **no argument** (the same ignore-the-args behaviour as `createColor`, §7) → a `LibraryTypography` whose `name` / `fontFamily` / `fontSize` / `fontWeight` / `lineHeight` / `letterSpacing` are writable afterwards and read back verbatim |
+| `style.setFont(font, variant)` | carries the family + weight onto the record; pick the variant with `String(v.fontWeight) === want` — a `FontVariant` exposes only `name / fontVariantId / fontWeight / fontStyle` |
+| `style.applyToText(textShape)` | family, size, weight and tracking transfer; **`lineHeight` is rewritten to `1.2` whatever the record holds** (measured twice: 1.05 → 1.2 and 1.4 → 1.2), so `TP.apply` re-asserts the style's own leading after the call or the ramp's rhythm flattens |
+| `penpot.library.local.typographies` | the list the Typography panel renders — **a token set puts nothing in it.** The Rayo file had 40 *active* `typography` tokens, `tokens.themes === []`, and `typographies.length === 0`: the panel was empty while every design rule passed, because every rule reads the shape tree or the token set |
+
+So a delivered file needs both: `TK` *declares* the ramp (bindings, the auditor), `TP.seed()` makes each step
+*pickable* by a human. `TP.seed` names every style exactly like its token (`type.prose-lg`), is idempotent
+(second run: `made 0`, list still 40) and verifies each field by readback (`drift: []`). Audit rule 30
+`no_type_styles` fails a text-bearing board whose library holds 0 styles.
+
 **New, and it changes how a theme switch must be driven:** adding a later active `· Dark` set with the same token name
 changed the *base* token's `resolvedValueString` to the dark value (later set wins — as documented), **but the already-bound
 shape kept its light fill**. The shape only re-resolved when the switch went through a **theme activation**:
@@ -406,6 +421,9 @@ Re-measured 2026-10-19 while building `scripts/prototype_engine.js` (this is the
 | `open-url` | `{type:'open-url', url:'https://…'}` → `action: {type, url}` round-trips |
 | `close-overlay` | `{type:'close-overlay'}` → `action: {type}` round-trips |
 | **auto-flow** | with **no** flows on the page, wiring navs from two boards auto-created flows named `Flow 1` and `Flow 2`. Creating one *named* flow first (from the entry board) meant the same batch produced **only** that named flow → always create the entry flow before wiring, and read `page.flows` afterwards to catch strays |
+| **cross-page destination (measured 2026-10-21)** | a `navigate-to` whose target board lives on **another page** is accepted, appears in `shape.interactions`, and reads back with `destination: null` — the viewer silently does nothing. Prototype wiring is **page-local**; this is the reason the screen chapters (`14/15/16`) are never paginated into one-page-per-screen (`penpot-structure.md` §2.3) |
+| **flows are not page-scoped in effect** | removing **any** page wipes **every** flow and interaction in the file (measured: 40 wired links → 0 after a chapter-page delete). Re-author from a name-based spec: shape ids do not survive a rebuild, board names do |
+| `flow.startingBoard` | the readback property is `startingBoard` (a shape), **not** `startingFrame`/`startingFrameId` — probe with `Object.keys(flow)` (`['name','startingBoard']`) before writing an audit that reports entries |
 
 **What this buys the skill**: a delivered design system can ship as a clickable prototype (screen → screen, menu →
 overlay, modal close) instead of a pile of static boards, and `showInViewMode` + `viewMode` navigation make it presentable.
@@ -460,6 +478,17 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
   distributeHorizontal/Vertical flatten createVariantFromComponents`.
 * `penpot.library.local`: `colors typographies components tokens createColor createTypography createComponent` + pluginData;
   `penpot.library` also exposes `connected availableLibraries connectLibrary` (cross-file libraries).
+* **Text content is writable**: `shape.characters = 'new label'` assigns and reads back (measured 2026-10-21). A wrong
+  caption is therefore a one-shape repair — do not rebuild a board to fix a string. (`shape.content` is **undefined** on
+  these proxies; `characters` is the only text accessor the engines use.)
+* **The shape tree of a non-current page is readable**: `pageRootOf(name)` resolves and walks without `openPage`
+  (measured: a registry scan of 70 spec boards in 2.8 s). Cross-page **reads** are cheap; cross-page **writes** need the
+  page active (`createComponent`, `place`, and anything that mounts).
+* **Instance children are half-frozen**: `child.x = …` / `.y = …` work, `child.width = …` throws
+  `TypeError: Cannot set property width of … which has only a getter`. Re-seat an instance's internals by position and
+  text; change its box by choosing a differently-sized master.
+* `penpot.components` does not exist and `inst.componentId` is `undefined`; `inst.component()` resolves the live
+  component record — that is the identity test.
 * Official type definitions are the reference for names **but not for this build's names** (§2 padding). npm
   `@penpot/plugin-types@1.4.2`, 4419 lines; authoritative docs `doc.plugins.penpot.app`.
 * The MCP server ships **5** tools (`execute_code`, `export_shape`, `high_level_overview`, `penpot_api_info`,
@@ -469,7 +498,7 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 
 | # | Native capability | What the skill does with it | Status |
 |---|---|---|---|
-| C1 | flex/grid with `fix`/`auto`/`fill`, real padding names, settle-then-measure | `storage.NL` authors screens with auto-layout; `LY` supplies the structure, `NL` supplies the flow; absolute stays for spec/art boards | **shipped** (`scripts/native_layout.js`, rules R1–R6, `whenSettled`/`auditFlow`/`nudge`/`fromRecipe`) |
+| C1 | flex/grid with `fix`/`auto`/`fill`, real padding names, settle-then-measure | `storage.NL` authors screens with auto-layout; `LY` supplies the structure, `NL` supplies the flow; absolute stays for `03–17` spec/art boards — **not** for `01.xx`/`02.xx`, where `FN`'s projection owns the geometry (gate G16) | **shipped** (`scripts/native_layout.js`, rules R1–R7, `whenSettled`/`auditFlow`/`nudge`/`fromRecipe`) |
 | C2 | `comp.instance()` + per-instance text override + `instance.resize` | screens place **instances** of registered components instead of re-calling factories | **shipped** (`CF.get`/`CF.component`/`CF.register`/`CF.instance`, sizing declared `fix` and last) |
 | C3 | variant containers + `switchVariant` | state/variant coverage becomes *switchable* on a delivered screen, not one board per state | **shipped** (`CF.variantSet`/`CF.variants` + `CF.swap`; rules in §5) |
 | C4 | token apply round-trip + **theme activation repaints** | `· Core`/`· Dark` + `Scheme` themes become the actual light/dark switch; acceptance runs `TK.paint` → `TK.activateTheme` → `TK.changed` → re-export | **mechanics shipped** (§6; `TK.paint`/`TK.changed` added to `token_engine.js` — the full switch loop runs in the demo session) |
@@ -478,15 +507,15 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 | C7 | `shape.exports` presets | delivery leaves batch-export configured; acceptance can run from the file, not the session | #15 |
 | C8 | `board.guides` column grid | the grid diagram on `11` is a native guide, no invisible rects | #15 |
 | C9 | `file.saveVersion(label)` / `findVersions` / `restore` | checkpoint before each risky batch; recovery without hand-rolled undo | #15 |
-| C10 | `setPluginData` on shapes/pages | recipe key, tier and gate stamp travel **inside the file** → audits are re-runnable by anyone | **shipped** (`NL.stamp`/`NL.readStamp`) |
+| C10 | `setPluginData` on shapes/pages | recipe key, tier and gate stamp travel **inside the file** → audits are re-runnable by anyone. This is what makes **G16** a gate rather than a claim: `FN.project` writes `nl:fn=<kind>` + `nl:shelf=1` on every projected Foundations board, and auditor rule 31 `not_projected` reads it back (measured 2026-10-21: 11 boards restamped, `getPluginDataKeys` returns them after a full re-seed of the engines, and `designPage({})` on that page reads `CLEAN`) | **shipped** (`NL.stamp`/`NL.readStamp`, `engines.md` §7.1) |
 | C11 | `createShapeFromSvg` | icons become editable vectors from any SVG, plus a **bundled Lucide catalog** (1966 icons, ISC) with a placement/grid engine; emoji placeholders demoted to a fallback | **shipped** (`scripts/icon_engine.js` + `assets/icons/lucide.jsonl`: origin rule + `base-background` removal + recolor + resize-to-size + root-move-before-tmp-removal, see `references/icons.md`) |
 | C12 | `generateStyle` / `generateMarkup` / `getBounds` | Design→Code gets CSS-accurate geometry from flow boards; text metrics stop being estimated | #16 |
 
 ## 12. Still unverified — do not claim these
 
 * `Group.makeMask`, `penpot.flatten`, boolean ops beyond `createBoolean` existence.
-* `createTypography` object shape (and `createColor` options *beyond* the create-then-assign recipe of §7 — six
-  argument shapes were tried and all were ignored, but no accepted form was found).
+* `createColor` options *beyond* the create-then-assign recipe of §7 — six argument shapes were tried and all were
+  ignored, but no accepted form was found. (`createTypography` **is** measured now — §6: it takes no argument at all.)
 * Cross-file `connectLibrary` behaviour and what `availableLibraries` returns in a multi-file team.
 * `penpot.ui` messaging, `openViewer` result, comment-thread round-trip.
 * Anything about the **exported-file** pipeline (`file.export`) beyond that the method exists — it has not been run.

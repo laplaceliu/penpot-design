@@ -54,6 +54,54 @@ Full-width controls are legal only inside a narrow container (card, drawer ≤40
 
 Whitespace is the hierarchy carrier, not leftover. Numbers that read as "designed":
 
+### 2.1 Whitespace is the FIRST separation device (default and preferred)
+
+When two things have to be told apart, spend air **before** reaching for any other device, in this order:
+
+1. **Whitespace** (`LY.BREATH`) — the gap between flow siblings. The default device for every stack: element↔element,
+   section↔section, block↔block.
+2. **Elevation / surface polarity** — a card, a wash, a shadow. Only when the two things are different *kinds* of surface.
+3. **A stroke or a divider** — only where whitespace would be a lie: table rows, pane edges, hairline separators (§1.3 rule 3).
+4. **Alignment / reading order** — never a substitute for 1.
+
+Reaching for a divider where a `block` gap would have carried the separation is the failure mode this section exists to
+prevent: dividers multiply, each one then has to be kept aligned, and the page reads as a grid of lines instead of a
+sequence of groups.
+
+**HARD — the gap comes from the ladder, not from a typed number.** `LY.BREATH` names one amount per hierarchy level and
+every value is a `SPACE` member, so a gap taken from the ladder cannot simultaneously be `space_off_scale`:
+
+| Level | web / pad | mobile | What it separates |
+|---|---|---|---|
+| `inline` | 8 | 8 | two shapes that are one thing (caption↔its block, icon↔label inside a control) |
+| `row` | 12 | 12 | a row of cells, a list line |
+| `block` | 16 | 16 | **the default**: block↔block inside one band |
+| `group` | 24 | 24 | a group of blocks (card padding, form group) |
+| `section` | 32 | 32 | heading → its content, section → section |
+| `band` | 48 | 48 | band → band inside one screen |
+| `page` | 96 | 64 | full-bleed page bands (marketing) |
+
+Read it with `LY.breath(level, tier)`; write it with `NL.frame({ breath: 'block' })` (`true` = `block`). Builder and gate
+then cannot drift, because both read the same table. An explicit `gap:` number stays legal — measured systems disagree
+with this ladder — but it must be a `SPACE` member and it must satisfy rules 32/33.
+
+**Measured 2026-10-21 on the live file** (19 pages, 110 flow containers): 100% of the gaps already sit on a ladder
+level (109 at `block` = 16, 1 at `inline` = 8) — after the ladder was **rewritten to include 16**. The first draft's
+levels were 8/12/24/32/48/64/96, which called the file's own rhythm off-ladder and measured 3% adoption. A ladder that
+indicts the system it describes is the wrong ladder; `LY.BREATH` documents the rhythm, it does not replace it.
+
+**The three exemptions, where whitespace is deliberately NOT the device** (the gate encodes all of them):
+
+- **A repeated run** — ≥3 siblings, equal extent along the axis, uniform pitch: table rows, list items, matrix cells.
+  Those are *one* group separated by rules and polarity, not several groups separated by air. Rule 33 never binds a run;
+  rule 32 binds it only when the items stack an interior of their own (a column of touching cards is cramped, a column of
+  touching rows is a table). Measured on `02.03 · Contrast matrix`, where the first draft indicted one 48px row 12 times.
+- **Abutting panes and segments** (§1.3 rule 3) — a row at gap 0 whose members are not cards.
+- **A label and its field** (4–6) — tighter than any ladder level and correct. Rule 32 only judges siblings that are
+  block-level (≥24 on the stack axis), so a caption never drags a form up to 16.
+
+### 2.2 The numbers
+
 | Context | Value |
 |---|---|
 | Page top inset (below app bar / nav) | 24–32 (web), 16 (mobile) |
@@ -105,10 +153,25 @@ Base body = **14px / 20px** (AntD `fontSize 14`, Fluent Body 14/20, Carbon 14/20
 - **HARD — minimum size 12px** for anything a user must read. 11px is legal **only for a declared role** — `overline` group labels,
   chart axes, keyboard hints — and the declaration is the shape *name*: `ctx.text({ role: 'axis' | 'overline' | 'kbd' })` writes
   the role into the name, which is what `audit_design.js` reads (`off_ramp_size` accepts an 11px box **only** when its name carries
-  one of those three tokens). An 11px box drawn by hand with no role in the name is a finding, not a style choice. Never 10px in CJK.
+  one of those three tokens, or a `sample · ` prefix — a type specimen is *supposed* to show the step it is named after).
+  An 11px box drawn by hand with no role in the name is a finding, not a style choice. Never 10px in CJK.
 - Tracking: negative (−0.01…−0.03em) only above 32px; CJK needs no negative tracking (glyphs are square, already tight).
   Penpot `letterSpacing` takes a **px number string** only (`'−0.5'`), not `em` (api-pitfalls §5).
 - Emphasis is a **three-signal system**: weight, size, color. Using only color = weak hierarchy; using all three at once on every element = noise.
+
+**HARD — typographic whitespace is part of the ramp, not a per-shape choice (§2.1 applied to type).** Two amounts decide whether a
+block of copy breathes, and both belong to the ramp step, never to the call site:
+
+- **Leading (行距)** — the step's own declared `lineHeight` is the floor. `mkText`/`TK.apply` write it from the token; a hand-typed
+  `t.lineHeight = '1'` on a wrapped paragraph is the same defect as a gap of 0 between two blocks. Measured floor the gate uses:
+  the **tightest declared leading at that size** (`TK.declared()` → `storage.breathSpec.lead`), so the auditor never demands more
+  air than the ramp itself claims. A single-line label at 1.0 is not judged — only wrapped copy (≥1.8 rendered lines) is.
+- **Paragraph air (段距)** — the gap between two consecutive prose blocks must be **≥ one line** of the block above (the CSS
+  `margin-block: 1em` convention). Copy stacked at the label gap reads as one grey mass even when every line has perfect leading.
+
+`CF.lineH(fs, weight, family)` returns the pixel line box for a step, which is what both the gate and `storage.breathe()` measure
+a paragraph against; a factory that stacks copy reserves `lineH(fs)`, never `fs`. Repair with `storage.breathe({ apply: true })`,
+which raises the container gap and re-binds the compressed paragraph to the declared leading in the same pass.
 
 ### 3.3 Text color ramp (DEFAULT, exact consensus values)
 
@@ -171,6 +234,11 @@ Each tone the kit can paint ships as three coordinated steps, and only the two e
   which is **2.56:1** and fails.
 - **Dark**: the triple is re-derived per step, not inverted — the wash becomes a low-alpha tint over the dark surface and the
   `*Ink` step **lifts** (a 3–4 level hue, e.g. `#93C5FD`-family copy on `#0F172A`). Mechanics in `color-schemes.md` §4.1.
+- **The triple is a name contract, and `02 · Semantic roles` reads it** (gate G16): `storage.FN.tones()` finds a tone only
+  when `color.X` has both an ink and a wash sibling, accepting both `X-ink`/`X-wash`/`X-soft` and the camelCase of the table
+  above (`XInk`/`XSoft`) — while a hue that merely ends in those letters (`color.pink`) never parses as a triple. A token set
+  with no complete triple makes the projector **refuse**, so a tone documented here but not declared in the set shows up as a
+  missing board, not as a board painted with a fallback hex (`engines.md` §7).
 
 ## 5. Elevation, borders and state layers
 
@@ -189,13 +257,50 @@ Each tone the kit can paint ships as three coordinated steps, and only the two e
 - A shadow implies "floating above something". Never stack a shadow on a section that is not floating (the classic "everything is a card" disease).
 - **Border vs divider**: containers get 1px `border` or a tone step; items *inside* a container get 1px dividers with `colorSplit`
   (`rgba(5,5,5,.06)` light) — a visible gray hairline inside a card reads as a table.
-- Radius nesting rule (HARD): `inner radius = outer radius − padding`, clamped ≥0. r16 card + r12 inner chip is fine; r8 inner in r8 outer is wrong.
-- Radius ramp (DEFAULT, cross-system): `none 0 / xs 2 / sm 4 / md 6–8 / lg 12 / xl 16 / full 9999`.
+- **A corner is taken from the `borderRadius` token set and nowhere else (HARD).** The ladder exists as tokens
+  (`radius.none / xs / sm / md / lg / xl / full`); every writer in the engines goes through `CF.radius()`, which takes a
+  role (`control`/`box`/`tile`/`card`/`field`/`panel`/`slab`/`hero`/`pill`…), a ladder key, a `radius.*` name or a number,
+  and **snaps anything off-ladder to the nearest step**, recording the coercion in `CF.coerced`. So the defect cannot be
+  introduced at draw time, and two machine rules judge the result: `radius_off_ladder` (a corner that is not a declared
+  value) and `radius_unbound` (a corner that is a declared value but carries no `tokens.borderRadius*` binding).
+  `TK.radiusSweep()` is the repair for the second one — see `design-tokens.md` §8.
+- **The two blind spots these rules had, and what closed them (read this before claiming a file is corner-clean).**
+  (1) *They judged only corners that exist*: both skip `v <= 0`, so a control host drawn square by an older generation of a
+  factory passed CLEAN — and (2) *they never looked inside a component*: `isComponentInstance()` is **also true for the
+  component's own shape** (measured 2026-10-22: `Button·Primary·MD·Focus·Pill` answers `isComponentInstance()`,
+  `isComponentMainInstance()`, `isComponentRoot()` and `isComponentHead()` all true), so the auditor's instance skip silently
+  exempted 79 button masters on `03.01` and the whole spec chapter read CLEAN while every Focus cell showed a square body
+  behind a pill ring. The auditor now stops only at a **copy** (`isComponentCopyInstance()`) and judges masters and copy hosts.
+  The pair itself is **rule 37 `ring_off_host`** (§5.1, `CF.ROLE.ring = 'host'`: a ring is the control's derived outline, so its
+  corner IS the control's corner — both values can sit on the ladder and still contradict each other, which is exactly why 35/36
+  could not see it), and the repair is **`TK.roleSweep()`** (`design-tokens.md` §8.2): pill-family hosts to the step DESIGN.md
+  binds them to, every ring to its host's corner, then bind + commit.
+- **Still not machine-checked: the role of a family DESIGN.md does not bind to one step.** A `Card·*` host carries whatever
+  corner the generation that drew it typed; DESIGN.md's `card: {rounded.md}` is the authority, but no rule compares a host to
+  its family's declared role, so a card at `sm` under a `md` contract reads CLEAN. Read the masters against DESIGN.md before
+  claiming the roles are applied, and repair by **re-driving that spec board through `CF`** (the factory is the only writer
+  that knows its family's role) — never by patching radii in place.
+- Radius nesting rule (HARD): `inner radius = outer radius − padding`, clamped ≥0 — read as **which step to take**, not
+  as arithmetic: the inner box takes the declared step at or below `outer − inset`. An interpolated number
+  (`card radius + 4`) is the old failure mode and is what `radius_nesting` now indicts.
+- Radius ramp (DEFAULT ladder, cross-system, for a design with no measured source):
+  `none 0 / xs 2 / sm 4 / md 8 / lg 12 / xl 16 / full 9999`. A step is a single number because a token is a single value.
+  A recreation **always takes the source's own ladder** and writes it into DESIGN.md §Shapes; `full` is stored as 9999
+  and rendered clamped, which is why a pill binds `radius.full` instead of `height/2`.
   One system uses **at most 3 radii** for the same component family; controls share one, cards a larger one, pills are `full` (only chips/buttons/tabs/pills).
 
 ### 5.2 State layers (M3 model — the only formal one; adopted as default)
 
 Hover **8%**, Focus **12%**, Pressed **12%**, Dragged **16%** overlay of the `on-*` content color over the container.
+
+**The overlay material has two cases, and the state board must show both.** Over a light container the wash is the
+declared on-surface ink. Over a **saturated brand fill** the same state is a **shade**, not a lift: white at 8% over
+`#2563EB` reads `#3F76ED`, where a white label drops to 4.18:1 and breaks §3.3, so `CF.fills(…, { onDark: true })`
+darkens instead (Fluent's brand hover is a darker step too). Over a **neutral inverse ground** (`#161616`) that shade is
+a visual no-op — seven identical black tiles — so a board that *documents* the state ladder passes the wash in explicitly
+(`FN.stateLayers` → `{ overlay: FN.ink(ground) }`, the declared token of the lane it belongs to). `disabledContent` is the
+other material: it dims the **copy** (`CF.STATE.disabledContent` = .38), it never paints a container wash, and the dimmed
+label still needs a ground-coloured tile behind it or it disappears into the board.
 
 | State | Rule |
 |---|---|
@@ -217,15 +322,17 @@ without them is a finding, not a style difference.
 
 | Rule | Primitive | What the auditor looks for |
 |---|---|---|
-| Hover / Pressed / Focus overlay alphas (§5.2) | `CF.fills(bg, state, { onDark })` appends an **overlay fill** at `CF.STATE[state]` (8/12/12%) — the ink color over the surface on light, black on dark surfaces (`onDark`) | the base fill stays opaque, so `contrast` measures the resting pair, and `off_grid` ignores the overlay |
+| Hover / Pressed / Focus overlay alphas (§5.2) | `CF.fills(bg, state, { onDark, overlay })` appends an **overlay fill** at `CF.STATE[state]` (8/12/12%) — the ink color over the surface on light, black over a saturated brand fill (`onDark`), or the wash you name (`overlay`, what `02.02 · State layers` uses so the dark lane is not seven identical black tiles) | the base fill stays opaque, so `contrast` measures the resting pair, and `off_grid` ignores the overlay |
 | Selected ≠ solid brand | `CF.fills(bg, 'selected', { tint: 1 })` paints the hue at **12% wash**, never solid — solid brand under its own label is 2.9:1 | a selected row/option/card whose fill is opaque brand reads as a `contrast` failure |
 | Focus ring | `ctx.ring(box)` mounts a **sibling plate named `ring·focus`** (2px stroke, 2px offset) | `focus_ring_missing` accepts a `ring·` layer **or** a ≥2px stroke; a darkened 1px border never counts |
 | Touch floor | `ctx.hitPad(box, CF.minHit())` mounts an **invisible plate named `hitpad·<w>×<h>`** centered on the control | `touch_target` counts the pad, so a 24px icon button on mobile is legal only with a ≥44 pad present |
-| Disabled = the whole control recedes | `ctx.place()` clamps **every text in the host subtree** (and in any host nested inside a `·Disabled` host) to `min(alpha, CF.STATE.disabledContent)` = `.38`; explicit alphas move downward only | `disabled_wrong` measures the label alpha and requires `.25–.40`; a dimmed plate with a full-opacity label fails |
+| Disabled = the whole control recedes | `ctx.place()` clamps **every text in the host subtree** (and in any host nested inside a `·Disabled` host) to `min(alpha, CF.STATE.disabledContent)` = `.38`; explicit alphas move downward only | `disabled_wrong` measures the label alpha and requires `.25–.40`; a dimmed plate with a full-opacity label fails. **The exemption is the §4 name grammar**: `disabled` must be a `·`-separated segment of an *ancestor host* name (`Button·Disabled·Md`), not a word anywhere in the chain — measured 2026-10-21, a caption that merely said "Disabled recedes a…" inherited the exemption and hid a real finding. And it only ever sees texts the auditor walks: rule 31's peers **stop at an instance boundary** (`api-pitfalls.md` §15) |
 | State axes are nameable | `CF.name({ state })` writes `·Hover` / `·Focus` / `·Disabled` / `·Selected` into the host name | `state_coverage` counts the columns by name — an unnamed host draws but is not counted |
 
-- `hitpad·` and `ring·` are also the **escape convention for hand-built boards**: if you must place a control outside `CF`,
+- `hitpad·` and `ring·` are also the **escape convention for hand-built `03–17` boards**: if you must place a control outside `CF`,
   name its invisible hit plate `hitpad·44×44` and its focus layer `ring·focus`, and the rules will see them.
+  **Never on a `01.xx`/`02.xx` chapter page** — those boards are `FN` projections and the stamp (`nl:fn=<kind>`) is the only
+  way one exists there (gate G16, rule 31 `not_projected`).
 - Anything that needs a *declared* role (11px `axis`/`overline`/`kbd`) works the same way: the role lives in the name.
 
 ## 6. Controls, targets and density
@@ -284,27 +391,119 @@ rounded: { none: 0px, sm: 4px, md: 8px, lg: 12px, xl: 16px, full: 9999px }
 
 | # | Rule | Signature |
 |---|---|---|
-| 1 | every coordinate and every size on the 4px grid (hairlines and text boxes exempt) | `off_grid` |
-| 2 | every measured gap ∈ `LY.SPACE` (0/2/4/8/12/16/20/24/32/48/64/96/128) | `off_scale_gap` |
-| 3 | every font size ∈ the declared ramp, ≥12px (11px only for a **named** role: `axis` / `overline` / `kbd`) | `off_ramp_size` |
+| 1 | every coordinate and every size **the designer typed** is on the 4px grid (hairlines and text boxes exempt; so are hug axes, a flow child's derived x/y, and a shelf-pinned board's top — see the note below) | `off_grid` |
+| 2 | every measured gap ∈ `LY.SPACE` (0/2/4/8/12/16/20/24/32/48/64/96/128) — judged between **adjacent siblings in the full child list**, never across an excluded one | `off_scale_gap` |
+| 3 | every font size ∈ **the declared ramp** (`TK.declared().types` when the token engine is live, else the `storage.T` mirror — the verdict prints which), ≥12px (11px only for a **named** role: `axis` / `overline` / `kbd`, or a `sample ·` type specimen) | `off_ramp_size` |
 | 4 | text with >2 lines and width >760 → prose measure exceeded | `measure_overflow` |
 | 5 | two-column split ratio outside 2.2–3.2 (and not a documented exception) | `split_ratio_50_50` |
 | 6 | control wider than its cap (input >420, select >240) in a container ≥720 wide | `control_too_wide` |
 | 7 | interactive target below tier minimum (mobile/pad 44, web 32) | `touch_target` |
 | 8 | more than one filled-primary control inside one region/board | `multiple_primary` |
 | 9 | row/board height not in the quantized set while the board is a list/table recipe | `row_height` |
-| 10 | radius of an inner box > (outer radius − inset) | `radius_nesting` |
+| 10 | radius of an inner box > (outer radius − inset) — the inner box must take the declared **step** at or below that bound, never an interpolated number | `radius_nesting` |
 | 11 | text/fill pair below 4.5:1 (3:1 for ≥24px, icons carrying meaning) | `contrast` |
 | 12 | screen board whose height equals the tier viewport while its content bands overflow / or a tall empty region | `viewport_locked` |
 | 13 | component spec board missing a required state column | `state_coverage` |
 | 14 | section rhythm variance > one scale step between sibling bands | `rhythm_inconsistent` |
 | 15 | family present with < 3 non-state, non-size variant tokens (no `IconStart`/affix/block variant drawn) | `variant_sparse` |
 | 16 | control family with no `ring·` layer and no ≥2px focus border on its Focus hosts | `focus_ring_missing` |
-| 17 | disabled content alpha outside `.25–.40` (`CF.STATE.disabledContent`) | `disabled_wrong` |
+| 17 | disabled content alpha outside `.25–.40` (`CF.STATE.disabledContent`); "is this disabled?" is decided on a **name segment** (`·Disabled`, `/disabled`, `-disabled`), never a substring — `CF.STATE.disabledContent` contains `disabled` and must not read as a disabled board | `disabled_wrong` |
 | 18 | shape/component name containing `/` or a newline — the variant-order grammar is `Family·Type·Size·State·Slot·Tone` | `name_invalid` |
+| 19 | an opaque paint whose hex **is** a declared colour token but the shape has no `tokens.fill` / `tokens.strokeColor` — the colour was typed, not chosen from the set | `paint_unbound` |
+| 20 | a paint whose hex is not any declared colour token — palette and token set have drifted | `paint_off_palette` |
+| 21 | copy that matches a declared ramp step but carries no `tokens.typography` binding | `type_unbound` |
+| 22 | a drawn `(family,size,weight)` that is not a declared typography token, so nothing can bind to it | `type_off_ramp` |
+| 23 | a flow container whose `rowGap`/`columnGap` equals a declared spacing token but has no `tokens.rowGap`/`tokens.columnGap` | `space_unbound` |
+| 24 | a gap or padding on a flow/grid container that is not any declared `spacing` value | `space_off_scale` |
+| 25 | a tier-viewport composition board with neither native `guides` nor `rulerGuides` — the grid must live on the board | `no_guides` |
+| 26 | a `region·` pane that holds child regions was also filled with copy — a pane is structure, not a band | `pane_filled` |
+| 27 | a control host whose name already has a master in the local library, drawn again instead of placed with `CF.instance` | `not_component` |
+| 28 | a `wash|hue|ink #RRGGBB` caption that does not match the paint of the swatch beside it — the board documents a value it no longer shows | `caption_stale` |
+| 29 | a `cell·slot·*` / `cell·recipe·*` container with **zero children** — the region plates its `after` pass draws are missing, so the block is an empty frame that every structural check passes | `empty_cell` |
+| 30 | the ramp declares `typography` tokens and this board draws text, but `library.local.typographies` is **empty** — 素材 → 排版 has nothing to offer a consumer | `no_type_styles` |
+| 31 | a board on a Foundations / Color-in-use chapter page (`FN.CHAPTER`) that carries no durable `nl:fn` projection stamp — it was **composed by hand, not projected** (the two declared exemptions are `Icons` on `01` and `Light vs dark` on `02`; if `storage.FN` is not seeded the rule reports instead of passing) | `not_projected` |
+| 32 | **§2.1** — a flow container whose ≥2 block-level (≥24 on the stack axis) siblings are separated by less than `LY.breath("inline", tier)`: the whitespace that carries the hierarchy was simply omitted. Skips a repeated run of cross-axis items (a table), abutting panes (§1.3), and any label↔field pair, which is legal at 4–6 | `cramped_gap` |
+| 33 | **§1.3 rule 1 / §2.1** — at composition level, a container whose gap between groups is under **2×** the gap inside those groups, where a group is a child that *stacks* ≥2 block-level siblings of its own. A row's cell gap is not a group gap, and a repeated run is one group, not several | `hierarchy_gap` |
+| 34 | **§3.2** — copy with no typographic whitespace: a wrapped paragraph (≥1.8 rendered lines) whose `lineHeight` is under the leading the ramp declares for that size, **or** two consecutive prose blocks separated by less than one line of the block above | `text_cramped` |
+| 35 | **§5.1** — a corner whose value is **not one of the declared `borderRadius` token values** (judged from the live `TK.declared().radii`, not a hard-coded ramp): an orphan number left on the canvas. One finding per shape, not per corner | `radius_off_ladder` |
+| 36 | **§5.1** — a corner whose value **is** a declared `borderRadius` token but carries no `tokens.borderRadiusTopLeft/TopRight/BottomRight/BottomLeft` binding: the value was typed, not chosen. Repaired by `TK.radiusSweep()`, whose adoption read (`radiusPages()`) is the number the delivery report quotes | `radius_unbound` |
+| 37 | **§5.1** — a `ring·*` layer whose corner is not its host control's corner (`CF.ROLE.ring = 'host'`). Rules 35/36 pass it: `r0` body and `r9999` ring are both declared and both bound, and only the **pair** is wrong — the defect a user sees as "a rectangle in front of a rounded ring" (measured 2026-10-22: 194 of 230 rings disagreed with their host). Repaired by `TK.roleSweep()` | `ring_off_host` |
 
-`storage.designGate()` verdict is computed from these 18 (`out.rules`); the 12 positioning signatures
-(`out_of_bounds`, `board_overlap`, …, `spec`) belong to `audit_layout.js` and are reported as delegated, never double-counted.
+**Rules 1/2 judge authored numbers, not arithmetic.** In a flow board the numbers the designer chose are the padding,
+the gap and the sizing declaration; the resulting coordinates and hug boxes are sums over font metrics (a 13px label is
+19 tall at leading 1.4), so `y=54` or `h=99` is not something anyone can fix without also changing the font — flagging it
+is a finding nobody can act on. `off_grid` therefore skips (a) a **hug** axis (`horizontalSizing`/`verticalSizing` =
+`auto`), (b) a flow child's derived x/y inside a flex parent (an **absolute** child still counts: its x/y *is* typed),
+and (c) a board pinned by the Foundations shelf, whose top is `previous bottom + declared gap` — snapping that coordinate
+would instead put the *gap* off `LY.SPACE`, and the gap is the decision `off_scale_gap` judges. Measured 2026-10-21 on
+the `FN` `Palette` board: every `off_grid` finding on it was of this kind, while the real defect — a hug frame frozen at
+6 px under 68 px of text — is invisible to rule 1 and is caught by `NL.auditFlow`'s `hug_frozen` instead
+(`native-layout.md` §7). **The exemptions move a finding to the right engine; they never delete it.**
+
+**The two identity chapters — `01 · Foundations` and `02 · Color in use` — are projections, so most of these rules cannot
+fire there (gate G16 — the only and default way those pages are built; both chapters are in `FN.CHAPTER` and are gated
+identically, so 02 is not a downstream consumer of 01, it is the same contract with the colour-side kinds).**
+`storage.FN` reads its values from `TK.declared()` (a missing token kind is a refusal, so 19–24 hold by construction),
+derives each height from the hug sum (so there is no typed number for 1/2 to reject), computes the `wash|hue|ink #RRGGBB`
+captions from the same record as the swatch (rule 28), and WCAG ratios from the palette itself (rule 11). Call shape, the
+one-board-per-call discipline and the measured cost are in `engines.md` §7. Hand-composing those boards — a `storage.T`
+hex mirror, a `[56,136,40,40]` row array — is the failure mode this replaces: each guessed number used to cost one audit
+round-trip.
+
+**G16 is machine-checked, in two scopes.** Every board `FN.project` mounts carries `nl:fn=<kind>` + `nl:shelf=1` as
+**pluginData**, i.e. inside the file, so the proof survives a storage wipe and is readable by anyone who opens it —
+unlike `FN.records`, which is JS memory. Rule 31 (`not_projected`) reads that stamp, and reads the chapter table, the
+exemption list and the kind list **from FN itself**, so auditor and engine cannot disagree. Because this skill's
+pagination is block-per-page (`01.09 · Foundations · Palette`), a chapter is spread over ~9 pages: per-page scope
+catches an un-stamped board, and `storage.designCoverage()` / `FN.coverage()` answer the file question — every chapter
+kind projected somewhere, no chapter board left hand-drawn. Measured 2026-10-21: coverage over 14 chapter pages is one
+read-only call; on the Rayo file it reported the 12 hand-composed boards still on `01.xx`/`02.xx` and refused
+`CLEAN`, and an 11-board projected page read `CLEAN` (351 boards / 919 shapes / 7.4 s).
+
+**Token rules 19–24 are birth rules, not backfill rules.** A hex that matches the palette is still a typed colour; the
+gate reads `tokens.fill` / `tokens.strokeColor` / `tokens.typography` / `tokens.rowGap`, never the hex. Seed the token
+set before the first board (G9) and bind each board in the same builder pass (`TK.bindBoard(board, { snapSpace: true })`,
+G14) — a late sweep is how a system ends up with colour, type and spacing surviving only as numbers. The full token
+surface and its six measured traps are in `design-tokens.md` §8.1.
+
+**Rule 28 exists because paint and copy have different lifetimes.** A swatch bound to a colour token re-renders whenever
+the token changes; the `wash #E7E1F9` label next to it is a string frozen at build time. Build a palette-documentation
+board **after** the theme overlay is loaded, and when repairing one, re-derive the caption from the sibling plate's own
+`fills[].fillColor` rather than from the palette mirror — the mirror is what was stale in the first place.
+
+Rule 29 exists because a block whose content pass never ran is invisible to every geometric rule: the container is
+correctly sized, correctly placed and correctly named, and only its **child count** says it is empty. The measured way
+to produce it is a build that hits the `execute_code` ceiling — the board is created, the call dies before `after`, and
+the stray-heal later mounts the bare frame (see `engines.md` §6). Re-drive those specs with `replace=true`; do not
+"fix" them by hand-drawing plates.
+
+Rule 30 closes the gap between *declared* and *reachable*. A `typography` token is what the auditor binds to and what
+`TK` writes; the type a designer picks off 素材 → 排版 is a **`LibraryTypography` style record**, a different subsystem
+(`penpot.library.local.typographies`). Measured on a delivered file: 40 active typography tokens, `themes: []`,
+`typographies.length === 0` — the panel was empty and every other rule passed, because every other rule reads the shape
+tree or the token set. `storage.TP.seed()` registers one style per declared step, named exactly like its token, verifies
+each field by readback and is idempotent; `TP.apply` exists for consumers, but **do not bulk-apply styles over bound
+text** — `applyToText` rewrites `lineHeight` to `1.2` whatever the record says (capabilities §6), so it flattens the
+rhythm rule 21/22 just tuned.
+
+`storage.designGate()` verdict is computed from these 37 (`out.rules`); the 15 defect signatures
+(`out_of_bounds`, `board_overlap`, `text_overlap`, `text_overlap_x`, `header_collision`, `malformed_text`, `align_missing`,
+`crash_100x100`, `degenerate_size`, `root_stray`, `text_centre_residue`, `loose_assembly`, `stroke_covered`, `stroke_clipped`,
+`duplicate_board`) belong to `audit_layout.js` and are reported as delegated, never double-counted. `text_centre_info` is
+informational and does not change the verdict. Rule 31 (`not_projected`) is the one rule that does not read geometry at all:
+it reads the durable `nl:fn=<kind>` stamp that only `FN.project` writes, and its **file-level** twin is
+`storage.designCoverage()` — deliberately a separate call, because a per-page audit cannot see a chapter page nobody built.
+
+**Rules 32–34 share one table with the builder, and have one repair twin.** The amounts come from `LY.BREATH`
+(`LY.breath(level, tier)`) and the leading floor from the declared typography tokens, published as
+`storage.breathSpec` (`blockMin`/`proseMin`/`minLeading`/`lead` + the shape-filter regexes) at audit time, so
+`storage.breathe()` (`fix_geometry.js`, dry-run by default, idempotent) aims at exactly the floor the gate measures and
+every gap it writes is the next `LY.SPACE` member — a repair can never create `space_off_scale`. `designPage()` also
+returns `out.breath`: an **adoption read** (how many flow containers sit on a ladder level, and the histogram of those
+that do not) — not a rule, because a gap can be on-scale and still not be the ladder's. Proven 2026-10-21 on a planted
+probe: 2 `cramped_gap` + 2 `hierarchy_gap` + 3 `text_cramped` → one `breathe({apply:true})` pass → 0/0/0, second pass
+`raised: 0` (idempotent), and the file's three real findings (`row·head` at gap 4 on `10.22`/`10.23`/`10.25`) cleared the
+same way with the gate CLEAN and the layout auditor unchanged on all three pages.
 
 Rules 3/13/15–18 depend on **names, not pixels**: `CF` writes the role (`ctx.text({ role: 'axis' })`), the slot
 (`slotName()` → `IconStart`/`Clear`/`Addon`/…) and the state into the shape name, so the auditor can decide coverage

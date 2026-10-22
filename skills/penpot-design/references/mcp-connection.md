@@ -326,7 +326,8 @@ SSE error: TypeError: fetch failed: unable to get local issuer certificate
 
 Layout approach is a **per-artifact choice**, not an ordering: **flex via `storage.NL` is the default for screens** (the
 historical "B hug collapse" was vocabulary — `'fixed'`→`'fix'`, `paddingTop`→`topPadding` — capabilities §2), **absolute
-(`mkAbsBoard`/`absMount`)** for spec boards/art/pixel-exact overlays, **bare boards** for one-offs after checking the
+(`mkAbsBoard`/`absMount`)** for the `03–09` spec boards/art/pixel-exact overlays (never a `01.xx`/`02.xx` board: those
+are `FN.project` projections, G16), **bare boards** for one-offs after checking the
 export offset. Full engines and pitfall table are in this skill's `references/`: mcp-automation.md (discipline/quick-ref) /
 api-pitfalls.md (mechanism details and three-approach tested table) / native-layout.md (flow authoring and its rules) /
 engines.md (engine mechanism and page recipes); engine code is in `scripts/`.

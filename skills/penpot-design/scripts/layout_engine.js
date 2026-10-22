@@ -49,6 +49,37 @@ return (function () {
   LY.SPACE = SPACE; LY.ROWS = ROWS; LY.TIERS = TIERS;
   LY.R = R;
 
+  // ---------------------------------------------------------------- the whitespace ladder (design-guide §2)
+  /** 留白 is the FIRST separation device, so its amounts live in one table instead of in each caller's habit.
+      Every number below is a `LY.SPACE` member — that is what makes this table and `off_scale_gap` unable to disagree,
+      and why the tier columns compress only the tail (§1: "tiers compress the tail, never the head").
+      `block` is the level the auditor judges: two block-level siblings closer than this are separated by nothing. */
+  // The gap ladder for the four hierarchy levels §2 names. Levels are SPACE members, so a builder that takes its gap
+  // from here cannot also trip `space_off_scale`. Measured 2026-10-21 on the live file: 121 of 125 flow containers
+  // separate at 16, so an earlier draft that skipped 16 made the file's own rhythm "off-ladder" — the ladder describes
+  // the rhythm, it does not invent a competing one. Tiers currently diverge only at the ceiling (`page`).
+  var BREATH = {
+    web:    { inline: 8,  row: 12, block: 16, group: 24, section: 32, band: 48, page: 96 },
+    pad:    { inline: 8,  row: 12, block: 16, group: 24, section: 32, band: 48, page: 96 },
+    mobile: { inline: 8,  row: 12, block: 16, group: 24, section: 32, band: 48, page: 64 }
+  };
+  LY.BREATH = BREATH;
+  /** The declared gap for one hierarchy level at one tier. An unknown level falls to `block` (the most common
+      omission), an unknown tier to `web`. Returned values are never off-scale. */
+  LY.breath = function (level, tier) {
+    var t = BREATH[tier] || BREATH.web;
+    var v = t[level] !== undefined ? t[level] : t.block;
+    if (!SPACE.some(function (s) { return Math.abs(s - v) <= 0.5; })) {
+      // A hand-edited table entry must not become an off-scale finding: take the next scale step UP, so the repair of a
+      // wrong number never costs whitespace.
+      var up = SPACE.filter(function (s) { return s >= v; })[0];
+      v = up === undefined ? SPACE[SPACE.length - 1] : up;
+    }
+    return v;
+  };
+  /** The level names the ladder defines — the auditor's adoption read uses this instead of a second list. */
+  LY.breathLevels = function () { return Object.keys(BREATH.web); };
+
   // snap any length onto the 4px grid (HARD rule 1); hairlines and text boxes are exempt by caller choice
   LY.snap = function (v, unit) { unit = unit || 4; return N(Math.round(v / unit) * unit); };
   LY.onScale = function (v, tol) { tol = tol === undefined ? 0.6 : tol; return SPACE.some(function (s) { return Math.abs(s - v) <= tol; }); };
@@ -944,6 +975,53 @@ return (function () {
     };
   };
 
+  /** §3.2 + §8 contact page: one promise, one form, and the details for the reader who would rather write by hand.
+      The two-pane is 800/336 (2.4:1) with a 64 gutter — a narrower aside would read as a second column of the form,
+      and an even split has no hierarchy. Fields live inside the form pane so the pane owns the vertical rhythm. */
+  RECIPES.contact = function (o) {
+    o = o || {};
+    var w = o.w || 1440;
+    var bandsSpec = o.bands || [
+      { key: 'nav', h: 72 }, { key: 'intro', h: o.introH || 224 }, { key: 'form', h: o.formH || 560 },
+      { key: 'faq', h: 400 }, { key: 'footer', h: 320 }
+    ];
+    var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
+    var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
+    var inner = LY.container(R(0, 0, w, totalH), { margin: 40, maxW: 1200 });
+    var b = fl.bands;
+    var intro = R(inner.x, b.intro.y + 48, Math.min(inner.w, 720), b.intro.h - 96);
+    var sp = LY.split(R(inner.x, b.form.y, inner.w, b.form.h), { panes: [{ w: o.formW || 800 }, {}], gap: 64 });
+    var stack = LY.rows(sp.panes[0], [{ h: 76 }, { h: 76 }, { h: 148 }, { h: 44 }, { h: 56 }], 24);
+    var aside = LY.repeat(R(sp.panes[1].x, sp.panes[1].y + 24, sp.panes[1].w, sp.panes[1].h - 48), 4, 16, 'y');
+    var faqCols = LY.repeat(R(inner.x, b.faq.y + 64, inner.w, b.faq.h - 128), 2, 64);
+    return {
+      frame: { w: w, h: totalH }, bands: fl.bands, order: fl.order, inner: inner, totalH: totalH,
+      regions: { nav: b.nav, intro: intro, form: sp.panes[0], aside: sp.panes[1], faq: faqCols[0], faqRight: faqCols[1], footer: b.footer },
+      formFields: { pair: LY.repeat(stack[0], 2, 24), subject: stack[1], message: stack[2], consent: stack[3], submit: stack[4] },
+      asideRows: aside, faqCols: faqCols,
+      notes: 'intro measure 66-75ch inside a 720 column; form pane 800 · aside 336 at 2.4:1 with a 64 gutter (§8 floor is 2.2:1); '
+        + 'name+email share one row of two 388 fields, message 148 (4 lines), consent 44, submit 56; the aside is four 116 '
+        + 'rows — email, phone, studio, socials — because a reader who will not type still has to reach someone.'
+    };
+  };
+
+  /** The fillable bands of a region plan: a region that *contains* another region is a pane (a scroll area, a
+   *  column, a document body), not content. Filling it draws a paragraph underneath every child band — the measured
+   *  `dashboard.content` defect, where prose ran behind the KPI cards, the chart and the table. A consumer of a plan
+   *  must fill `LY.leaves()` and treat the rest as structure. Accepts the plan's `regions` object or an array. */
+  LY.leaves = function (regions) {
+    var list = [];
+    if (Array.isArray(regions)) regions.forEach(function (r) { if (r) list.push(r); });
+    else Object.keys(regions || {}).forEach(function (k) { var r = regions[k]; if (r) { r.name = k; list.push(r); } });
+    return list.filter(function (a) {
+      return !list.some(function (b) {
+        if (b === a) return false;
+        return b.x >= a.x - 1 && b.y >= a.y - 1 && b.x + (b.w || 0) <= a.x + (a.w || 0) + 1 &&
+               b.y + (b.h || 0) <= a.y + (a.h || 0) + 1 && (b.w * b.h) < (a.w * a.h);
+      });
+    });
+  };
+
   /** One-screen height per tier. Exported because audit_design.js must know what "locked to the viewport" means. */
   function viewportHeight(tierName) {
     return tierName === 'mobile' ? 812 : (tierName === 'pad' ? 1112 : 900);
@@ -981,6 +1059,7 @@ return (function () {
     commandPalette:  { tiers: ['web', 'pad'],        mobile: null },
     reportPrint:     { tiers: ['web'],               pad: null, mobile: null },
     pricing:         { tiers: ['web', 'pad'],        mobile: null },
+    contact:         { tiers: ['web'],               pad: 'authCard', mobile: 'authCard' },
     mobileFeed:      { tiers: ['mobile', 'pad'] },
     mobileListDetail:{ tiers: ['mobile', 'pad'] }
   };
@@ -1027,9 +1106,15 @@ return (function () {
     var plan = LY.recipe(key, { w: (o.w || host.width), h: (o.h || host.height), tier: o.tier });
     if (plan.err) return plan;
     var ofs = { x: host.x, y: host.y };
-    LY._draw = { plan: plan, host: host, keys: Object.keys(plan.regions || {}), i: 0, ofs: ofs,
+    // Painter's order by descending area: a recipe's regions overlap (a card contains a title band), and Penpot paints
+    // later siblings on top, so drawing in key order buries the small region's border under the big region's tint.
+    var keys = Object.keys(plan.regions || {}).sort(function (a, b) {
+      var ra = plan.regions[a] || {}, rb = plan.regions[b] || {};
+      return (rb.w || 0) * (rb.h || 0) - (ra.w || 0) * (ra.h || 0);
+    });
+    LY._draw = { plan: plan, host: host, keys: keys, i: 0, ofs: ofs,
                  tint: o.tint || '#EEF2F7', line: o.line || '#94A3B8', label: o.label || '#475569', done: false, drawn: 0 };
-    return { queued: LY._draw.keys.length, regions: LY._draw.keys };
+    return { queued: keys.length, regions: keys };
   };
   LY.drawStep = function (perCall) {
     var d = LY._draw;
@@ -1039,7 +1124,9 @@ return (function () {
     while (perCall-- > 0 && d.i < d.keys.length) {
       var k = d.keys[d.i++];
       var r = p.regions[k];
-      if (!r || !r.w) continue;
+      // A recipe collapses a region to h=0 when the tier has no room for it (`listCrud.bulkBar`); Penpot refuses
+      // resize(…, 0), and a zero-area plate carries no information anyway, so it is skipped and named in `skipped`.
+      if (!r || !r.w || !r.h) { (d.skipped || (d.skipped = [])).push(k + '(' + (r ? r.w + 'x' + r.h : 'no rect') + ')'); continue; }
       var b = storage.mkAbsBoard('region·' + k, d.ofs.x + r.x, d.ofs.y + r.y, r.w, r.h, d.tint, 4);
       b.strokes = [{ strokeColor: d.line, strokeOpacity: 1, strokeWidth: 1, strokeAlignment: 'inner' }];
       b.fills = [{ fillColor: d.tint, fillOpacity: 0.5 }];
@@ -1055,21 +1142,73 @@ return (function () {
         storage.absMount(d.host, nt, d.ofs.x, d.ofs.y + (p.frame && p.frame.h ? p.frame.h : d.host.height) + 12);
       }
     }
-    return { drawn: d.drawn, left: d.keys.length - d.i, done: d.done };
+    return { drawn: d.drawn, left: d.keys.length - d.i, done: d.done, skipped: d.skipped || [] };
   };
 
-  /** Fold marker: dashed first-viewport outline over a long board. Its absence on a 2000+ board is signature `viewport_locked`;
-      its presence says "the design scrolls, this is only what the user sees before scrolling". */
+  /** Put the tier's grid on a board as **native Penpot guides**: the column grid (margin + gutter straight from
+   *  `LY.TIERS`) and a horizontal ruler guide at the first-viewport line, so the reviewer sees the fold without a
+   *  drawn rectangle. Every screen board must carry these — a board laid out on a grid it never declared is the thing
+   *  the audit used to be blind to (gate G15, design-guide §12).
+   *  o: { tier, rows, viewport, foldRuler, color, rowColor } */
+  LY.guides = function (host, o) {
+    o = o || {};
+    var name = o.tier || host.foldTier || 'web';
+    var t = LY.tier(name);
+    var res = { board: host.name, tier: name, margin: t.margin, gutter: t.gutter };
+    if (!storage.NL || !storage.NL.guide) return { err: 'LY.guides needs native_layout.js loaded (NL.guide)' };
+    var col = storage.NL.guide(host, { axis: 'column', margin: t.margin, gutter: t.gutter, color: o.color || '#8B5CF6' });
+    if (col.err) res.err = col.err; else res.columns = col.guides;
+    if (o.rows) {
+      var rw = storage.NL.guide(host, { axis: 'row', margin: t.margin, gutter: t.gutter, color: o.rowColor || '#0EA5E9' });
+      if (rw.err) res.rowErr = rw.err; else res.rows = rw.guides;
+    }
+    if (o.foldRuler !== false) {
+      var vh = o.viewport || viewportHeight(name);
+      var ru = storage.NL.rulerGuide(host, Math.min(vh, Math.round(host.height)), 'horizontal');
+      if (ru.err) res.rulerErr = ru.err; else res.fold = ru.position;
+    }
+    var c = storage.NL.guideCount(host);
+    res.guides = c.guides; res.ruler = c.ruler;
+    return res;
+  };
+
+  /** Fold marker: 2px accent first-viewport outline over a long **baseline-width** board. Its absence there is signature
+      `viewport_locked`; its presence says "the design scrolls, this is only what the user sees before scrolling".
+      A PageRoot is a canvas, not a screen: a 1440 outline at its origin annotated empty page space and drew an orange
+      edge across the header (measured), so a root returns null instead of growing a marker. */
   LY.fold = function (host, tier) {
+    if (/-PageRoot$/i.test(String(host.name || ''))) return null;
     var name = tier || host.foldTier || 'web';
     var t = LY.tier(name);
     var vh = viewportHeight(name);
+    // Replace, never stack: a rebuild calls fold() again and an older marker at the same anchor would paint a second
+    // ruler and a second label over the same pixels (audit_layout's text_overlap_x). The marker is annotation only,
+    // so removing every fold· at this anchor — nested or page-level — is safe.
+    try {
+      var pageRoot = (penpot.currentPage && penpot.currentPage.root) || penpot.root;
+      var stale = [];
+      var scan = function (n) {
+        (n.children || []).forEach(function (c) {
+          var cx = 1e9, cy = 1e9;
+          try { cx = c.x; cy = c.y; } catch (e) {}
+          if (/^fold·/.test(c.name || '') && Math.abs(cx - host.x) <= 2 && Math.abs(cy - host.y) <= 2) stale.push(c);
+          scan(c);
+        });
+      };
+      scan(pageRoot);
+      stale.forEach(function (c) { try { c.remove(); } catch (e) {} });
+    } catch (e) {}
     var b = storage.mkAbsBoard('fold·' + t.w + '×' + vh, host.x, host.y, Math.min(t.w, host.width), vh, null, 0);
     b.strokes = [{ strokeColor: '#F97316', strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner' }];
     // The marker is a *sibling* of the board it annotates (overlaying it would make the board its own parent and the
     // audit would judge the marker as content). A board always has a parent on a real page; the fallback keeps the
     // helper usable for a detached board.
-    var par = host.parent || (penpot.currentPage && penpot.currentPage.root) || penpot.root;
+    // EXCEPTION — a PageRoot has no usable sibling slot: its parent is `page.root`, which refuses layout children
+    // (absMount throws on `layoutChild.absolute`) and where any top-level shape is audit_layout's `root_stray`. A page
+    // root therefore carries its own marker; designPage's fold hunt accepts a `fold·` at any depth and both auditors
+    // skip ANNO subtrees, so judging is unchanged.
+    var par = /-PageRoot$/.test(host.name || '') ? host
+      : (host.parent || (penpot.currentPage && penpot.currentPage.root) || penpot.root);
     if (par) storage.absMount(par, b, host.x, host.y);
     var lt = storage.mkText('fold · ' + (host.height - vh) + 'px more below the fold', 0, 0, 12, '#F97316', 600);
     storage.absMount(b, lt, b.x + 12, b.y + b.height - 24);
@@ -1077,6 +1216,7 @@ return (function () {
   };
 
   storage.LY = LY;
-  return { seeded: 'LY', recipes: LY.keys(), primitives: ['frame', 'container', 'grid', 'split', 'rows', 'flow', 'repeat', 'snap', 'onScale', 'tier'],
+  return { seeded: 'LY', recipes: LY.keys(), primitives: ['frame', 'container', 'grid', 'split', 'rows', 'flow', 'repeat', 'snap', 'onScale', 'tier',
+           'BREATH', 'breath', 'breathLevels'],
            slots: Object.keys(LY.slots), draw: ['drawStart', 'drawStep', 'fold'] };
 })();

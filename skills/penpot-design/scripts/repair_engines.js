@@ -137,14 +137,38 @@ return (function () {
   };
 
   // ---- unclip: release board clipping (fix glow invisible) ----
+  // ⚠ Authored crops are NOT part of that fix. A `clip·*` frame (half star, cover media, avatar) is drawn *around*
+  // its content precisely so the overflow is cut; clearing it makes the overflow visible and turns the audit's
+  // clip exemption off (audit_layout reads the live `clipContent`, so the escape then reports as out_of_bounds).
+  const KEEP_CLIP = /^clip·/;
   storage.unclip = () => {
+    const root = rootOf();
+    let n = 0, kept = 0;
+    function walk(node) {
+      const kids = kidsOf(node); if (!kids) return;
+      for (const c of kids) {
+        try {
+          if (c.type === 'board' && c.clipContent === true) {
+            if (KEEP_CLIP.test(c.name || '') || (storage._clipKeep && storage._clipKeep[c.id])) { kept++; c.clipContent = true; }
+            else { c.clipContent = false; n++; }
+          }
+          walk(c);
+        } catch (e) {}
+      }
+    }
+    walk(root);
+    return { released: n, kept };
+  };
+
+  // ---- reclip: re-assert the crops a previous unclip (or an older engine) dropped ----
+  storage.reclip = () => {
     const root = rootOf();
     let n = 0;
     function walk(node) {
       const kids = kidsOf(node); if (!kids) return;
       for (const c of kids) {
         try {
-          if (c.type === 'board' && c.clipContent === true) { c.clipContent = false; n++; }
+          if (c.type === 'board' && KEEP_CLIP.test(c.name || '')) { (storage._clipKeep || (storage._clipKeep = {}))[c.id] = 1; if (c.clipContent !== true) { c.clipContent = true; n++; } }
           walk(c);
         } catch (e) {}
       }
@@ -168,6 +192,16 @@ return (function () {
   //    so fixing by this fingerprint is **zero false-hurt**. Per-axis independent judgment and fix (may only be off on one axis).
   // Division of labor with alignPage: alignPage snaps ≤6px micro-diff; this engine specializes in >6px, fingerprint-hit large offsets.
   // Defect-introduction fallback (G8): only moves the text coordinates that hit the fingerprint, doesn't change z-order/style; blind-centering false-hurts are excluded by the fingerprint condition.
+  // The audit's own classification (audit_layout walkB): a caption whose box nearly fills its host and whose centre is
+  // ≤8px off the host centre is a centring *residue* (a defect), while a narrow label far from the centre is a
+  // deliberate inset (informational). Kept beside fixStaleCenter so the gate and the repair can never disagree.
+  const residueOk = (host, c) => {
+    const dx = Math.abs((c.x + c.width / 2) - (host.x + host.width / 2));
+    const dy = Math.abs((c.y + c.height / 2) - (host.y + host.height / 2));
+    const m = Math.max(dx, dy);
+    return m > 0.5 && m <= 8 && c.width >= host.width * 0.72 &&
+           c.width <= host.width && c.height <= host.height;
+  };
   storage.fixStaleCenter = (root) => {
     root = root || rootOf();
     const log = [];
@@ -178,6 +212,10 @@ return (function () {
         try {
           const isFlow = c.layoutChild && c.layoutChild.absolute === false;
           if (c.type === 'text' && !isFlow) {
+            // Deliberately edge-aligned copy is never a centering residue: its x is pad-X by design, and in a tall
+            // container its row centre can still fall on the host's mid-line, which reads as the y fingerprint.
+            let al = null; try { al = c.align; } catch (e0) {}
+            if (al && String(al).toLowerCase() !== 'center') continue;
             let host = null, ha = Infinity;
             const tcx = c.x + c.width / 2, tcy = c.y + c.height / 2;
             for (const h of hosts) {
@@ -196,6 +234,15 @@ return (function () {
                 catch (e) { if (sx) c.x = nx; if (sy) c.y = ny; }
                 log.push([host.name, String(c.characters).slice(0, 8), sx ? (sy ? 'xy' : 'x') : 'y',
                           (sx ? ox : oy).toFixed(1)]);
+              } else if (residueOk(host, c)) {
+                // Near-miss centring: the audit's `text_centre_residue` is box-centre off host-centre by ≤8px on a
+                // label whose width fills the host (a button/nav-link caption). It is invisible as a defect and
+                // invisible as an intent — the fix is the same one the author meant, so the pair is exact.
+                const mx = (host.x + host.width / 2) - (c.x + c.width / 2);
+                const my = (host.y + host.height / 2) - (c.y + c.height / 2);
+                try { if (Math.abs(mx) > 0.5) c.parentX = c.parentX + mx; if (Math.abs(my) > 0.5) c.parentY = c.parentY + my; }
+                catch (e) { c.x = c.x + mx; c.y = c.y + my; }
+                log.push([host.name, String(c.characters).slice(0, 8), 'centre', Math.max(Math.abs(mx), Math.abs(my)).toFixed(1)]);
               }
             }
           }
@@ -226,14 +273,20 @@ return (function () {
       for (const c of kids0.slice()) if (c.type === 'board' || c.type === 'group') walk(c);  // inner first
       const kids = kidsOf(node); if (!kids) return;
       const byArea = kids
-        .filter((h) => (PLATE(h) || h.type === 'board') && h.width >= 24 && h.height >= 24 && !isFlow(h) && !OVER.test(h.name || ''))
+        // PLATE-only, mirroring audit_layout S11: a board is a partition container, so a label cell that holds its own
+        // text is layout, not loose stacking. Grouping those would also move CF-built boards out of the flex flow the
+        // factory authored them in.
+        .filter((h) => PLATE(h) && h.width >= 24 && h.height >= 24 && !isFlow(h) && !OVER.test(h.name || ''))
         .sort((a, b) => (b.width * b.height) - (a.width * a.height));
       const taken = new Set();      // members already absorbed
       const live = kids.slice();    // member stand-in list (replaced by group after grouping)
       for (const h of byArea) {
         try {
           if (taken.has(h.id)) continue;   // already a member of an inner group
-          const members0 = live.filter((s) => s !== h && !taken.has(s.id) && !isFlow(s) &&
+          // OVER layers (focus ring, hit pad, shadow, scrim) are deliberately larger than the control they wrap and are
+          // judged by name. Swallowing one into an assembly group hides it from `designPage`'s ring hunt (which walks
+          // boards, not groups) and re-sorts it in z-order, so they are never members.
+          const members0 = live.filter((s) => s !== h && !taken.has(s.id) && !isFlow(s) && !OVER.test(s.name || '') &&
             s.x + s.width / 2 >= h.x && s.x + s.width / 2 <= h.x + h.width &&
             s.y + s.height / 2 >= h.y && s.y + s.height / 2 <= h.y + h.height);
           const members = members0.filter((s) => {
@@ -307,5 +360,109 @@ return (function () {
     return fixed;
   };
 
-  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder'] };
+  // ---- componentize (G10, point 6): a redrawn copy of a registered master → a real instance ----
+  // `CF.autoRegister` promotes one host per name; every OTHER host with that name is a copy, and a copy cannot be
+  // fixed, swapped or variant-driven. This engine replaces each copy **in place**: same parent, same box, same z,
+  // text overrides copied by text-layer name (the copy and its master come from the same factory, so the anatomy
+  // matches). Flow children are skipped — appendChild + absolute would reflow the siblings; report them instead.
+  // Size guard: a factory's internals are absolute, so `instance.resize()` does NOT reflow them. Replacing a 200-wide
+  // demo copy with a 300-wide master instance left its field rect 100px outside the host (audit out_of_bounds ×5 on
+  // page 04). Only a same-size copy can be swapped; a differently sized one is reported as `misfit`, never replaced.
+  // Anatomy guard: a copy can be the *same size* and still carry more than the master — a screen's pricing card has
+  // title + subtitle + seven feature rows + an action, while the registered master is the library's 2-text demo. The
+  // swap kept the box and dropped everything else (measured on page 15: 3 pricing cards, 8 landing cards). A copy with
+  // more descendants than the master is reported as `anatomy`, never replaced; registering a fuller master is the fix.
+  storage.componentize = (opts) => {
+    opts = opts || {};
+    const root = opts.root || rootOf();
+    const apply = !!opts.apply;
+    const out = { apply: apply, hosts: 0, copies: 0, replaced: 0, flow: 0, failed: 0, main: 0, misfit: 0, anatomy: 0, sample: [], misfitSample: [], anatomySample: [], errors: [] };
+    if (!storage.CF || !storage.CF.get) return { err: 'componentize needs component_factory.js (CF.get)' };
+    const texts = (box) => {
+      const acc = [], walk = (n, d) => {
+        if (d > 8) return;
+        let k; try { k = Array.from(n.children || []); } catch (e) { return; }
+        for (const c of k) { if (c.type === 'text') acc.push(c); walk(c, d + 1); }
+      };
+      walk(box, 0);
+      return acc;
+    };
+    const size = (box) => {
+      let n = 0; const walk = (s, d) => {
+        if (d > 8) return;
+        let k; try { k = Array.from(s.children || []); } catch (e) { return; }
+        n += k.length; k.forEach((c) => walk(c, d + 1));
+      };
+      walk(box, 0);
+      return n;
+    };
+    const walk = (node) => {
+      let kids; try { kids = kidsOf(node); } catch (e) { return; }
+      if (!kids) return;
+      for (const h of kids) {
+        try {
+          if (h.type !== 'board' || h.width < 4 || h.height < 4) { walk(h); continue; }
+          const nm = String(h.name || '');
+          const rec = /^([A-Za-z]+)·/.test(nm) ? storage.CF.get(nm) : null;
+          if (!rec) { walk(h); continue; }
+          const isInst = h.isComponentInstance && h.isComponentInstance();
+          let main = null; try { main = rec.mainInstance ? rec.mainInstance() : null; } catch (e) {}
+          if (isInst || (main && main.id === h.id)) { if (main && main.id === h.id) out.main++; walk(h); continue; }
+          if (main && (Math.abs(main.width - h.width) > 2 || Math.abs(main.height - h.height) > 2)) {
+            out.misfit++;
+            if (out.misfitSample.length < 12) out.misfitSample.push(nm + ' ' + Math.round(h.width) + '×' + Math.round(h.height) + ' vs master ' + Math.round(main.width) + '×' + Math.round(main.height));
+            walk(h); continue;
+          }
+          if (main && size(h) > size(main)) {
+            out.anatomy++;
+            if (out.anatomySample.length < 12) out.anatomySample.push(nm + ' ' + size(h) + ' nodes vs master ' + size(main));
+            walk(h); continue;
+          }
+          out.hosts++; out.copies++;
+          let absolute = true;
+          try { absolute = !(h.layoutChild && h.layoutChild.absolute === false); } catch (e) {}
+          if (!absolute) { out.flow++; walk(h); continue; }
+          if (!apply) { if (out.sample.length < 12) out.sample.push(nm); walk(h); continue; }
+          const box = { x: h.x, y: h.y, w: h.width, h: h.height };
+          const parent = h.parent;
+          let idx = 0, z = 0;
+          try { idx = h.parentIndex; z = h.parentIndex; } catch (e) {}
+          const hostTexts = texts(h);
+          let inst = null;
+          try { inst = rec.instance(); } catch (e) { out.failed++; out.errors.push(nm + ' → instance(): ' + String(e).slice(0, 60)); continue; }
+          if (!inst) { out.failed++; out.errors.push(nm + ' → instance() returned null'); continue; }
+          try { inst.resize(box.w, box.h); } catch (e) {}
+          parent.appendChild(inst);
+          try { if (inst.layoutChild) inst.layoutChild.absolute = true; } catch (e) {}
+          try { inst.x = box.x; inst.y = box.y; } catch (e) {}
+          try { inst.setParentIndex(z); } catch (e) {}
+          try {
+            const instTexts = texts(inst);
+            const pool = {};
+            instTexts.forEach((t) => { const k = String(t.name || ''); (pool[k] || (pool[k] = [])).push(t); });
+            hostTexts.forEach((t) => {
+              const list = pool[String(t.name || '')];
+              const dst = list && list.shift();
+              let s = ''; try { s = String(t.characters || ''); } catch (e) {}
+              if (dst && s) { try { dst.characters = s; } catch (e) {} }
+            });
+          } catch (e) {}
+          let okW = 0, okH = 0;
+          try { okW = inst.width; okH = inst.height; } catch (e) {}
+          if (Math.abs(okW - box.w) > 2 || Math.abs(okH - box.h) > 2) {
+            try { inst.resize(box.w, box.h); } catch (e) {}
+            try { okW = inst.width; okH = inst.height; } catch (e) {}
+          }
+          try { h.remove(); out.replaced++; if (out.sample.length < 12) out.sample.push(nm + ' ' + Math.round(okW) + '×' + Math.round(okH)); }
+          catch (e) { out.failed++; out.errors.push(nm + ' → host.remove(): ' + String(e).slice(0, 60)); try { inst.remove(); } catch (e2) {} }
+        } catch (e) { out.failed++; out.errors.push(String((h && h.name) || '?') + ' → ' + String(e).slice(0, 60)); }
+        walk(h);
+      }
+    };
+    walk(root);
+    out.library = storage.CF.libraryCount ? storage.CF.libraryCount() : null;
+    return out;
+  };
+
+  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize'] };
 })();
