@@ -229,7 +229,7 @@ TK.activeSets();                        // current actually-activated set names
 ### 5.5 A token set is **not** the 素材 panel (measured 2026-10-21)
 
 There is a third surface beside sets and themes: the **library style records** the Assets panel lists —
-`library.local.colors` (fills) and `library.local.typographies` (text). Creating tokens fills **neither**. The Rayo file
+`library.local.colors` (fills) and `library.local.typographies` (text). Creating tokens fills **neither**. A live file
 proved it: 40 active `typography` tokens, `themes: []`, `typographies.length === 0` → the Typography panel was empty,
 and every design rule still passed, because every rule reads the shape tree or the token set.
 
@@ -350,9 +350,10 @@ where you can (`{color.primaryInk}` inside a typography token), so one override 
 
 `design-guide.md §5.1` makes this a HARD rule, and the mechanics that make it checkable are here:
 
-- **Seed the ladder as tokens, then never write a corner again.** `TK.seed` records `radius.none / xs / sm / md / lg / xl / full`
-  from DESIGN.md's `Shapes` section — for a recreation, **the source site's own ladder** (Rayo: `0 / 4 / 10 / 26 / 50 / 80 / 9999`),
-  not the skill's default ramp. A recreated file that invents its own steps documents a system the source does not have.
+- **Seed the ladder as tokens, then never write a corner again.** `TK.seed` records `radius.none / xs / sm / md / lg / full`
+  from DESIGN.md's `Shapes` section — for a recreation, **the source site's own ladder** (for example
+  `0 / 4 / 10 / 26 / 50 / 80 / 9999`), not the engine's default ladder. A recreated file that invents its own steps
+  documents a system the source does not have.
 - **Every writer goes through `CF.radius(role)`** (`ctx.plate`, `ctx.ring`, `ctx.clip`, `CF.build`, `NL.frame`, `NL.gridFrame`,
   `mkAbsBoard`, `mkRect`). A number that is not a declared step is *snapped* to the nearest one and recorded in `CF.coerced`, so
   an invented value is visible in the registry instead of silently drawn.
@@ -364,8 +365,8 @@ where you can (`{color.primaryInk}` inside a typography token), so one override 
 - **`TK.roleSweep()` — the repair for a corner that is legal but wrong (rule 37's twin).** 35/36 can only judge values that
   exist, so the two real defects of a rebuilt file are invisible to them: a control host still square because an older
   factory generation drew it, and a `ring·*` layer that disagrees with that host. Both are judged against the **source's own
-  contract**: `TK.PILL_FAMS` (button · iconbutton · splitbutton · fab · chip · badge · tag) is the set of families DESIGN.md
-  binds to `{rounded.full}` — a family absent from the table is never judged — and `CF.ROLE.ring = 'host'` supplies the second
+  contract**: `TK.CONTROL_FAMS` (button · iconbutton · splitbutton · fab · chip · badge · tag) is the set of families DESIGN.md
+  binds to the control step (`CF.radius('control')`) — a family absent from the table is never judged — and `CF.ROLE.ring = 'host'` supplies the second
   rule. `TK.roleStart()` + `TK.roleSweep({budget})` until `done: true`, then `TK.rolePages()` for the per-page table and a
   **dry re-read** for the proof (measured: 136 pages → 367 hosts (241 masters + 23 copies) + 192 rings repaired, re-read 0/0/0).
 - **`TK.ringSweep()` — the repair for a ring that is bound, correctly rounded, and in the wrong place (rule 38).**

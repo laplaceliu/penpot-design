@@ -50,6 +50,12 @@ return (function () {
   CF.P = P;
   CF.theme = function (map) { Object.assign(P, map || {}); C._res = null; return Object.keys(P).length; };
 
+  // ---------------------------------------------------------------- brand copy for shell previews
+  /** Product name the shell factories print when the caller passes no `name`. Set it once per design system
+      (`CF.brandName = DESIGN.name`); a shared kit must not ship a sample product's name as a silent default. */
+  CF.brandName = 'Brand';
+  CF.brandLegal = function () { return '© ' + new Date().getFullYear() + ' ' + CF.brandName + ' · Privacy · Terms · Status'; };
+
   // ---------------------------------------------------------------- §1.1 state model
   CF.STATE = { hover: 0.08, focus: 0.12, pressed: 0.12, dragged: 0.16, selected: 0.12,
                disabledContainer: 0.12, disabledContent: 0.38 };
@@ -86,10 +92,10 @@ return (function () {
   };
 
   // ---------------------------------------------------------------- §2 geometry ladder
-  // `radius` is the CONTROL role, and DESIGN.md §Shapes is unambiguous: every control of this system is a pill
-  // (`radius = height/2`), at 24px or 56px alike. It is therefore the same token at every size — the size axis changes
-  // height, type and padding, not the corner. A factory that needs a non-pill corner (a checkbox box, a card) asks for
-  // that ROLE, not for `L.radius`.
+  // `radius` is the CONTROL role: every control of one system takes the same corner token at every size, because the
+  // size axis changes height, type and padding, not the shape. Which step that is (a pill, a 3px rectangle, anything
+  // else) is the source ladder's decision, recorded in ROLE below. A factory that needs a different corner (a checkbox
+  // box, a card) asks for that ROLE, not for `L.radius`.
   var LADDER = {
     xs:   { h: 24, fs: 12, padX: 8,  icon: 16, radius: 'control', gap: 4 },
     sm:   { h: 28, fs: 13, padX: 12, icon: 16, radius: 'control', gap: 6 },
@@ -122,12 +128,11 @@ return (function () {
              color: { color: P.ink, opacity: e.o } }];
   };
   // ---------------------------------------------------------------- §2.1 radius = the token ladder, and nothing else
-  // The ladder is the SOURCE SITE's own `border-radius` steps (DESIGN.md §Shapes), measured off the Boedoxol
-  // stylesheet and nothing else: `0` (flat bands and section plates), `2` (the small inner boxes), `3` (every
-  // button, tag, chip and segmented-nav corner — the site's dominant step, 21 uses), `5` (every card, work item,
-  // image plate and hero card — 93 uses, the site's dominant step) and `100` (the 20px award dot, the 16px client
-  // ornament and the 48px avatars — the circle step, 30 uses).
-  // `full` (9999) is the pill the radius FORGE needs and the source has none of: `TK.radiusFor` reads it to bind a
+  // The ladder is the source site's own `border-radius` steps (DESIGN.md §Shapes), measured off its stylesheet and
+  // nothing else: `0` (flat bands and section plates), `2` (small inner boxes), `3` (the dominant control step —
+  // buttons, tags, chips, segmented nav), `5` (the dominant surface step — cards, work items, image plates, hero
+  // cards) and `100` (dots, ornaments and avatars — the circle step).
+  // `full` (9999) is the pill the radius FORGE needs and a source may not declare: `TK.radiusFor` reads it to bind a
   // corner that is `min(w,h)/2` or larger, and the renderer clamps it to a clean pill (measured 2026-10-21: a 320×32
   // and a 320×8 at 9999 both export as clean pills). It is a forge affordance, labelled as such — every DRAWN corner
   // in this file comes from the five source steps above.
@@ -135,7 +140,7 @@ return (function () {
   CF.RAD = RAD;
   // role → ladder key. A factory asks for the ROLE it is drawing; the number and the token name both come from here,
   // so "which radius is legal where" has exactly one answer in the file.
-  // Boedoxol's controls are 3px RECTANGLES, not pills: `control` is `sm`, and `TK.PILL_FAMS`'s repair pass reads
+  // The default ladder's controls are 3px RECTANGLES, not pills: `control` is `sm`, and `TK.CONTROL_FAMS`'s repair pass reads
   // `CF.radius('control')`, so the sweep and the factories agree on the same number.
   var ROLE = { control: 'sm', box: 'xs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
                slab: 'none', inverse: 'none', hero: 'md', flat: 'none', ring: 'host', clip: 'host' };
@@ -900,7 +905,7 @@ return (function () {
     var round = o.shape === 'circle' || o.shape === 'round' || o.shape === 'pill';
     var rad = o.shape === 'square' ? 0 : CF.radius('control');
     var box = B(o.x || 0, o.y || 0, w, o.h || L.h);
-    // `shape` is a real axis in this kit (Rayo draws every CTA as a pill), so it belongs in the name: without it a
+    // `shape` is a real axis in this kit (a source may draw every CTA as a pill), so it belongs in the name: without it a
     // pill and a radius-6 button of the same type/size/state would share one name and the size axis would lie.
     var shapeV = o.shape === 'pill' || o.shape === 'round' || o.shape === 'circle' ? 'Pill' : (o.shape === 'square' ? 'Square' : null);
     var ctx = CF.build(CF.name('Button', { type: type, size: o.size, state: S, variant: shapeV, slot: slotName(o) }), box, { parent: o.parent });
@@ -1313,7 +1318,7 @@ return (function () {
     var L = CF.ladder(o.size || 'md'), padX = 12, icon = L.icon;
     if (o.group) { ctx.text(String(o.label).toUpperCase(), B(r.x + padX, r.y, r.w - padX * 2, r.h), { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false }); return; }
     // The keyboard-active row is a wash of the brand, never solid brand: a system whose primary is a dark neutral
-    // (Rayo #161616) would paint an invisible plate under its own ink label and fail §3.3 at the factory.
+    // (a dark neutral such as #161616) would paint an invisible plate under its own ink label and fail §3.3 at the factory.
     if (o.active) ctx.plate(r, { name: 'row·tint', fills: CF.fills(C('primary'), 'focus', { tint: 1 }), radius: 'xs' });
     if (o.selected) ctx.plate(r, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 'xs' });
     if (o.hover) ctx.plate(r, { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: 'xs' });
@@ -1934,7 +1939,7 @@ return (function () {
     var soft = TONEMAP[tone] || TONEMAP.neutral;
     // A link chip is CF.link with a pill outline, not a filled pill: its hue lives in the copy + underline, so the
     // host stays empty at rest. Giving it the base fill too made the copy primary-on-primary — invisible whenever the
-    // brand hue is dark (Rayo's primary is #161616), and §3.3 fails on the drawing, not on paper.
+    // brand hue is dark (a primary such as #161616), and §3.3 fails on the drawing, not on paper.
     var bgc = kind === 'link' ? null
       : kind === 'actionable' ? (on ? C('primary') : C('surface'))
       : (on ? C(soft[0]) : C('surface'));
@@ -2750,7 +2755,7 @@ return (function () {
   /** Breadcrumb — 13-14 · chevron or slash separator 16 · links tint on hover · last = current (ink 500, not a link) · truncation menu. */
   CF.breadcrumb = async function (o) {
     o = o || {};
-    var items = o.items || ['Workspace', 'Projects', 'Atlas design'];
+    var items = o.items || ['Workspace', 'Projects', CF.brandName + ' design'];
     var fs = o.fs || 13, sepKind = o.sep || 'chevron', h = o.h || max(22, fs + 8);
     var sepW = sepKind === 'slash' ? 10 : 16 + 8;
     var backW = o.back ? 24 + 8 : 0;
@@ -3025,7 +3030,7 @@ return (function () {
     var w = o.w || 560, rowH = o.rowH || 40, pad = 8, searchH = o.searchH || 44, groupH = 26, footH = o.footer === false ? 0 : 36;
     var groups = o.groups || [
       { label: 'Suggested', items: [{ glyph: 'file', title: 'New file', key: 'Ctrl N' }, { glyph: 'folder', title: 'Open project…', key: 'Ctrl O' }, { glyph: 'settings', title: 'Workspace settings' }] },
-      { label: 'Recent', items: [{ glyph: 'layers', title: 'Atlas design system', hint: 'edited 2h ago' }, { glyph: 'chart', title: 'Q3 report', hint: 'shared' }] }
+      { label: 'Recent', items: [{ glyph: 'layers', title: CF.brandName + ' design system', hint: 'edited 2h ago' }, { glyph: 'chart', title: 'Q3 report', hint: 'shared' }] }
     ];
     var h = pad + searchH + 9 + 8;
     groups.forEach(function (g) { h += (g.label ? groupH : 0) + g.items.length * rowH; });
@@ -3198,7 +3203,7 @@ return (function () {
     var tone = o.tone || 'info';
     var soft = TONEMAP[tone] || TONEMAP.info;
     var title = String(o.title === undefined ? 'Upload finished' : o.title);
-    var desc = String(o.description === undefined ? 'atlas-2026.fig landed in 3 files.' : o.description);
+    var desc = String(o.description === undefined ? 'design-2026.fig landed in 3 files.' : o.description);
     var pad = o.pad === undefined ? 16 : o.pad, fs = 14, dfs = 13;
     var iconW = o.icon === false ? 0 : 20 + 12, closeW = o.closable === false ? 0 : 16 + 8;
     var contentW = max(CF.estW(title, fs), CF.estW(desc, dfs));
@@ -3359,7 +3364,7 @@ return (function () {
       ctx.plate(B(rect.x + rect.w / 2 - sw2 / 2, rect.y + rect.h / 2 - sh2 / 2, sw2, sh2),
         { name: 'scrim', fill: C('ink'), opacity: o.scrimOpacity === undefined ? 0.55 : Number(o.scrimOpacity) });
     }
-    ctx.text(String(o.title === undefined ? 'Share “Atlas design”' : o.title), B(header.x + pad, header.y, header.w - pad * 2 - 56, headerH),
+    ctx.text(String(o.title === undefined ? 'Share “' + CF.brandName + '”' : o.title), B(header.x + pad, header.y, header.w - pad * 2 - 56, headerH),
       { size: 16, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
     if (o.closable !== false) {
       ctx.plate(B(closeB.x, closeB.y, closeB.w, closeB.h), { name: 'close·hit', fills: CF.fills(null, o.hoverClose ? 'hover' : null), radius: CF.radius('sm') });
@@ -3538,7 +3543,7 @@ return (function () {
     var lg = slot.logo;
     ctx.plate(B(lg.x, lg.y + (lg.h - 28) / 2, 28, 28), { name: 'logo·mark', fill: C('primary'), radius: 'sm' });
     ctx.glyph(o.mark === 'hex' ? 'layers' : 'command', B(lg.x + 5, lg.y + (lg.h - 18) / 2, 18, 18), { color: C('onPrimary'), strokeW: 2 });
-    ctx.text(String(o.name === undefined ? 'Atlas' : o.name), B(lg.x + 36, lg.y, max(40, lg.w - 36), lg.h),
+    ctx.text(String(o.name === undefined ? CF.brandName : o.name), B(lg.x + 36, lg.y, max(40, lg.w - 36), lg.h),
       { size: 16, color: ink, weight: 700, align: 'left', valign: 'middle', refit: false });
     var ws = items.map(function (l) { return CF.estW(String(l), 14) + 4; });
     var gap = 24, room = slot.links.w;
@@ -3573,7 +3578,7 @@ return (function () {
     o = o || {};
     // `user` is a name, not a switch: callers wrote `user: h > 520` and the footer rendered the string "true"
     // as the account holder (measured on the dashboard screen). One caller's boolean is a name here.
-    if (o.user === true) o.user = 'Ana Rayo';
+    if (o.user === true) o.user = 'Alex Doe';
     var rect = o.rect || B(o.x || 0, o.y || 0, o.w || (o.rail ? 72 : 256), o.h || 720);
     var groups = o.groups || [{ label: 'Workspace', items: ['Overview', 'Projects', 'Assets'] }, { label: 'Team', items: ['Members', 'Settings'] }];
     var plan = [], slotGroups = [], railMode = !!o.rail;
@@ -3596,7 +3601,7 @@ return (function () {
       var bd = slot.brand;
       ctx.plate(B(bd.x, bd.y, bd.w, bd.h), { name: 'logo·mark', fill: C('primary'), radius: CF.radius('md') });
       ctx.glyph('command', B(bd.x + (bd.w - 18) / 2, bd.y + (bd.h - 18) / 2, 18, 18), { color: C('onPrimary'), strokeW: 2 });
-      if (!rail) ctx.text(String(o.name === undefined ? 'Atlas' : o.name), B(bd.x + bd.w + 10, bd.y, rect.x + rect.w - (bd.x + bd.w) - 16, bd.h),
+      if (!rail) ctx.text(String(o.name === undefined ? CF.brandName : o.name), B(bd.x + bd.w + 10, bd.y, rect.x + rect.w - (bd.x + bd.w) - 16, bd.h),
         { size: 16, color: ink, weight: 700, align: 'left', valign: 'middle', refit: false });
     }
     if (slot.cta) {
@@ -3736,7 +3741,7 @@ return (function () {
     // column 0 is the brand block, so the link columns never sit under the logo
     var brand = slot.columns[0], top = rect.y + padT, brandW = max(140, brand.w);
     ctx.plate(B(brand.x, top, 32, 32), { name: 'logo·mark', fill: C('primary'), radius: CF.radius('lg') });
-    ctx.text(String(o.name === undefined ? 'Atlas' : o.name), B(brand.x + 42, top + 4, brandW - 42, 24),
+    ctx.text(String(o.name === undefined ? CF.brandName : o.name), B(brand.x + 42, top + 4, brandW - 42, 24),
       { size: 16, color: ink, weight: 700, align: 'left', valign: 'top', refit: false });
     CF.wrap(String(o.tagline === undefined ? 'Design infrastructure for product teams.' : o.tagline), brandW, 13)
       .slice(0, 2).forEach(function (ln, i) {
@@ -3762,7 +3767,7 @@ return (function () {
     }
     var legal = slot.legal;
     ctx.plate(B(legal.x, legal.y - 16, legal.w, 1), { name: 'hairline·legal', fill: dark ? '#FFFFFF' : C('border'), opacity: dark ? 0.14 : 1 });
-    ctx.text(String(o.legal === undefined ? '© 2026 Atlas Labs · Privacy · Terms · Status' : o.legal), B(legal.x, legal.y, max(120, legal.w - 120), legal.h),
+    ctx.text(String(o.legal === undefined ? CF.brandLegal() : o.legal), B(legal.x, legal.y, max(120, legal.w - 120), legal.h),
       { size: 12, color: sub, opacity: 0.6, align: 'left', valign: 'middle', refit: false });
     ['globe', 'chat', 'mail'].forEach(function (g, i) {
       ctx.glyph(g, B(legal.x + legal.w - 24 - (2 - i) * 32, legal.y + (legal.h - 18) / 2, 18, 18), { color: sub, opacity: 0.72, anchor: 'right' });

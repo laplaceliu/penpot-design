@@ -5,10 +5,10 @@
 //
 // Usage (after the G1 seed order, plus media_engine.js):
 //   SC.config({ server: 'http://127.0.0.1:8779' })         // the loopback server --root'ed at the PROJECT (media paths)
-//   SC.record('contact', { src: 'https://rayo-agency-template.vercel.app/contact', tier: 'web', recipe: 'contact',
+//   SC.record('contact', { src: 'https://example.com/contact', tier: 'web', recipe: 'contact',
 //     sections: [{ region: 'form', controls: [{ family: 'input', type: 'outlined', size: 'md' }],
 //                  copy: [{ text: 'Tell us about the project', size: 32, weight: 700, role: 'headline' }],
-//                  media: [{ slot: 'cover', path: 'rayo-agency/assets/cover.png' }] }] })
+//                  media: [{ slot: 'cover', path: 'assets/cover.png' }] }] })
 //   await SC.build({ page: '15 · Screens · content', screen: 'contact' })   // → census + gaps
 //   SC.audit()                       // the current page, measured against the same contract the gate reads
 //   SC.coverage()                    // record-side: which declared entries landed
@@ -17,7 +17,7 @@
 //
 // WHY this engine exists: the factory calls (`CF.button({parent, x, y, …})`) DRAW a control. That is right on a spec
 // board, where the drawing is what gets registered. On a screen it produced one-off copies — 100 + 60 control-named
-// hosts on the Rayo file's screens pages, none of them instances, and `mediaFills: 0` on all three screen pages
+// hosts on a live file's screens pages, none of them instances, and `mediaFills: 0` on all three screen pages
 // (measured 2026-10-22). A copy cannot be fixed, swapped or themed, and a gray plate with an `image` glyph is not the
 // photograph the user asked to reproduce. SC is the path that makes the contract satisfiable instead of aspirational.
 //

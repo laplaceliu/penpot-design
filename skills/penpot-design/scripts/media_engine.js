@@ -12,7 +12,7 @@
 // silently loses the thing the user asked to reproduce. Gate G17 (`SKILL.md`) therefore requires real media on screens,
 // and this file is what makes that requirement satisfiable without hand-drawing.
 //
-// Rules for raster media (every one measured 2026-10-22 on the live Rayo file, capabilities §9):
+// Rules for raster media (every one measured 2026-10-22 on a live reference file, capabilities §9):
 //   M1  `uploadMediaData(name, bytes, mtype)` takes **three** arguments. The 2-arg form and the `{name,data,mtype}`
 //       object form both fail with `media type  is not supported` — Penpot does not sniff, it is told.
 //   M2  the bytes must decode to a real image: three garbage bytes return `http error` from the backend. A successful

@@ -113,7 +113,7 @@ return (function () {
 
   // ---------- 3 · the editorial table (content, never geometry) ----------
   FN.prose = {
-    samples: [[30, 'Rayo'], [60, 'Rayo'], [1e9, 'R']], defaultSample: 'Rayo Agency copy',
+    samples: [[30, 'Brand'], [60, 'Brand'], [1e9, 'R']], defaultSample: 'Brand Agency copy',
     usage: {}, rules: {}, notes: {},
     seriesTones: null,      // null = take every declared tone hue, capped at 6
     strokeWidths: [1, 2],   // no stroke-width token exists; declared here so the board is still data

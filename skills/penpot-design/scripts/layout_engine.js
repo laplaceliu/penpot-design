@@ -657,6 +657,81 @@ return (function () {
     };
   };
 
+  // ---------------------------------------------------------------- one-page portfolio recreation recipes
+  // The source is a dark one-page portfolio plus two index pages. These three recipes encode its band stack and the
+  // leaf regions the screen record fills; a band that merely contains another region is NOT a region here (overlapping
+  // boards), so only leaves are listed. Heights are the source's own 1440 rhythm: 900 hero, 180 band padding.
+  var bdxCells = function (rect, cols, rows, gap) {
+    var cw = G((rect.w - gap * (cols - 1)) / cols), ch = G((rect.h - gap * (rows - 1)) / rows);
+    var out = [];
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++)
+      out.push(R(rect.x + c * (cw + gap), rect.y + r * (ch + gap), cw, ch));
+    return out;
+  };
+  RECIPES.portfolioHome = function (o) {
+    o = o || {};
+    var w = o.w || 1440, bandsSpec = [
+      { key: 'nav', h: 72 }, { key: 'hero', h: 900 }, { key: 'works', h: 1500 }, { key: 'services', h: 1600 },
+      { key: 'quote', h: 900 }, { key: 'skills', h: 1100 }, { key: 'stats', h: 900 }, { key: 'philosophy', h: 900 },
+      { key: 'journal', h: 1300 }, { key: 'footer', h: 900 }];
+    var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
+    var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
+    var b = fl.bands, M = 72, W = w - M * 2;
+    var svc = bdxCells(R(M, b.services.y + 360, W, 1040), 3, 2, 24);
+    var st = bdxCells(R(M, b.stats.y + 340, W, 360), 4, 1, 24);
+    var jr = bdxCells(R(M, b.journal.y + 360, W, 920), 2, 2, 24);
+    var regions = {
+      nav: R(0, b.nav.y, w, 72),
+      'hero.copy': R(M, b.hero.y + 160, 700, 520),
+      'hero.media': R(w - M - 468, b.hero.y + 80, 468, 700),
+      'works.header': R(M, b.works.y + 96, W, 220),
+      'works.card': R(M, b.works.y + 360, W, 960),
+      'services.header': R(M, b.services.y + 96, W, 220),
+      'quote.copy': R(M, b.quote.y + 160, 800, 560),
+      'quote.media': R(w - M - 468, b.quote.y + 100, 468, 700),
+      'skills.header': R(M, b.skills.y + 96, W, 220),
+      'skills.list': R(M, b.skills.y + 360, W, 640),
+      'stats.header': R(M, b.stats.y + 96, W, 180),
+      'philosophy.copy': R(M, b.philosophy.y + 160, 800, 560),
+      'philosophy.media': R(w - M - 468, b.philosophy.y + 100, 468, 700),
+      'journal.header': R(M, b.journal.y + 96, W, 220),
+      'footer.brand': R(M, b.footer.y + 96, 600, 300),
+      'footer.social': R(w - M - 468, b.footer.y + 96, 468, 300),
+      'footer.legal': R(M, b.footer.y + 500, W, 120)
+    };
+    svc.forEach(function (r, i) { regions['services.c' + (i + 1)] = r; });
+    st.forEach(function (r, i) { regions['stats.c' + (i + 1)] = r; });
+    jr.forEach(function (r, i) { regions['journal.c' + (i + 1)] = r; });
+    return { frame: { w: w, h: totalH }, bands: b, order: fl.order, totalH: totalH, regions: regions,
+             notes: 'One-page portfolio: hero 900 with a 700 copy column and a 468 media card; bands 900–1600; contact in the footer.' };
+  };
+  RECIPES.worksIndex = function (o) {
+    o = o || {};
+    var w = o.w || 1440, bandsSpec = [{ key: 'nav', h: 72 }, { key: 'header', h: 300 }, { key: 'grid', h: 1752 }, { key: 'footer', h: 900 }];
+    var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
+    var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
+    var b = fl.bands, M = 72, W = w - M * 2;
+    var cards = bdxCells(R(M, b.grid.y, W, b.grid.h), 3, 4, 24);
+    var regions = { nav: R(0, b.nav.y, w, 72), header: R(M, b.header.y, W, b.header.h),
+      footer: R(M, b.footer.y + 96, W, 300) };
+    cards.forEach(function (r, i) { regions['c' + (i + 1)] = r; });
+    return { frame: { w: w, h: totalH }, bands: b, order: fl.order, totalH: totalH, regions: regions,
+             notes: 'Works index: 12 project cards in a 3-column grid; the card shows still, client, year and categories.' };
+  };
+  RECIPES.journalIndex = function (o) {
+    o = o || {};
+    var w = o.w || 1440, bandsSpec = [{ key: 'nav', h: 72 }, { key: 'header', h: 300 }, { key: 'grid', h: 1064 }, { key: 'pagination', h: 120 }, { key: 'footer', h: 900 }];
+    var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
+    var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
+    var b = fl.bands, M = 72, W = w - M * 2;
+    var cards = bdxCells(R(M, b.grid.y, W, b.grid.h), 2, 2, 24);
+    var regions = { nav: R(0, b.nav.y, w, 72), header: R(M, b.header.y, W, b.header.h),
+      pagination: R(M, b.pagination.y + 24, W, 56), footer: R(M, b.footer.y + 96, W, 300) };
+    cards.forEach(function (r, i) { regions['c' + (i + 1)] = r; });
+    return { frame: { w: w, h: totalH }, bands: b, order: fl.order, totalH: totalH, regions: regions,
+             notes: 'Journal index: four cover cards in a 2-column grid plus a 56px pagination row.' };
+  };
+
   RECIPES.blogArticle = function (o) {
     o = o || {};
     var f = LY.frame({ w: o.w || 1440, h: o.h || 2400, chrome: { statusBar: 0, navBar: 68, tabbar: 0, safeBottom: 0 } });
@@ -1060,6 +1135,9 @@ return (function () {
     reportPrint:     { tiers: ['web'],               pad: null, mobile: null },
     pricing:         { tiers: ['web', 'pad'],        mobile: null },
     contact:         { tiers: ['web'],               pad: 'authCard', mobile: 'authCard' },
+    portfolioHome:   { tiers: ['web'],               pad: null, mobile: null },
+    worksIndex:      { tiers: ['web'],               pad: null, mobile: null },
+    journalIndex:    { tiers: ['web'],               pad: null, mobile: null },
     mobileFeed:      { tiers: ['mobile', 'pad'] },
     mobileListDetail:{ tiers: ['mobile', 'pad'] }
   };

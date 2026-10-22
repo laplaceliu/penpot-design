@@ -78,7 +78,7 @@ register components → recipe screens. Where the library contradicts a `design-
 1. **Connect Penpot MCP** (`references/mcp-connection.md`): verify the 4 tools work, `high_level_overview` can read files.
 2. **Seed, in engine order** (gate G1): `scripts/seed_storage.js` (factories + `storage.T`, which is only a JS-side color mirror) →
    `scripts/layout_engine.js` (`storage.LY`) → `scripts/component_factory.js` (`storage.CF`, re-skin it with `CF.theme(map)` from the
-   entry's measurements) → `scripts/token_engine.js` `TK.seed(spec)` to **actually record Penpot design tokens** (set split by color mode) →
+   entry's measurements and set `CF.brandName` from DESIGN.md's name, so shell previews carry the product's name instead of `Brand`) → `scripts/token_engine.js` `TK.seed(spec)` to **actually record Penpot design tokens** (set split by color mode) →
    `TK.assert()` must PASS. See `references/design-tokens.md`.
 3. **Skeleton**: `scripts/scaffold_structure.js` builds the 18 pages + PageRoot/header/footer (PageRoot always 1920, it's the spec-sheet canvas);
    run its phase-3 **fit** again at delivery time.
@@ -105,7 +105,7 @@ register components → recipe screens. Where the library contradicts a `design-
      One board per **recipe × accepted tier** (`LY.recipe(key,{tier})` refuses and returns `{err, use}` — follow the pointer, never squeeze),
      `CF.tier` set first, height from the recipe's `totalH` (long documents stack bands, they do not fit one screen),
      each carrying `LY.fold(board, tier)`, each finishing with `SC.audit()` → `ASSEMBLED` and `NL.auditFlow(board)` → `CLEAN`.
-     What that replaces, and why it is now blocked: the Rayo file's screens were built this way before `SC` existed and the
+     What that replaces, and why it is now blocked: the screens of a live file were built this way before `SC` existed and the
      measurement was `14` → 12 screens / 51 drawn controls with no master / 19 placeholder raster slots, `15` → 16 / 49 / 27
      (rules 39/40/41 report exactly that today).
 5. **Register library components**: `CF.component(host)` (masters collected in `AI Component Masters`; the host *becomes* the main instance),

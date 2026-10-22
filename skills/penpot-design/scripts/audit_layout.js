@@ -201,7 +201,7 @@ return (function () {
         for (let j = i + 1; j < kids.length; j++) {
           const a = kids[i], b = kids[j];
           // A region-anatomy label is drawn OVER the skeleton copy it names (`region·label·modal·body` on
-          // `modal·copy 4`), which is the whole point of the atlas board; ANNO layers are exempt from every stacking
+          // `modal·copy 4`), which is the whole point of the anatomy board; ANNO layers are exempt from every stacking
           // signature, so this pair is not a collision.
           if (a.type === 'text' && b.type === 'text' && !ANNO.test(a.name || '') && !ANNO.test(b.name || '') && ovr(R(a), R(b)) > 0.6) {
             add('text_overlap', a, node, 'vs "' + String(b.characters).slice(0, 12) + '"');

@@ -1134,7 +1134,11 @@ return (function () {
         // not to a full-bleed band inside it. Without this the first census indicted 45 boards on page 14 for what are
         // 12 screens, because a `region·` band at tier width and 300+ tall matches `isScreen` too.
         const parB = (function () { try { return b.parent; } catch (e) { return null; } })();
-        const topLevel = !parB || parB.id === str(root, 'id', '') || /-PageRoot$/.test(nameOf(parB));
+        // The PageRoot is the 1920-wide SHEET the screens are mounted on, not a screen: it is wider than the tier and
+        // carries no `nl:sc` by design. Judging it made every content page with screens report `no_source_record` about
+        // its own canvas (measured 2026-10-22 on `15 · Screens · content`).
+        const isCanvas = /-PageRoot$/.test(nameOf(b));
+        const topLevel = !isCanvas && (!parB || parB.id === str(root, 'id', '') || /-PageRoot$/.test(nameOf(parB)));
         if (topLevel) {
           out.screens = (out.screens || 0) + 1;
           let srec = null; try { srec = storage.NL && storage.NL.readStamp ? storage.NL.readStamp(b) : null; } catch (e) {}
@@ -1162,7 +1166,7 @@ return (function () {
       }
       // The fold contract binds a **baseline-width screen**, not a documentation canvas. A 1920 PageRoot is wider than
       // the tier and carries no scrollable viewport: judging it as a screen forced a 1440×900 marker at x=0, which
-      // annotated empty page space and drew an orange edge across the header (measured on the Rayo file). This is the
+      // annotated empty page space and drew an orange edge across the header (measured on a live file). This is the
       // same guard the guides branch above already applies.
       if (r.h >= CFG.longBoard && Math.abs(r.w - LY.TIERS[bt].w) <= 1) {
         // LY.fold() mounts the marker next to the board it annotates, so it is found among the siblings too

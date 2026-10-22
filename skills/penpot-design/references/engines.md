@@ -365,8 +365,8 @@ Browser/plugin crash → storage all lost. Rebuild in order:
 ## 6. Re-pagination driver (chapter pages → block pages, contract: penpot-structure.md §2.3)
 
 Re-splitting an existing file is a **migration**, not a rebuild: the boards already exist, the gates already pass, and
-every destructive step costs a rebuild of a derived artifact. Write it as a small driver on `storage` (the Rayo file's
-`storage.MIG` is the reference implementation) with exactly these steps, in this order:
+every destructive step costs a rebuild of a derived artifact. Write it as a small driver on `storage` (the reference
+implementation is `storage.MIG`) with exactly these steps, in this order:
 
 | Step | What it does | Why it is where it is |
 |---|---|---|
@@ -396,7 +396,7 @@ Hard-won rules for this driver:
    `spec.build()`'s `after` hook draws the region plates (`build_l4.js` `anatomyBoard`, `build_l5.js` `recipeBoard`). If
    the call dies between the two, the bare frame is still in the tree, `strays` mounts it as the real board, the spec is
    already off the queue, and `MIG.fast` skips it forever because "board exists". Every geometric rule then passes on an
-   empty frame — 39 blocks in the Rayo file were hollow this way and all 39 read CLEAN.
+   empty frame — 39 blocks in a live file were hollow this way and all 39 read CLEAN.
    Detect by **child count**, not geometry (that is rule 29, `empty_cell`: a `cell·slot·*` / `cell·recipe·*` with zero
    children). Repair by re-driving the **spec**, which still lives in `R0.l4.specs` / `R0.l5.specs`: `R0.requeue(spec)`
    sets `replace=true`, then `fast(1)`, then delete the same-name twin by **id** (name comparison is not enough — proxy
@@ -511,7 +511,7 @@ Measured 2026-10-21, both directions, on the live file (FN 1.1.0; seeding `audit
   `designCoverage().foreign` as `01.90 · … · Negative control stray`, produced the page finding
   `99-PageRoot :: 1 further un-projected board(s) …`, and read `foreignNow: []` after the control was removed in the
   next call (the staging page is unchanged).
-* **The real cost of the old mode, now visible**: `designCoverage()` on the Rayo file read `NEEDS_REPAIR` in 35 ms with
+* **The real cost of the old mode, now visible**: `designCoverage()` on a live file read `NEEDS_REPAIR` in 35 ms with
   15 chapter pages, 12 `foreign` boards (every `01.01`–`02.04` board, all built before FN existed), 4 chapter-`02` kinds
   `missing` and 4 `offChapter` (the staging page's 02 boards sit on an 01 page).
   That was the migration backlog, stated by a gate instead of by memory. **After the chapter-`02` migration (§7.2) the
@@ -581,7 +581,7 @@ When the user hands over source material — a URL, screenshots, an existing lib
 it (仿写 / 复刻), the screen pages are where the answer either respects the design system or quietly abandons it. `CF` **draws**
 a control, which is exactly right on a `·Spec` board (that drawing is what gets registered) and exactly wrong on a screen:
 the drawing becomes a disposable copy that cannot be fixed centrally, has no variants, cannot be swapped, and carries no
-relation to the library the same file just built. Measured on the Rayo file before `SC` existed (2026-10-22): pages `14/15`
+relation to the library the same file just built. Measured on a live file before `SC` existed (2026-10-22): pages `14/15`
 held **99 + 60 control-named hosts, 0 of them instances of what they imitated**, and every raster slot on all three screen
 pages was a gray plate with an `image` glyph — **`mediaFills: 0`**, i.e. the user's photographs were not in the file at all.
 
@@ -611,11 +611,11 @@ loopback), so binary always travels as base64 → `atob` → `Uint8Array` → `u
 ```js
 SC.config({ server: 'http://127.0.0.1:8779' });
 SC.record('contact', {
-  src: 'https://rayo-agency-template.vercel.app/contact', tier: 'web', recipe: 'contact',
+  src: 'https://example.com/contact', tier: 'web', recipe: 'contact',
   sections: [{ region: 'form',
     controls: [{ family: 'input', type: 'outlined', size: 'md', place: { x: 0, y: 0 } }],
     copy:     [{ text: 'Tell us about the project', size: 32, weight: 700, role: 'headline' }],
-    media:    [{ slot: 'cover', path: 'rayo-agency/assets/img/demo/01_card-img.webp' }],
+    media:    [{ slot: 'cover', path: 'assets/img/cover.webp' }],
     icons:    [{ kind: 'mail' }] }]
 });
 const census = await SC.build({ page: '15 · Screens · content', screen: 'contact' });

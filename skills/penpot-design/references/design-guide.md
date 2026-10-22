@@ -473,7 +473,7 @@ exemption list and the kind list **from FN itself**, so auditor and engine canno
 pagination is block-per-page (`01.09 · Foundations · Palette`), a chapter is spread over ~9 pages: per-page scope
 catches an un-stamped board, and `storage.designCoverage()` / `FN.coverage()` answer the file question — every chapter
 kind projected somewhere, no chapter board left hand-drawn. Measured 2026-10-21: coverage over 14 chapter pages is one
-read-only call; on the Rayo file it reported the 12 hand-composed boards still on `01.xx`/`02.xx` and refused
+read-only call; on a live file it reported the 12 hand-composed boards still on `01.xx`/`02.xx` and refused
 `CLEAN`, and an 11-board projected page read `CLEAN` (351 boards / 919 shapes / 7.4 s).
 
 **Token rules 19–24 are birth rules, not backfill rules.** A hex that matches the palette is still a typed colour; the

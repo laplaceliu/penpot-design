@@ -77,8 +77,8 @@ so the reviewer can see that hover is not a different blue.
   `NL.frame`, `NL.plate`, `storage.mkAbsBoard`, `storage.mkRect`) passes through `CF.radius()`, which snaps an off-ladder
   number to the nearest step and records the coercion in `CF.coerced`. A drawn control is therefore **always** a token
   corner, and gate rules 35/36/37/38 (`radius_off_ladder`, `radius_unbound`, `ring_off_host`, `ring_detached`) are the
-  machine check. For a file drawn before the roles existed, `TK.roleSweep()` is the repair: it forces every pill-family
-  host (`TK.PILL_FAMS`) to `CF.radius('control')` and every `ring·*` plate to its host's corner — on masters **and** placed
+  machine check. For a file drawn before the roles existed, `TK.roleSweep()` is the repair: it forces every control-family
+  host (`TK.CONTROL_FAMS`) to `CF.radius('control')` and every `ring·*` plate to its host's corner — on masters **and** placed
   copies, because a write to a master does not re-sync the copies already in the file. `ctx.ring` also fixes **where** the
   ring lives: it mounts inside the control whose plate it outlines, so a ring that sits on the spec board instead of inside
   its control is a stale outline from a refit (rule 38; census and repair `TK.ringSweep()`).

@@ -316,7 +316,7 @@ variantError getPluginData/…`. **Absent**: `switchVariant` (instances have it,
 | `penpot.library.local.createTypography()` | takes **no argument** (the same ignore-the-args behaviour as `createColor`, §7) → a `LibraryTypography` whose `name` / `fontFamily` / `fontSize` / `fontWeight` / `lineHeight` / `letterSpacing` are writable afterwards and read back verbatim |
 | `style.setFont(font, variant)` | carries the family + weight onto the record; pick the variant with `String(v.fontWeight) === want` — a `FontVariant` exposes only `name / fontVariantId / fontWeight / fontStyle` |
 | `style.applyToText(textShape)` | family, size, weight and tracking transfer; **`lineHeight` is rewritten to `1.2` whatever the record holds** (measured twice: 1.05 → 1.2 and 1.4 → 1.2), so `TP.apply` re-asserts the style's own leading after the call or the ramp's rhythm flattens |
-| `penpot.library.local.typographies` | the list the Typography panel renders — **a token set puts nothing in it.** The Rayo file had 40 *active* `typography` tokens, `tokens.themes === []`, and `typographies.length === 0`: the panel was empty while every design rule passed, because every rule reads the shape tree or the token set |
+| `penpot.library.local.typographies` | the list the Typography panel renders — **a token set puts nothing in it.** A live file had 40 *active* `typography` tokens, `tokens.themes === []`, and `typographies.length === 0`: the panel was empty while every design rule passed, because every rule reads the shape tree or the token set |
 
 So a delivered file needs both: `TK` *declares* the ramp (bindings, the auditor), `TP.seed()` makes each step
 *pickable* by a human. `TP.seed` names every style exactly like its token (`type.prose-lg`), is idempotent
@@ -454,7 +454,7 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 
 A recreated screen shows the user's **photographs, illustrations, logos and screenshots**, which no icon channel can
 produce. Drawing a gray plate with an `image` glyph in it is a placeholder, so gate **G17** requires the real thing; these
-are the seven rules that make it writable, each measured on the live Rayo file:
+are the seven rules that make it writable, each measured on a live file:
 
 | # | Call | Measured |
 |---|---|---|

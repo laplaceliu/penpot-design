@@ -924,14 +924,15 @@ return (function () {
   // ---------- the step a HOST must carry (DESIGN.md's decision, not the factory's memory) ----------
   // Rules 35/36 judge corners that exist, so a control host drawn square by an older generation of the factory passes
   // vacuously — measured 2026-10-22, when the `Button·Spec` export showed square bodies behind pill focus rings. The
-  // authority for which step a host takes is DESIGN.md's component list, and Rayo binds every button, tag, chip and
-  // badge variant to `{rounded.full}`; these are the families that says something about, in the name `CF` uses.
+  // authority for which step a host takes is DESIGN.md's component list: a source may bind every button, tag, chip
+  // and badge variant to `{rounded.full}` while another binds the same families to a 3px step; these are the families
+  // that declaration speaks about, in the name `CF` uses.
   // A family absent from this table is NOT judged — the auditor never invents a step the source did not declare.
   // Measured 2026-10-22 on the live file: `Button·Primary·MD·Focus·Pill` reports `isComponentInstance() === true` AND
   // `isComponentMainInstance() === isComponentRoot() === isComponentHead() === true` — in Penpot a component IS its main
   // instance, so skipping "instances" would skip every master and fix nothing. Only a COPY is a consumer whose interior
   // belongs to the master (`isComponentCopyInstance()`); repairing the master is what propagates to the copies.
-  TK.PILL_FAMS = { button: 1, iconbutton: 1, splitbutton: 1, fab: 1, chip: 1, badge: 1, tag: 1 };
+  TK.CONTROL_FAMS = { button: 1, iconbutton: 1, splitbutton: 1, fab: 1, chip: 1, badge: 1, tag: 1 };
   // The second half of the same contract: `CF.ROLE.ring = 'host'` — a ring is a derived outline, so its corner is the
   // host's corner. A ring at 10 around a host at 0 (or 9999) is the defect the user pointed at on `Button·Primary·MD·Focus·Pill`.
   TK.roleStart = function (names, o) {
@@ -995,7 +996,7 @@ return (function () {
         } else if (String(s.type) === 'board') {
           h = s;
           const base = nm.split('·')[0].toLowerCase();
-          if (TK.PILL_FAMS[base] && !/·Spec$|-PageRoot$|-Header$|-Footer$/.test(nm)) {
+          if (TK.CONTROL_FAMS[base] && !/·Spec$|-PageRoot$|-Header$|-Footer$/.test(nm)) {
             const v = maxC(s);
             if (v !== null && v !== FULL) {
               hosts++;
