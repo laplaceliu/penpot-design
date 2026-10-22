@@ -2512,8 +2512,13 @@ return (function () {
           bws = bws.slice(0, maxLines);
           bws[bws.length - 1] = bws[bws.length - 1].replace(/[\s,.;:]+$/, '') + ' …';
         }
+        // The body block is centred in its band, not glued to the header divider: a one-line answer in a 44px band
+        // starts 12 below the header (and leaves 12 below), so the copy breathes on both sides. Measured 2026-10-22 on
+        // `Accordion·Bordered·Hover·Multi`, where the first body line sat exactly on the header's bottom edge.
+        var textH = Math.min(bws.length, maxLines) * blh;
+        var bodyPad = Math.max(4, Math.round((bodyH - textH) / 2));
         bws.forEach(function (ln, li) {
-          ctx.text(ln, B(box.x + padX + (o.icon ? 24 : 0), y + headH + li * blh, w - padX * 2 - 24, blh),
+          ctx.text(ln, B(box.x + padX + (o.icon ? 24 : 0), y + headH + bodyPad + li * blh, w - padX * 2 - 24, blh),
             { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
         });
       }
