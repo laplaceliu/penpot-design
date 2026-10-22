@@ -2363,9 +2363,13 @@ return (function () {
       ctx.glyph('image', B(box.x + padX + media * 0.25, box.y + (h - media) / 2 + media * 0.25, media * 0.5, media * 0.5), { color: C('muted') });
     }
     var textW = box.w - (tx - box.x) - padX - trailW;
-    var titleY = lines === 1 ? box.y : box.y + (h - (lines === 2 ? 38 : 56)) / 2;
+    // The copy block (title + optional sub/meta) is centred as a whole inside the row. A one-line row used to start at
+    // `box.y`, so its 14/1.4 title sat at the TOP of a 48px row while the leading icon and trailing chevron were
+    // vertically centred — measured 2026-10-22 on `ListItem·1line·Trail·chevron` (title centre 14px above the host's).
+    var blockH = lines === 1 ? 22 : (lines === 2 ? 38 : 56);
+    var titleY = box.y + (h - blockH) / 2;
     ctx.text(String(o.title === undefined ? 'List item' : o.title), B(tx, titleY, textW, 22),
-      { size: 14, color: S === 'disabled' ? C('muted') : C('ink'), weight: 500, opacity: stateAlpha(S), align: 'left', valign: 'top', refit: false });
+      { size: 14, color: S === 'disabled' ? C('muted') : C('ink'), weight: 500, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
     if (lines >= 2) ctx.text(String(o.sub === undefined ? 'Secondary line, one row only' : o.sub), B(tx, titleY + 20, textW, 18),
       { size: 13, color: C('muted'), opacity: stateAlpha(S), align: 'left', valign: 'top', refit: false });
     if (lines >= 3) ctx.text(String(o.meta || 'Tertiary detail'), B(tx, titleY + 40, textW, 16),

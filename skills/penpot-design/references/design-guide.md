@@ -381,6 +381,7 @@ without them is a finding, not a style difference.
   numbers right-aligned with equal decimals; icons share a leading edge column.
 - Keep content away from the window edge (fixed page margin) — never let a block "float" to the viewport bound.
 - Baseline-align text+icon+chip inside one row; a 1px baseline drift across a toolbar reads as slop at export zoom.
+- **Row copy is centred as a BLOCK inside the row, not top-aligned.** A 48px one-line list row centres its 14/1.4 title (box 22) at `(48−22)/2`; a 2/3-line row centres the whole 38/56 block. The leading icon and trailing chevron share that centre — a top-aligned title beside a centred chevron reads as a broken row (measured 2026-10-22 on `ListItem·1line·Trail·chevron`).
 - Two-column content ratio **2.2–3.2 : 1** (HARD, never 50/50): a side panel equal to the main column turns properties into content.
 
 ## 9. Motion (Design → Code side; static in the design file)
