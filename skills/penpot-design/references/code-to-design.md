@@ -116,7 +116,7 @@ register components → recipe screens. Where the library contradicts a `design-
    `groupAssemblies` → `fixZOrder`), focus: closed stroke inner, glow board `clipContent=false`, correct CJK font, pad/mobile touch targets ≥44.
    Screens additionally pass `NL.auditFlow(board) === 'CLEAN'` (settle with `NL.whenSettled`, size controls `fix`, never `auto`).
 7. **Accept**: both auditors CLEAN with the page scope named in contract §2 — `storage.auditPage()` (positioning) and
-   `storage.designGate({ tier | families })` (the 41 design rules, the file-level `designCoverage()` when `storage.FN`
+   `storage.designGate({ tier | families })` (the 42 design rules, the file-level `designCoverage()` when `storage.FN`
    is seeded, and on the screen pages `SC.coverage()` when `storage.SC` is seeded) — then export PNG per page and check against the self-check list
    (`penpot-structure.md` §8); pages 14–16 accepted recipe by recipe, tier by tier; ask the user to zoom in the editor to review.
    With a light+dark answer, prove the switch on the **paint** (`TK.paint` → `TK.activateTheme` → `TK.changed` ≥ 1) and

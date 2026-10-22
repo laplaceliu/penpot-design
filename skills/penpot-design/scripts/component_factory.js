@@ -142,8 +142,12 @@ return (function () {
   // so "which radius is legal where" has exactly one answer in the file.
   // The default ladder's controls are 3px RECTANGLES, not pills: `control` is `sm`, and `TK.CONTROL_FAMS`'s repair pass reads
   // `CF.radius('control')`, so the sweep and the factories agree on the same number.
+  // A background plate (a spec sheet, a modal, a command palette) holds a GROUP; it is not a control and not a card.
+  // It defaults to square because a large corner CLIPS the group at the plate's own corners — measured 2026-10-22 on
+  // `FAB·Spec`, where the ladder's `lg` (the source's 100px avatar/pill step) cut the corner cells. Rounding belongs to
+  // controls and cards; `spec` is the plate role, and audit_design rule 42 (`plate_rounded`) gates it.
   var ROLE = { control: 'sm', box: 'xs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
-               slab: 'none', inverse: 'none', hero: 'md', flat: 'none', ring: 'host', clip: 'host' };
+               spec: 'none', slab: 'none', inverse: 'none', hero: 'md', flat: 'none', ring: 'host', clip: 'host' };
   CF.ROLE = ROLE;
   var TOKEN_OF = { none: 'radius.none', xs: 'radius.xs', sm: 'radius.sm', md: 'radius.md', lg: 'radius.lg',
                    full: 'radius.full' };
@@ -2510,7 +2514,7 @@ return (function () {
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('EmptyState', { type: kind, slot: o.firstRun ? 'FirstRun' : null }), box, { parent: o.parent });
     var cx = box.x + box.w / 2;
-    ctx.plate(B(cx - ih / 2, box.y + 20, ih, ih), { name: 'illustration', fill: C('surfaceAlt'), radius: CF.radius('lg') });
+    ctx.plate(B(cx - ih / 2, box.y + 20, ih, ih), { name: 'illustration', fill: C('surfaceAlt'), radius: CF.radius('spec') });
     ctx.glyph(ill, B(cx - 32, box.y + 20 + ih / 2 - 32, 64, 64), { color: C('muted'), strokeW: 3 });
     ctx.text(String(title), B(box.x, box.y + 20 + ih + 10, box.w, 26), { size: 20, color: C('ink'), weight: 600 });
     if (body) { var bw = min(400, box.w - 32); ctx.text(String(body), B(cx - bw / 2, box.y + 20 + ih + 40, bw, 36), { size: 14, color: C('muted') }); }
@@ -3037,7 +3041,7 @@ return (function () {
     h += pad + footH;
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('CommandPalette', { slot: o.preview ? 'Preview' : null, state: o.state }), box,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('lg'), stroke: C('border'), strokeW: 1, shadow: o.flat ? 0 : 5 });
+      { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), stroke: C('border'), strokeW: 1, shadow: o.flat ? 0 : 5 });
     var sb = B(box.x + pad, box.y + pad, box.w - pad * 2, searchH);
     // `preview` is a documented slot of this family, so the factory has to draw it: a spec row labelled "160 right pane"
     // that renders a plain list is the "documented but unbuilt" failure the engine exists to prevent. The list column
@@ -3358,7 +3362,7 @@ return (function () {
     var footer = slot ? slot.footer : B(rect.x, rect.y + rect.h - footerH, rect.w, footerH);
     var closeB = slot ? slot.closeButton : B(rect.x + rect.w - 44, rect.y + 10, 32, 32);
     var ctx = CF.build(CF.name('Modal', { type: o.confirm ? 'Confirm' : (o.width === 'wide' ? 'Wide' : null), size: o.size, state: o.state, slot: o.footer === false ? 'NoFooter' : null }), rect,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('lg'), shadow: o.flat ? 0 : 5 });
+      { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), shadow: o.flat ? 0 : 5 });
     if (o.scrim) {
       var sw2 = o.scrimW || 1440, sh2 = o.scrimH || max(900, rect.h + 240);
       ctx.plate(B(rect.x + rect.w / 2 - sw2 / 2, rect.y + rect.h / 2 - sh2 / 2, sw2, sh2),
@@ -3844,7 +3848,7 @@ return (function () {
     var h = padY * 2 + headH + stateRowH + bodyH + (o.notes ? 44 : 0);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name(o.family || 'Component', { slot: 'Spec' }), box,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('lg'), stroke: C('border'), strokeW: 1 });
+      { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), stroke: C('border'), strokeW: 1 });
     var titleText = String(o.title === undefined ? (o.family || 'Component') + ' · variants' : o.title);
     if (headH) {
       ctx.text(titleText, B(box.x + padX, box.y + padY, box.w - padX * 2, 28),

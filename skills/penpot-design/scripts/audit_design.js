@@ -84,6 +84,7 @@ return (function () {
     radius_unbound: '§5.1 + design-tokens §8 · a radius equal to a declared `borderRadius` token but with no `tokens.borderRadius*` binding — the corner was typed instead of taken from the set; run TK.bindBoard',
     ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not its host control\'s corner: a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places. Rules 35/36 cannot see it — **both** values are on the ladder and bound. Repair with `TK.roleSweep`',
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
+    plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
@@ -542,6 +543,14 @@ return (function () {
       // every copy inherits. Only `isCopy` stops the descent below (the interior of a consumer is not a second opinion).
       if (!RI || !RI.count || isAnno(s) || isCopy(s)) return;
       const cs = cornersOf(s); if (!cs) return;
+      // Rule 42: a spec sheet is a background plate for a GROUP of controls, so it defaults to square. A non-zero
+      // corner on it is not a taste choice — the board clips its own children, and the ladder step used as "large"
+      // (`lg`, the source's 100px avatar/pill step) cuts the corner cells (measured 2026-10-22 on `FAB·Spec`).
+      if (/·Spec$/.test(nameOf(s))) {
+        const mx = Math.max.apply(null, cs);
+        if (mx > 0) add('plate_rounded', s, st.top,
+          '"' + nameOf(s) + '" has a ' + N(mx) + 'px corner — a ·Spec background plate holds a group and defaults to square (radius.none); round the controls, not the sheet');
+      }
       const hit = cs.filter((v) => v > 0);
       if (!hit.length) return;
       const rc = out.radius || (out.radius = { shapes: 0, onLadder: 0, bound: 0, steps: {}, off: {} });
