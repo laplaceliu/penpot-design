@@ -1053,6 +1053,23 @@ return (function () {
           }
         }
       }
+      // rule 45b · the same axis binds an ICON to the copy it sits beside (§2.3 + §7). `CF.glyph` scaled the 24-unit
+      // CELL to the slot, so artwork that is not itself centred in that cell arrived displaced — `undo` spans
+      // [1,4]–[16,14] (centre 8.5,9 of 12,12), which put a side-nav icon 1.7–2.5px off its label. Judged only against
+      // copy whose band the icon actually overlaps, so a calendar header chevron is never compared with a day number.
+      if (/^glyph·/.test(nm) && !isAnno(s) && par && r.h > 0) {
+        const gcy = r.y + r.h / 2;
+        const label = (kidsOf(par) || []).find((k) => {
+          if (!isText(k)) return false;
+          const q = box(k);
+          return q.h > 0 && r.y < q.y + q.h && r.y + r.h > q.y;
+        });
+        if (label) {
+          const lb = box(label), d = Math.abs(gcy - (lb.y + lb.h / 2));
+          if (d > 1.2) add('row_axis_off', s, st.top, 'icon centre ' + N(gcy) + ' is ' + N(d) + 'px off the copy beside it at ' +
+            N(lb.y + lb.h / 2) + ' — the glyph table centres its CELL, the row centres its INK (§7, repair: CF.glyph shifts by G_BOX)');
+        }
+      }
       if (!rec(s)) return;
       if (isCopy(s)) {
         const ib = typeOf(s) === 'board' ? s : null;

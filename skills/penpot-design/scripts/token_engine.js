@@ -1590,6 +1590,74 @@ return (function () {
     return Object.keys(TK._focusReport || {}).map((n) => Object.assign({ page: n }, TK._focusReport[n]));
   };
 
+  // ---------- §2.3 / §7 row-axis repair (`TK.axisSweep`) ----------
+  // The engine centres the INK at birth now (`CF.glyph` + `G_BOX`), but hosts drawn before that carry a displaced mark.
+  // Rebuilding a whole host to move one path is the wrong blast radius (a shell row would lose its context), so this
+  // pass does the minimal thing: for every `glyph·*` path and every `tail·`/`rail·` connector inside a control host,
+  // move it onto the axis of the copy / node it belongs to. Idempotent: a second pass finds nothing to move.
+  TK.axisStart = function (names) { TK._axisQueue = (names || TK.pageNames()).slice(); TK._axisReport = {}; return { queued: TK._axisQueue.length }; };
+  TK.axisSweep = async function (o) {
+    o = o || {};
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (!TK._axisQueue || !TK._axisQueue.length) TK.axisStart(null);
+    const CF = storage.CF;
+    const budget = o.budget === undefined ? 15000 : o.budget;
+    const t0 = Date.now(); const anomalies = []; let pages = 0, moved = 0, checked = 0, hosts = 0;
+    const kids = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    const nm = (s) => { try { return String(s.name || ''); } catch (e) { return ''; } };
+    const centre = (s) => s.y + (s.height || 0) / 2;
+    const overlaps = (a, b) => a.y < b.y + b.height && a.y + a.height > b.y;
+    while (TK._axisQueue.length && Date.now() - t0 < budget) {
+      const n = TK._axisQueue.shift(); pages++;
+      let page = null; try { page = penpotUtils.getPageByName(n); } catch (e) {}
+      if (!page) { anomalies.push({ page: n, err: 'no page' }); continue; }
+      if (penpot.currentPage.name !== page.name) { try { await penpot.openPage(page.id); } catch (e) { anomalies.push({ page: n, err: 'open failed' }); continue; } await nap(o.dry ? 60 : 160); }
+      let root = null; try { root = penpot.currentPage.root; } catch (e) {}
+      for (let i = 0; !root && i < 6; i++) { await nap(150); try { const rp = penpotUtils.getPageByName(n); root = rp && rp.root; } catch (e) {} }
+      if (!root) { anomalies.push({ page: n, err: 'no root (cold page)' }); TK._axisQueue.unshift(n); break; }
+      (function walk(s, d) {
+        if (d > 10) return;
+        kids(s).forEach((c) => {
+          const isCtl = c.type === 'board' && /·/.test(nm(c)) && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root /.test(nm(c));
+          if (isCtl) {
+            hosts++;
+            const ks = kids(c);
+            const texts = ks.filter((k) => k.type === 'text' && (k.height || 0) > 0);
+            // 1 · icons onto the axis of the copy they sit beside
+            ks.filter((k) => /^glyph·/.test(nm(k)) && (k.height || 0) > 0).forEach((g) => {
+              const label = texts.find((t) => overlaps(g, t));
+              if (!label) return;
+              checked++;
+              const dY = centre(label) - centre(g);
+              if (Math.abs(dY) <= 1.2) return;
+              // every path sharing this glyph's name is one mark (fill + line parts) — move them together
+              const parts = ks.filter((k) => /^glyph·/.test(nm(k)) && nm(k) === nm(g));
+              parts.forEach((p) => { if (!o.dry) { try { p.y = Math.round(p.y + dY); } catch (e) {} } });
+              moved++;
+              if (anomalies.length < (o.samples || 12)) anomalies.push({ page: n, host: nm(c).slice(0, 30), mark: nm(g).slice(0, 20), dy: +dY.toFixed(1) });
+            });
+            // 2 · connectors onto the axis of the nodes they join
+            const nodes = ks.filter((k) => /^node·/.test(nm(k)) && (k.height || 0) > 0);
+            if (nodes.length) {
+              const big = nodes.reduce((a, k) => (k.height > a.height ? k : a), nodes[0]);
+              ks.filter((k) => /^(tail·|rail·)/.test(nm(k)) && (k.height || 0) > 0 && k.height <= 6 && k.width > k.height).forEach((t) => {
+                checked++;
+                const dY = centre(big) - centre(t);
+                if (Math.abs(dY) <= 1) return;
+                if (!o.dry) { try { t.y = Math.round(t.y + dY); } catch (e) {} }
+                moved++;
+              });
+            }
+          }
+          walk(c, d + 1);
+        });
+      })(root, 0);
+      TK._axisReport[n] = { hosts: hosts, moved: moved };
+    }
+    return { pages: pages, remaining: TK._axisQueue.length, done: TK._axisQueue.length === 0, ms: Date.now() - t0,
+      total: { pages, hosts, checked, moved }, anomalies: anomalies.slice(0, o.samples || 12), anomalyCount: anomalies.length };
+  };
+
   // ---------- library typography styles: the 素材 → 排版 list ----------
   // Measured 2026-10-21: a file can hold 40 *active* `typography` tokens and still show an **empty** Typography
   // panel, because that panel lists `penpot.library.local.typographies` (the style records) — a different subsystem

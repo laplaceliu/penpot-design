@@ -814,6 +814,33 @@ return (function () {
   var GLYPH_ALIAS = { prev: 'chevronLeft', next: 'chevronRight', back: 'arrowLeft', forward: 'arrowRight',
     up: 'arrowUp', down: 'arrowDown', add: 'plus', remove: 'minus', more: 'dots', settings: 'dots',
     delete: 'trash', close: 'close', search: 'search' };
+  /** §7 The ARTWORK bbox of every glyph, in 24-grid units. The table is hand-authored, so the drawings are NOT
+      uniformly centred in their cell: `home`/`check`/`search` sit at (12,12), but `undo` spans [1,4]–[16,14] (centre
+      8.5,9), `redo` (15.5,9), `chart` (12,14), `bell` (12,11.35). `CF.glyph` used to centre the GRID in the slot, so
+      any off-centre artwork arrived at the row visibly displaced — measured on a side-nav `NavItem`: the icon centre
+      sat 1.7px above its label (and `undo`'s is 2.5px high + 2.9px left). Centring the ARTWORK fixes the whole table
+      at once and keeps working for glyphs added later. `o.rawGrid` opts out for a caller that wants the cell aligned. */
+  var G_BOX = (function () {
+    var out = {};
+    Object.keys(G).forEach(function (kind) {
+      var xs = [], ys = [];
+      var P = function (x, y) { xs.push(x); ys.push(y); };
+      (G[kind] || []).forEach(function (part) {
+        (part.p || []).forEach(function (s) {
+          if (typeof s === 'string') return;
+          if (s[0] === 'M' || s[0] === 'L') P(s[1], s[2]);
+          else if (s[0] === 'C') { P(s[3], s[4]); P(s[5], s[6]); }          // control points are not ink
+          else if (s[0] === 'O') { P(s[1] - s[3], s[2] - s[3]); P(s[1] + s[3], s[2] + s[3]); }
+          else if (s[0] === 'R') { P(s[1], s[2]); P(s[1] + s[3], s[2] + s[4]); }
+        });
+      });
+      if (!xs.length) return;
+      out[kind] = { x0: Math.min.apply(null, xs), x1: Math.max.apply(null, xs),
+                    y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys) };
+    });
+    return out;
+  })();
+  CF.glyphBox = G_BOX;
   /** Draw an icon mark at a world box → at most 2 path shapes (one filled group, one stroked group). */
   CF.glyph = function (ctx, kind, box, o) {
     o = o || {};
@@ -823,6 +850,9 @@ return (function () {
     if (!def) { warn('CF.glyph unknown kind "' + kind + '" (placeholder square drawn — add it to G)'); return ctx.plate(box, { name: 'glyph·' + kind, fill: o.color || P.muted, opacity: 0.25, radius: 'xs' }); }
     var size = min(box.w, box.h), k = size / 24;
     var ox = box.x + (box.w - 24 * k) / 2, oy = box.y + (box.h - 24 * k) / 2;
+    // §7 shift the grid so the INK is centred in the slot, not the cell
+    var gb = G_BOX[resolved];
+    if (gb && !o.rawGrid) { ox += (12 - (gb.x0 + gb.x1) / 2) * k; oy += (12 - (gb.y0 + gb.y1) / 2) * k; }
     var f = function (v) { return v.toFixed(2); };
     var dFill = '', dLine = '';
     def.forEach(function (part) {
