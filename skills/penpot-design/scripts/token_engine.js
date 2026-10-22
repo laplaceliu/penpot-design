@@ -1264,6 +1264,45 @@ return (function () {
       .map((n) => Object.assign({ page: n }, TK._ringReport[n]));
   };
 
+  // ---------- §2.3 fit a control host to its own content ----------
+  // `CF.estW` is an estimate, so a factory can draw a label 12px wider than the host it put it in. The file repairs
+  // that by growing the host AFTER the build (the old session did it with a throwaway `storage.fitHosts` that was never
+  // written down, so every rebuild silently reintroduced the overflow — measured 2026-10-22: rebuilt Breadcrumb hosts
+  // came back 11px narrow and their crumb text escaped). This is that pass, in the engine: chrome (`ring·`, `hitpad·`,
+  // `wash·`, shadows) is allowed to overhang; copy and plates are not.
+  TK.hostFit = function (sh) {
+    // `num` in this file is a ONE-ARGUMENT string parser (`num('12px') → 12`); reusing it as `num(shape,'x')` silently
+    // returned NaN for every child, so the pass computed "nothing escapes" and did nothing (measured 2026-10-22).
+    const n2 = (o, k, d) => { try { const v = Number(o[k]); return Number.isFinite(v) ? v : d; } catch (e) { return d; } };
+    let grew = 0;
+    // A crop is never fitted to its content — the overhang IS the effect, and `CF.keepClip` marks the ones the
+    // factories registered on purpose.
+    try { if (/^clip·/.test(String(sh.name || ''))) return 0; } catch (e) {}
+    try { if (storage._clipKeep && storage._clipKeep[String(sh.id)]) return 0; } catch (e) {}
+    try { if (typeof sh.clipContent === 'boolean' && sh.clipContent) return 0; } catch (e) {}
+    try {
+      const hb = { x: sh.x, y: sh.y, w: sh.width, h: sh.height };
+      let l = hb.x, t = hb.y, r = hb.x + hb.w, b = hb.y + hb.h;
+      Array.from(sh.children || []).forEach((c) => {
+        // `clip·` is a DELIBERATE crop (a half star, an avatar, a marquee): its child is authored to overhang, and
+        // growing the crop to its content destroys the effect (measured: fitting `clip·half` widened a half star back
+        // to a full one). `CF.keepClip` is the same registry the factories use to say "this clip is the design".
+        if (/^(ring·|hitpad·|wash·|shadow|glow|scrim|guide·|clip·)/.test(String(c.name || ''))) return;
+        const cx = n2(c, 'x', NaN), cy = n2(c, 'y', NaN), cw = n2(c, 'width', 0), ch = n2(c, 'height', 0);
+        if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
+        l = Math.min(l, cx); t = Math.min(t, cy);
+        r = Math.max(r, cx + cw); b = Math.max(b, cy + ch);
+      });
+      const w = Math.ceil(r - l), h = Math.ceil(b - t);
+      if (w > Math.ceil(hb.w) + 1 || h > Math.ceil(hb.h) + 1 || l < hb.x - 1 || t < hb.y - 1) {
+        const nx = Math.floor(l), ny = Math.floor(t);
+        if (storage.CF && storage.CF.move) { try { storage.CF.move(sh, nx, ny); } catch (e) {} }
+        try { sh.resize(Math.max(1, w), Math.max(1, h)); grew = 1; } catch (e) {}
+      }
+    } catch (e) {}
+    return grew;
+  };
+
   // ---------- §1.3 focus-expression sweep (`TK.focusSweep`, component-library §1.3 / rules 16 + 44) ----------
   // Two things changed in the engine: a ring is drawn on the focus UNIT (the box the factory passed), and a `reserved`
   // family expresses focus as an alpha-0 slot + a 12% `wash·focus`. Neither can be patched onto an OLD host by editing
@@ -1492,29 +1531,50 @@ return (function () {
           try { nh = await CF[key](props); } catch (e) { nh = null; }
           if (!nh) continue;
           probesN++;
-          // Same host, same slot. The live board may be WIDER/TALLER than a fresh factory build because the file was
-          // grown to fit its copy after the matrix placed it (`storage.fitHosts`) — the neighbours sit on those grown
-          // pitches, so the rebuilt host is resized back to the box it replaces. A probe that came out LARGER is a
-          // real mismatch (it would collide with the next column) and is discarded.
-          const same = nm(nh) === nm(host) && nh.width <= hb.w + 2 && nh.height <= hb.h + 2 &&
+          // grow the fresh host to its own copy BEFORE comparing it, or every rebuild reintroduces the overflow the
+          // file had already been fitted for (§2.3 `TK.hostFit`)
+          TK.hostFit(nh);
+          // Same host, same ROW AXIS. `CF.matrix` centres every cell on the row midline (`closeLine`), so the rebuilt
+          // host is placed by CENTRE, not by top-left: pasting at the old top silently moved a host that came out a
+          // few pixels shorter (measured 2026-10-22: a Checkbox grown to 24 by `fitHosts` and rebuilt at 20 left its
+          // content 2px high in the row). The box is NOT resized to the old one — a resize keeps the children where
+          // they were built and only stretches the frame, which is how the misalignment got in.
+          const same = nm(nh) === nm(host) && nh.width <= hb.w + 8 && nh.height <= hb.h + 8 &&
             nh.width >= Math.min(hb.w, 40) - 12 && nh.height >= Math.min(hb.h, 20) - 8;
           if (!same) { try { nh.remove(); } catch (e) {} continue; }
           if (o.dry) { try { nh.remove(); } catch (e) {} done = { row: r, need: v.need, would: true }; }
           else {
             try {
-              CF.move(nh, Math.round(hb.x), Math.round(hb.y));
-              if (Math.round(nh.width) !== Math.round(hb.w) || Math.round(nh.height) !== Math.round(hb.h)) {
-                try { nh.resize(Math.round(hb.w), Math.round(hb.h)); } catch (e) {}
-              }
-              host.remove(); removedIds.push(hid); done = { row: r, need: v.need, rebuilt: true };
+              CF.move(nh, Math.round(hb.x), Math.round(hb.y + hb.h / 2 - nh.height / 2));
+              // Removing a board in this Penpot build RE-PARENTS its loose children to the page root instead of
+              // deleting them (measured 2026-10-22: 8 Steps labels ended up as `root_stray` texts at 0,0 after a
+              // rebuild). Take the child ids first, then delete the host and anything that escaped with it.
+              const childIds = Array.from(host.children || []).map((c) => String(c.id));
+              host.remove(); removedIds.push(hid);
+              try {
+                const pr = penpot.currentPage.root;
+                Array.from((pr && pr.children) || []).forEach((c) => {
+                  if (childIds.indexOf(String(c.id)) >= 0) { try { c.remove(); } catch (e) {} }
+                });
+              } catch (e) {}
+              done = { row: r, need: v.need, rebuilt: true };
             }
             catch (e) { try { nh.remove(); } catch (e2) {} anomalies.push({ page: n, host: nm(host).slice(0, 34), err: 'move failed: ' + e.message }); }
           }
         }
         if (done) rebuiltN++; else { unresolvedN++; anomalies.push({ page: n, host: nm(host).slice(0, 34), need: v.need, err: 'no spec row reproduces this host (' + rows.length + ' tried)' }); }
       }
+      // A factory draws a node as an ellipse + a glyph sibling; the file's grouping is a POST-BUILD pass
+      // (`storage.groupAssemblies`, penpot-structure §4), so a rebuild that skips it leaves 40 `loose_assembly`
+      // findings behind. Run it on the page, then bind.
+      if (!o.dry && rebuiltN && typeof storage.groupAssemblies === 'function') {
+        try { storage.groupAssemblies(penpot.currentPage.root); } catch (e) { anomalies.push({ page: n, err: 'groupAssemblies: ' + e.message }); }
+      }
       let bind = { radius: 0 };
-      if (!o.dry && (rebuiltN || remountedN)) bind = await TK.bindPage(n, { only: 'radius', settle: 0, pageSettle: settle });
+      // A rebuilt host is a NEW shape tree: its copy carries no `tokens.typography` ref and its plates no
+      // colour ref, so this pass binds EVERYTHING — binding only `radius` left 134 `type_unbound` findings on
+      // page 08 after a structurally correct rebuild.
+      if (!o.dry && (rebuiltN || remountedN)) bind = await TK.bindPage(n, { settle: 0, pageSettle: settle });
       agg.pages++; agg.hosts += hostsN; agg.ok += okN; agg.rebuilt += rebuiltN; agg.remounted += remountedN; agg.probes += probesN;
       agg.unresolved += unresolvedN; agg.masters += mastersN; agg.copies += copiesN; agg.bound += bind.radius || 0;
       TK._focusReport[n] = { hosts: hostsN, ok: okN, rebuilt: rebuiltN, remounted: remountedN, probes: probesN, unresolved: unresolvedN, masters: mastersN, copies: copiesN, pending: TK._focusQueue.indexOf(n) >= 0 };

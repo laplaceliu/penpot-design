@@ -18,7 +18,10 @@ return (function () {
   // Layers that *deliberately* escape the box they sit in: a focus ring is drawn at a 2px offset, the §6 hit pad is
   // larger than the control it wraps, a scrim/shadow covers its sibling. They must never read as out_of_bounds, and
   // never as an assembly host or a centering target.
-  const OVER = /^(ring·|hitpad·|shadow|glow|scrim|state·layer|fold·|region·)/;
+  // Chrome, not assembly: a state overlay is authored to sit over/under the control it describes, so S11 must not
+  // demand it be grouped with the copy. `wash·` is §1.3's focus/state wash (component-library §1.3) — same class as
+  // `state·layer`; without it every reserved-family Focus host reads as 49 "loose" shapes.
+  const OVER = /^(ring·|hitpad·|shadow|glow|scrim|state·layer|wash·|fold·|region·)/;
   // A painted box a shape can sit on or in. Penpot reports rectangles as 'rect'; older code compared 'rectangle'.
   // Accepting both is not hedging — a missed spelling silently disables every plate-based signature below.
   const PLATE = (s) => s.type === 'rect' || s.type === 'rectangle' || s.type === 'ellipse';

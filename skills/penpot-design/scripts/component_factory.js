@@ -578,9 +578,14 @@ return (function () {
         if (fit.mountOutside && this.host && this.host.parent) mount = 'outside';
         mk = fit.box;
       }
-      // the perceivable half of a `reserved` focus state: the unit's 12% brand wash, under the row's own copy
-      if (mount !== 'outside' && role === 'reserved' && alpha < 0.05) {
-        var wp = this.plate(src, { name: 'wash·focus', fills: CF.fills(null, 'focus', { tint: true }), radius: r });
+      // the perceivable half of a `reserved` focus state: the unit's 12% brand wash, under the row's own copy.
+      // A FILLED plate belongs inside its control — an outline may overhang at its offset, a background may not
+      // (audit_layout `out_of_bounds`), so the wash is clamped to the host box while the boundary keeps the halo.
+      if (mount !== 'outside' && role === 'reserved' && alpha < 0.05 && hb) {
+        var wb = B(Math.max(src.x, hb.x), Math.max(src.y, hb.y),
+                   Math.max(4, Math.min(src.x + src.w, hb.x + hb.w) - Math.max(src.x, hb.x)),
+                   Math.max(4, Math.min(src.y + src.h, hb.y + hb.h) - Math.max(src.y, hb.y)));
+        var wp = this.plate(wb, { name: 'wash·focus', fills: CF.fills(null, 'focus', { tint: true }), radius: r });
         if (wp) { try { wp.sendToBack(); } catch (e) {} }
       }
       var opts = { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, strokeOpacity: alpha, radius: r };
@@ -3022,9 +3027,15 @@ return (function () {
       var xx = box.x + padX, ny0 = box.y + max(0, (h - bodyH) / 2);
       cells.forEach(function (c, i) {
         var cw2 = colW(c), nx = labelRight ? xx : xx + (cw2 - cs) / 2, ny = ny0;
-        node(nx, ny, c, i);
-        var inkc = c.status === 'wait' ? C('muted') : C('ink');
         var tLH = CF.lineH(fs, c.status === 'process' ? 600 : 400), dLH = CF.lineH(dfs);
+        // §2.3 ONE axis per row: the node, its connector and its label are centred on the same line. The band is
+        // `max(cs, tLH)` tall, so drawing the node at the band's TOP puts it above the line whenever the node is
+        // smaller than the copy — measured on `Steps·Dot·LG` (a 12px dot under a 20px label): node centres sat at 6
+        // while every `tail·bg` and label centre sat at 10, so the timeline read as a row of dots that had slipped out
+        // of its own connector.
+        var nyNode = labelRight ? N(ny + (max(cs, tLH) - cs) / 2) : ny;
+        node(nx, nyNode, c, i);
+        var inkc = c.status === 'wait' ? C('muted') : C('ink');
         if (labelRight) {
           ctx.text(c.title, B(xx + cs + 12, ny, titleW(c), max(cs, tLH)), { size: fs, color: inkc,
             weight: c.status === 'process' ? 600 : 400, align: 'left', valign: 'middle', refit: false });

@@ -124,6 +124,15 @@ indicts the system it describes is the wrong ladder; `LY.BREATH` documents the r
 app pages `max(viewport, content)`. Compute the height from band stacking (§ layout-library), never from a fixed canvas habit.
 A 1440×900 board containing 3 bands of content with dead space at the bottom is an amateur tell.
 
+### 2.3 One axis per row (nodes · connectors · copy)
+
+Inside a row, everything that shares the line is centred on **one** axis: `max(node size, line height)`. Anchoring the node
+to the band's TOP and the label to its middle is the defect a reviewer reads as "these are not aligned" — it only shows up
+when the node is *smaller* than the copy beside it. Measured 2026-10-22 on `Steps·Dot·LG`: a 12px step dot under a 20px
+label put the node centres at 6px and every connector and label centre at 10px, so the timeline's dots sat above their own
+connecting line. `CF.steps` centres `nyNode` on the band; the same rule binds any hand-built row (steppers, timelines,
+icon+label lists, avatar rows). Gated by rule 45 `row_axis_off`.
+
 ## 3. Typography
 
 ### 3.1 Family assignment
@@ -456,6 +465,7 @@ rounded: { none: 0px, sm: 4px, md: 8px, lg: 12px, xl: 16px, full: 9999px }
 | 43 | **§2.1** — a content separator drawn as a `divider`/`hairline` plate. Content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16 bound as `rowGap`/`columnGap`), never a 1px line whose absolute x/y drifts when the host refits. Functional boundaries and state indicators are named `boundary·*` / `underline·*` and are not judged. Removed from ListItem, TableHeader/Row/State, Accordion, Menu and the spec-matrix row/header hairlines in the Boedoxol file (285 plates total); Accordion/Menu now use a 12px internal gap | `divider_separator` |
 | 41 | **§12 (gate G17)** — *screen pages only*: a top-level content board at a tier baseline width with **no durable `nl:sc` / `nl:rec` stamp** — it was composed freehand, so there is no record of the source material it claims to recreate and the gate cannot be re-read in a later session. Rebuild with `SC.record(…)` then `SC.build(…)`. The **page-level half** of the same rule reports a Screens page where `storage.SC` was never seeded: **unprovable is REPORTED, not passed** — the contract rule 31 applies to G16. Judges top-level boards only, because a full-bleed band inside a screen is the same width as its host and would otherwise be counted as a second screen | `no_source_record` |
 | 44 | **component-library §1.3** — a `ring·*` boundary at `strokeOpacity < .05` (the slot a `reserved` composition authors) with **no visible focus layer** in the same control (`wash·focus` / `row·focus` / `node·focus` … at fill alpha ≥ .05, or a painting ring / ≥2px border). Hidden borders are the form; a hidden border **alone** is an invisible focus state, which WCAG 2.4.7 and §1.1 both reject — this is the rule that makes the `reserved` role safe to use. Measured before the rule existed: the old `focus_ring_missing` matched the **name** only, so a fully transparent box would have passed it | `focus_invisible` |
+| 45 | **§2.3** — a horizontal connector (`tail·*` / `rail·*` / `connector`) whose centre is not the centre of the nodes it joins. One row has ONE axis: the node, its connector and its copy are all centred on `max(node, line-height)`. A node anchored to the band's TOP slips out of its own line whenever it is smaller than the copy beside it — `Steps·Dot·LG` (a 12px dot under a 20px label) measured node centres 6 vs connector and label centres 10, which is what a reviewer calls "these are not aligned". `CF.steps` centres `nyNode`; a hand-built row must place the node ON the line | `row_axis_off` |
 
 **Rules 1/2 judge authored numbers, not arithmetic.** In a flow board the numbers the designer chose are the padding,
 the gap and the sizing declaration; the resulting coordinates and hug boxes are sums over font metrics (a 13px label is

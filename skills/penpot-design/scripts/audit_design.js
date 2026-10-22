@@ -86,7 +86,8 @@ return (function () {
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
-    focus_invisible: '§1.3 + WCAG 2.4.7 · a Focus control whose only focus evidence is a boundary at (near) zero alpha — `CF.FOCUS`\'s `reserved` role authors the ring as a SLOT (2px, the unit\'s corner, `strokeOpacity` 0) so a runtime can raise it, and the perceivable cue is the 12% brand state wash. A ghost boundary with no `wash·focus` / `row·focus` / `node·focus` … plate in the same control is an invisible focus state: it satisfies nothing. `ctx.ring` draws both halves for a reserved family; if only the boundary survives, the wash was dropped (repair: rebuild the host, or `TK.focusSweep`)',
+    focus_invisible: '§1.3 + WCAG 2.4.7 · a Focus control whose only focus evidence is a boundary at (near) zero alpha — `CF.FOCUS`\'s `reserved` role authors the ring as a SLOT (2px, the unit\'s corner, `strokeOpacity` 0) so a runtime can raise it, and the eye reads the 12% brand state wash. A ghost boundary with no `wash·focus` / `row·focus` / `node·focus` … plate in the same control is an invisible focus state: it satisfies nothing. `ctx.ring` draws both halves for a reserved family; if only the boundary survives, the wash was dropped (repair: rebuild the host, or `TK.focusSweep`)',
+    row_axis_off: '§2.3 · a horizontal connector (`tail·*` / `rail·*` / `connector`) whose centre is not the centre of the nodes it joins: one row has ONE axis, and a node smaller than its own label (a 12px step dot under a 20px line) drawn at the band\'s TOP slips out of its own connector (measured 2026-10-22 on `Steps·Dot·LG`: node centres 6px, connector and label centres 10px). Repair: `CF.steps` centres `nyNode` on `max(cs, tLH)`; anything drawn by hand must place the node on the line, not the line on the node',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
@@ -1003,6 +1004,22 @@ return (function () {
         } else {
           add('ring_detached', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' off host "' + nameOf(rh).slice(0, 30) +
             '" by ' + N(host.dist) + 'px — a drifted plate, not a corner disagreement (repair: TK.ringSweep)');
+        }
+      }
+      // rule 45 · row_axis_off — §2.3: one row has ONE axis. A horizontal connector must join the CENTRES of the nodes
+      // it runs between. A node drawn at the band's TOP slips out of its own line whenever the node is smaller than the
+      // copy beside it (a 12px step dot under a 20px label = 4px), which is what the eye reads as "these are not aligned".
+      if (/^(tail·|tail$|rail·|rail$|connector)/.test(nm) && !isAnno(s) && par) {
+        const cb = box(s);
+        if (cb.h > 0 && cb.h <= 6 && cb.w > cb.h) {
+          const nodes = (kidsOf(par) || []).filter((k) => /^node·/.test(nameOf(k)) && box(k).h >= cb.h);
+          if (nodes.length) {
+            const big = nodes.reduce((a, k) => (box(k).h > box(a).h ? k : a), nodes[0]);
+            const nb = box(big);
+            const d = Math.abs((cb.y + cb.h / 2) - (nb.y + nb.h / 2));
+            if (d > 1) add('row_axis_off', s, st.top, 'connector centre ' + N(cb.y + cb.h / 2) + ' is ' + N(d) +
+              'px off the "' + nameOf(big).slice(0, 20) + '" centre ' + N(nb.y + nb.h / 2) + ' — a row has one axis (§2.3)');
+          }
         }
       }
       if (!rec(s)) return;
