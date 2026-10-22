@@ -2398,10 +2398,15 @@ return (function () {
     var valW = items.reduce(function (a, it) {
       return (it.span || 1) === 1 ? max(a, CF.estW(String(it.value === undefined ? '—' : it.value), 14) + 4) : a;
     }, 0);
-    var need = lw + 8 + valW;
+    // The bordered label plate ends at `cx + lw + 8`; the value used to start exactly on that edge (0 gap, the copy
+    // seemed glued to the label cell). Give it one row-level breath from the ladder — 12 on web, `space.md`. The plain
+    // variant has no plate, so its existing 8px column gap stays.
+    var VGAP = LY && LY.breath ? LY.breath('row') : 12;
+    var valueDx = o.bordered ? lw + 8 + VGAP : lw + 8;
+    var need = valueDx + valW;
     var w = o.w || (padX * 2 + cols * need + cgap * (cols - 1));
     var cw = (w - padX * 2 - cgap * (cols - 1)) / cols;
-    if (cw < need) lw = max(56, cw - 8 - valW);
+    if (cw < need) lw = max(56, cw - 8 - (o.bordered ? VGAP : 0) - valW);
     var rowsUsed = items.reduce(function (a, it) { return a + (it.span || 1); }, 0);
     var rowCount = 0, acc = 0;
     items.forEach(function (it) { acc += (it.span || 1); if (acc >= cols) { rowCount++; acc = 0; } });
@@ -2421,9 +2426,12 @@ return (function () {
         // the tint is drawn after the bordered cell, so a flush box would paint over its 1px border (stroke_covered).
         ctx.plate(CF.inset(B(cx - 8, ry, lw + 16, rowH - 4), 1), { name: 'cell·label·' + i, fill: C('surfaceAlt'), radius: 'none' });
       }
-      ctx.text(String(it.label), B(cx, ry + 4, lw, rowH - 12), { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
-      ctx.text(String(it.value === undefined ? '—' : it.value), B(cx + lw + 8, ry + 4, max(valW, cellW - lw - 8), rowH - 12),
-        { size: 14, color: C('ink'), align: 'left', valign: 'top', refit: false });
+      // The text box is `rowH-12` tall, starting 4 below the cell top: its centre is the cell's centre, so the copy
+      // must be `middle`, not `top`. Measured 2026-10-22 on `Descriptions·Bordered·2col`: label/value centres sat 6px
+      // above the 40px cell centre because both were top-aligned.
+      ctx.text(String(it.label), B(cx, ry + 4, lw, rowH - 12), { size: 13, color: C('muted'), align: 'left', valign: 'middle', refit: false });
+      ctx.text(String(it.value === undefined ? '—' : it.value), B(cx + valueDx, ry + 4, max(valW, cellW - valueDx), rowH - 12),
+        { size: 14, color: C('ink'), align: 'left', valign: 'middle', refit: false });
       col += span;
       if (col >= cols) { col = 0; ry += rowH; }
     });
