@@ -87,7 +87,10 @@ return (function () {
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
     focus_invisible: '§1.3 + WCAG 2.4.7 · a Focus control whose only focus evidence is a boundary at (near) zero alpha — `CF.FOCUS`\'s `reserved` role authors the ring as a SLOT (2px, the unit\'s corner, `strokeOpacity` 0) so a runtime can raise it, and the eye reads the 12% brand state wash. A ghost boundary with no `wash·focus` / `row·focus` / `node·focus` … plate in the same control is an invisible focus state: it satisfies nothing. `ctx.ring` draws both halves for a reserved family; if only the boundary survives, the wash was dropped (repair: rebuild the host, or `TK.focusSweep`)',
-    row_axis_off: '§2.3 · a horizontal connector (`tail·*` / `rail·*` / `connector`) whose centre is not the centre of the nodes it joins: one row has ONE axis, and a node smaller than its own label (a 12px step dot under a 20px line) drawn at the band\'s TOP slips out of its own connector (measured 2026-10-22 on `Steps·Dot·LG`: node centres 6px, connector and label centres 10px). Repair: `CF.steps` centres `nyNode` on `max(cs, tLH)`; anything drawn by hand must place the node on the line, not the line on the node',
+    row_axis_off: '§2.3 + §7 · a horizontal connector (`tail·*` / `rail·*` / `connector`) whose centre is not the centre of the nodes it joins: one row has ONE axis, and a node smaller than its own label (a 12px step dot under a 20px line) drawn at the band\'s TOP slips out of its own connector (measured 2026-10-22 on `Steps·Dot·LG`: node centres 6px, connector and label centres 10px). Repair: `CF.steps` centres `nyNode` on `max(cs, tLH)`; anything drawn by hand must place the node on the line, not the line on the node',
+    overlay_in_flow: 'M8/§8 · an OVERLAY plate (`scrim*`, `overlay*`, `veil*`, `wash·*`, `ring·*`, `hitpad·*`) that is a NON-absolute child of a flex parent: an overlay is meant to sit ON its slot, but a flow child CONSUMES the slot — measured on `15 · Screens · content`, all 22 `scrim·region·*` plates were in-flow and half-height (468×315 inside a 468×700 media slot), so each one pushed the photograph it was supposed to darken down out of its own region. `CF` mounts its plates through `absMount` (absolute), so a factory cannot produce this and a hand-authored screen can. Repair: `absMount(parent, plate, parent.x, parent.y)`, and the media under it `sendToBack()`',
+    list_gap_split: '§2.1 · a control host whose repeated command/row labels are NOT uniformly spaced: the tightest gap REPEATS (that is the established row pitch) and one gap is more than 1px wider with NOTHING drawn in the extra space. A semantic group boundary (a `\'-\'` in a menu) that eats `space.md` after rule 43 removed its line reads as a mistake, not as grouping — measured on `Menu·IconStart`: label gaps 12 / 24 / 12 around DUPLICATE. Either mark the break with something visible (a `group` label row, or a functional `boundary·*` line, which rule 43 exempts) or give it no space at all, which is what `CF.menu` does now. Copy is read one level deep (a hovered row lives inside its `row·` group) and a host with no repeating pitch is NOT judged — an Accordion\'s 26/39/40 are header→body, body→header, header→header, three different relationships, not three rows with a hole',
+    media_stretched: 'M8 (media_engine) · a shape carrying a `fillImage` whose box ratio is more than 2% off the asset\'s own ratio — the photograph is being DISTORTED, not cropped. This build cannot ask for the crop: writing `fillFitMode: \'cover\'` succeeds and is silently dropped (the readback keeps only fillColor/fillOpacity/fillColorGradient/fillColorRefFile/fillColorRefId/fillImage), so Penpot falls back to `content` = stretch. Measured 2026-10-22 on `15 · Screens · content`: **30 of 30** images were stretched, worst 62% (a 1440×816 photo in a 468×700 gallery slot). The two legal forms are geometry: `MD.place({mode:\'fit\'})` sizes the shape to the asset ratio, `MD.place({mode:\'cover\'})` — the default when they disagree — builds a real MASK (`clip·` board with `clipContent`, the media inside at its own ratio scaled to cover and centred). Repair an existing file with `MD.refit`',
     frame_dead_band: '§3.3 + §2 · a control host whose border reserves a band its content never fills: one side\'s content inset is >= 32px AND >= 3x the opposite side (the frame is bigger than what it frames). Measured 2026-10-22 on `MiniCalendar·32cell`: the height formula used a hardcoded `rows: 6` while the drawn month (31 days starting on the first column) needs 5, and the loop `continue`d over every out-of-month slot, so the 6th row was empty and the grid\'s leading/trailing cells were never painted — inset bottom 49px vs top 7px. It is NOT a reservation for adjacent-month days: a reservation that is never filled is dead space. Repair: derive the frame from the content (`CF.miniCalendar` computes `need = ceil((firstWeekday + days) / 7)` and paints adjacent-month cells muted) or fill the band',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
@@ -847,6 +850,61 @@ return (function () {
       if (SCREEN && !isCopy(s) && isMediaSlot(nm) && !arr(s, 'fills').some((f) => f && f.fillImage)) {
         add('placeholder_media', s, st.top, '"' + nm + '" claims a raster slot but no fill carries `fillImage` — import the source asset with MD.place({ parent, slot, path }) (scripts/media_engine.js); the icon-glyph plate this replaces is a placeholder, not the user\'s image');
       }
+      // rule 49 · list_gap_split — repeated labels in one host share ONE rhythm. A wider gap is legal only when
+      // something is DRAWN in it (a group label, a boundary line); an empty wider gap is what the owner reads as
+      // "the padding is uneven" once rule 43 has removed the line that used to justify it.
+      // TWO DISCIPLINES KEEP THIS FROM INDICTING A LEGITIMATE HOST (both measured 2026-10-22):
+      //  · copy is read ONE LEVEL DEEP, because `groupAssemblies` wraps a hovered/selected row's label in a `row·`
+      //    group: reading direct children only made that row invisible and reported a 3-row host as 2 gaps.
+      //  · an outlier needs an ESTABLISHED PITCH — the smallest gap must repeat (≥2 rows at it). A host whose gaps
+      //    are all different has no rhythm to break: that is an Accordion (header→body 26, body→header 39, 40) or a
+      //    Popover (title→body 2, body→edge 0), where a "wider gap" is a different RELATIONSHIP, not a missing row.
+      if (typeOf(s) === 'board' && /·/.test(nm) && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root |^(fold|region)·/.test(nm) && !isAnno(s)) {
+        const kidsS = kidsOf(s) || [];
+        const flat = [];
+        kidsS.forEach((k) => { flat.push(k); (kidsOf(k) || []).forEach((c) => flat.push(c)); });
+        const labels = flat.filter((k) => isText(k) && box(k).h > 0).sort((a, b) => box(a).y - box(b).y);
+        const sameRow = (a, b) => Math.abs(box(a).h - box(b).h) <= 1 && Math.abs(box(a).x - box(b).x) <= 1;
+        // the run of consecutive labels that are siblings in the same column (a menu's items, a list's rows)
+        const run = [];
+        labels.forEach((k) => { if (!run.length || sameRow(run[run.length - 1], k)) run.push(k); });
+        if (run.length >= 3) {
+          const gaps = [];
+          for (let i3 = 1; i3 < run.length; i3++) gaps.push({ i: i3, v: box(run[i3]).y - box(run[i3 - 1]).b });
+          const lo = Math.min.apply(null, gaps.map((g) => g.v));
+          const repeats = gaps.filter((g) => Math.abs(g.v - lo) <= 1).length;
+          const bad = repeats >= 2 ? gaps.filter((g) => g.v > lo + 1).find((g) => {
+            const from = box(run[g.i - 1]).b, to = box(run[g.i]).y;
+            // anything painted between the two labels marks the break
+            return !flat.some((k) => { const q = box(k); return q.h > 0 && q.y >= from - 1 && q.b <= to + 1 &&
+              !(q.y === box(run[g.i - 1]).y && q.h === box(run[g.i - 1]).h) && !(q.y === box(run[g.i]).y && q.h === box(run[g.i]).h); });
+          }) : null;
+          if (bad) add('list_gap_split', s, st.top, 'label gaps ' + gaps.map((g) => N(g.v)).join('/') + ' — ' + repeats +
+            ' rows sit at ' + N(lo) + 'px but one carries nothing in its ' + N(bad.v - lo) +
+            'px of extra space: mark the break (a group label, a `boundary·*` line) or give it no space (§2.1)');
+        }
+      }
+      // rule 48 · overlay_in_flow — an overlay that takes part in the flow is a second content block, not a veil.
+      // NOTE: judged on the plate's OWN name, not `isAnno(s)` — that helper also reads the ancestor chain, and an
+      // overlay lives inside a `region·…` pane, so using it here would blind the rule to exactly its whole target class.
+      if (/^(scrim|overlay|veil|wash·|ring·|hitpad·)/.test(nm) && par && !ANNO.test(nm)) {
+        let pflex = false, abs = true;
+        try { pflex = !!(par.flex && String(par.flex.dir) !== 'none'); } catch (e) {}
+        try { abs = !!(s.layoutChild && s.layoutChild.absolute); } catch (e) {}
+        if (pflex && !abs) add('overlay_in_flow', s, st.top, '"' + nm.slice(0, 26) + '" is a ' + N(r.w) + '\u00d7' + N(r.h) +
+          ' overlay laid OUT inside "' + nameOf(par).slice(0, 22) + '" instead of covering it — it consumes ' +
+          N(r.h) + 'px of the slot its sibling was authored to fill');
+      }
+      // rule 47 · media_stretched (M8) — an image fill is being stretched instead of cropped. Judged on the
+      // ASSET's own numbers, which the fill record carries, so no registry read is needed.
+      const imFill = arr(s, 'fills').find((f) => f && f.fillImage && f.fillImage.width && f.fillImage.height);
+      if (imFill && r.h > 0) {
+        const ia = imFill.fillImage.width / imFill.fillImage.height;
+        const d = Math.abs((r.w / r.h) / ia - 1) * 100;
+        if (d > 2) add('media_stretched', s, st.top, imFill.fillImage.name + ' ' + imFill.fillImage.width + '\u00d7' +
+          imFill.fillImage.height + ' painted into ' + N(r.w) + '\u00d7' + N(r.h) + ' \u2014 ' + N(d) +
+          '% off the asset ratio: place it with MD.place({mode:"cover"}) (a clip\u00b7 mask) or "fit"');
+      }
       if (isText(s)) { auditText(s, st, par); return; }
 
       // level 1 (composed layout only): grid + radius nesting
@@ -892,15 +950,22 @@ return (function () {
         })();
         const hugW = (function () { try { return String(s.horizontalSizing) === 'auto'; } catch (e) { return false; } })();
         const hugH = (function () { try { return String(s.verticalSizing) === 'auto'; } catch (e) { return false; } })();
-        if (isPlate(s) || !fam) {                                  // a CF control host's own size is ladder- or content-derived
-          // A device viewport (375, 834) is a hardware fact, not a coordinate the designer chose — §1 does not bind it.
-          const devw = [LY.TIERS.web.w, LY.TIERS.pad.w, LY.TIERS.mobile.w];
-          if (!hugW && r.w > CFG.hairline && devw.indexOf(N(r.w)) < 0 && Math.abs(LY.snap(r.w) - r.w) > 0.5) axes.push('w=' + N(r.w));   // epsilon: penpot.group bbox math leaves 1e-13 residue
-          if (!hugH && r.h > CFG.hairline && Math.abs(LY.snap(r.h) - r.h) > 0.5) axes.push('h=' + N(r.h));
-        }
-        if (r.w > CFG.hairline && r.h > CFG.hairline && !flowChild && !shelfPlaced) {
-          if (!centered('x') && Math.abs(LY.snap(r.x - pr.x) - (r.x - pr.x)) > 0.5) axes.push('x=' + N(r.x - pr.x));
-          if (!centered('y') && Math.abs(LY.snap(r.y - pr.y) - (r.y - pr.y)) > 0.5) axes.push('y=' + N(r.y - pr.y));
+        // M8: inside a `clip·` crop, EVERYTHING is derived arithmetic — the painted media is the slot scaled by
+        // `max(slotW/imgW, slotH/imgH)` and centred, so its size and offset are fractions of an aspect ratio
+        // (measured: `img·hero-media-0` 1235×700 at x −383 inside a 468×700 mask). §1 binds the numbers the designer
+        // typed; the mask's own box is one of those, the crop inside it is not.
+        const inCrop = (function () { try { return /^clip·/.test(nameOf(par)) || !!(par && par.clipContent); } catch (e) { return false; } })();
+        if (!inCrop) {
+          if (isPlate(s) || !fam) {                                  // a CF control host's own size is ladder- or content-derived
+            // A device viewport (375, 834) is a hardware fact, not a coordinate the designer chose — §1 does not bind it.
+            const devw = [LY.TIERS.web.w, LY.TIERS.pad.w, LY.TIERS.mobile.w];
+            if (!hugW && r.w > CFG.hairline && devw.indexOf(N(r.w)) < 0 && Math.abs(LY.snap(r.w) - r.w) > 0.5) axes.push('w=' + N(r.w));   // epsilon: penpot.group bbox math leaves 1e-13 residue
+            if (!hugH && r.h > CFG.hairline && Math.abs(LY.snap(r.h) - r.h) > 0.5) axes.push('h=' + N(r.h));
+          }
+          if (r.w > CFG.hairline && r.h > CFG.hairline && !flowChild && !shelfPlaced) {
+            if (!centered('x') && Math.abs(LY.snap(r.x - pr.x) - (r.x - pr.x)) > 0.5) axes.push('x=' + N(r.x - pr.x));
+            if (!centered('y') && Math.abs(LY.snap(r.y - pr.y) - (r.y - pr.y)) > 0.5) axes.push('y=' + N(r.y - pr.y));
+          }
         }
         if (axes.length) add('off_grid', s, st.top, axes.join(' ') + ' off the 4px grid');
       }
@@ -1058,16 +1123,30 @@ return (function () {
       // [1,4]–[16,14] (centre 8.5,9 of 12,12), which put a side-nav icon 1.7–2.5px off its label. Judged only against
       // copy whose band the icon actually overlaps, so a calendar header chevron is never compared with a day number.
       if (/^glyph·/.test(nm) && !isAnno(s) && par && r.h > 0) {
-        const gcy = r.y + r.h / 2;
-        const label = (kidsOf(par) || []).find((k) => {
-          if (!isText(k)) return false;
-          const q = box(k);
-          return q.h > 0 && r.y < q.y + q.h && r.y + r.h > q.y;
+        // a mark is TWO shapes (`…·fill` + `…·line`) whose ink bboxes differ, so the axis is their UNION — but this is
+        // judged ONLY in a host that owns exactly ONE mark and at least one label (Button, Chip, Alert, NavItem): in a
+        // multi-row host (Tree, Menu, Accordion) every pairing rule I can invent is wrong somewhere — by name it
+        // merges five rows into one mark, by bbox intersection a stroked path still reaches across the row. Those
+        // hosts are corrected by rebuilding them from the factory, not by comparing siblings.
+        const sibs = (kidsOf(par) || []).filter((k) => /^glyph·/.test(nameOf(k)) && box(k).h > 0);
+        const kind = nm.replace(/·(fill|line)$/, '');
+        const sameKind = sibs.filter((k) => kind === nameOf(k).replace(/·(fill|line)$/, ''));
+        const labels0 = (kidsOf(par) || []).filter((k) => isText(k) && box(k).h > 0);
+        const nested = sameKind.length <= 1 || sameKind.every((p) => {
+          const q = box(p);
+          return !(Math.max(q.x, r.x) > Math.min(q.x + q.w, r.x + r.w) || Math.max(q.y, r.y) > Math.min(q.y + q.h, r.y + r.h));
         });
-        if (label) {
-          const lb = box(label), d = Math.abs(gcy - (lb.y + lb.h / 2));
-          if (d > 1.2) add('row_axis_off', s, st.top, 'icon centre ' + N(gcy) + ' is ' + N(d) + 'px off the copy beside it at ' +
-            N(lb.y + lb.h / 2) + ' — the glyph table centres its CELL, the row centres its INK (§7, repair: CF.glyph shifts by G_BOX)');
+        if (sibs.length <= 2 && nested && labels0.length === 1) {
+          let y0 = r.y, y1 = r.b;
+          sameKind.forEach((p) => { const q = box(p); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y + q.h); });
+          const gcy = (y0 + y1) / 2;
+          const label = labels0.filter((k) => { const q = box(k); return y0 < q.y + q.h && y1 > q.y; })
+            .sort((a, b) => Math.abs(box(a).x - r.x) - Math.abs(box(b).x - r.x))[0];
+          if (label) {
+            const lb = box(label), d = Math.abs(gcy - (lb.y + lb.h / 2));
+            if (d > 1.2) add('row_axis_off', s, st.top, 'icon "' + kind.slice(0, 18) + '" centre ' + N(gcy) + ' is ' + N(d) + 'px off the copy beside it at ' +
+              N(lb.y + lb.h / 2) + ' — the glyph table centres its CELL, the row centres its INK (§7, repair: CF.glyph shifts by G_BOX)');
+          }
         }
       }
       if (!rec(s)) return;

@@ -673,7 +673,11 @@ return (function () {
     var w = o.w || 1440, bandsSpec = [
       { key: 'nav', h: 72 }, { key: 'hero', h: 900 }, { key: 'works', h: 1500 }, { key: 'services', h: 1600 },
       { key: 'quote', h: 900 }, { key: 'skills', h: 1100 }, { key: 'stats', h: 900 }, { key: 'philosophy', h: 900 },
-      { key: 'journal', h: 1300 }, { key: 'footer', h: 900 }];
+      { key: 'journal', h: 1300 },
+      // §2 a band is only as tall as what the recipe puts in it. The footer here ends at `footer.legal`
+      // (+500 +120 = 620); declaring 900 left 280px of empty board under the last region, which `audit_design`
+      // rule 46 (`frame_dead_band`) now fails — measured on `Screen·home` in the live file.
+      { key: 'footer', h: 620 }];
     var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
     var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
     var b = fl.bands, M = 72, W = w - M * 2;
@@ -707,7 +711,10 @@ return (function () {
   };
   RECIPES.worksIndex = function (o) {
     o = o || {};
-    var w = o.w || 1440, bandsSpec = [{ key: 'nav', h: 72 }, { key: 'header', h: 300 }, { key: 'grid', h: 1752 }, { key: 'footer', h: 900 }];
+    var w = o.w || 1440, bandsSpec = [{ key: 'nav', h: 72 }, { key: 'header', h: 300 }, { key: 'grid', h: 1752 },
+      // §2 the footer band holds one 300px region inset 96 → 396; the 900 it used to declare left 504px of empty
+      // board under the page (rule 46 `frame_dead_band`, measured on `Screen·works`).
+      { key: 'footer', h: 396 }];
     var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
     var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
     var b = fl.bands, M = 72, W = w - M * 2;
@@ -720,7 +727,9 @@ return (function () {
   };
   RECIPES.journalIndex = function (o) {
     o = o || {};
-    var w = o.w || 1440, bandsSpec = [{ key: 'nav', h: 72 }, { key: 'header', h: 300 }, { key: 'grid', h: 1064 }, { key: 'pagination', h: 120 }, { key: 'footer', h: 900 }];
+    var w = o.w || 1440, bandsSpec = [{ key: 'nav', h: 72 }, { key: 'header', h: 300 }, { key: 'grid', h: 1064 }, { key: 'pagination', h: 120 },
+      // §2 396, not 900 — see `worksIndex`: the band carries one 300px region inset 96 (rule 46).
+      { key: 'footer', h: 396 }];
     var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
     var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
     var b = fl.bands, M = 72, W = w - M * 2;

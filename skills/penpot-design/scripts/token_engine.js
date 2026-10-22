@@ -1623,19 +1623,34 @@ return (function () {
             hosts++;
             const ks = kids(c);
             const texts = ks.filter((k) => k.type === 'text' && (k.height || 0) > 0);
-            // 1 · icons onto the axis of the copy they sit beside
-            ks.filter((k) => /^glyph·/.test(nm(k)) && (k.height || 0) > 0).forEach((g) => {
-              const label = texts.find((t) => overlaps(g, t));
-              if (!label) return;
-              checked++;
-              const dY = centre(label) - centre(g);
-              if (Math.abs(dY) <= 1.2) return;
-              // every path sharing this glyph's name is one mark (fill + line parts) — move them together
-              const parts = ks.filter((k) => /^glyph·/.test(nm(k)) && nm(k) === nm(g));
-              parts.forEach((p) => { if (!o.dry) { try { p.y = Math.round(p.y + dY); } catch (e) {} } });
-              moved++;
-              if (anomalies.length < (o.samples || 12)) anomalies.push({ page: n, host: nm(c).slice(0, 30), mark: nm(g).slice(0, 20), dy: +dY.toFixed(1) });
-            });
+            // 1 · icons onto the axis of the copy they sit beside. Judged ONLY in a host with exactly ONE mark (its
+            // `…·fill` + `…·line` parts) and at least one label: Button, Chip, Alert, NavItem… — the single-line
+            // controls a person actually reads. In a multi-row host (Tree, Menu, Accordion) any pairing rule I can
+            // invent is wrong somewhere: grouping by name merged five rows into one mark (dy −63.7), grouping by bbox
+            // intersection still merged them because a path's bbox carries its stroke. Those hosts are fixed by
+            // REBUILDING them from the factory, never by搬运 the parts.
+            const kindOf = (s) => nm(s).replace(/·(fill|line)$/, '');
+            const glyphs = ks.filter((k) => /^glyph·/.test(nm(k)) && (k.width || 0) > 0 && (k.height || 0) > 0);
+            // one mark, one label: 1–2 parts that share their space (the `…·fill` dot sits inside the `…·line` circle),
+            // and exactly ONE text in the host. An Accordion/Tree has a text per row, so no pairing is provable there.
+            const nested = glyphs.length === 1 || (glyphs.length === 2 && !(
+              Math.max(glyphs[0].x, glyphs[1].x) > Math.min(glyphs[0].x + glyphs[0].width, glyphs[1].x + glyphs[1].width) ||
+              Math.max(glyphs[0].y, glyphs[1].y) > Math.min(glyphs[0].y + glyphs[0].height, glyphs[1].y + glyphs[1].height)));
+            if (glyphs.length && glyphs.length <= 2 && nested && texts.length === 1) {
+              const y0 = Math.min.apply(null, glyphs.map((p) => p.y));
+              const y1 = Math.max.apply(null, glyphs.map((p) => p.y + p.height));
+              const label = texts.filter((t) => t.y < y1 && t.y + t.height > y0)
+                .sort((a, b) => Math.abs(a.x - glyphs[0].x) - Math.abs(b.x - glyphs[0].x))[0];
+              if (label) {
+                checked++;
+                const dY = centre(label) - (y0 + y1) / 2;
+                if (Math.abs(dY) > 1.2) {
+                  moved++;
+                  if (anomalies.length < (o.samples || 12)) anomalies.push({ page: n, host: nm(c).slice(0, 30), mark: kindOf(glyphs[0]).slice(0, 24), parts: glyphs.length, dy: +dY.toFixed(1) });
+                  if (!o.dry) glyphs.forEach((p) => { try { p.y = Math.round(p.y + dY); } catch (e) {} });
+                }
+              }
+            }
             // 2 · connectors onto the axis of the nodes they join
             const nodes = ks.filter((k) => /^node·/.test(nm(k)) && (k.height || 0) > 0);
             if (nodes.length) {
@@ -1656,6 +1671,124 @@ return (function () {
     }
     return { pages: pages, remaining: TK._axisQueue.length, done: TK._axisQueue.length === 0, ms: Date.now() - t0,
       total: { pages, hosts, checked, moved }, anomalies: anomalies.slice(0, o.samples || 12), anomalyCount: anomalies.length };
+  };
+
+  // `CF.matrix` centres every cell on its ROW MIDLINE (`closeLine` → `ln.top + ln.h/2 − host.height/2`), and the row
+  // caption on the left is drawn on the same line. So closing 12px INSIDE a host without re-anchoring it slides the
+  // cell off the axis the sheet was built on (measured 2026-10-22: 6px of drift on all 12 Menu hosts). The caption is
+  // the only record of that midline in the file, so it is the anchor: a sibling text that sits LEFT of the host and
+  // is already within 8px of its centre is the row label, and the host is placed back on it.
+  TK.centreOnRow = function (host) {
+    const n2 = (o, k, d) => { try { const v = Number(o[k]); return Number.isFinite(v) ? v : d; } catch (e) { return d; } };
+    let par = null; try { par = host.parent; } catch (e) {}
+    if (!par) return 0;
+    let ks = null; try { ks = Array.from(par.children || []); } catch (e) { return 0; }
+    const hc = n2(host, 'y', 0) + n2(host, 'height', 0) / 2;
+    const cap = ks.filter((k) => k !== host && k.type === 'text' && n2(k, 'height', 0) > 0)
+      .map((k) => ({ k: k, c: n2(k, 'y', 0) + n2(k, 'height', 0) / 2, left: n2(k, 'x', 0) + n2(k, 'width', 0) <= n2(host, 'x', 0) + 1 }))
+      .filter((o) => o.left && Math.abs(o.c - hc) <= 8)
+      .sort((a, b) => Math.abs(a.c - hc) - Math.abs(b.c - hc))[0];
+    if (!cap) return 0;
+    const d = Math.round(cap.c - hc);
+    if (!d) return 0;
+    try { host.y = n2(host, 'y', 0) + d; return d; } catch (e) { return 0; }
+  };
+
+  // ---------- §2.1 list-rhythm repair (`TK.gapSweep`, rule 49) ----------
+  // `CF.menu` used to give a `'-'` divider row a `space.md` of EMPTY space. Rule 43 then removed the line, so what is
+  // left is a hole with nothing in it: measured 2026-10-22 on all 12 `Menu·*` hosts, label gaps 12 / 24 / 12. The
+  // engine now gives a divider zero height, but rebuilding a host to close 12px is the wrong blast radius (a spec
+  // board row would lose its wash/ring/grouping passes), so this pass does the arithmetic the factory stopped doing:
+  // find the wider gap, check nothing is PAINTED in it (same test rule 49 uses), move the rows below it up by the
+  // excess, and take the same amount off the host. Idempotent — after a pass the gaps are uniform, so `cuts` is empty.
+  TK.gapFlatten = function (host, o) {
+    o = o || {};
+    const kids = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    const direct = kids(host);
+    const flat = [];
+    direct.forEach((k) => { flat.push(k); kids(k).forEach((c) => flat.push(c)); });
+    const ks = flat;
+    const hostH = Number(host.height) || 0;
+    const run = flat.filter((k) => k.type === 'text' && (Number(k.height) || 0) > 0)
+      .sort((a, b) => a.y - b.y);
+    if (run.length < 3) return null;
+    const sameCol = (a, b) => Math.abs(a.height - b.height) <= 1 && Math.abs(a.x - b.x) <= 1;
+    const col = [];
+    run.forEach((k) => { if (!col.length || sameCol(col[col.length - 1], k)) col.push(k); });
+    if (col.length < 3) return null;
+    const gaps = [];
+    for (let i = 1; i < col.length; i++) gaps.push({ i: i, v: col[i].y - (col[i - 1].y + col[i - 1].height) });
+    const lo = Math.min.apply(null, gaps.map((g) => g.v));
+    // an outlier is only a broken RHYTHM when the smallest gap repeats (rule 49). An Accordion's 26/39/40 are three
+    // different relationships (header→body, body→next header), not three rows with one hole, and must stay untouched.
+    const repeats = gaps.filter((g) => Math.abs(g.v - lo) <= 1).length;
+    if (repeats < 2) return null;
+    const cuts = gaps.filter((g) => g.v > lo + 1).filter((g) => {
+      const from = col[g.i - 1].y + col[g.i - 1].height, to = col[g.i].y;
+      return !ks.some((k) => {
+        const q = { y: Number(k.y) || 0, h: Number(k.height) || 0 };
+        return q.h > 0 && q.y >= from - 1 && q.y + q.h <= to + 1 &&
+          !(q.y === col[g.i - 1].y && q.h === col[g.i - 1].height) && !(q.y === col[g.i].y && q.h === col[g.i].height);
+      });
+    }).map((g) => ({ at: col[g.i].y + col[g.i].height / 2, excess: g.v - lo }));
+    if (!cuts.length) return null;
+    const shiftFor = (k) => {
+      if ((Number(k.height) || 0) >= hostH - 2) return 0;   // spans the host (a rail, a backdrop): it is not a row
+      const c = (Number(k.y) || 0) + (Number(k.height) || 0) / 2;
+      return cuts.filter((x) => c >= x.at - 0.5).reduce((a, x) => a + x.excess, 0);
+    };
+    let moved = 0;
+    // ONE MOVE PER ROW UNIT, and only direct children: a hovered row's label is inside its `row·` group, so moving
+    // the group moves the copy — walking the flattened set would move both and overshoot by the full excess.
+    if (!o.dry) direct.forEach((k) => { const d = shiftFor(k); if (d > 0) { try { k.y = Math.round(k.y - d); moved++; } catch (e) {} } });
+    const total = cuts.reduce((a, x) => a + x.excess, 0);
+    let resized = 0;
+    if (!o.dry && total > 0) { try { host.resize(Number(host.width), hostH - total); resized = 1; } catch (e) {} }
+    // the host keeps its place on its row: `CF.matrix` centred it on the row midline, and closing empty space
+    // inside it must not slide the whole cell off that axis.
+    if (!o.dry && resized && TK.centreOnRow) TK.centreOnRow(host);
+    return { host: String(host.name || ''), gaps: gaps.map((g) => Math.round(g.v)), cuts: cuts.length, excess: total,
+      moved: moved, resized: resized };
+  };
+  TK.gapStart = function (names) { TK._gapQueue = (names || TK.pageNames()).slice(); TK._gapReport = {}; return { queued: TK._gapQueue.length }; };
+  TK.gapSweep = async function (o) {
+    o = o || {};
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (!TK._gapQueue || !TK._gapQueue.length) TK.gapStart(null);
+    const budget = o.budget === undefined ? 15000 : o.budget;
+    const t0 = Date.now(); const anomalies = []; let pages = 0, hosts = 0, repaired = 0, shapes = 0, resized = 0;
+    const kids = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    const nm = (s) => { try { return String(s.name || ''); } catch (e) { return ''; } };
+    const SPECISH = /·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root |^(fold|region)·/;
+    while (TK._gapQueue.length && Date.now() - t0 < budget) {
+      const n = TK._gapQueue.shift(); pages++;
+      let page = null; try { page = penpotUtils.getPageByName(n); } catch (e) {}
+      if (!page) { anomalies.push({ page: n, err: 'no page' }); continue; }
+      if (penpot.currentPage.name !== page.name) { try { await penpot.openPage(page.id); } catch (e) { anomalies.push({ page: n, err: 'open failed' }); continue; } await nap(o.dry ? 60 : 160); }
+      let root = null; try { root = penpot.currentPage.root; } catch (e) {}
+      for (let i = 0; !root && i < 6; i++) { await nap(150); try { const rp = penpotUtils.getPageByName(n); root = rp && rp.root; } catch (e) {} }
+      if (!root) { anomalies.push({ page: n, err: 'no root (cold page)' }); TK._gapQueue.unshift(n); break; }
+      (function walk(s, d, anno) {
+        if (d > 10) return;
+        kids(s).forEach((c) => {
+          const isAnno = anno || /^(fold·|region·)/.test(nm(c));
+          if (c.type === 'board' && /·/.test(nm(c)) && !SPECISH.test(nm(c)) && !isAnno) {
+            hosts++;
+            const r = TK.gapFlatten(c, o);
+            if (r) { repaired++; shapes += r.moved; resized += r.resized;
+              if (anomalies.length < (o.samples || 12)) anomalies.push(Object.assign({ page: n }, r)); }
+          }
+          walk(c, d + 1, isAnno);
+        });
+      })(root, 0, false);
+      TK._gapReport[n] = { hosts: hosts, repaired: repaired };
+    }
+    return { pages: pages, remaining: TK._gapQueue.length, done: TK._gapQueue.length === 0, ms: Date.now() - t0,
+      total: { pages, hosts, repaired, shapes, resized }, anomalies: anomalies.slice(0, o.samples || 12), anomalyCount: anomalies.length };
+  };
+  TK.gapPages = function () {
+    return Object.keys(TK._gapReport || {}).filter((n) => TK._gapReport[n].repaired)
+      .map((n) => Object.assign({ page: n }, TK._gapReport[n]));
   };
 
   // ---------- library typography styles: the 素材 → 排版 list ----------

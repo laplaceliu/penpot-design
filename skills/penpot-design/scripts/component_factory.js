@@ -3115,7 +3115,11 @@ return (function () {
     o = o || {};
     var raw = o.items || ['Edit', 'Duplicate', '-', 'Share', 'Delete'];
     var w = o.w || 220, itemH = o.itemH || 32, padX = o.padX === undefined ? 12 : o.padX, padV = o.padV === undefined ? 4 : o.padV;
-    var itemGap = LY && LY.breath ? LY.breath('row') : 12;   // group separation is a gap, not a divider row
+    // §2.1 A `'-'` in the items list is a SEMANTIC group boundary, not a spacer: it draws nothing and takes no
+    // vertical space, so every command row keeps the same rhythm. Measured on `Menu·IconStart`, giving it a
+    // `space.md` gap made the label gaps 12 / 24 / 12 — the owner read that as uneven padding, and with rule 43
+    // having removed the line there is no marker left to justify the hole. When a break must be SEEN, use the
+    // `group` row (a 24px label) or a functional `boundary·group` line, which rule 43 exempts.
     var hasIcons = o.icon !== false, hasKeys = !!o.keys;
     var rows = raw.map(function (it) {
       if (it === '-' || it === null) return { kind: 'divider' };
@@ -3124,7 +3128,7 @@ return (function () {
       return Object.assign({ kind: 'item' }, it);
     });
     var h = padV * 2;
-    rows.forEach(function (r) { h += r.kind === 'divider' ? itemGap : (r.kind === 'group' ? 24 : itemH); });
+    rows.forEach(function (r) { h += r.kind === 'divider' ? 0 : (r.kind === 'group' ? 24 : itemH); });
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('Menu', { type: o.variant === 'submenu' ? 'Submenu' : (o.selectable ? 'Selectable' : null), state: o.state,
       // the leading 16px glyph column IS the menu's icon slot, so the host name has to say so (§4 coverage reads names).
@@ -3137,7 +3141,7 @@ return (function () {
     var rowB = null;
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      if (r.kind === 'divider') { y += itemGap; continue; }
+      if (r.kind === 'divider') { continue; }   // no spacer, no plate — see the §2.1 note above
       if (r.kind === 'group') {
         ctx.text(String(r.label).toUpperCase(), B(box.x + padX, y, box.w - padX * 2, 24),
           { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
