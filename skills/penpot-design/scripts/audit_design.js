@@ -88,6 +88,7 @@ return (function () {
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
     focus_invisible: '§1.3 + WCAG 2.4.7 · a Focus control whose only focus evidence is a boundary at (near) zero alpha — `CF.FOCUS`\'s `reserved` role authors the ring as a SLOT (2px, the unit\'s corner, `strokeOpacity` 0) so a runtime can raise it, and the eye reads the 12% brand state wash. A ghost boundary with no `wash·focus` / `row·focus` / `node·focus` … plate in the same control is an invisible focus state: it satisfies nothing. `ctx.ring` draws both halves for a reserved family; if only the boundary survives, the wash was dropped (repair: rebuild the host, or `TK.focusSweep`)',
     row_axis_off: '§2.3 · a horizontal connector (`tail·*` / `rail·*` / `connector`) whose centre is not the centre of the nodes it joins: one row has ONE axis, and a node smaller than its own label (a 12px step dot under a 20px line) drawn at the band\'s TOP slips out of its own connector (measured 2026-10-22 on `Steps·Dot·LG`: node centres 6px, connector and label centres 10px). Repair: `CF.steps` centres `nyNode` on `max(cs, tLH)`; anything drawn by hand must place the node on the line, not the line on the node',
+    frame_dead_band: '§3.3 + §2 · a control host whose border reserves a band its content never fills: one side\'s content inset is >= 32px AND >= 3x the opposite side (the frame is bigger than what it frames). Measured 2026-10-22 on `MiniCalendar·32cell`: the height formula used a hardcoded `rows: 6` while the drawn month (31 days starting on the first column) needs 5, and the loop `continue`d over every out-of-month slot, so the 6th row was empty and the grid\'s leading/trailing cells were never painted — inset bottom 49px vs top 7px. It is NOT a reservation for adjacent-month days: a reservation that is never filled is dead space. Repair: derive the frame from the content (`CF.miniCalendar` computes `need = ceil((firstWeekday + days) / 7)` and paints adjacent-month cells muted) or fill the band',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
@@ -1019,6 +1020,36 @@ return (function () {
             const d = Math.abs((cb.y + cb.h / 2) - (nb.y + nb.h / 2));
             if (d > 1) add('row_axis_off', s, st.top, 'connector centre ' + N(cb.y + cb.h / 2) + ' is ' + N(d) +
               'px off the "' + nameOf(big).slice(0, 20) + '" centre ' + N(nb.y + nb.h / 2) + ' — a row has one axis (§2.3)');
+          }
+        }
+      }
+      // rule 46 · frame_dead_band — a border that reserves more than its content ever uses. The frame is not a
+      // placeholder for a band nobody paints: measured on `MiniCalendar·32cell`, a hardcoded 6-row height around a
+      // 5-row month left 49px of empty sheet under the last row while the top inset was 7px.
+      if (typeOf(s) === 'board' && /·/.test(nm) && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root |^(fold|region)·/.test(nm) && !isAnno(s)) {
+        const kb = box(s);
+        let cl = Infinity, ct = Infinity, cr = -Infinity, cb = -Infinity, seen = false;
+        (kidsOf(s) || []).forEach((k) => {
+          if (/^(ring·|hitpad·|wash·|shadow|glow|scrim|guide·)/.test(nameOf(k))) return;   // chrome overhangs by design
+          const q = box(k);
+          if (!(q.w > 0 && q.h > 0)) return;
+          seen = true;
+          cl = Math.min(cl, q.x); ct = Math.min(ct, q.y); cr = Math.max(cr, q.x + q.w); cb = Math.max(cb, q.y + q.h);
+        });
+        if (seen) {
+          const ins = { top: ct - kb.y, left: cl - kb.x, bottom: kb.b - cb, right: kb.r - cr };
+          // BOTTOM ONLY, deliberately. A row, a list item and a table row are containers that STRETCH to their
+          // column, so a right-hand band is the design (measured: 29 of the 30 page-06 findings a 4-side test
+          // produced were `TableRow`/`ListItem`/`Timeline` trailing to their container width). The defect this rule
+          // exists for is the frame that is TALLER than the content it frames — a sheet with an empty row under it.
+          const sides = [['bottom', 'top']];
+          for (let i2 = 0; i2 < sides.length; i2++) {
+            const a = sides[i2][0], o2 = sides[i2][1];
+            if (ins[a] >= 32 && ins[a] >= 3 * Math.max(1, ins[o2])) {
+              add('frame_dead_band', s, st.top, N(ins[a]) + 'px of empty band at the ' + a + ' while the opposite side is ' +
+                N(ins[o2]) + 'px — the border reserves space its content never fills (derive the frame from the content, or fill it)');
+              break;
+            }
           }
         }
       }

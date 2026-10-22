@@ -2665,14 +2665,30 @@ return (function () {
       selected disc · range wash · 4px event dots. 238 wide fits a 240–300 panel. */
   CF.miniCalendar = async function (o) {
     o = o || {};
-    var cell = o.cell || 32, gap = o.gap === undefined ? 2 : o.gap, rows = o.rows || 6;
+    var cell = o.cell || 32, gap = o.gap === undefined ? 2 : o.gap;
     var headH = o.headH || 32, weekH = o.weekH || 20, padX = 8, padB = 8;
+    var dim = o.days || 31, first = o.firstWeekday || 0;
+    var today = o.today === undefined ? 14 : o.today, sel = o.selected === undefined ? 18 : o.selected;
+    // §3.3 `range` is not a label, it is a DRAWING: the soft band only exists when the selection has two ends, so a
+    // host named `·Range` that was handed a single day painted nothing but carried the name (measured on the exported
+    // `MiniCalendar·Spec` RANGE row). An explicit `selected` array always wins; `range` supplies the in-progress one.
+    if (o.range && !Array.isArray(sel)) sel = [today, today + 4];
+    var events = o.events || [3, 8, 14, 18, 22, 27];
+    // §3.3 the frame is DERIVED from the month it draws. `rows` is a declared axis (5 · 6), but a 31-day month that
+    // starts on the first column occupies 5 rows, and a hardcoded 6 drew a 252×262 sheet around 252×228 of calendar —
+    // a whole empty band inside the border (measured 2026-10-22: content inset bottom 49px vs top 7px). An explicit
+    // `rows` still wins (that is how the 6-row variant is drawn), it just never shrinks below what the month needs.
+    var need = Math.max(1, Math.ceil((first + dim) / 7));
+    var rows = o.rows === undefined ? need : Math.max(need, Number(o.rows) || need);
+    // The leading/trailing slots of the grid belong to the previous/next month. They are PAINTED (muted, no state,
+    // no event dot) — an unfilled slot is exactly the dead band the border was blamed for.
+    var adj = o.adjacent !== false;
     var w = o.w || (7 * (cell + gap) - gap + padX * 2);
     var h = o.h || (headH + weekH + rows * (cell + gap) - gap + padB);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ST = o.state || 'default';
     var ctx = CF.build(CF.name('MiniCalendar', { size: cell + 'cell', state: ST,
-      slot: [o.range ? 'Range' : null, o.events === false ? 'NoEvents' : null].filter(Boolean).join('-') || null }), box,
+      slot: [o.range ? 'Range' : null, o.events === false ? 'NoEvents' : null, rows + 'row'].filter(Boolean).join('-') }), box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border'), strokeW: 1 });
     if (!LY) return ctx.host;
     var grid = LY.grid(B(box.x + padX, box.y + headH + weekH, w - padX * 2, rows * (cell + gap) - gap), 7, gap);
@@ -2685,14 +2701,16 @@ return (function () {
       ctx.text(String(d), B(grid[i].x, box.y + headH, grid[i].w, weekH),
         { size: 11, role: 'axis', color: C('muted'), weight: 500, align: 'center', valign: 'middle', refit: false });
     });
-    var dim = o.days || 31, first = o.firstWeekday || 0;
-    var today = o.today === undefined ? 14 : o.today, sel = o.selected === undefined ? 18 : o.selected;
-    var events = o.events || [3, 8, 14, 18, 22, 27];
     var fcell = null;
     for (var i = 0; i < rows * 7; i++) {
       var dnum = i - first + 1;
-      if (dnum < 1 || dnum > dim) continue;
       var col = i % 7, r = B(grid[col].x, box.y + headH + weekH + Math.floor(i / 7) * (cell + gap), cell, cell);
+      if (dnum < 1 || dnum > dim) {
+        if (!adj) continue;
+        ctx.text(String(dnum < 1 ? dim + dnum : dnum - dim), r,
+          { size: 12, color: C('muted'), weight: 400, opacity: 0.62, align: 'center', valign: 'middle', refit: false });
+        continue;
+      }
       var muted = o.weekendMuted && col >= 5;
       var isSel = Array.isArray(sel) ? (dnum === sel[0] || dnum === sel[1]) : dnum === sel;
       var inRange = Array.isArray(sel) && dnum > sel[0] && dnum < sel[1];
