@@ -122,23 +122,28 @@ return (function () {
              color: { color: P.ink, opacity: e.o } }];
   };
   // ---------------------------------------------------------------- §2.1 radius = the token ladder, and nothing else
-  // The ladder is the file's own `borderRadius` tokens (DESIGN.md §Shapes, measured from the source's `--_radius-*`),
-  // plus `xs 4`, which the source cannot give us: it ships no checkbox, no switch thumb, no 20px box — every one of
-  // those would become a circle at `sm 10`. So the spine is the site's, and the one addition is labelled [inferred].
-  // `full` is STORED as 9999 and rendered clamped (measured 2026-10-21: a 320×32 and a 320×8 at 9999 both export as
-  // clean pills), which is why a control is pill BY TOKEN instead of by the `h/2` arithmetic that used to mint 722
-  // one-off radii the auditor could never tie to a set.
-  var RAD = { none: 0, xs: 4, sm: 10, md: 26, lg: 50, xl: 80, full: 9999 };
+  // The ladder is the SOURCE SITE's own `border-radius` steps (DESIGN.md §Shapes), measured off the Boedoxol
+  // stylesheet and nothing else: `0` (flat bands and section plates), `2` (the small inner boxes), `3` (every
+  // button, tag, chip and segmented-nav corner — the site's dominant step, 21 uses), `5` (every card, work item,
+  // image plate and hero card — 93 uses, the site's dominant step) and `100` (the 20px award dot, the 16px client
+  // ornament and the 48px avatars — the circle step, 30 uses).
+  // `full` (9999) is the pill the radius FORGE needs and the source has none of: `TK.radiusFor` reads it to bind a
+  // corner that is `min(w,h)/2` or larger, and the renderer clamps it to a clean pill (measured 2026-10-21: a 320×32
+  // and a 320×8 at 9999 both export as clean pills). It is a forge affordance, labelled as such — every DRAWN corner
+  // in this file comes from the five source steps above.
+  var RAD = { none: 0, xs: 2, sm: 3, md: 5, lg: 100, full: 9999 };
   CF.RAD = RAD;
   // role → ladder key. A factory asks for the ROLE it is drawing; the number and the token name both come from here,
   // so "which radius is legal where" has exactly one answer in the file.
-  var ROLE = { control: 'full', box: 'xs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
-               slab: 'lg', inverse: 'lg', hero: 'xl', flat: 'none', ring: 'host', clip: 'host' };
+  // Boedoxol's controls are 3px RECTANGLES, not pills: `control` is `sm`, and `TK.PILL_FAMS`'s repair pass reads
+  // `CF.radius('control')`, so the sweep and the factories agree on the same number.
+  var ROLE = { control: 'sm', box: 'xs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
+               slab: 'none', inverse: 'none', hero: 'md', flat: 'none', ring: 'host', clip: 'host' };
   CF.ROLE = ROLE;
   var TOKEN_OF = { none: 'radius.none', xs: 'radius.xs', sm: 'radius.sm', md: 'radius.md', lg: 'radius.lg',
-                   xl: 'radius.xl', full: 'radius.full' };
-  var VALUE_OF = { 0: 'radius.none', 4: 'radius.xs', 10: 'radius.sm', 26: 'radius.md', 50: 'radius.lg',
-                   80: 'radius.xl', 9999: 'radius.full' };
+                   full: 'radius.full' };
+  var VALUE_OF = { 0: 'radius.none', 2: 'radius.xs', 3: 'radius.sm', 5: 'radius.md', 100: 'radius.lg',
+                   9999: 'radius.full' };
   /** The token name a radius value belongs to, read from the LIVE set when the token engine is seeded (so a file that
       renamed its ladder still resolves), falling back to the table above. null = the value is not the ladder. */
   CF.radiusToken = function (v) {
@@ -3406,7 +3411,7 @@ return (function () {
     var body = slot ? slot.body : B(rect.x + pad, rect.y + headerH, rect.w - pad * 2, rect.h - headerH - footerH);
     var footer = slot ? slot.footer : B(rect.x, rect.y + rect.h - footerH, rect.w, footerH);
     var ctx = CF.build(CF.name('Drawer', { type: bottom ? 'Bottom' : (side === 'left' ? 'Start' : 'End'), state: o.state, slot: o.footer === false ? 'NoFooter' : null }), rect,
-      { parent: o.parent, fill: C('surface'), radius: bottom ? CF.radius('xl') : 0, shadow: o.flat ? 0 : 5 });
+      { parent: o.parent, fill: C('surface'), radius: bottom ? CF.radius('md') : 0, shadow: o.flat ? 0 : 5 });
     if (o.scrim) ctx.plate(B(rect.x + (bottom ? 0 : (side === 'right' ? -rect.w : rect.w)), rect.y - (bottom ? rect.h : 0),
       bottom ? rect.w : rect.w, bottom ? rect.h * 2 : rect.h * 2), { name: 'scrim', fill: C('ink'), opacity: 0.45 });
     ctx.text(String(o.title === undefined ? 'File history' : o.title), B(header.x + pad, header.y, header.w - pad * 2 - 44, header.h),
@@ -3478,7 +3483,7 @@ return (function () {
     var h = (grabber ? 12 : pad) + (title ? 40 : 0) + rowsH + (o.cancel ? rowH + 8 : 0) + pad + safe;
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('Sheet', { type: title ? 'Title' : 'Options', slot: o.cancel ? 'Cancel' : null }), box,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('xl'), shadow: o.flat ? 0 : 5 });
+      { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), shadow: o.flat ? 0 : 5 });
     var y = box.y;
     if (grabber) { ctx.plate(B(box.x + w / 2 - 16, y + 8, 32, 4), { name: 'grabber', fill: C('borderStrong'), radius: 'xs' }); y += 12; }
     if (title) {
