@@ -1264,6 +1264,272 @@ return (function () {
       .map((n) => Object.assign({ page: n }, TK._ringReport[n]));
   };
 
+  // ---------- §1.3 focus-expression sweep (`TK.focusSweep`, component-library §1.3 / rules 16 + 44) ----------
+  // Two things changed in the engine: a ring is drawn on the focus UNIT (the box the factory passed), and a `reserved`
+  // family expresses focus as an alpha-0 slot + a 12% `wash·focus`. Neither can be patched onto an OLD host by editing
+  // properties, because the unit box lives in the factory, not in the file. So this sweep REBUILDS the host from the
+  // recorded spec row (`storage.SPECS`) and accepts the new board only when it reproduces the old one EXACTLY — same
+  // name, same size ±2px — otherwise the probe is removed and the host is reported unresolved. That makes the pass
+  // idempotent and safe to interrupt: re-running finds the same list minus what already landed, and nothing is ever
+  // replaced by a board of a different shape.
+  // Hosts that are library masters or placed copies are NOT rebuilt (a master's copies would lose their component):
+  // they are counted and reported, and the board-level rebuild is the operator's call.
+  const FOCUS_WASH_NAME = /(?:^|·)(wash|row|node|band|cell|item|tint|day|tile|segment|crumb|underline|boundary|bar|rail)·focus$/;
+  // Families whose factory passes a box SMALLER than its host (measured from the `ctx.ring` call sites in
+  // component_factory.js): `outline` roles that used to be drawn container-wide. A Rating, a Segmented or a Tabs strip
+  // is focused AS A WHOLE by design (the ring box IS the host), so it is deliberately not in this list.
+  TK.FOCUS_UNIT_OUTLINE = /^(Otp|OtpInput|Slider|Pagination|Checkbox|Radio|Switch|Transfer)(·|$)/;
+  // The plate a labelled control's ring must shrink onto: the keyboard lands on the BOX, the TRACK, the CIRCLE — not on
+  // the row of copy next to it. Remounting the existing boundary is preferred to rebuilding the host, because the live
+  // host may have been grown to fit its label (`storage.fitHosts`) and a rebuild would shrink it back and shift every
+  // column of the matrix.
+  TK.FOCUS_UNIT_PLATE = { checkbox: 'box', radio: 'ring', switch: 'track', slider: 'handle', otp: 'digit', pagination: 'cell', transfer: 'panel' };
+  TK.focusStart = function (names) {
+    TK._focusQueue = (names || TK.pageNames()).slice();
+    TK._focusReport = {};
+    TK._focusAgg = { pages: 0, hosts: 0, ok: 0, rebuilt: 0, remounted: 0, probes: 0, unresolved: 0, masters: 0, copies: 0, bound: 0, calls: 0, mode: 'dry' };
+    return { queued: TK._focusQueue.length };
+  };
+  TK.focusSweep = async function (o) {
+    o = o || {};
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    const CF = storage.CF;
+    if (!CF || !CF.FOCUS || typeof CF.focusRole !== 'function') return { err: 'CF.FOCUS is not seeded (re-seed component_factory.js)' };
+    if (!storage.SPECS || !storage.SPECS.families) return { err: 'storage.SPECS is not seeded (the sweep rebuilds from the spec records)' };
+    if (!TK._focusQueue || !TK._focusQueue.length) TK.focusStart(null);
+    if (!TK._focusAgg) TK.focusStart(TK._focusQueue);
+    const agg = TK._focusAgg; agg.calls++; agg.mode = o.dry ? 'dry' : 'apply';
+    const budget = o.budget === undefined ? 15000 : o.budget;
+    const maxHosts = o.maxHosts === undefined ? 8 : o.maxHosts;
+    const settle = o.dry ? 0 : (o.settle === undefined ? 700 : o.settle);
+    const t0 = Date.now(); const anomalies = []; let chunks = 0;
+    const keyByFam = {};
+    Object.keys(storage.SPECS.families).forEach((k) => { keyByFam[String(storage.SPECS.families[k].family || '')] = k; });
+    const kids = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    const nm = (s) => { try { return String(s.name || ''); } catch (e) { return ''; } };
+    const paints = (s) => { try { return (s.strokes || []).some((k) => (k.strokeOpacity === undefined ? 1 : k.strokeOpacity) >= 0.05); } catch (e) { return false; } };
+    const isCtl = (b) => b && b.type === 'board' && /·/.test(nm(b)) && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root /.test(nm(b));
+    const hasWash = (b) => {
+      let f = false;
+      (function scan(k, d) {
+        kids(k).forEach((c) => {
+          if (f) return;
+          if (!/^ring·/.test(nm(c)) && FOCUS_WASH_NAME.test(nm(c))) {
+            try { if ((c.fills || []).some((x) => (x.fillOpacity === undefined ? 1 : x.fillOpacity) >= 0.05)) { f = true; return; } } catch (e) {}
+          }
+          if (d < 3) scan(c, d + 1);
+        });
+      })(b, 0);
+      return f;
+    };
+    const ringOf = (b) => kids(b).filter((c) => /^ring·/.test(nm(c)))[0] || null;
+    // any focus layer that PAINTS anywhere inside (a nested control may carry the state for a composite host —
+    // `Field·Focus` owns no ring, its `Input·Outlined·MD·Focus` child does)
+    const anyFocusLayer = (b) => {
+      let f = false;
+      (function scan(k, d) {
+        kids(k).forEach((c) => {
+          if (f) return;
+          const n = nm(c);
+          if (/^ring·/.test(n)) { if (paints(c)) f = true; return; }
+          if (FOCUS_WASH_NAME.test(n)) { try { if ((c.fills || []).some((x) => (x.fillOpacity === undefined ? 1 : x.fillOpacity) >= 0.05)) f = true; } catch (e) {} return; }
+          if (d < 4) scan(c, d + 1);
+        });
+      })(b, 0);
+      return f;
+    };
+    const heavyEdge = (b) => { try { return (b.strokes || []).some((k) => (k.strokeWidth || 0) >= 2 && (k.strokeOpacity === undefined ? 1 : k.strokeOpacity) >= 0.05); } catch (e) { return false; } };
+    // `shape.component` is a BOUND METHOD in this plugin build, not a component object — sniffing it makes every plain
+    // board read as an instance (measured 2026-10-22: 56 of 133 hosts "were copies" with `compType: "function"`).
+    // The only honest answers are the shape's own predicates, the same pair `audit_design.js` uses.
+    const compOf = (b) => {
+      try { if (typeof b.isComponentMainInstance === 'function' && b.isComponentMainInstance()) return 'master'; } catch (e) {}
+      try { if (typeof b.isComponentCopyInstance === 'function' && b.isComponentCopyInstance()) return 'copy'; } catch (e) {}
+      return null;
+    };
+    // classify one Focus host: what the §1.3 contract requires of it vs what it carries
+    // `o.checkHex` adds the palette guard: a host rebuilt while `storage.T`/`CF.P` was still the ENGINE DEFAULT
+    // (a plugin reload wipes `storage`, and CF seeds its palette from it — api-pitfalls §17) carries hexes the declared
+    // set does not name. Those hosts look structurally perfect and are coloured wrong, so the sweep rebuilds them.
+    const decHexes = (function () {
+      if (!o.checkHex || !TK.declared) return null;
+      const m = {};
+      try { (TK.declared().colors || []).forEach((c) => { m[String(c.hex).toLowerCase()] = 1; }); } catch (e) { return null; }
+      return Object.keys(m).length ? m : null;
+    })();
+    const offHex = (b) => {
+      if (!decHexes) return null;
+      const bad = [];
+      (function scan(k, d) {
+        if (d > 4) return;
+        kids(k).forEach((c) => {
+          try { (c.fills || []).forEach((f) => { if (f.fillColor && !decHexes[String(f.fillColor).toLowerCase()]) bad.push(String(f.fillColor)); }); } catch (e) {}
+          try { (c.strokes || []).forEach((t) => { if (t.strokeColor && !decHexes[String(t.strokeColor).toLowerCase()]) bad.push(String(t.strokeColor)); }); } catch (e) {}
+          scan(c, d + 1);
+        });
+      })(b, 0);
+      return bad.length ? bad : null;
+    };
+    const verdict = (host) => {
+      const role = CF.focusRole(nm(host));
+      const rg = ringOf(host);
+      if (!rg) {
+        // no boundary of its own: legal when a visible ≥2px edge or a nested control's focus layer carries the state
+        // (an underlined field draws a 2px underline — component-library §3.2; a Field delegates to its Input child)
+        if (heavyEdge(host) || anyFocusLayer(host)) return { role: role, need: null };
+        return { role: role, need: 'no-boundary' };
+      }
+      const hb = { x: host.x, y: host.y, w: host.width, h: host.height };
+      const rb = { w: rg.width, h: rg.height };
+      const wide = Math.abs(rb.w - (hb.w + 4)) <= 2 && Math.abs(rb.h - (hb.h + 4)) <= 2;   // host+2 = the old container-wide box
+      if (role === 'reserved') {
+        if (paints(rg)) return { role: role, need: 'paint→slot' };
+        if (!hasWash(host)) return { role: role, need: 'slot-without-wash' };
+        if (wide) return { role: role, need: 'container-wide' };
+        return { role: role, need: null };
+      }
+      if (wide && TK.FOCUS_UNIT_OUTLINE.test(nm(host))) return { role: role, need: 'container-wide' };
+      if (!paints(rg)) return { role: role, need: 'outline-not-painting' };
+      return { role: role, need: null };
+    };
+    // shrink an existing boundary onto the anatomy plate it should trace (no host rebuild, no matrix reflow)
+    const remount = (host, ring, plateName) => {
+      let unit = null;
+      (function scan(k, d) {
+        kids(k).forEach((c) => {
+          if (unit) return;
+          const n = nm(c);
+          if (n === plateName || n.indexOf(plateName + '·') === 0) { unit = c; return; }
+          if (d < 3) scan(c, d + 1);
+        });
+      })(host, 0);
+      if (!unit) return false;
+      try { ring.resize(Math.max(4, unit.width + 4), Math.max(4, unit.height + 4)); } catch (e) { return false; }
+      try { ring.x = Math.round(unit.x - 2); ring.y = Math.round(unit.y - 2); } catch (e) {}
+      // rule 37: a ring takes the corner of the plate it traces
+      try { const cs = TK.cornersOf(unit); const v = cs ? Math.max.apply(null, cs) : null; if (v !== null) ring.borderRadius = v; } catch (e) {}
+      return true;
+    };
+    while (TK._focusQueue.length && Date.now() - t0 < budget) {
+      const n = TK._focusQueue.shift(); chunks++;
+      let page = null; try { page = penpotUtils.getPageByName(n); } catch (e) {}
+      if (!page) { anomalies.push({ page: n, err: 'no page' }); continue; }
+      if (penpot.currentPage.name !== n) { try { await penpot.openPage(page.id); } catch (e) { anomalies.push({ page: n, err: 'open failed' }); continue; } await nap(o.dry ? 60 : 150); }
+      let root = null; try { root = penpot.currentPage.root; } catch (e) {}
+      for (let i = 0; !root && i < 6; i++) { await nap(o.dry ? 80 : 200); try { const rp = penpotUtils.getPageByName(n); root = rp && rp.root; } catch (e) {} }
+      if (!root) { anomalies.push({ page: n, err: 'no root (cold page)' }); TK._focusQueue.unshift(n); break; }
+      const hosts = [];
+      (function walk(s, d) {
+        if (d > 9) return;
+        kids(s).forEach((c) => {
+          if (isCtl(c) && /·Focus(?=·|$)/.test(nm(c))) hosts.push(c);
+          walk(c, d + 1);
+        });
+      })(root, 0);
+      let hostsN = 0, okN = 0, rebuiltN = 0, remountedN = 0, probesN = 0, unresolvedN = 0, mastersN = 0, copiesN = 0, touched = 0;
+      const removedIds = [];
+      for (let i = 0; i < hosts.length; i++) {
+        const host = hosts[i];
+        // A host whose ancestor was just rebuilt is a stale reference. Read the chain defensively: an UNBOUNDED
+        // `while (n = n.parent)` over a removed shape is what froze the plugin's main thread on 2026-10-22 (every later
+        // execute_code then timed out at the bridge ceiling) — api-pitfalls §17.
+        let stale = false;
+        try {
+          if (!host.parent) stale = true;
+          let a = host.parent, gd = 0;
+          while (!stale && a && gd++ < 8) { if (removedIds.indexOf(String(a.id)) >= 0) stale = true; else a = a.parent; }
+        } catch (e) { stale = true; }
+        if (stale) continue;
+        hostsN++;
+        const v = verdict(host);
+        if (!v.need && decHexes) {
+          const bad = offHex(host);
+          if (bad) { v.need = 'off-palette'; v.hexes = bad.slice(0, 4); }
+        }
+        if (!v.need) { okN++; continue; }
+        // the ceiling is checked PER HOST, not only per page: one heavy board (an Accordion, a Menu with five state
+        // columns) can burn the whole 30 s on its own and the call dies mid-probe, leaving a stray at the scratch x.
+        if (Date.now() - t0 > budget) { TK._focusQueue.unshift(n); anomalies.push({ page: n, host: nm(host).slice(0, 34), deferred: true, need: v.need, reason: 'wall clock' }); break; }
+        if (touched >= maxHosts) { TK._focusQueue.unshift(n); anomalies.push({ page: n, host: nm(host).slice(0, 34), deferred: true, need: v.need }); break; }
+        touched++;
+        const cp = compOf(host);
+        if (cp === 'master') { mastersN++; anomalies.push({ page: n, host: nm(host).slice(0, 40), need: v.need, err: 'master: rebuilding it would orphan its copies — repair at board level' }); continue; }
+        if (cp === 'copy') { copiesN++; anomalies.push({ page: n, host: nm(host).slice(0, 40), need: v.need, err: 'copy: repair the master, then re-place' }); continue; }
+        const fam = nm(host).split('·')[0], key = keyByFam[fam];
+        if (v.need === 'container-wide' && v.role === 'outline') {
+          const plate = TK.FOCUS_UNIT_PLATE[String(fam).toLowerCase()];
+          if (plate && remount(host, ringOf(host), plate)) {
+            if (o.dry) { anomalies.push({ page: n, host: nm(host).slice(0, 40), need: v.need, err: 'would remount onto "' + plate + '"' }); continue; }
+            remountedN++; touched++; continue;
+          }
+        }
+        if (o.dry) { unresolvedN++; anomalies.push({ page: n, host: nm(host).slice(0, 40), need: v.need, role: CF.focusRole(nm(host)), spec: key || 'none' }); continue; }
+        const s = key ? storage.SPECS.families[key] : null;
+        if (!s || typeof CF[key] !== 'function') { unresolvedN++; anomalies.push({ page: n, host: nm(host).slice(0, 34), need: v.need, err: 'no spec row for ' + fam }); continue; }
+        const rows = (s.vars && s.vars.length ? s.vars : [{}]).map((vv, ix) => Object.assign({}, vv, { size: (s.sizes && s.sizes[ix % s.sizes.length]) || 'md' }));
+        const hb = { x: host.x, y: host.y, w: host.width, h: host.height };
+        const hid = String(host.id);
+        const wantSelected = /Selected/.test(nm(host));
+        // The host's own NAME is the authority for the axes a spec row does not carry: `Checkbox·LG·Focus·Checked-Label`
+        // is size lg + checked + labelled whatever row 0 of the record happens to hold. The probe set is therefore
+        // row props ⊕ name-derived props, and the name/size equality test still has to pass before anything is kept.
+        const parsed = {};
+        const sm = nm(host).match(/·(XS|SM|MD|LG|XL|2XL)(?:·|$)/);
+        if (sm) parsed.size = sm[1].toLowerCase();
+        if (/Checked/.test(nm(host))) parsed.checked = true;
+        if (/Unchecked/.test(nm(host))) parsed.checked = false;
+        if (/Indeterminate/.test(nm(host))) parsed.indeterminate = true;
+        if (/Loading/.test(nm(host))) parsed.loading = true;
+        if (/(?:·|^)Off(?:-|$)/.test(nm(host))) parsed.checked = false;
+        if (/(?:·|^)On(?:-|$)/.test(nm(host))) parsed.checked = true;
+        if (/·Label|-Label/.test(nm(host))) parsed.label = true;
+        if (/Readonly/.test(nm(host))) parsed.readonly = true;
+        if (/Disabled/.test(nm(host))) parsed.disabled = true;
+        let done = null;
+        for (let r = 0; r < rows.length && !done; r++) {
+          const props = Object.assign({}, parsed, rows[r], wantSelected ? { selected: true } : {}, { parent: host.parent, x: Math.round(hb.x) + 100000, y: Math.round(hb.y), state: 'focus' });
+          let nh = null;
+          try { nh = await CF[key](props); } catch (e) { nh = null; }
+          if (!nh) continue;
+          probesN++;
+          // Same host, same slot. The live board may be WIDER/TALLER than a fresh factory build because the file was
+          // grown to fit its copy after the matrix placed it (`storage.fitHosts`) — the neighbours sit on those grown
+          // pitches, so the rebuilt host is resized back to the box it replaces. A probe that came out LARGER is a
+          // real mismatch (it would collide with the next column) and is discarded.
+          const same = nm(nh) === nm(host) && nh.width <= hb.w + 2 && nh.height <= hb.h + 2 &&
+            nh.width >= Math.min(hb.w, 40) - 12 && nh.height >= Math.min(hb.h, 20) - 8;
+          if (!same) { try { nh.remove(); } catch (e) {} continue; }
+          if (o.dry) { try { nh.remove(); } catch (e) {} done = { row: r, need: v.need, would: true }; }
+          else {
+            try {
+              CF.move(nh, Math.round(hb.x), Math.round(hb.y));
+              if (Math.round(nh.width) !== Math.round(hb.w) || Math.round(nh.height) !== Math.round(hb.h)) {
+                try { nh.resize(Math.round(hb.w), Math.round(hb.h)); } catch (e) {}
+              }
+              host.remove(); removedIds.push(hid); done = { row: r, need: v.need, rebuilt: true };
+            }
+            catch (e) { try { nh.remove(); } catch (e2) {} anomalies.push({ page: n, host: nm(host).slice(0, 34), err: 'move failed: ' + e.message }); }
+          }
+        }
+        if (done) rebuiltN++; else { unresolvedN++; anomalies.push({ page: n, host: nm(host).slice(0, 34), need: v.need, err: 'no spec row reproduces this host (' + rows.length + ' tried)' }); }
+      }
+      let bind = { radius: 0 };
+      if (!o.dry && (rebuiltN || remountedN)) bind = await TK.bindPage(n, { only: 'radius', settle: 0, pageSettle: settle });
+      agg.pages++; agg.hosts += hostsN; agg.ok += okN; agg.rebuilt += rebuiltN; agg.remounted += remountedN; agg.probes += probesN;
+      agg.unresolved += unresolvedN; agg.masters += mastersN; agg.copies += copiesN; agg.bound += bind.radius || 0;
+      TK._focusReport[n] = { hosts: hostsN, ok: okN, rebuilt: rebuiltN, remounted: remountedN, probes: probesN, unresolved: unresolvedN, masters: mastersN, copies: copiesN, pending: TK._focusQueue.indexOf(n) >= 0 };
+      if (TK._focusQueue.indexOf(n) >= 0) break;                 // this page still has work: it is first again next call
+    }
+    return {
+      chunks: chunks, ms: Date.now() - t0, remaining: TK._focusQueue.length, done: TK._focusQueue.length === 0,
+      anomalies: anomalies.slice(0, o.samples || 14), anomalyCount: anomalies.length,
+      total: { pages: agg.pages, hosts: agg.hosts, ok: agg.ok, rebuilt: agg.rebuilt, remounted: agg.remounted, probes: agg.probes, unresolved: agg.unresolved, masters: agg.masters, copies: agg.copies, bound: agg.bound }
+    };
+  };
+  TK.focusPages = function () {
+    return Object.keys(TK._focusReport || {}).map((n) => Object.assign({ page: n }, TK._focusReport[n]));
+  };
+
   // ---------- library typography styles: the 素材 → 排版 list ----------
   // Measured 2026-10-21: a file can hold 40 *active* `typography` tokens and still show an **empty** Typography
   // panel, because that panel lists `penpot.library.local.typographies` (the style records) — a different subsystem

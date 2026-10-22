@@ -61,7 +61,7 @@ return (function () {
     state_coverage: '§5.2 + component-library §3.0 · required state columns missing on the spec board',
     rhythm_inconsistent: '§2 · sibling band gaps spread over more than one scale step',
     variant_sparse: 'component-library §4 · too few variants / sizes / icon slots for the family',
-    focus_ring_missing: 'component-library §4 · a Focus state with neither a ring layer nor a 2px focus border',
+    focus_ring_missing: 'component-library §4 + §1.3 · a Focus state with neither a PAINTING focus layer (a `ring·*` at alpha ≥.05, or a visible `wash·focus`/`row·focus`/`node·focus` state layer, or a ≥2px focus border) nor a 2px focus border. A ghost boundary alone is rule 44, not evidence here',
     disabled_wrong: 'component-library §4 · disabled label alpha outside the .25–.40 state band',
     name_invalid: 'component-library §4 · name contains an illegal "/" or newline',
     paint_unbound: 'design-tokens §8.1 · an opaque solid paint whose hex IS a declared token colour but the shape carries no `tokens.fill` / `tokens.strokeColor` binding — the colour was typed, not chosen from the set',
@@ -86,6 +86,7 @@ return (function () {
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
+    focus_invisible: '§1.3 + WCAG 2.4.7 · a Focus control whose only focus evidence is a boundary at (near) zero alpha — `CF.FOCUS`\'s `reserved` role authors the ring as a SLOT (2px, the unit\'s corner, `strokeOpacity` 0) so a runtime can raise it, and the perceivable cue is the 12% brand state wash. A ghost boundary with no `wash·focus` / `row·focus` / `node·focus` … plate in the same control is an invisible focus state: it satisfies nothing. `ctx.ring` draws both halves for a reserved family; if only the boundary survives, the wash was dropped (repair: rebuild the host, or `TK.focusSweep`)',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
@@ -765,6 +766,20 @@ return (function () {
       if (got < want * CFG.contrastTol) add('contrast', t, st.top, charsOf(t).slice(0, 14) + ' ' + got.toFixed(2) + ':1 < ' + want + ':1 for ' + str(fl[0], 'fillColor', '?') + ' on ' + toHex(bg));
     }
 
+    // ---- §1.3: what counts as focus evidence
+    // A focus state is HARD (§1.1, WCAG 2.4.7), but its FORM is a family role: `CF.FOCUS` gives an atomic control a
+    // 2px boundary that paints, and a COMPOSITION (step timeline, menu, table row, accordion header …) a boundary
+    // authored at alpha 0 — a reserved slot a runtime raises — whose perceivable cue is the 12% brand state wash.
+    // So the gate asks one question of a candidate layer: does it PAINT? A zero-alpha ring is never evidence (rule 44
+    // judges it on its own), and a name match alone used to make an invisible box pass `focus_ring_missing`.
+    const FOCUS_WASH = /(?:^|·)(wash|row|node|band|cell|item|tint|day|tile|segment|crumb|underline|boundary|bar|rail)·focus$/;
+    function focusEvidence(sh) {
+      const n = nameOf(sh);
+      if (/^ring·/.test(n)) return arr(sh, 'strokes').some((k) => num(k, 'strokeOpacity', 1) >= 0.05 && num(k, 'strokeWidth', 1) >= 1);
+      if (FOCUS_WASH.test(n)) return arr(sh, 'fills').some((k) => num(k, 'fillOpacity', 1) >= 0.05);
+      return false;
+    }
+
     // ---- shape rules
     // Coverage is counted from the host's NAME, which survives componentization: once G10 replaces a spec-matrix cell with
     // an instance, the instance still demonstrates that family's state/variant/size — only its internals belong to the
@@ -784,14 +799,16 @@ return (function () {
         F.focus++;
         const ds = []; const collect = (n3) => { (kidsOf(n3) || []).forEach((c) => { ds.push(c); if (rec(c)) collect(c); }); };
         collect(board);
-        let hasRing = ds.some((d) => /^ring·/.test(nameOf(d)));
+        // §1.3: the evidence must PAINT. A `reserved` family authors its boundary at alpha 0 as a slot and carries the
+        // 12% state wash as the cue, so counting a ghost ring here would let an invisible focus state pass rule 16.
+        let hasRing = ds.some((d) => focusEvidence(d));
         // CF.ring() deliberately mounts the ring one level up when the host clips (a card, a modal): drawn inside, the
         // clipped host cuts the outer band and the focus state shows two line segments instead of a ring. That ring is
         // still the host's focus evidence, so look for a sibling anchored on the host's box before calling it missing.
         if (!hasRing && board.parent) {
           const br = box(board);
           hasRing = (kidsOf(board.parent) || []).some((c) => {
-            if (!/^ring·/.test(nameOf(c))) return false;
+            if (!/^ring·/.test(nameOf(c)) || !focusEvidence(c)) return false;
             const cr = box(c);
             return Math.abs(cr.w - br.w - 4) <= 2 && Math.abs(cr.h - br.h - 4) <= 2 &&
               Math.abs((cr.x + cr.w / 2) - (br.x + br.w / 2)) <= 2 &&
@@ -799,7 +816,7 @@ return (function () {
           });
         }
         if (hasRing) F.rings++;
-        else if (arr(board, 'strokes').some((sh) => num(sh, 'strokeWidth', 1) >= 2)) F.thickBorder++;
+        else if (arr(board, 'strokes').some((sh) => num(sh, 'strokeWidth', 1) >= 2 && num(sh, 'strokeOpacity', 1) >= 0.05)) F.thickBorder++;
       }
     }
     function auditShape(s, par, st) {
@@ -936,6 +953,25 @@ return (function () {
           return { host: best, concentric: !!best, floating: false, contained: contained, dist: best ? bestV : null };
         })();
         const rh = host.host;
+        // rule 44 · focus_invisible — §1.3: a `reserved` family's boundary is authored at alpha 0 (the slot a runtime
+        // raises) and the eye reads the unit's state wash instead. Drop the wash and the focus state is invisible while
+        // every name-based check still passes, so a ghost boundary is judged HERE, next to the geometry it belongs to.
+        const ghost = !arr(s, 'strokes').some((k) => num(k, 'strokeOpacity', 1) >= 0.05);
+        if (ghost) {
+          const ctl = host.control || par;
+          let wash = null;
+          (function scanW(k, d) {
+            (kidsOf(k) || []).forEach((c) => {
+              if (wash) return;
+              if (focusEvidence(c)) { wash = c; return; }
+              if (d < 3) scanW(c, d + 1);
+            });
+          })(ctl, 0);
+          if (!wash) {
+            add('focus_invisible', s, st.top, 'boundary at alpha 0 on "' + nameOf(ctl).slice(0, 30) +
+              '" with no visible focus layer (wash·focus / row·focus / …) inside it — an invisible focus state is not a focus state');
+          }
+        }
         if (host.floating) {
           // rule 38 · ring_detached — the plate is mounted on the CONTAINER board, not inside a control. `ctx.ring` can
           // only produce this when the ring was drawn before a refit moved its host: the outline keeps its old box while

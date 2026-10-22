@@ -224,7 +224,7 @@ thresholds, single-sourced in `audit_design.js`:
 | variants | ≥ 3 distinct **non-state, non-size** name tokens | skipped for `Checkbox` / `Radio`: one drawing per state, no style axis exists |
 | sizes | ≥ 2 ladder sizes, only when the family declares a size at all | `xs`–`2xl` tokens |
 | icon slots | a `IconStart`/`IconEnd`/`Clear` variant wherever the family is in `ICON_FAMS` | named by `CF`'s `slotName()`, not by prose |
-| focus | ≥ 1 `ring·` layer or a ≥2px focus border on the Focus hosts | drawn by `ctx.ring`, never by darkening a 1px border |
+| focus | ≥ 1 focus layer that **paints** on the Focus hosts: a `ring·*` at alpha ≥ .05 drawn **tight on the focus unit**, or the visible `wash·focus` (12% brand state layer) that a `reserved` composition carries beside its alpha-0 slot, or a ≥2px focus border | drawn by `ctx.ring`, never by darkening a 1px border; the two forms are `CF.FOCUS`'s family roles (component-library §1.3), and rule 44 `focus_invisible` rejects a slot with no visible layer |
 | disabled | content alpha in `.25–.40` (`CF.STATE.disabledContent`) | `place()` clamps it for the whole host subtree |
 | coverage scope | families present with < 2 hosts are not judged; composites listed in `SPEC_SKIP` are judged only inside their own board | page 10 runs `{ families: […] }` to bring them back |
 

@@ -61,6 +61,24 @@ return (function () {
                disabledContainer: 0.12, disabledContent: 0.38 };
   CF.AXES = ['default', 'hover', 'focus', 'pressed', 'selected', 'disabled', 'loading'];
 
+  // ---------------------------------------------------------------- §1.3 the two focus expressions
+  // A focus indicator is HARD (§1.1, WCAG 2.4.7) — the state must be perceivable. Its FORM is not fixed, and the choice
+  // is made once here so no factory decides it locally:
+  //   `outline`  — the keyboard lands ON a plate the control owns (a button, a field, a checkbox, one OTP digit, one
+  //                page cell). The ring is drawn TIGHT on that unit: 2px, ≥3:1 against the surface, the unit's corner.
+  //   `reserved` — the control is a COMPOSITION whose rows/nodes are bands of copy with no plate of their own (a step
+  //                timeline, a menu, an anchor rail, a table row, an accordion header). A rectangle around such a band
+  //                reads as a crop mark, so the boundary is authored but painted at alpha 0: the slot, the 2px width and
+  //                the corner all exist in the layer tree (a runtime only has to raise the alpha), and what the eye
+  //                reads is the 12% brand state wash on the focused unit — the same layer hover/selected use (§1.2).
+  // `audit_design` rule 44 (`focus_invisible`) is what keeps `reserved` honest: a near-zero-alpha boundary with no
+  // visible wash in the same control is a HARD finding, so an invisible box can never satisfy the focus gate.
+  CF.FOCUS = {
+    reserved: /^(Steps|Anchor|Menu|Breadcrumb|Tree|Table|TableRow|TableHeader|TableState|Accordion|ListItem|Descriptions|Transfer|MiniCalendar|CommandPalette)(·|$)/,
+    wash: CF.STATE.focus, ghost: 0
+  };
+  CF.focusRole = function (nm) { return CF.FOCUS.reserved.test(String(nm || '')) ? 'reserved' : 'outline'; };
+
   // ---------------------------------------------------------------- §6 touch floor
   /** The tier the page builder is currently drawing for. Set it once per screen (`CF.tier = 'mobile'`) before calling
       the factories: it drives the invisible hit pads, so the same factory output meets 32 on web and 44 on touch. */
@@ -514,33 +532,65 @@ return (function () {
         A ring is authored to sit OUTSIDE the control, but a board clips by default (api-pitfalls §4) — drawn inside a
         clipped host its outer band is cut and the focus state shows two line segments instead of a ring (measured
         2026-10-20: 56 cropped `ring·focus` layers on page 03). `CF.fitToClip` releases the host clip, or pulls the
-        box inside a clip that must stay. */
+        box inside a clip that must stay.
+        THE CALLER'S BOX WINS. It is the unit the keyboard is actually on — `CF.steps` passes the active node, `CF.menu`
+        the highlighted row, `CF.otp` the digit being typed, `CF.anchor` the active line. Taking the host box instead
+        (the old behaviour, measured 2026-10-22 on `08 · Navigation`: 20 of 20 rings were host+2) drew one rectangle
+        around the whole composition: a 775×24 lime band over a five-node step timeline, a 224×152 box around a menu
+        whose focused item is 32px. A matrix refit CAN move the host after the factory computed its box — which is why
+        the host box was used at all — so the unit now travels by the host's own delta instead of being discarded.
+        §1.3: for a `reserved` family the boundary is authored at alpha 0 and the unit gets the state wash. */
     ring: function (box, o) {
       o = o || {};
       var off = o.offset === undefined ? 2 : o.offset, w = o.width || 2, r = RZ(o.radius === undefined ? 'sm' : o.radius);
-      var want = B(box.x - off, box.y - off, box.w + off * 2, box.h + off * 2);
+      var hb = this.host ? B(this.host.x, this.host.y, this.host.width, this.host.height) : null;
+      var src = box ? B(box.x, box.y, box.w, box.h) : (hb ? B(hb.x, hb.y, hb.w, hb.h) : null);
+      if (!src) return null;
+      if (hb && this.box) {
+        src = B(src.x + (hb.x - this.box.x), src.y + (hb.y - this.box.y), src.w, src.h);
+        // a caller that asked for (nearly) the whole host follows the host through a resize refit as well
+        if (Math.abs(src.w - hb.w) <= 6 && Math.abs(src.h - hb.h) <= 6) src = B(hb.x, hb.y, hb.w, hb.h);
+        else {
+          // A unit may legitimately overhang its host by its own halo (a 3px ring around a node at the host's edge) and
+          // the clip is released, so a small escape is left alone. A LARGE escape means the box was authored before a
+          // refit moved the host further than the delta shows — then it is pulled back inside, which is what the old
+          // host-box shortcut was really protecting against.
+          var ox = src.x - hb.x, oy = src.y - hb.y, or = hb.x + hb.w - (src.x + src.w), ob = hb.y + hb.h - (src.y + src.h);
+          if (ox < -6 || oy < -6 || or < -6 || ob < -6) {
+            src = B(Math.max(hb.x, Math.min(src.x, hb.x + hb.w - src.w)),
+                    Math.max(hb.y, Math.min(src.y, hb.y + hb.h - src.h)),
+                    Math.min(src.w, hb.w), Math.min(src.h, hb.h));
+          }
+        }
+      }
+      var role = o.role || CF.focusRole(this.host && this.host.name);
+      var alpha = o.strokeOpacity === undefined ? (role === 'reserved' ? CF.FOCUS.ghost : 1) : o.strokeOpacity;
+      var want = B(src.x - off, src.y - off, src.w + off * 2, src.h + off * 2);
       // CONTROL host (not a `clip·` crop): the ring is the host's own state, so lift the pill clip and draw it
-      // INSIDE the host, where the audit looks (`focus_ring_missing`). The box is taken from the HOST'S CURRENT
-      // bounds, not the caller's: factories call ctx.ring AFTER ctx.place(), and in a matrix the cell refit can
-      // move the host — a ring drawn at the pre-move box lands at board level and gets covered by the host fill
-      // (`stroke_covered`). Measured 2026-10-21 on 03.03 ButtonGroup; deliberate crops (`clip·` media, avatars,
+      // INSIDE the host, where the audit looks (`focus_ring_missing`). Deliberate crops (`clip·` media, avatars,
       // half-stars) keep the full fitToClip path below.
+      var mount = null, mk = want;
       if (this.host && !/^clip·/.test(String(this.host.name || ''))) {
         try { if (this.host.clipContent) this.host.clipContent = false; } catch (e) {}
-        var hb = B(this.host.x, this.host.y, this.host.width, this.host.height);
-        var iw = B(hb.x - off, hb.y - off, hb.w + off * 2, hb.h + off * 2);
-        var ir = r;
-        return this.plate(iw, { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: ir });
+        mount = 'inside';
+      } else {
+        var fit = CF.fitToClip(this.host, want, w, { refuseClamp: true });
+        if (fit.mountOutside && this.host && this.host.parent) mount = 'outside';
+        mk = fit.box;
       }
-      var fit = CF.fitToClip(this.host, want, w, { refuseClamp: true });
-      if (fit.mountOutside && this.host && this.host.parent) {
-        var sh = this.plate(fit.box, { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: r });
+      // the perceivable half of a `reserved` focus state: the unit's 12% brand wash, under the row's own copy
+      if (mount !== 'outside' && role === 'reserved' && alpha < 0.05) {
+        var wp = this.plate(src, { name: 'wash·focus', fills: CF.fills(null, 'focus', { tint: true }), radius: r });
+        if (wp) { try { wp.sendToBack(); } catch (e) {} }
+      }
+      var opts = { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, strokeOpacity: alpha, radius: r };
+      if (mount === 'outside') {
+        var sh = this.plate(mk, opts);
         // one level up: the crop must stay a crop, so the ring belongs to the host's container, not inside it
-        if (sh) { try { storage.absMount(this.host.parent, sh, fit.box.x, fit.box.y); } catch (e) {} }
+        if (sh) { try { storage.absMount(this.host.parent, sh, mk.x, mk.y); } catch (e) {} }
         return sh;
       }
-      var rb = fit.box;
-      return this.plate(rb, { name: 'ring·focus', fill: null, stroke: o.color || P.primary, strokeW: w, radius: r });
+      return this.plate(mk, opts);
     },
     /** empty hit pad so a 24px control still meets the touch floor (§2 HARD, signature touch_target). It is invisible,
         so it must keep its real size: only the clip is released, the box is never clamped (a 24px pad fails the floor). */
@@ -1146,7 +1196,7 @@ return (function () {
     ctx.plate(fb, { name: 'field', fill: C(fv.bg), fills: CF.fills(C(fv.bg), S === 'readonly' ? null : (S === 'error' || S === 'success' || S === 'warning' ? null : S)),
       stroke: variant === 'underlined' ? null : line, strokeW: lw, strokeOpacity: lineAlpha,
       radius: variant === 'outlined' || variant === 'filled' ? L.radius : 'none' });
-    if (variant === 'underlined') ctx.plate(B(fb.x, fb.y + fb.h - (S === 'focus' ? 2 : 1), fb.w, S === 'focus' ? 2 : 1), { name: 'underline', fill: S === 'focus' ? C('primary') : line, opacity: lineAlpha });
+    if (variant === 'underlined') ctx.plate(B(fb.x, fb.y + fb.h - (S === 'focus' ? 2 : 1), fb.w, S === 'focus' ? 2 : 1), { name: S === 'focus' ? 'underline·focus' : 'underline', fill: S === 'focus' ? C('primary') : line, opacity: lineAlpha });
     if (S === 'disabled') ctx.plate(fb, { name: 'disabled-overlay', fills: [{ fillColor: C('ink'), fillOpacity: CF.STATE.disabledContainer }], radius: L.radius });
     [o.addonBefore ? B(box.x, box.y, aB, fh) : null, o.addonAfter ? B(box.x + aB + fieldW, box.y, aA, fh) : null].forEach(function (ab, i) {
       if (!ab) return;
@@ -2633,6 +2683,7 @@ return (function () {
     var dim = o.days || 31, first = o.firstWeekday || 0;
     var today = o.today === undefined ? 14 : o.today, sel = o.selected === undefined ? 18 : o.selected;
     var events = o.events || [3, 8, 14, 18, 22, 27];
+    var fcell = null;
     for (var i = 0; i < rows * 7; i++) {
       var dnum = i - first + 1;
       if (dnum < 1 || dnum > dim) continue;
@@ -2640,6 +2691,8 @@ return (function () {
       var muted = o.weekendMuted && col >= 5;
       var isSel = Array.isArray(sel) ? (dnum === sel[0] || dnum === sel[1]) : dnum === sel;
       var inRange = Array.isArray(sel) && dnum > sel[0] && dnum < sel[1];
+      // §1.3 the keyboard lands on ONE day cell, so that cell is the focus unit — not the 238×250 calendar.
+      if (!fcell && (isSel || dnum === today)) fcell = r;
       if (inRange) ctx.plate(B(r.x, r.y + (cell - 24) / 2, cell, 24), { name: 'range·' + dnum, fills: CF.fills(C('primarySoft'), null), radius: 'none' });
       if (isSel) ctx.plate(B(r.x, r.y, cell, cell), { name: 'sel·' + dnum, fill: C('primary'), radius: 'control' });
       else if (dnum === today) ctx.plate(B(r.x + 1, r.y + 1, cell - 2, cell - 2), { name: 'today·' + dnum, fill: null, stroke: C('primary'), strokeW: 1.5, radius: 'control' });
@@ -2652,7 +2705,7 @@ return (function () {
       if (o.marks && o.marks[dnum]) ctx.text(String(o.marks[dnum]), B(r.x, r.y + 1, cell, 12), { size: 11, role: 'axis', color: C('muted'), align: 'center', valign: 'top', refit: false });
     }
     await ctx.settle(); ctx.place();
-    if (ST === 'focus') ctx.ring(box, { radius: CF.radius('md') });
+    if (ST === 'focus') ctx.ring(fcell || box, { radius: CF.radius('control') });
     return ctx.host;
   };
 
@@ -2992,7 +3045,9 @@ return (function () {
       });
     }
     await ctx.settle(); ctx.place();
-    if (ST === 'focus' && focusBox) ctx.ring(focusBox, { radius: 'control' });
+    // §1.3 reserved: the boundary is authored around the node the keyboard is on (a circle → the ladder's circle step),
+    // the perceivable cue is the 12% wash ctx.ring draws under it.
+    if (ST === 'focus' && focusBox) ctx.ring(focusBox, { radius: 'lg' });
     return ctx.host;
   };
 

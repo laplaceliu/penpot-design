@@ -42,7 +42,7 @@ Union verified across M3 (state layers), MUI (class names), Carbon (focus mixin)
 | Axis | What changes | Consensus value |
 |---|---|---|
 | hover | +state layer tint (bg tinted), elevation unchanged for filled, +1 level for outlined card | **8%** overlay [spec M3 `hover-state-layer-opacity`] |
-| focus | state layer **12%** + **focus ring** | ring **2px** thick, **2px offset**, contrast **≥3:1** vs adjacent [spec WCAG 2.4.11 AA] |
+| focus | state layer **12%** + **focus ring** (atomic control) **or** state layer **12%** + a boundary reserved at alpha **0** (composition — §1.3) | ring **2px** thick, **2px offset**, contrast **≥3:1** vs adjacent, drawn **tight on the focus unit** [spec WCAG 2.4.11 AA] |
 | pressed | state layer **12%** (+ label/icon shifts 1px down for tactile systems) | [spec M3 `pressed-state-layer-opacity` .12] |
 | dragged | state layer **16%** + elevation level 3 + slight scale | [spec M3 `dragged-state-layer-opacity` .16] |
 | selected | persistent fill tint + 2px accent border **or** accent fill (never both a hover tint and a selected tint at the same alpha) | [obs] |
@@ -57,6 +57,28 @@ color at 1px. `state_coverage` fails a board whose only "focus" is a darker bord
 Overlay tint = base fill + a second fill at the alpha above, same hue. On dark surfaces the overlay is **white**, on light surfaces
 it is the **ink** color — that is the only polarity swap. A component board must show the tint applied to the *same* base color,
 so the reviewer can see that hover is not a different blue.
+
+### 1.3 The two focus expressions (`CF.FOCUS`, chosen by family role)
+
+The focus state itself is HARD (§1.1). Its **form** is not: a rectangle is right on some controls and wrong on others, and
+"wrong" is decided by what the keyboard actually lands on, not by taste.
+
+| Role | The control is… | What is drawn | Families |
+|---|---|---|---|
+| `outline` | one plate the keyboard lands on (a button, a field, a checkbox, **one** OTP digit, **one** page cell, **one** slider thumb) | `ring·focus`: 2px, 2px offset, **tight on that unit**, ≥3:1 against the surface, the unit's own corner | everything not named below |
+| `reserved` | a **composition** whose rows/nodes are bands of copy with no plate of their own | `ring·focus` authored at the unit box with `strokeOpacity: 0` — the slot, width and corner exist in the layer tree so a runtime only raises the alpha — **plus** the perceivable cue: `wash·focus`, the 12% brand state layer (§1.2) on the focused unit | Steps · Anchor · Menu · Breadcrumb · Tree · Table · TableRow · TableHeader · TableState · Accordion · ListItem · Descriptions · Transfer · MiniCalendar · CommandPalette |
+
+**HARD — a ring is drawn on the focus UNIT, never on the container.** `ctx.ring` used to replace the box the factory passed
+with "host board + 2px", so every composition got one rectangle around the whole thing: measured 2026-10-22 on
+`08 · Navigation`, **20 of 20** rings were host+2 — a 775×24 band over a five-node step timeline, a 224×152 box around a menu
+whose focused item is 32px, a 128×200 rail around a 28px active row. The factories already computed the unit
+(`CF.steps` → the active node, `CF.menu` → the highlighted row, `CF.otp` → the digit, `CF.anchor` → the active line,
+`CF.miniCalendar` → the selected day); the bug threw it away.
+
+**HARD — `reserved` is never only a hidden border.** A boundary at alpha 0 reserves a slot; it is not an indicator
+(WCAG 2.4.7 needs one to be *perceivable*). Rule 44 `focus_invisible` fails a ghost boundary whose control carries no visible
+focus layer, and rule 16 `focus_ring_missing` no longer counts a layer that does not paint (alpha ≥ .05), so an invisible box
+can never satisfy the focus gate.
 
 ## 2. Control geometry ladder
 
@@ -230,7 +252,8 @@ For each component family present in the design system, the board must satisfy:
 | variants | ≥ 3 distinct non-state, non-size name tokens (the §3 Min variant set is the intent; the threshold is what is decidable) | `variant_sparse` |
 | states | the family's row in §3.0 drawn as matrix columns, at most 2 missing for its control class (`ctl` / `field` / `toggle` / `row` / `sel`) | `state_coverage` |
 | sizes | at least 2 ladder sizes, **only when the family declares a size at all** | `variant_sparse` |
-| focus | ≥ 1 `ring·` layer or a ≥2px focus border on the Focus hosts of every focusable family | `focus_ring_missing` |
+| focus | ≥ 1 focus layer that **paints** on the Focus hosts of every focusable family: a `ring·*` at alpha ≥ .05 tight on the focus unit (§1.3), or the visible `wash·focus` / `row·focus` / `node·focus` … state layer a `reserved` family carries instead, or a ≥2px focus border | `focus_ring_missing` |
+| focus is visible | a `ring·*` at alpha < .05 must be paired with a visible focus layer in the same control — a reserved slot alone is not an indicator | `focus_invisible` (§1.3, rule 44) |
 | disabled | content alpha in `.25–.40` (`CF.STATE.disabledContent`), clamped for the whole host subtree by `ctx.place()` | `disabled_wrong` |
 | touch | every target ≥ tier floor (mobile/pad 44, web 32) — an invisible `hitpad·<w>×<h>` plate counts toward it | `touch_target` |
 | icon slots | a `IconStart` / `IconEnd` / `Clear` variant wherever the family is in the auditor's `ICON_FAMS` | `variant_sparse` |
