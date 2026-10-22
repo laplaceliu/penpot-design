@@ -13,6 +13,12 @@ If a measured value cannot be expressed through a factory or a recipe, that is a
 
 ## Entry A: give a URL
 
+> **[Gate G17 · capture the source as you survey]** Every page you survey is a screen you will later have to *assemble*, so
+> record where each one came from and download the rasters it shows: `src` = the page URL (it becomes `SC.record({src})` and
+> the `nl:src` stamp), and the photographs/logos/screenshots go under `assets/<project>/…` so the record can name a `path`
+> (rule 40 `placeholder_media` indicts a slot without one — a gray plate is not the user's image). Do the fetching once, here;
+> a screen rebuilt later reads the record, not this conversation.
+
 1. **Survey**: web_fetch the target URL (and key subpages: login, dashboard, typical form page), extract:
    - Color: primary/secondary/neutral/semantic colors (sample from CSS variables, buttons, links, state components);
      for each tone record the **triple** the kit needs — wash / hue / ink (`design-guide.md` §4.1), not just the base.
@@ -27,6 +33,11 @@ If a measured value cannot be expressed through a factory or a recipe, that is a
 
 ## Entry B: give a set of images
 
+> **[Gate G17 · the images ARE the source record]** Keep every supplied file where it can be re-read by path
+> (`assets/<project>/screens/…`), one `src` per image: `SC.record(screen, {src:'img/03-pricing.png', …, media:[{slot:'hero', path:'assets/…'}]})`.
+> An image that is only *looked at* and never kept cannot be placed as a `fillImage`, so the screen would end up with a
+> placeholder plate — which is exactly what rule 40 reports.
+
 1. **Read images** (read one by one): identify theme, component families, layout density, light/dark theme, and the **scroll
    idiom** of each screen (fixed-shell app vs long scrolling document) — that is what decides recipe pages 14 vs 15.
 2. **Sample**: use PIL to assist color picking (write a small picking script alongside `scripts/pixel_diff.py`), quantize
@@ -38,6 +49,11 @@ If a measured value cannot be expressed through a factory or a recipe, that is a
 5. **Enter the unified build pipeline**.
 
 ## Entry C: give an existing React/UI library source (recreate)
+
+> **[Gate G17 · the source tree gives the record for free]** While reading the components, note per screen which family
+> renders where and which asset files (`src/assets/…`) the page references — those two lists become `controls[]` and
+> `media[]` of `SC.record`, with `src` = the component path. A library prop set that has no `CF` factory is a **G12** task
+> (extend the factory, register it), not a licence to draw the control on the screen.
 
 When the user gives an existing component library (`.tsx` + `.module.less` etc.) and asks to recreate it into a design system,
 use the **recreation pipeline** (`references/mcp-automation.md` §5): first read the full source (don't rely on doc impressions;
@@ -79,9 +95,19 @@ register components → recipe screens. Where the library contradicts a `design-
    - `11 · Grid & breakpoints`: one diagram board **per tier** in `targetProfiles` (`LY.TIERS`), the container ladder, the collapse order, the touch floor.
    - `12 · Screen recipes`: one annotated skeleton per `LY.keys()` (`LY.drawStart`/`drawStep`) + the tier-gate table (which recipe refuses which tier, and its `use` pointer).
    - `13 · Component index` + `component-map.json` (generated from `CF.map()`/`CF.variants()`: component name → page/board, token references, variant list, asset names).
-   - `14–16 · Screens`: one board per **recipe × accepted tier** (`LY.recipe(key,{tier})` refuses and returns `{err, use}` — follow the pointer),
-     each built at its own tier width with `CF.tier` set first, height from the recipe's `totalH` (long documents stack bands, they do not fit one screen),
-     each carrying `LY.fold(board, tier)`.
+   - `14–16 · Screens` — **[Gate G17: on a recreation, `SC.record` → `SC.build` is the only path]**. The source material the
+     user gave (Entry A pages, Entry B images, Entry C components) is first written into a **record per screen**:
+     `SC.record(screen, {src, tier, recipe, sections:[{region, controls, copy, media:[{slot,path}], icons}]})` — this validates
+     before anything is drawn (unknown recipe / no master / no asset path / no text all return in `gaps`) — then
+     `await SC.build({page, screen[, sections:[…]]})` assembles it: regions from the recipe, controls as **library instances**,
+     copy on the ramp carrying the library type style, raster as the **user's own bytes** (`MD.place`), then guides +
+     `TK.bindBoard` + the durable `nl:sc`/`nl:rec` stamp, mounted **inside `NN-PageRoot`**.
+     One board per **recipe × accepted tier** (`LY.recipe(key,{tier})` refuses and returns `{err, use}` — follow the pointer, never squeeze),
+     `CF.tier` set first, height from the recipe's `totalH` (long documents stack bands, they do not fit one screen),
+     each carrying `LY.fold(board, tier)`, each finishing with `SC.audit()` → `ASSEMBLED` and `NL.auditFlow(board)` → `CLEAN`.
+     What that replaces, and why it is now blocked: the Rayo file's screens were built this way before `SC` existed and the
+     measurement was `14` → 12 screens / 51 drawn controls with no master / 19 placeholder raster slots, `15` → 16 / 49 / 27
+     (rules 39/40/41 report exactly that today).
 5. **Register library components**: `CF.component(host)` (masters collected in `AI Component Masters`; the host *becomes* the main instance),
    then `CF.variantSet(hosts, family, props)` — one `properties` object per host (`Type/Size/State/Slot`, capabilities §5);
    it renames the container and the merged record to `family`, and **the heads must never be renamed** (that wipes the
@@ -90,8 +116,8 @@ register components → recipe screens. Where the library contradicts a `design-
    `groupAssemblies` → `fixZOrder`), focus: closed stroke inner, glow board `clipContent=false`, correct CJK font, pad/mobile touch targets ≥44.
    Screens additionally pass `NL.auditFlow(board) === 'CLEAN'` (settle with `NL.whenSettled`, size controls `fix`, never `auto`).
 7. **Accept**: both auditors CLEAN with the page scope named in contract §2 — `storage.auditPage()` (positioning) and
-   `storage.designGate({ tier | families })` (the 34 design rules, and the file-level `designCoverage()` when `storage.FN`
-   is seeded) — then export PNG per page and check against the self-check list
+   `storage.designGate({ tier | families })` (the 41 design rules, the file-level `designCoverage()` when `storage.FN`
+   is seeded, and on the screen pages `SC.coverage()` when `storage.SC` is seeded) — then export PNG per page and check against the self-check list
    (`penpot-structure.md` §8); pages 14–16 accepted recipe by recipe, tier by tier; ask the user to zoom in the editor to review.
    With a light+dark answer, prove the switch on the **paint** (`TK.paint` → `TK.activateTheme` → `TK.changed` ≥ 1) and
    re-export after switching; if the delivery is interactive, wire it with `PR.prototype(links, {flow})` and check

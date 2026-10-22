@@ -358,8 +358,9 @@ where you can (`{color.primaryInk}` inside a typography token), so one override 
   an invented value is visible in the registry instead of silently drawn.
 - **`full = 9999` is a real step, not a trick.** It renders as a clean pill (see pitfall 7 above), so a control's corner is
   `radius.full`, and a pill's `h/2` derivation is gone: the value comes from the set, so retuning the set retunes every pill.
-- **Gate**: rules **35 `radius_off_ladder`**, **36 `radius_unbound`** and **37 `ring_off_host`** judge the ladder, the binding
-  and the ring↔host pair from the LIVE declared set (`TK.declared().radii`), never from `CF.RAD`.
+- **Gate**: rules **35 `radius_off_ladder`**, **36 `radius_unbound`**, **37 `ring_off_host`** and **38 `ring_detached`** judge
+  the ladder, the binding, the ring↔host corner pair and the ring↔host **mounting**, from the LIVE declared set
+  (`TK.declared().radii`), never from `CF.RAD`.
 - **`TK.roleSweep()` — the repair for a corner that is legal but wrong (rule 37's twin).** 35/36 can only judge values that
   exist, so the two real defects of a rebuilt file are invisible to them: a control host still square because an older
   factory generation drew it, and a `ring·*` layer that disagrees with that host. Both are judged against the **source's own
@@ -367,6 +368,21 @@ where you can (`{color.primaryInk}` inside a typography token), so one override 
   binds to `{rounded.full}` — a family absent from the table is never judged — and `CF.ROLE.ring = 'host'` supplies the second
   rule. `TK.roleStart()` + `TK.roleSweep({budget})` until `done: true`, then `TK.rolePages()` for the per-page table and a
   **dry re-read** for the proof (measured: 136 pages → 367 hosts (241 masters + 23 copies) + 192 rings repaired, re-read 0/0/0).
+- **`TK.ringSweep()` — the repair for a ring that is bound, correctly rounded, and in the wrong place (rule 38).**
+  37 compares a ring's *corner* to its host; it cannot see a ring that drifted off the plate it outlines, which is what a
+  user reports as "this element moved". `TK.ringHost(shape)` resolves the owner in one place for both the auditor and the
+  repairer — nearest control ancestor (≤4 up) → deep subtree scan for a plate the ring **encloses** (margin 0–12 per axis)
+  and is **concentric** with (Δ ≤ 3) → expanded-containment for a flat row band → page-wide size match — and returns
+  `{host, control, concentric, floating, contained, ox, oy, via, kind, dist}`. `TK.ringStart(null)` (or a page-name list) then
+  `TK.ringSweep({dry:true})` / `{budget, settle}` is the census and the fix, and `TK.ringPages()` reads the per-page defect
+  table **after** a pass; the write re-applies the ring's **own measured
+  margins** (`ox`/`oy`, default `TK.RING_OFF` = 2), never a forced 2, re-mounts it inside the owning control (`clip·` plates
+  keep their ring one level up), copies the host corner only when the host is a control *board*, and then
+  `TK.bindPage(n, {only:'radius'})`, because the geometry write dropped the binding. Measured 2026-10-22: 231 rings over
+  pages 03–16 → 224 ok + 3 contained row rings + **7 floating drifts of 10–72px, all repaired**; dry re-read 41/41 ok, 0
+  drift (idempotent); negative control +24px → `NEEDS_REPAIR {ring_detached:1}` → restore → `CLEAN`.
+  Why the margins are not a constant, and the ±2 test that produced 47 false findings, are in `api-pitfalls.md §17` and
+  `engines.md` §"Ring mounting".
 - **Two measured facts that decide the sweep's scope** (`api-pitfalls.md §17`): a component's own shape answers
   `isComponentInstance() === true` **and** `isComponentMainInstance() === true`, so "skip instances" would skip every master
   and fix nothing; and a plugin-side write to a master **does not re-sync the copies already placed in the file** (measured:

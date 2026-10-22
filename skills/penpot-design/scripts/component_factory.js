@@ -329,8 +329,13 @@ return (function () {
     });
     return parts.join('·').replace(/[\/\n]/g, '-');
   };
-  CF.props = function (o) {
-    return { Type: cap(o.type) || 'Default', Size: cap(o.size) || 'Md',
+  /** The raster-slot grammar, in ONE place: `media_engine.js` (MD.isSlot) and the auditor's `placeholder_media` rule
+      must agree, or a plate can be a slot for one and invisible to the other. A slot is a shape that *claims* to hold
+      a source image, so on a screen page a slot without an image fill is a defect (gate G17), not a style choice. */
+  CF.isMediaSlot = function (name) {
+    return /^(img·|image·|media$|media·|thumb$|thumb·|photo|hero·media|cover·|avatar·|og:)/i.test(String(name || ''));
+  };
+  CF.props = function (o) {    return { Type: cap(o.type) || 'Default', Size: cap(o.size) || 'Md',
              State: cap(o.state) || 'Default', Slot: cap(o.slot) || 'None' };
   };
   /** Shrink a box by `w` on every side. Any plate drawn *over* a bordered box (state layer, label tint, selection

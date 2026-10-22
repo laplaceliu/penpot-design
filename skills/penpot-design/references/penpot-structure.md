@@ -247,7 +247,7 @@ Every visual component's primitives live in **exactly one** container:
 
 | Ownership | Judgment | How | Name |
 |---|---|---|---|
-| **component** | reused: in the 13 index, or in ≥ 2 places on 14–16 | assemble into a group → `CF.component(group)`; on a screen, **place an instance** with `CF.instance(CF.name(…))` and switch states with `CF.swap` (instancing is scriptable — api-pitfalls §6, capabilities §5); a `CF` factory re-call is the fallback when no master exists. Never copy loose primitives into a screen | `Family·Type·Size·State` |
+| **component** | reused: in the 13 index, or in ≥ 2 places on 14–16 | assemble into a group → `CF.component(group)`; on a screen, **place an instance** with `CF.instance(CF.name(…))` (or `SC.ctl`, which is that call with the master lookup attached) and switch states with `CF.swap` (instancing is scriptable — api-pitfalls §6, capabilities §5). **On a recreation there is no factory re-call fallback**: a missing master is a `missing_master` gap to close by extending the factory (G12), and rule 39 `not_assembled` reports the drawn version (G17, `design-guide.md` §12). Never copy loose primitives into a screen | `Family·Type·Size·State` |
 | **group** | single-use primitive set: a matrix cell, an anatomy illustration, a KPI card | `penpot.group([host, …members])` in the same parent | host name |
 | **board** | page partition, spec board, screen board, overlay container | a Foundations/Color board is **projected** (`FN.project`, G16 — never `mkAbsBoard`); the `03–09` spec boards, screens and overlays are `storage.mkAbsBoard`/`NL` (approach C), not a group host | see §2 |
 
@@ -256,6 +256,10 @@ Every visual component's primitives live in **exactly one** container:
 - Label-less primitive sets (track + thumb, ring + dot) cannot be found by text pairing: group them manually.
 - A `CF.*` factory **always returns one host with everything mounted inside it** — building through `CF` satisfies
   this section for free, which is the real reason G12 exists.
+- **Drawing right ≠ screen right (G17).** §4.3 governs *what contains what*; it does not decide whether a control on a
+  screen is a master's instance. Pages `14–16` need both: a correctly owned assembly **and** an assembled-from-library
+  control. A perfect `Card·Horizontal·Lg` drawn by `CF` on a screen is a `not_assembled` finding, because nothing in the
+  library owns it.
 - Z-order: within a group the area descends (base plate at the bottom, label/icon on top) and the group takes the top
   member's slot. `penpot.group` scrambles it; repair with `storage.fixZOrder()`.
 - Machine enforcement: `loose_assembly` (audit_layout.js) + `storage.groupAssemblies()` + gate G10.
@@ -293,10 +297,18 @@ This is where amateur output is most visible, so the rules are explicit:
 3. **Only the extent the agent chose is judged.** Grid, scale, rhythm, split ratio, viewport and control-cap rules
    apply to the sections and boxes you placed; geometry *inside* a `CF` host or a `·Spec` board is not grid-audited,
    because an auto-width chip is 97px wide when its label is 97px wide.
-4. **Screens are assembled from the factories, not from re-drawn primitives** (§4.3): chrome from `CF.appBar`/`CF.sideNav`,
-   regions from `LY.rect`, content from the `CF` family that owns it. Re-calling a factory is the scripted equivalent of
-   instancing — same geometry, same name, and the coverage lint can see it.
+4. **Screens are assembled from the system, never re-drawn (gate G17).** On a task where the user supplied source material
+   (`仿写`/`复刻`), the path is `SC.record(…)` → `SC.build({page, screen})` (`engines.md` §8): chrome and content as
+   **library instances** (`SC.ctl` → `CF.instance`), regions from `LY.rect` via `NL.fromRecipe`, copy carrying the library
+   typography style, raster as the user's own bytes (`MD.place`). Re-calling a `CF` factory on a screen is the failure this
+   replaced: a drawn control has no master, so it cannot be fixed centrally, has no variants and cannot be swapped — and the
+   auditor now indicts it (`not_assembled`, rule 39), along with a placeholder plate (`placeholder_media`, 40) and a screen
+   with no source record (`no_source_record`, 41). `13 · Component index` and the `03–09` `·Spec` boards keep drawing: that
+   drawing is what gets registered. Rules 39–41 are scoped by **page name** (`14–16 · Screens`), so no other chapter is judged by them.
 5. `CF.tier` is set per screen (§2.1) and the board is audited with the matching `{ tier }`.
+6. **A screen board lives INSIDE `NN-PageRoot`** (`SC.pageRoot()` + `SC.nextSlot()`). `designPage()` walks from the page head,
+   so a screen at page root is invisible to the design gate while `audit_layout` indicts it as `root_stray` — measured
+   2026-10-22: a 31-shape screen at root audited `shapes: 201` and read **CLEAN**.
 
 ## 7. Mapping to DESIGN.md (design-to-code basis)
 
@@ -326,16 +338,31 @@ This is where amateur output is most visible, so the rules are explicit:
 - [ ] Pages 03–09: one `Family·Spec` per family of `CF.map()`, packed by `LY.pack`, names in
       `Family·Type·Size·State·Slot` form, no `/`.
 - [ ] Coverage per §4.1: `variant_sparse`, `state_coverage`, `focus_ring_missing`, `disabled_wrong` all **0**.
-- [ ] Assembly ownership per §4.3: `loose_assembly` = 0; screens re-call the `CF` factories, never re-draw loose primitives.
+- [ ] Assembly ownership per §4.3: `loose_assembly` = 0; screens never re-draw loose primitives.
+- [ ] **A recreated screen is assembled from the system (G17 — the only screen path when the user supplied source material)**:
+      `not_assembled` (39), `placeholder_media` (40) and `no_source_record` (41) are **0 on every `14–16` page**, every screen
+      board carries the durable `nl:sc` + `nl:rec` stamp that rule 41 reads, `SC.audit()` reads **ASSEMBLED** per page
+      (`drawnHosts: 0`, `placeholders: 0`, `copy === copyBound`), and `SC.coverage()` reads **COMPLETE** (`notInLibrary: []`,
+      `mediaWithoutSource: []`, `emptyRegions: []`). Every photograph, logo or screenshot from the source is a **real media
+      object** (`MD.place`, `fillImage` readback, proof by `export_shape mode:'fill'`) — a gray plate with an `image` glyph in
+      it is a placeholder, not the user's asset. Then **still** run the PIL diff against the source: G17 proves assembly, not
+      fidelity (`verification.md`, `engines.md` §8).
 - [ ] Tokens: `storage.TK.audit().ok === true` and every name/value pair matches DESIGN.md.
-- [ ] **Corners come from the `borderRadius` set and nowhere else**: `radius_off_ladder` (35), `radius_unbound` (36) and
-      `ring_off_host` (37) are **0** on every page, and `designNext`'s `out.radius` adoption reads `shapes === onLadder === bound`.
+- [ ] **Corners come from the `borderRadius` set and nowhere else**: `radius_off_ladder` (35), `radius_unbound` (36),
+      `ring_off_host` (37) and `ring_detached` (38) are **0** on every page, and `designNext`'s `out.radius` adoption reads
+      `shapes === onLadder === bound`.
       Repair an existing file with `TK.radiusStart()` + `TK.radiusSweep()` (ladder) until `done: true`, then
       `TK.roleStart()` + `TK.roleSweep()` (role: pill-family hosts and every `ring·*` → its host's corner, masters **and**
-      placed copies) until `done: true` — one commit yield per page, see `api-pitfalls.md §17` — then **re-read in dry mode**
+      placed copies) until `done: true`, then `TK.ringStart(null)` + `await TK.ringSweep()` until `done: true` (mounting: every
+      `ring·*` re-mounted inside the control whose plate it outlines, at that ring's own measured margin) — one commit yield
+      per page, see `api-pitfalls.md §17` — then **re-read in dry mode**
       before claiming it. Note what the rules cannot see: a host with **no** corner passes vacuously, and a family DESIGN.md
       does not pin to one step reads CLEAN at the wrong step, so also read the masters (`design-guide.md §5.1`) and re-drive any
       spec board whose host corner contradicts the role its factory declares.
+- [ ] **A ring is mounted inside the control it outlines (38)**: `TK.ringSweep({dry:true})` returns `drift: 0` and
+      `unresolved: 0`, and `ring_detached` is 0 in every page verdict. The margin is **not** a checkable constant (0–12 per
+      axis, non-uniform legal) — enclosure + concentricity is, so read `total.floating` (a ring on the container board) and
+      `total.rowRing` (a flat band's ring, legal by containment) rather than a margin histogram (`engines.md` §"Ring mounting").
 - [ ] **Foundations chapters come from `FN` and can prove it (G16 — the only way those pages are built)**:
       `storage.designCoverage()` reads **CLEAN** (every `FN.CHAPTER` kind projected on some `NN.MM` page of its chapter,
       `missing: []`, `foreign: []`), `await storage.FN.check(page)` reads design CLEAN + layout CLEAN with `unbound: []`

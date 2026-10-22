@@ -442,13 +442,33 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 | `penpotUtils.generateCss(...)` | **has an `openPage` side effect** — never call it mid-batch without re-verifying the page |
 | `penpotUtils.getBounds(shape)` | uses `text.textBounds` → **real rendered text metrics**; replaces the `CF.estW` estimate wherever an exact measure matters |
 | `penpot.createShapeFromSvg(svg)` | returns a Group whose size is the **drawn path bbox in grid units** (see the size rule below) → **icons can be imported as editable vectors** instead of emoji placeholders. Five measured rules: it is inserted **at world (0,0), inside whichever board covers the origin** (two different origin-covering boards each received it at x/y −12,−12; with none, it goes to the page root) — `penpot.selection` and `viewport.center` are ignored; the platform adds a `base-background` rectangle you must delete or it paints a plate behind the icon; if the origin is covered by a **component copy** the import cannot be reparented (`Value not valid: Cannot change the structure of a component copy`) — import through a throwaway board at the origin and move from there; a **no-`parent` group is born inside that throwaway**, so it must be moved to the page root *before* the throwaway is removed (otherwise it is deleted with it — measured as `Value not valid: … :getChildren` on the next read); and **the svg root `width/height` is ignored** — the group lands at its 24-grid path bbox (an 18-unit icon arrives 18 px whatever the root says), so the size control is `group.resize(size, size)` after the import, before the sizing declaration (R5). `IC.svg`/`IC.place`/`CF.svgIcon` encode all five |
-| `penpot.uploadMediaUrl/uploadMediaData` | available for raster assets |
+| `penpot.uploadMediaUrl/uploadMediaData` | **the raster channel — the seven measured rules (M1–M7) are in §9.1** |
 | `penpotUtils.addFlexLayout(board, dir)` | adds flex and re-orders **newly added** children — but existing children keep `layoutChild.absolute = true` and stay at their hand-placed coordinates (measured: two rects still at `parentX/Y` 20,20 / 20,80 after the call). The release is per child: `c.layoutChild.absolute = false`, after which they re-flow to the padding edge and the row gap (measured: 16,16 and 16,68 with `pad:16, gap:12`). `NL.reflow` does both |
 | `file.export('penpot'\|'zip','all'\|'merge'\|'detach')` | the method exists — **the pipeline has not been run** (§12) |
 | `file.findVersions()` / `FileVersion` | **async, measured**: `await findVersions()` → `[{label, createdBy, createdAt, isAutosave, restore(), pin(), remove()}]`, ~21 ms; `await version.restore()` → `1`. No `id` field on a version row (labels are the key) |
 | `file.saveVersion(label)` | **worked 3× in one session** (returned `{label, createdBy, createdAt}`; the labels appeared in `findVersions`) **and then silently stopped landing**: the promise never settled, and polling `findVersions` for 6 s found nothing — while a checkpoint whose *call had already timed out* appeared in the list seconds later. Conclusion: the write and the promise are on different clocks, so a checkpoint is **only** a checkpoint if the label shows up in `findVersions` (`PR.checkpoint` polls for 6 s and returns `ok:false` otherwise) |
 | `penpot.history` | only `undoBlockBegin()/undoBlockFinish(id)` — no general undo; do not plan on it |
 | `shape.setPluginData/getPluginData/getPluginDataKeys`, same for `page`/`file`/`library` | available → engine bookkeeping (recipe key, tier, audit stamp) can live **in the file** instead of only in `storage` |
+
+### 9.1 Raster media: a source image as a real Penpot asset (measured 2026-10-22, `scripts/media_engine.js` → `storage.MD`)
+
+A recreated screen shows the user's **photographs, illustrations, logos and screenshots**, which no icon channel can
+produce. Drawing a gray plate with an `image` glyph in it is a placeholder, so gate **G17** requires the real thing; these
+are the seven rules that make it writable, each measured on the live Rayo file:
+
+| # | Call | Measured |
+|---|---|---|
+| M1 | `penpot.uploadMediaData(name, bytes, mtype)` | **three** arguments. The 2-arg form and the `{name,data,mtype}` object form both fail with `media type  is not supported` — Penpot does not sniff, it is told. |
+| M2 | same, with bytes | The bytes must decode to a real image: three garbage bytes return `http error` from the backend. A successful upload returns `{name, width, height, mtype, id}` carrying the asset's **true pixel size**, so the media object is itself the record — never trust a hand-typed width. |
+| M3 | `penpot.uploadMediaUrl(url)` | **not** the loopback path: a `http://127.0.0.1:…` URL fails with `Value not valid. Code: :uploadMedia-url`, because that fetch runs inside the Penpot container, which cannot see this machine's loopback. Binary therefore travels as the skill server's `/b64/<path>` → `atob` → `Uint8Array` → `uploadMediaData`. (The sandbox `fetch` response exposes only `.text()`/`.json()` — there is no `arrayBuffer`/`blob`, which is exactly why `/b64/` exists.) |
+| M4 | `shape.fills = [{ fillImage: media }]` | The **whole** media object from the upload result. A partial `{id}` or `{id,mtype}` is rejected: `Value not valid: [{:fill-image {:id #uuid …}}]. Code: :fills`. |
+| M5 | `fillImage.keepAspectRatio` | **not observable** in the fill readback — assigned `true` and `false`, both read `null`, so crop behaviour is unverified (see §12, do not claim it). `fillOpacity` *does* land (0.5 reads back as 0.5). |
+| M6 | the media list | There is **no media registry to read**: `penpot.currentFile` exposes only `id/name/revn/pages`. So `MD` caches `name → media` for the session and `MD.recover()` rebuilds it by scanning shapes for `fillImage` — an already-placed asset is re-findable, an uploaded-but-unused one is not. |
+| M7 | proof of a placed asset | An export, not a readback: `export_shape(shapeId, mode:'fill')` returns the raw asset and `mode:'shape'` renders the shape with it — both verified byte-for-byte against the source PNG. |
+
+The slot grammar (`img·*`, `media*`, `thumb*`, `photo`, `cover·*`, `avatar·*`, `og:*`) has **one** source —
+`CF.isMediaSlot(name)` — which `MD.isSlot` and auditor rule 40 `placeholder_media` both call, so a plate cannot be a
+media slot for the gate and invisible to the engine.
 
 ## 10. API-surface facts that cost a probe each
 
@@ -510,6 +530,8 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 | C10 | `setPluginData` on shapes/pages | recipe key, tier and gate stamp travel **inside the file** → audits are re-runnable by anyone. This is what makes **G16** a gate rather than a claim: `FN.project` writes `nl:fn=<kind>` + `nl:shelf=1` on every projected Foundations board, and auditor rule 31 `not_projected` reads it back (measured 2026-10-21: 11 boards restamped, `getPluginDataKeys` returns them after a full re-seed of the engines, and `designPage({})` on that page reads `CLEAN`) | **shipped** (`NL.stamp`/`NL.readStamp`, `engines.md` §7.1) |
 | C11 | `createShapeFromSvg` | icons become editable vectors from any SVG, plus a **bundled Lucide catalog** (1966 icons, ISC) with a placement/grid engine; emoji placeholders demoted to a fallback | **shipped** (`scripts/icon_engine.js` + `assets/icons/lucide.jsonl`: origin rule + `base-background` removal + recolor + resize-to-size + root-move-before-tmp-removal, see `references/icons.md`) |
 | C12 | `generateStyle` / `generateMarkup` / `getBounds` | Design→Code gets CSS-accurate geometry from flow boards; text metrics stop being estimated | #16 |
+| C13 | `uploadMediaData` + `fillImage` | a recreated screen paints the **user's own raster** instead of a placeholder plate — `MD.import`/`MD.place`, judged by rule 40 `placeholder_media` | **shipped** (`scripts/media_engine.js`, rules M1–M7 above) |
+| C14 | a source record stamped into the file (`nl:sc`/`nl:rec`) | **G17**: a screen on `14–16` must be *assembled* — `LY.recipe` regions, `CF` library **instances**, `TK`/`TP`-bound paint and type, `MD` raster — and the record it was assembled from travels in the board, so `SC.coverage()` re-runs in any later session | **shipped** (`scripts/screen_engine.js`, `engines.md` §8) |
 
 ## 12. Still unverified — do not claim these
 
@@ -522,3 +544,4 @@ The whole grammar is in `storage.PR` (`scripts/prototype_engine.js`): `PR.flow/e
 * `transformInVariant()` / `addVariant()` / `variantError` semantics: they *exist* on records (§5), but no call has been
   exercised, so their effect is unknown.
 * `replaceColor` on **strokes** (§7 measured fills only), and on a whole page rather than a shape array.
+* `fillImage.keepAspectRatio` and every crop/contain claim (§9.1 M5: the write is accepted, the readback is always `null`).

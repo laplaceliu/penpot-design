@@ -981,8 +981,15 @@ return (function () {
         const isCop = isCopy(s);
         let h = host;
         if (/^ring·/.test(nm)) {
-          if (host) {
-            const hv = maxC(host), rv = maxC(s);
+          // The host is resolved by geometry, not by "the nearest enclosing board": inside a `Family·Spec` board that
+          // fallback hands the rule the shelf itself (TK.ringHost, and the drifted `Search·Spec` plate of 2026-10-22).
+          // A ring takes the corner of the control BOARD it outlines; when it hugs a nested plate (a `field` rect, one
+          // crumb text run) that plate's own radius is design-guide §5.1's open question, and copying it here would
+          // rewrite 100+ rings to a value no token bound them to.
+          const r = TK.ringHost ? TK.ringHost(s) : { host: host, floating: false };
+          const rh = r.host;
+          if (rh && !r.floating && String(rh.type) === 'board' && isControlBoard(rh)) {
+            const hv = maxC(rh), rv = maxC(s);
             if (hv !== null && rv !== null && hv !== rv) { rings++; if (!o.dry) { try { s.borderRadius = hv; } catch (e) { rings--; } } }
           }
         } else if (String(s.type) === 'board') {
@@ -1018,6 +1025,242 @@ return (function () {
   TK.rolePages = function () {
     return Object.keys(TK._roleReport || {}).filter((n) => TK._roleReport[n].hosts || TK._roleReport[n].rings)
       .map((n) => Object.assign({ page: n }, TK._roleReport[n]));
+  };
+
+  // ---------- the ring ↔ owner relation: resolved by GEOMETRY, in one place ----------
+  // Rule 37 (`ring_off_host`) compares a ring's corner to its host's, but it *found* its host by assuming the ring is
+  // already concentric. Measured 2026-10-22 on `04.04 · Text fields · Search·Spec`: a `ring·focus` left at its pre-refit
+  // box (204×36 at y 546, drawn for a 200px cell before the row was refit to 281×32 at y 532) has no concentric sibling,
+  // and the old fallback `famOf(par) ? par : null` handed rule 37 the **Spec board** as the host — corners 0 — so a
+  // floating, 16px-low ring around nothing read CLEAN. A container is never a host: a `·Spec` / `·PageRoot` / `-Header` /
+  // `-Footer` board holds controls, it is not one. This function is the single source of the relation; the auditor reads
+  // it (`audit_design` rules 37/38) and `TK.ringSweep` repairs with it, so the two cannot own two tables (api-pitfalls §16).
+  //
+  // Two measured facts set the semantics of this whole section (census 2026-10-22, 231 rings over the 116 pages 03–16):
+  //   1. **the margin is not a constant.** 176 rings hug their plate at 2px, but Rating/IconButton rows use 6, a Segmented
+  //      uses 5, a `Slider` handle uses 10, and a Breadcrumb crumb ring is *coincident* with its row (0). A ±2 box
+  //      comparison therefore mis-called 47 healthy rings detached. The invariant is not the margin but the **relation**:
+  //      the ring is concentric with a real plate and strictly encloses it (`margin ∈ [0, RING_MAX_MARGIN]`).
+  //   2. **the owner is usually not the control board.** A ring outlines what the user sees: the `field` rect of an addon
+  //      Input (204×36 inside a 279×32 host), the 140×32 input segment of a NumberField, the 18×18 `box` of a Checkbox,
+  //      one `handle` of a Slider, one **row** of a Tree / Accordion / rail / crumb list. So the scan walks the whole
+  //      control subtree (text and paths included — a crumb link *is* a text run), and a ring that outlines a row band
+  //      and simply has no plate of its own is judged by **containment** instead, not called detached.
+  TK.RING_OFF = 2;
+  TK.RING_MAX_MARGIN = 12;
+  const RING_CONTAINER = /·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root /;
+  const RING_DECOR = /^(ring·|hairline·|guide·|axis|Group$)/;
+  function ringName(sh) { try { return String(sh.name || ''); } catch (e) { return ''; } }
+  function ringBox(sh) {
+    try {
+      const x = Number(sh.x), y = Number(sh.y), w = Number(sh.width), h = Number(sh.height);
+      return [x, y, w, h].every((v) => isFinite(v)) ? { x: x, y: y, w: w, h: h } : null;
+    } catch (e) { return null; }
+  }
+  // a host is a CF-shaped control board (`Family·Variant·Size·State·Slot`), never the shelf that holds them
+  function isControlBoard(sh) {
+    if (String(sh.type) !== 'board') return false;
+    const n = ringName(sh);
+    if (RING_CONTAINER.test(n)) return false;
+    return n.indexOf('·') >= 0;
+  }
+  function isOwnable(sh) {
+    if (String(sh.type) === 'svg') return false;
+    return !RING_DECOR.test(ringName(sh));
+  }
+  function N2(v) { return Math.round(v * 100) / 100; }
+
+  // The page-wide fallback for a ring that is NOT inside any control: its SIZE identifies the plate it was drawn for
+  // (ring = plate ⊕ m for the family's m), so the owner is the nearest plate the ring is exactly the right size to hug.
+  TK.ringOwner = function (s, o) {
+    o = o || {};
+    const margin = o.margin === undefined ? TK.RING_MAX_MARGIN : o.margin;
+    const maxDelta = o.maxDelta === undefined ? 200 : o.maxDelta;
+    const rb = ringBox(s);
+    if (!rb) return { host: null, err: 'no box' };
+    const cx = rb.x + rb.w / 2, cy = rb.y + rb.h / 2;
+    const matches = [];
+    (function scan(k, d) {
+      if (k !== s && isOwnable(k)) {
+        const b = ringBox(k);
+        if (b && b.w > 0 && b.h > 0) {
+          const ox = (rb.w - b.w) / 2, oy = (rb.h - b.h) / 2;
+          // The ring ENCLOSES its owner with a tight, non-negative margin on both axes. Uniformity is NOT required: an
+          // inline-link ring is its text ⊕ (1.5, 3) — a crumb of `08.06` — because a link adds vertical breathing room,
+          // not a square frame. Rank by centre distance, then by total slack, then innermost.
+          if (ox >= -0.01 && oy >= -0.01 && ox <= margin && oy <= margin) {
+            const v = Math.abs(cx - (b.x + b.w / 2)) + Math.abs(cy - (b.y + b.h / 2));
+            if (v <= maxDelta) matches.push({ sh: k, box: b, ox: ox, oy: oy, slack: Math.abs(ox - oy) + ox + oy, delta: N2(v) });
+          }
+        }
+      }
+      if (d >= (o.depth === undefined ? 6 : o.depth)) return;
+      let ks = []; try { ks = Array.from(k.children || []); } catch (e) {}
+      ks.forEach((c) => scan(c, d + 1));
+    })(o.scan || s.parent, 0);
+    matches.sort((a, b) => (a.delta - b.delta) || (a.slack - b.slack) || (a.box.w * a.box.h - b.box.w * b.box.h));
+    if (!matches.length) return { host: null, matches: 0 };
+    return { host: matches[0].sh, margin: N2(matches[0].ox), oy: N2(matches[0].oy), delta: matches[0].delta, matches: matches.length,
+      runnerUp: matches.length > 1 ? matches[1].delta : null, ambiguous: matches.length > 1 && matches[1].delta - matches[0].delta <= 2 };
+  };
+
+  // THE resolver. Returns `{host, concentric, floating, contained, ox, oy}` — `host` = the plate the ring outlines,
+  // `concentric` = it really traces it, `floating` = the ring is not mounted inside any control (the defect the user
+  // reported), `contained` = it sits inside its control and outlines a row band that has no plate of its own.
+  TK.ringHost = function (s, o) {
+    o = o || {};
+    const tol = o.tol === undefined ? 3 : o.tol;
+    const margin = o.margin === undefined ? TK.RING_MAX_MARGIN : o.margin;
+    const rb = ringBox(s);
+    if (!rb) return { host: null, concentric: false, err: 'no box' };
+    const cx = rb.x + rb.w / 2, cy = rb.y + rb.h / 2;
+    let control = null, a = null, g = 0;
+    try { a = s.parent; } catch (e) {}
+    while (a && g < 4) { if (isControlBoard(a)) { control = a; break; } try { a = a.parent; } catch (e) { a = null; } g++; }
+    const cb = ringBox(control);
+    // A row ring legitimately overhangs its control by its own margin, so containment is judged on the control
+    // EXPANDED by RING_MAX_MARGIN, with the ring's centre inside the control (measured: the Tree/Accordion/rail rows have
+    // no plate of their own — only their Text runs and glyphs are drawn flat — so a row outline traces nothing).
+    const contained = !!cb && rb.x >= cb.x - margin && rb.y >= cb.y - margin &&
+      rb.x + rb.w <= cb.x + cb.w + margin && rb.y + rb.h <= cb.y + cb.h + margin &&
+      cx >= cb.x && cx <= cb.x + cb.w && cy >= cb.y && cy <= cb.y + cb.h;
+    if (control) {
+      const good = [];
+      (function scan(k, d) {
+        if (k !== s && isOwnable(k)) {
+          const b = ringBox(k);
+          if (b && b.w > 0 && b.h > 0) {
+            const v = Math.abs(cx - (b.x + b.w / 2)) + Math.abs(cy - (b.y + b.h / 2));
+            const ox = (rb.w - b.w) / 2, oy = (rb.h - b.h) / 2;
+            if (v <= tol && ox >= -0.01 && oy >= -0.01 && ox <= margin && oy <= margin) good.push({ sh: k, v: v, ox: ox, oy: oy });
+          }
+        }
+        if (d >= (o.depth === undefined ? 4 : o.depth)) return;
+        let ks = []; try { ks = Array.from(k.children || []); } catch (e) {}
+        ks.forEach((c) => scan(c, d + 1));
+      })(control, 0);
+      // a composite's ring hugs the SMALLER thing it outlines, so the innermost concentric plate wins.
+      good.sort((p, q) => (p.v - q.v) || (p.sh.width * p.sh.height - q.sh.width * q.sh.height));
+      if (good.length) {
+        const w = good[0];
+        return { host: w.sh, control: control, concentric: true, floating: false, contained: contained,
+          via: w.sh === control ? 'control' : 'descendant', ox: N2(w.ox), oy: N2(w.oy), dist: N2(w.v),
+          kind: String(w.sh.type), accepts: good.length };
+      }
+      return { host: null, control: control, concentric: false, floating: false, contained: contained, kind: 'none' };
+    }
+    // floating: mounted on the container board, so no concentric sibling can exist. Use the size match instead.
+    const own = TK.ringOwner(s, { margin: margin, maxDelta: o.maxDelta, scan: o.scan });
+    if (!own.host) return { host: null, control: null, concentric: false, floating: true, contained: false, matches: own.matches || 0 };
+    return { host: own.host, control: null, concentric: own.delta <= tol, floating: true, contained: false,
+      via: 'size-match', ox: own.margin, oy: own.oy, dist: own.delta, kind: String(own.host.type),
+      matches: own.matches, runnerUp: own.runnerUp, ambiguous: own.ambiguous };
+  };
+
+  // The board a repaired ring must be mounted IN: `ctx.ring` puts a ring inside the control whose plate it outlines
+  // (`clip·` crops are the one exception — their ring stays one level up, api-pitfalls §4).
+  function ringMount(host) {
+    if (isControlBoard(host)) return /^clip·/.test(ringName(host)) ? host.parent : host;
+    let a = null, g = 0;
+    try { a = host.parent; } catch (e) {}
+    while (a && g < 5) { if (isControlBoard(a)) return /^clip·/.test(ringName(a)) ? a.parent : a; try { a = a.parent; } catch (e) { a = null; } g++; }
+    return null;
+  }
+
+  // Census + idempotent repair for the drift class. `dry` reports; a write refits the ring onto its owner (owner box ±
+  // the ring's own measured margin, never a forced 2), re-mounts it inside the owning control, and takes the owner's
+  // corner when the owner is a control BOARD (a nested plate's radius is design-guide §5.1's open question, not this rule).
+  TK.ringStart = function (names, o) {
+    o = o || {};
+    TK._ringQueue = (names || TK.pageNames()).slice();
+    TK._ringReport = {};
+    if (!TK._ringAgg || o.reset !== false) {
+      TK._ringAgg = { mode: o.dry ? 'dry' : 'apply', calls: 0, pages: 0, rings: 0, ok: 0, drift: 0, reparented: 0, refit: 0, corners: 0, floating: 0, rowRing: 0, unresolved: 0, bound: 0, errs: [] };
+    }
+    return { queued: TK._ringQueue.length };
+  };
+  TK.ringSweep = async function (o) {
+    o = o || {};
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (!TK._ringQueue || !TK._ringQueue.length) TK.ringStart(null, o);
+    if (!TK._ringAgg) TK.ringStart(TK._ringQueue, o);
+    const agg = TK._ringAgg; agg.calls++; agg.mode = o.dry ? 'dry' : 'apply';
+    const budget = o.budget === undefined ? 16000 : o.budget;
+    const settle = o.dry ? 0 : (o.settle === undefined ? 800 : o.settle);
+    const t0 = Date.now(); const anomalies = []; let chunks = 0;
+    while (TK._ringQueue.length && Date.now() - t0 < budget) {
+      const n = TK._ringQueue.shift(); chunks++;
+      let page = null; try { page = penpotUtils.getPageByName(n); } catch (e) {}
+      if (!page) { anomalies.push({ page: n, err: 'no page' }); continue; }
+      if (penpot.currentPage.name !== n) { try { await penpot.openPage(page.id); } catch (e) { anomalies.push({ page: n, err: 'open failed' }); continue; } await nap(o.dry ? 60 : 150); }
+      let root = null; try { root = penpot.currentPage.root; } catch (e) {}
+      for (let i = 0; !root && i < 6; i++) { await nap(o.dry ? 80 : 200); try { const rp = penpotUtils.getPageByName(n); root = rp && rp.root; } catch (e) {} }
+      if (!root) { anomalies.push({ page: n, err: 'no root (cold page)' }); TK._ringQueue.unshift(n); break; }
+      let rings = 0, ok = 0, drift = 0, reparented = 0, refit = 0, corners = 0, floating = 0, rowRing = 0, unresolved = 0;
+      const list = [];
+      (function walk(s) {
+        if (/^ring·/.test(ringName(s))) { list.push(s); return; }
+        let ks = []; try { ks = Array.from(s.children || []); } catch (e) {}
+        ks.forEach((k) => walk(k));
+      })(root);
+      list.forEach((s) => {
+        rings++;
+        const res = TK.ringHost(s, { tol: o.tol, margin: o.margin });
+        const host = res.host;
+        if (!host) {
+          if (res.floating) { floating++; unresolved++; anomalies.push({ page: n, ring: ringName(s), floating: true, matches: res.matches }); }
+          else if (res.contained) { rowRing++; ok++; }
+          else { unresolved++; anomalies.push({ page: n, ring: ringName(s), err: 'inside control, fits nothing' }); }
+          return;
+        }
+        if (res.concentric && !res.floating) {
+          ok++;
+          if (String(host.type) === 'board' && isControlBoard(host)) {
+            const cs = TK.cornersOf(host), rs = TK.cornersOf(s);
+            const hv = cs ? Math.max.apply(null, cs) : null, rv = rs ? Math.max.apply(null, rs) : null;
+            if (hv !== null && rv !== null && hv !== rv) { corners++; if (!o.dry) { try { s.borderRadius = hv; } catch (e) { corners--; } } }
+          }
+          return;
+        }
+        drift++;
+        // the ring's OWN measured margins are re-applied (a link ring is ⊕1.5/3, a control ring ⊕2, a handle ring ⊕10) —
+        // forcing 2 here would repaint every non-uniform outline in the file.
+        const ox = res.ox === undefined ? TK.RING_OFF : res.ox, oy = res.oy === undefined ? TK.RING_OFF : res.oy;
+        const hb = ringBox(host);
+        const target = ringMount(host);
+        const to = [Math.round(hb.x - ox), Math.round(hb.y - oy), Math.round(hb.w + ox * 2), Math.round(hb.h + oy * 2)];
+        if (res.floating) floating++;
+        if (o.dry) { anomalies.push({ page: n, ring: ringName(s), drift: { via: res.via, dist: res.dist, margin: [ox, oy], host: ringName(host), kind: res.kind, from: [Math.round(s.x), Math.round(s.y), Math.round(s.width), Math.round(s.height)], to: to } }); return; }
+        if (!target) { anomalies.push({ page: n, ring: ringName(s), err: 'no mount target' }); drift--; return; }
+        try { if (target.clipContent) target.clipContent = false; } catch (e) {}
+        storage.absMount(target, s, hb.x - ox, hb.y - oy);
+        s.resize(hb.w + ox * 2, hb.h + oy * 2);
+        if (target !== s.parent) reparented++;
+        refit++;
+        if (String(host.type) === 'board' && isControlBoard(host)) {
+          const cs = TK.cornersOf(host);
+          const hv = cs ? Math.max.apply(null, cs) : null;
+          if (hv !== null) { const rs = TK.cornersOf(s); const rv = rs ? Math.max.apply(null, rs) : null; if (rv !== hv) { corners++; try { s.borderRadius = hv; } catch (e) {} } }
+        }
+      });
+      let bind = { radius: 0 };
+      // a geometry write and a corner write both drop the token binding, so the pass must re-bind to leave the file bound.
+      if (!o.dry && (refit || corners)) bind = await TK.bindPage(n, { only: 'radius', settle: 0, pageSettle: settle });
+      else if (!o.dry && settle) await nap(settle);
+      agg.pages++; agg.rings += rings; agg.ok += ok; agg.drift += drift; agg.reparented += reparented;
+      agg.refit += refit; agg.corners += corners; agg.floating += floating; agg.rowRing += rowRing;
+      agg.unresolved += unresolved; agg.bound += bind.radius || 0;
+      TK._ringReport[n] = { rings: rings, ok: ok, drift: drift, reparented: reparented, refit: refit, corners: corners, floating: floating, rowRing: rowRing, unresolved: unresolved, bound: bind.radius || 0 };
+    }
+    return {
+      chunks: chunks, ms: Date.now() - t0, remaining: TK._ringQueue.length, done: TK._ringQueue.length === 0,
+      anomalies: anomalies.slice(0, o.samples || 10), anomalyCount: anomalies.length,
+      total: { pages: agg.pages, rings: agg.rings, ok: agg.ok, drift: agg.drift, reparented: agg.reparented, refit: agg.refit, corners: agg.corners, floating: agg.floating, rowRing: agg.rowRing, unresolved: agg.unresolved, bound: agg.bound }
+    };
+  };
+  TK.ringPages = function () {
+    return Object.keys(TK._ringReport || {}).filter((n) => TK._ringReport[n].drift || TK._ringReport[n].unresolved || TK._ringReport[n].floating || TK._ringReport[n].corners)
+      .map((n) => Object.assign({ page: n }, TK._ringReport[n]));
   };
 
   // ---------- library typography styles: the 素材 → 排版 list ----------

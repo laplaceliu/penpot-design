@@ -8,14 +8,16 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 | `scripts/layout_engine.js` | **`storage.LY.*`** — the region math: `SPACE`/`ROWS`/`TIERS`, `snap`/`onScale`, `frame`/`container`/`grid`/`split`/`rows`/`flow`/`repeat`/`pack`, `viewportHeight`/`fold`, `recipe`/`plan`/`rect`/`keys`, `slots`, `drawStart`/`drawStep` | run right after seed; every coordinate on every page comes from it (gate **G11**) |
 | `scripts/component_factory.js` | **`storage.CF.*`** — the variant-producing factories + `build`/`matrix`/`component`/`variants`, **components** `get`/`register`/`instance`/`swap`/`variantSet`/`svgIcon`, `P` palette, `STATE` alphas, `ladder`/`radius`/`fills`/`name`/`glyph`, `minHit`/`tier`/`autoHit`, `map`/`missing` | run after LY; every control on every page is produced by it (gate **G12**). The registry is `CF.map()`; **`CF.missing()` must return `[]`** — that is the count to trust, not a number written in a doc. Screens reuse controls through `CF.instance(CF.name(...))` + `CF.swap` (instances, not re-drawn copies); a variant set needs `CF.variantSet(hosts, family, props)` with one `properties` object per host |
 | `scripts/native_layout.js` | **`storage.NL.*`** — native flex/grid authoring: `frame`/`row`/`col`/`gridFrame`/`cell`, `mount`/`add`/`sizing`/`fill`/`fix`/`hug`/`alignSelf`/`margin`, `applyFlex` (whitelisted pad/gap/align vocabulary), `label`/`plate`/`line`, `guide`/`rulerGuide`, `stamp`/`readStamp`, `settle`/`whenSettled`/`report`/`auditFlow`/`nudge`/`reflow`/`fromRecipe` | run after CF; turns the LY region plan into **flow** boards so the file stays editable (`references/native-layout.md`). `fromRecipe` needs LY, `frame({shadow})` needs CF, both degrade instead of throwing |
-| `scripts/audit_design.js` | **design-rule lint** (`designPage`/`designStart`/`designNext`/`designAll`/`designGate`/`designCoverage`): 37 signatures — grid/scale/ramp/gap/measure/split/cap/touch/primary/row-height/radius/contrast/viewport/state-coverage/`variant_sparse`/`focus_ring_missing`/`disabled_wrong`/`name_invalid` + token-binding `paint_unbound`/`paint_off_palette`/`type_unbound`/`type_off_ramp`/`space_unbound`/`space_off_scale` + `no_guides`/`pane_filled`/`not_component`/`caption_stale`/`empty_cell`/`no_type_styles` + the G16 provenance rule `not_projected`, whose chapter/exemption table it imports from `storage.FN` + the **whitespace trio** `cramped_gap`/`hierarchy_gap`/`text_cramped` (amounts from `LY.BREATH`, leading floor from the declared ramp, both published to the repairer as `storage.breathSpec`; `designPage()` also returns `out.breath`, the per-page **adoption read**) + the **radius pair** `radius_off_ladder`/`radius_unbound` (ladder read from the live `TK.declared().radii`, never from `CF.RAD`; `designPage()` returns `out.radius = {shapes, onLadder, bound, steps, off}`, and both skip `v <= 0` — see design-guide §5.1 "what the gate cannot see") + `ring_off_host` (a `ring·*` plate whose corner is not its host control's; `CF.ROLE.ring = 'host'`, repair `TK.roleSweep`). It judges **component masters** too: the skip is `isComponentCopyInstance()`, never `isComponentInstance()` — a main instance answers the latter `true`, so the old guard exempted every master in the file | run per board as built and per page at the end; gate **G13** blocks delivery |
+| `scripts/audit_design.js` | **design-rule lint** (`designPage`/`designStart`/`designNext`/`designAll`/`designGate`/`designCoverage`): 41 signatures — grid/scale/ramp/gap/measure/split/cap/touch/primary/row-height/radius/contrast/viewport/state-coverage/`variant_sparse`/`focus_ring_missing`/`disabled_wrong`/`name_invalid` + token-binding `paint_unbound`/`paint_off_palette`/`type_unbound`/`type_off_ramp`/`space_unbound`/`space_off_scale` + `no_guides`/`pane_filled`/`not_component`/`caption_stale`/`empty_cell`/`no_type_styles` + the G16 provenance rule `not_projected`, whose chapter/exemption table it imports from `storage.FN` + the **whitespace trio** `cramped_gap`/`hierarchy_gap`/`text_cramped` (amounts from `LY.BREATH`, leading floor from the declared ramp, both published to the repairer as `storage.breathSpec`; `designPage()` also returns `out.breath`, the per-page **adoption read**) + the **radius pair** `radius_off_ladder`/`radius_unbound` (ladder read from the live `TK.declared().radii`, never from `CF.RAD`; `designPage()` returns `out.radius = {shapes, onLadder, bound, steps, off}`, and both skip `v <= 0` — see design-guide §5.1 "what the gate cannot see") + `ring_off_host` (a `ring·*` plate whose corner is not its host control's; `CF.ROLE.ring = 'host'`, repair `TK.roleSweep`) + **the gate-G17 trio** `not_assembled`/`placeholder_media`/`no_source_record` (rules 39/40/41, §8 — scoped by page name to `/^1[4-9] · Screens/`, with the family index read **live** from `CF.map()` and the slot grammar from `CF.isMediaSlot`, so a `·Spec` chapter that shows a drawing is never judged by them) + `ring_detached` (rule 38 — a `ring·*` plate that is not **mounted inside** the control it outlines: its ancestry reaches the `·Spec`/PageRoot container without passing a control board, or it traces no plate at all. Judged by `TK.ringHost()` = enclosure + concentricity, **never** by a fixed margin; repair `TK.ringSweep`. See §"Ring mounting" below and design-guide §5.1). It judges **component masters** too: the skip is `isComponentCopyInstance()`, never `isComponentInstance()` — a main instance answers the latter `true`, so the old guard exempted every master in the file | run per board as built and per page at the end; gate **G13** blocks delivery |
 | `scripts/repair_engines.js` | `fixStaleCenter` / `groupAssemblies` / `fixZOrder` / `alignPage` / `vAlignPage` / `fixInner` / `unclip` / `cleanOrphans` | run once to plant into storage, call page by page |
 | `scripts/fix_layout.js` | flex-collapse repair (getDesignSize + absRow + fixCol, two-round convergence) | run directly on the target page |
-| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.paint`·`TK.changed` theme-switch paint proof / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) **plus the library typography styles** (`storage.TP`: `TP.seed` one `LibraryTypography` per declared ramp step, named exactly like its token, idempotent and readback-verified / `TP.audit` tokens ↔ styles diff / `TP.apply` apply-to-shape) **plus the two whole-file corner drivers** (`TK.radiusStart`/`TK.radiusSweep`/`TK.radiusPages` snap every drawn corner onto the live ladder and bind it; `TK.roleStart`/`TK.roleSweep`/`TK.rolePages` force the corner a family must carry — pill hosts to `CF.radius('control')` and every `ring·*` to its host — across masters **and** placed copies, then re-bind, because a raw `borderRadius` write clears the token binding) | record immediately after building skeleton; re-run health check before acceptance (gate **G9**); `TP.seed()` once per file **after** the ramp tokens exist — 素材 → 排版 lists `library.local.typographies`, which a token set never fills (capabilities §6, rule 30 `no_type_styles`) |
+| `scripts/token_engine.js` | Design Tokens (`TK.seed` build set + record token auto-active / `TK.apply` apply + readback verify / `TK.paint`·`TK.changed` theme-switch paint proof / `TK.audit`·`TK.assert` health check / `TK.unbindFill`) **plus the library typography styles** (`storage.TP`: `TP.seed` one `LibraryTypography` per declared ramp step, named exactly like its token, idempotent and readback-verified / `TP.audit` tokens ↔ styles diff / `TP.apply` apply-to-shape) **plus the two whole-file corner drivers** (`TK.radiusStart`/`TK.radiusSweep`/`TK.radiusPages` snap every drawn corner onto the live ladder and bind it; `TK.roleStart`/`TK.roleSweep`/`TK.rolePages` force the corner a family must carry — pill hosts to `CF.radius('control')` and every `ring·*` to its host — across masters **and** placed copies, then re-bind, because a raw `borderRadius` write clears the token binding) **plus the ring-mount driver** (`TK.ringStart`/`TK.ringSweep`/`TK.ringPages` — the census and idempotent repair for rule 38: `TK.ringHost(shape)` resolves the plate a `ring·*` outlines by enclosure + concentricity, `ringSweep` re-mounts and resizes a drifted ring onto its owner with the *measured* per-axis margin and copies the host corner, then re-binds `radius` per page; it is the single resolver shared by the repairer **and** `audit_design.js`, so the gate and the fix cannot disagree) | record immediately after building skeleton; re-run health check before acceptance (gate **G9**); `TP.seed()` once per file **after** the ramp tokens exist — 素材 → 排版 lists `library.local.typographies`, which a token set never fills (capabilities §6, rule 30 `no_type_styles`) |
 | `scripts/palette_engine.js` | Library colors (`LIB.seed` idempotent create+rename+set / `LIB.fill`·`LIB.stroke` ref-bound paint with readback / `LIB.audit` channel inventory via `shapesColors` / `LIB.replace` raw-hex swap) | the second re-skin channel (capabilities §7); independent of LY/CF/NL, so it can be seeded at any point |
 | `scripts/foundations_engine.js` | **`storage.FN.*`** — the Foundations/Color-in-use boards **projected out of the library records**: `FN.setContent` (editorial content as data) / `FN.project({page,kind[,set]})` one board per call, stamped `nl:fn=<kind>` / `FN.bindNext({page})` bind+gate / `FN.check`·`FN.audit` / `FN.lanes`·`place`·`reflow`·`fitRoot`·`relayout` / `FN.source`·`tones`·`ratio`·`verdict` / the provenance read side `FN.CHAPTER`·`EXEMPT`·`boards`·`stampOf`·`kindsOn`·`foreign`·`chapterPages`·`coverage`·`restamp` | run LAST (it refuses without LY+CF+NL+TK); replaces hand-composed spec pages §7, and **is what makes gate G16 checkable**: `audit_design` rule 31 `not_projected` reads its stamp and `storage.designCoverage()` reads its chapter table (§7.1) |
 | `scripts/prototype_engine.js` | Prototype + delivery (`PR.flow`/`ensureFlow`, `PR.nav`/`overlay`/`close`/`url`/`delay`, `PR.prototype(links,{flow})`, `PR.read`/`clear`, `PR.exports`/`bytes`, `PR.checkpoint`/`versions`/`restore`, `PR.ANIM` presets) | wire `14–16 · Screens` into a clickable flow before delivery (C6/C7/C9); its four rules P1–P4 (destination is a **shape**, interactions are append-only, animation fields complete, versions are verified not trusted) are in capabilities §8/§9 |
 | `scripts/icon_engine.js` | Icons (`IC.seed` JSONL/`IC.add` any SVG / `IC.get`·`search`·`missing` / `IC.svg` color substitution / `IC.place` / `IC.grid`) | catalog `assets/icons/lucide.jsonl` (Lucide, ISC, 1966 icons); seed only the lines a page needs; channel choice + licenses in `references/icons.md` — in-control glyphs stay `CF.glyph` |
+| `scripts/media_engine.js` | **`storage.MD.*`** — the raster channel: `MD.config({server})` / `bytes(path)` / `import({path[,name]})` / `fill(shape, media)` / `place({parent, slot, path[, x,y,w,h, radius]})` / `audit` / `recover()` / `isSlot(name)` / `report` | run after `token_engine`; a source image becomes a **real Penpot media object** painted with `fillImage` (M1–M7 in the file header and capabilities §9.1). Needs the **project-rooted** server (`serve_skill.py --root <project> --port 8779`) because `uploadMediaUrl` cannot reach loopback (M3) — the skill server on 8777 only serves `scripts/` (§8.1) |
+| `scripts/screen_engine.js` | **`storage.SC.*`** — the record-driven screen assembler: `record(screen, spec)` (validates → `gaps`) / `build({page, screen[, sections, rebuild, x0, y0, h]})` → census / `ctl`·`copy`·`media`·`icon` (the four channels) / `master`·`familyIndex`·`libIndex`·`isControlName` / `pageRoot`·`nextSlot`·`find`·`scope`·`digest` / `audit`·`auditStart`·`auditNext` / `coverage` / `reconcile({dry}`|`{apply:'register'})` / `report` | run after `MD`; **the only screen path on a recreation** (gate **G17**, §8): places library **instances**, carries the type style, fills raster slots from the source, binds tokens, and stamps `nl:sc`/`nl:rec` so rules 39/40/41 and `SC.coverage()` can re-read the contract from the file |
 | `scripts/audit_layout.js` | positioning audit (`auditPage`/`auditAll`): **15 defect signatures + `text_centre_info`** (S1–S14 catalogue: containment, stale-center, size degradation, header, root stray, board/text overlap incl. S8b cross-parent, malformed, align, loose assembly, S12 stroke covered, S12b stroke clipped, S13 duplicate board) + font histogram, read-only | run on each board as built; recompute after finishing |
 | `scripts/fix_geometry.js` | geometry repair (column offset/board height/root height/right overflow, four engines, all support dry-run) | repair page by page after audit lists |
 | `scripts/scaffold_structure.js` | **18-page skeleton**: pages → PageRoot/Header/Footer → `fit` (root height = used height) | first step of code-to-design; re-runnable, and phase 3 is the delivery-time height fix |
@@ -33,6 +35,11 @@ Build and repair engine code is **all externalized to `scripts/`** (can be paste
 > `foundations_engine.js` (`FN`) is the exception in the other direction: it captures `LY`/`CF`/`NL`/`TK` **at seed
 > time** and returns `{err:'load seed_storage + layout_engine + component_factory + native_layout + token_engine
 > first'}`, so it is always loaded last and re-loaded last after a storage wipe.
+>
+> `media_engine.js` (`MD`) + `screen_engine.js` (`SC`) join the order **before the auditors** whenever the task is a
+> recreation (gate **G17**, §8): `SC` refuses without `LY`+`CF`+`NL` and reads `MD`/`TK`/`TP` at call time, and it must be
+> seeded *before* `audit_design.js` runs on a `14–16` page — rule 41's page-scope half reports a Screens page where `SC`
+> is absent rather than passing it (`penpot-capabilities.md` §9.1 for the media rules, `api-pitfalls.md` §18 for the traps).
 >
 > **Re-seeding is not exempt from the order.** `audit_design.js` and `FN` bind `const LY = storage.LY` in their closure,
 > so re-seeding `layout_engine.js` alone leaves every consumer pointing at the *superseded object* — the new table is on
@@ -81,6 +88,13 @@ for (const f of ['layout_engine.js', 'component_factory.js', 'native_layout.js',
 The three sandbox objects must be passed as **parameters** — a `new Function` body cannot *see* `storage`/`penpotUtils`
 (api-pitfalls §7); the engines assign themselves into `storage`, so the return value is only the seed report (read it:
 `seeded`, `factories`, `slots`, …).
+
+⚠️ **The path hangs off whichever root owns port 8777.** `serve_skill.py` serves *its own skill directory* (`ROOT =
+dirname(dirname(__file__))`), so its URLs are `http://127.0.0.1:8777/scripts/<f>`. Measured 2026-10-22: that fetch
+returned **404** here, because an ad-hoc repo-root CORS server already held 8777 and the skill's own instance was
+silently not bound — from a repo root the same file is `/skills/penpot-design/scripts/<f>`. Before seeding, settle it
+in one call instead of guessing both forms: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8777/ping.txt`
+proves a server is up, `ss -ltnp | grep 8777` + `readlink /proc/<pid>/cwd` tells you which root it serves.
 
 ⚠️ **Two of the scripts are runners, not planters**: `fix_layout.js` and `scaffold_structure.js` *execute* when loaded
 (scaffold creates up to 6 pages and schedules a page switch as a side effect of seeding — which hijacks
@@ -167,6 +181,44 @@ Note: run an audit once before snapping (collect the offset list for manual revi
 - **Crash-damage repair**: walk detects 100×100 non-text primitives → resize per design spec (board + edge-touching children, header board must be handled).
 - **Cross-page delete**: first `penpot.openPage` that page (wait for switch to take effect), then remove.
 
+### Ring mounting (`TK.ringHost` / `TK.ringSweep`) — rule 38 `ring_detached`
+
+A `ring·*` plate is an *outline of something*, so its position is a relation, not a coordinate. Measured 2026-10-22 over
+the 231 rings of pages 03–16, the relations are:
+
+- **The ring encloses a real plate** with margin `0…12` on both axes — 2 for 176 of them, but 5/6/7/9/10 for other
+  families and **0** for an inline-link or breadcrumb ring, where the ring is the text's own box. A link ring is even
+  non-uniform (≈1.5 horizontal / 3 vertical). **A fixed ±2 margin test is therefore a fallacy**: it flagged 47 rings,
+  then 25, none of them defects.
+- **The ring is concentric with that plate** (centre Δ ≤ `tol`, default **3**). Concentricity is the invariant; the
+  margin is not judged at all.
+- **The owner is usually a nested plate, not the control board**: an addon field's `field` rect, a Checkbox `box`
+  (18×18), a Slider `handle`/`state·layer` (20×20 / 40×40), one OTP digit, one crumb `Text` run. Plain anatomy names
+  carry no `·`, so an owner filter that requires `·` rejects all of them.
+- **A row band may have no plate** (Tree / Accordion / anchor-rail rows are drawn flat: `Text` + glyphs only). Those 3
+  rings are legitimate and pass by **containment**: the ring sits inside the control expanded by the max margin, with
+  the ring centre inside the control.
+
+The structural defect signature is a ring whose ancestry reaches the `·Spec`/PageRoot container **without passing a
+control board** — `ctx.ring` always mounts inside the control (one level up only around a `clip·`), so a board-level
+ring is a stale outline left behind by a refit. `TK.ringHost(shape)` resolves it in that order (control ancestor ≤4 up →
+deep subtree scan for concentric + enclosing, innermost wins → expanded containment → page-wide size match) and returns
+`{host, control, concentric, floating, contained, ox, oy, kind}` — the same object the auditor reads, so the gate and
+the repair cannot disagree.
+
+```js
+const TK = storage.TK;
+TK.ringStart(null);                                  // queue every page (pass names to scope it); an empty queue auto-starts
+await TK.ringSweep({ dry: true });                    // census: {total:{rings, ok, drift, floating, rowRing, unresolved…}}
+await TK.ringSweep({ budget: 16000, settle: 800 });   // apply: re-mount + resize per measured ox/oy, copy host corner,
+                                                      // then TK.bindPage(n,{only:'radius'}) — a geometry write clears it
+TK.ringPages();                                       // AFTER a pass: per-page table of drift/unresolved/floating/corners
+```
+
+Idempotent: the first apply pass took `drift 7, reparented 7, refit 7, corners 1` and the re-read returned
+`41/41 ok, drift 0`. Negative control: nudging one repaired ring +24px makes `designPage()` return
+`NEEDS_REPAIR {ring_detached:1}`, and restoring it returns `CLEAN`.
+
 ## 2. Build seeds and the component factory
 
 `scripts/seed_storage.js` is the single source for the primitives (approach C, `mkAbsBoard`/`absMount`/`mkText`/`ct`) and
@@ -243,6 +295,13 @@ Symptom: buttons/cards on the export are squashed to text size (flex hug). Three
 
 ## 4. Screen assembly (code: `LY.recipe` + `CF.*`, recipes documented in layout-library.md §3/§5)
 
+> **[Gate G17] When the user supplied source material (a URL, screenshots, a library tree → `仿写`/`复刻`), this section is
+> not the entry point — §8 is.** `SC.record(…)` → `SC.build(…)` performs the calls below *and* places library instances,
+> binds paint, carries the type style, fills the raster slots with the user's own assets and stamps the record into the board.
+> What follows stays valid for what `SC` cannot know: the two-pass `totalH` measurement, the tier refusal semantics, and the
+> three leftovers in the list at the end. Building a screen by hand on a recreation now produces `not_assembled` (39),
+> `placeholder_media` (40) and `no_source_record` (41) findings on every page, so it is not a shorter route — it is a reroute.
+
 **There is no page-assembly coordinate table in this skill any more** — that table was the thing gate G11 replaces. A
 screen is produced by three calls:
 
@@ -286,11 +345,17 @@ Browser/plugin crash → storage all lost. Rebuild in order:
 
 1. re-seed **in the engine order**: `seed_storage.js` (T/fonts/mkText/mkAbsBoard/absMount/pg/sleep) → `layout_engine.js`
    (`LY`) → `component_factory.js` (`CF`) → `native_layout.js` (`NL`) → `audit_design.js` (`designPage`/`designGate`) →
-   `audit_layout.js` (`auditPage`), plus the three engines that carry their own state and work at any point once their
-   shapes exist: `token_engine.js` (`TK`), `palette_engine.js` (`LIB`), `prototype_engine.js` (`PR`); one command probes and
+   `audit_layout.js` (`auditPage`), plus the engines that carry their own state and work at any point once their
+   shapes exist: `token_engine.js` (`TK`), `palette_engine.js` (`LIB`), `prototype_engine.js` (`PR`),
+   **`media_engine.js` (`MD`) and `screen_engine.js` (`SC`)** — one command probes and
    supplements what is missing. Storage loss also wipes `NL._reg` (the build-time declarations) — without it `auditFlow`
    loses its `sizing_dropped`/`size_stale`/`not_settled` precision — so re-stamp with `NL.stamp` and prefer
    `whenSettled` over remembered sleeps;
+   **Storage loss does NOT wipe the screen records** (§8): `SC.records` is session state, but every built screen still
+   carries `nl:sc` + `nl:rec` in its own pluginData, so `SC.coverage()` re-derives the contract from the file, `MD.recover()`
+   rebuilds the media cache by scanning shapes for `fillImage`, and `SC.build({screen, sections:[…]})` **mounts into the
+   existing board** instead of creating a second one. A recreation therefore survives a crash without this conversation;
+   a freehand screen does not, which is what rule 41 is for.
 2. `penpotUtils.getPages()` inventory page structure (measured working — returns the page objects; the alternative is
    `penpot.currentFile.pages`; **there is no `penpot.pages`**, capabilities §10), confirm canvas damage (100×100
    degradation check in api-pitfalls.md §8);
@@ -509,3 +574,120 @@ alpha produced `NEEDS_REPAIR`, restoring `.38` produced `CLEAN` — the rule is 
 The exemption test is also now the §4 **name grammar** (`inDisabledHost`: `disabled` as a `·`-segment of an ancestor host),
 not a word search — the old word search was triggered by my own caption "Disabled recedes a…". See `api-pitfalls.md` §15.
 
+
+## 8. Recreation: a screen assembled from the system (`storage.SC`) + the raster channel (`storage.MD`) — gate **G17**
+
+When the user hands over source material — a URL, screenshots, an existing library tree — and asks to **imitate / recreate**
+it (仿写 / 复刻), the screen pages are where the answer either respects the design system or quietly abandons it. `CF` **draws**
+a control, which is exactly right on a `·Spec` board (that drawing is what gets registered) and exactly wrong on a screen:
+the drawing becomes a disposable copy that cannot be fixed centrally, has no variants, cannot be swapped, and carries no
+relation to the library the same file just built. Measured on the Rayo file before `SC` existed (2026-10-22): pages `14/15`
+held **99 + 60 control-named hosts, 0 of them instances of what they imitated**, and every raster slot on all three screen
+pages was a gray plate with an `image` glyph — **`mediaFills: 0`**, i.e. the user's photographs were not in the file at all.
+
+`SC` is the path that makes the requirement satisfiable instead of aspirational, and `MD` is the channel it needed for raster.
+
+### 8.1 Seed order and the two loopback servers
+
+`SC`/`MD` are fetched like the other engines (`new Function('storage','penpot','penpotUtils', src)`), after `TK`:
+
+```
+seed_storage → layout_engine → component_factory → native_layout → token_engine
+  → media_engine (MD) → screen_engine (SC) → audit_layout → audit_design → foundations_engine
+```
+
+Two servers, two roots — conflating them is the first thing that fails:
+
+| Server | Root | Used for |
+|---|---|---|
+| `python3 scripts/serve_skill.py` → `:8777` | the **skill** directory | fetching `scripts/*.js` (`http://127.0.0.1:8777/skills/penpot-design/scripts/screen_engine.js`) |
+| `serve_skill.py --root <project> --port 8779` → `:8779` | the **project** directory | raster bytes for the user's assets, through the `/b64/<path>` route (`MD.config({server})`, `SC.config({server})`) |
+
+`uploadMediaUrl` cannot use either (M3: the fetch runs in the Penpot container, which has no route to this machine's
+loopback), so binary always travels as base64 → `atob` → `Uint8Array` → `uploadMediaData`.
+
+### 8.2 The record, then the build
+
+```js
+SC.config({ server: 'http://127.0.0.1:8779' });
+SC.record('contact', {
+  src: 'https://rayo-agency-template.vercel.app/contact', tier: 'web', recipe: 'contact',
+  sections: [{ region: 'form',
+    controls: [{ family: 'input', type: 'outlined', size: 'md', place: { x: 0, y: 0 } }],
+    copy:     [{ text: 'Tell us about the project', size: 32, weight: 700, role: 'headline' }],
+    media:    [{ slot: 'cover', path: 'rayo-agency/assets/img/demo/01_card-img.webp' }],
+    icons:    [{ kind: 'mail' }] }]
+});
+const census = await SC.build({ page: '15 · Screens · content', screen: 'contact' });
+```
+
+`SC.record` **validates while you declare** and returns `gaps` before a single shape exists: a recipe outside `LY.keys()`, a
+control whose master does not exist (`tried:` lists every name it looked for), a media slot with no `path`, copy with no text.
+`SC.build` then assembles it through four channels, each of which has exactly one legal call:
+
+| Channel | Call | Guarantee |
+|---|---|---|
+| structure | `NL.fromRecipe(recipe,{tier,parent})` | regions named `region·*`, gaps from `LY.BREATH`, panes detected geometrically and **never filled with copy** |
+| control | `SC.ctl` → `CF.instance` | an **instance**; a missing master is a `missing_master` gap (fix: grow the factory per G12, then `CF.autoRegister`), never a re-draw |
+| copy | `SC.copy` → `mkText` + `TP.apply` | snapped to a declared ramp step *and* carrying the library typography style (a token with no style is unpickable in the 素材 panel) |
+| raster | `SC.media` → `MD.place` | the user's own bytes as a `fillImage` media object |
+
+Then, in the same call: `NL.stamp(board, {sc,src,recipe,tier,assembled:'1'})` + `setPluginData('nl:rec', digest)` (**S6**, the
+proof is durable — `SC.coverage()` re-reads the contract from the board in a session that never called `SC.record`),
+native column guides on the board **and on every child band at the tier width** (`no_guides` binds both),
+`TK.bindBoard(board)` **after** the writes (**S5**: a geometry write drops a binding — measured for radius and for rings), and
+`NL.whenSettled()`.
+
+Rules **S1–S8** are in the file header; the three that decide the shape of a session are **S7** (idempotent by stamp: the
+first call creates the board, later calls *mount into it* — `mode:'mount'` — so a retry never duplicates a screen and nothing
+is created and then deleted; only `{rebuild:true}` re-creates), **S8** (the 30 s ceiling is planned for: `SC.build({sections:[…]})`,
+and `census.sectionsLeft` is read off the board — a region with no children is a section still owed), and **S1** (instance-first,
+with `missing_master` reported rather than worked around).
+
+### 8.3 A screen mounts INSIDE `NN-PageRoot`
+
+`designPage()` walks from the page head, so a screen board placed at **page root** is invisible to the design gate *and* is
+indicted by `audit_layout.root_stray`. Measured 2026-10-22: a 31-shape screen at page root audited `shapes: 201` and read
+**CLEAN** — the falsest verdict this file has produced, and the reason the first proof screen looked finished. `SC.pageRoot()`
+finds `NN-PageRoot`, `SC.nextSlot()` packs the new board below the existing content by one page breath, and rule 41 only
+judges **top-level** content boards so that it counts screens instead of counting their full-bleed bands.
+
+### 8.4 The reads the gate shares
+
+| Read | Answers |
+|---|---|
+| `SC.audit()` / `auditStart(prefixes)` + `auditNext()` | this page as a screen: `stamped`, `instances`, `drawnHosts`, `slots`/`filled`/`placeholders`, `copy`/`copyBound`, `paint`/`paintBound`, empty regions, `verdict` `ASSEMBLED`/`NOT_ASSEMBLED` |
+| `SC.coverage()` | **record**-side: every declared entry re-read from `nl:rec` — `notInLibrary`, `mediaWithoutSource`, `emptyRegions`, `digest:'yes'`, verdict `COMPLETE`/`INCOMPLETE`/`NO SCREENS` |
+| `SC.reconcile({dry})` → `({apply:'register', limit})` | the retro-apply path for a legacy file: census the drawn hosts per page, then promote them with `CF.autoRegister` over `SC.scope()`. **Additive** — deleting a host and re-placing an instance is a destructive write and is deliberately not the default |
+| `SC.master` / `SC.libIndex` / `SC.familyIndex` / `SC.find` / `SC.digest` / `SC.report` | the lookups the above are built from (`libIndex` is case-insensitive because the factory map is camelCase while a name head keeps the authored case: `otp` vs `OTP·Block·Md`) |
+
+`MD` on its side is `MD.config/import/place/fill/get/find/recover/audit` and obeys the seven measured media rules
+**M1–M7** (`penpot-capabilities.md` §9.1: three-arg `uploadMediaData`, whole-media-object fills, no media registry to read,
+proof = `export_shape` `mode:'fill'|'shape'`). The slot grammar has **one** source — `CF.isMediaSlot` — which `MD.isSlot`
+and auditor rule 40 both call, so a plate cannot be a slot for the gate and invisible to the engine.
+
+### 8.5 Proof, census, and what G17 does not prove
+
+Negative control, measured 2026-10-22 on the live file: one drawn `Card·Horizontal·Lg` plus one unfilled `img·hero` plate
+produced **exactly** `not_assembled: 1` + `placeholder_media: 1` on a screen page and **zero** G17 findings on
+`17 · Reference imitation` (`designPage` there reads `CLEAN`, 221 shapes). `CF.autoRegister` then cleared `not_assembled`
+without tripping rule 27 on the host it registered, and `MD.place` cleared `placeholder_media` on the readback of
+`fillImage`. The finished proof screen read `SC.audit()` → **ASSEMBLED**: 7 instances, 0 drawn hosts, 2/2 media filled,
+95/95 copy bound, 135/135 paint bound — with **2 empty FAQ regions reported, not hidden**.
+
+The debt the gate now blocks, page by page (`designNext`, same day):
+
+| Page | screens | `no_source_record` | `not_assembled` | `placeholder_media` | verdict |
+|---|---|---|---|---|---|
+| `14 · Screens · app` | 12 | 12 | 51 | 19 | NEEDS_REPAIR |
+| `15 · Screens · content` | 16 | 16 | 49 | 27 | NEEDS_REPAIR |
+| `16 · Screens · mobile` | 2 | 2 | 0 | 0 | NEEDS_REPAIR |
+
+(Read `no_source_record` as *one per screen board*: all 30 were composed before records existed. The pages are otherwise
+well bound — `SC.audit` measures 327/327 and 326/326 copy styles bound, 520/532 and 502/521 paints bound — so this is
+**assembly** debt, not token debt. `SC.audit`'s `drawnHosts` (99 / 60) counts every control-named host; rule 39 indicts the
+51 / 49 of them that have **no** master, so the two numbers are different questions, not a discrepancy.)
+
+**G17 proves assembly, not fidelity.** It cannot see that the copy is wrong, that a hero crop is off, or that the source had
+four testimonials and the board has three. The PIL diff against the source (`verification.md`, `scripts/pixel_diff.py`) stays
+the acceptance step for a recreated screen, and a board that was never exported is never described as verified.

@@ -76,10 +76,12 @@ so the reviewer can see that hover is not a different blue.
   produced the orphan corners this rule removes: every writer path (`ctx.plate`, `ctx.ring`, `ctx.clip`, `CF.build`,
   `NL.frame`, `NL.plate`, `storage.mkAbsBoard`, `storage.mkRect`) passes through `CF.radius()`, which snaps an off-ladder
   number to the nearest step and records the coercion in `CF.coerced`. A drawn control is therefore **always** a token
-  corner, and gate rules 35/36/37 (`radius_off_ladder`, `radius_unbound`, `ring_off_host`) are the machine check. For a file
-  drawn before the roles existed, `TK.roleSweep()` is the repair: it forces every pill-family host (`TK.PILL_FAMS`) to
-  `CF.radius('control')` and every `ring·*` plate to its host's corner — on masters **and** placed copies, because a write
-  to a master does not re-sync the copies already in the file.
+  corner, and gate rules 35/36/37/38 (`radius_off_ladder`, `radius_unbound`, `ring_off_host`, `ring_detached`) are the
+  machine check. For a file drawn before the roles existed, `TK.roleSweep()` is the repair: it forces every pill-family
+  host (`TK.PILL_FAMS`) to `CF.radius('control')` and every `ring·*` plate to its host's corner — on masters **and** placed
+  copies, because a write to a master does not re-sync the copies already in the file. `ctx.ring` also fixes **where** the
+  ring lives: it mounts inside the control whose plate it outlines, so a ring that sits on the spec board instead of inside
+  its control is a stale outline from a refit (rule 38; census and repair `TK.ringSweep()`).
 - **Touch floors (HARD)**: mobile/pad target **≥44×44** (AAA 44 [spec WCAG 2.5.5], M3 state layer 40dp, iOS 44pt); web ≥32 with
   spacing exception. A 24px `xs` control is legal on a dense desktop table row **only** when its hit pad makes the target 32+.
 - Icon-only buttons are **square**: 28 / 40 / 52 with icon 16–18 / 24 / 28 [obs MUI IconButton paddings 5/8/12].

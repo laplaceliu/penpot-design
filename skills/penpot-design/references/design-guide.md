@@ -275,6 +275,18 @@ Each tone the kit can paint ships as three coordinated steps, and only the two e
   corner IS the control's corner — both values can sit on the ladder and still contradict each other, which is exactly why 35/36
   could not see it), and the repair is **`TK.roleSweep()`** (`design-tokens.md` §8.2): pill-family hosts to the step DESIGN.md
   binds them to, every ring to its host's corner, then bind + commit.
+- **A `ring·*` plate must be mounted INSIDE the control it outlines — rule 38 `ring_detached` (HARD).** Rule 37 compares a
+  ring's *corner* to its host's; it says nothing about *where the ring is*, and a ring that sits on the spec board instead of
+  inside its control is the same defect seen from the other side (what the user reported as "the element drifted"). The
+  relation is geometric, and **not** a fixed margin: measured 2026-10-22 over the file's 231 rings, the ring↔plate margin is
+  2 for 176 of them but 5/6/7/9/10 for other families and **0** for an inline-link or breadcrumb ring — where the ring *is*
+  the text's box and even non-uniform (≈1.5 horizontal / 3 vertical). What is invariant: the ring **encloses** a real plate
+  (margin 0–12 on each axis) and is **concentric** with it (centre Δ ≤ 3). The owner is usually a *nested* plate — an addon's
+  `field` rect, a Checkbox `box`, a Slider `handle`, one OTP digit, one crumb `Text` run — not the control board, and a flat
+  row band (Tree / Accordion / anchor rail) has no plate at all, so its ring is accepted by containment instead.
+  `TK.ringHost(shape)` is the one resolver behind both the gate and the repair, and `TK.ringSweep()` is the idempotent fix
+  (7 of 231 drifted 10–72px; re-read 41/41 ok). Semantics and the failure modes in `engines.md` §"Ring mounting", call
+  details in `design-tokens.md` §8.2.
 - **Still not machine-checked: the role of a family DESIGN.md does not bind to one step.** A `Card·*` host carries whatever
   corner the generation that drew it typed; DESIGN.md's `card: {rounded.md}` is the authority, but no rule compares a host to
   its family's declared role, so a card at `sm` under a `md` contract reads CLEAN. Read the masters against DESIGN.md before
@@ -428,6 +440,10 @@ rounded: { none: 0px, sm: 4px, md: 8px, lg: 12px, xl: 16px, full: 9999px }
 | 35 | **§5.1** — a corner whose value is **not one of the declared `borderRadius` token values** (judged from the live `TK.declared().radii`, not a hard-coded ramp): an orphan number left on the canvas. One finding per shape, not per corner | `radius_off_ladder` |
 | 36 | **§5.1** — a corner whose value **is** a declared `borderRadius` token but carries no `tokens.borderRadiusTopLeft/TopRight/BottomRight/BottomLeft` binding: the value was typed, not chosen. Repaired by `TK.radiusSweep()`, whose adoption read (`radiusPages()`) is the number the delivery report quotes | `radius_unbound` |
 | 37 | **§5.1** — a `ring·*` layer whose corner is not its host control's corner (`CF.ROLE.ring = 'host'`). Rules 35/36 pass it: `r0` body and `r9999` ring are both declared and both bound, and only the **pair** is wrong — the defect a user sees as "a rectangle in front of a rounded ring" (measured 2026-10-22: 194 of 230 rings disagreed with their host). Repaired by `TK.roleSweep()` | `ring_off_host` |
+| 38 | **§5.1** — a `ring·*` plate that is **not mounted inside the control it outlines**: its ancestry reaches the `·Spec`/PageRoot container without passing a control board, or it is inside a control but traces no plate and is not contained by it. Judged by enclosure + concentricity (margin **0–12** per axis, non-uniform allowed, centre Δ ≤ 3) — **never** by a fixed 2px margin, which is what made the first draft of this rule flag 47 legitimate rings. What the user reports as "this element drifted"; repaired by `TK.ringSweep()` (7 of 231 drifted by 10–72px) | `ring_detached` |
+| 39 | **§12 (gate G17)** — *screen pages only* (`14–16 · Screens`, matched by page name): a family-named board **drawn** where the library has **no master of that name**. Rule 27 `not_component` structurally cannot see this — it needs an exact-name master to compare against — so a screen made of disposable one-off rectangles passed the gate while having nothing to fix centrally, no variants and no swap. The repair is never "draw it again": extend the factory (G12), `CF.autoRegister`, then **place** it (`SC.ctl` → `CF.instance`). The family index is read **live** from `CF.map()` (falling back to the auditor's own `CLASS` table), so a newly added factory is judged the same session it appears | `not_assembled` |
+| 40 | **§12 (gate G17)** — *screen pages only*: a shape whose name claims a raster slot (the **single** grammar `CF.isMediaSlot`, which `MD.isSlot` also calls — a plate cannot be a slot for the gate and invisible to the engine) but carries no `fillImage` in its fills: a gray rectangle standing in for the user's own photograph. Import the source asset with `MD.place({parent, slot, path})`; judged **before** `rec()`, because a rect plate is not a box shape and the text/box early-return would have hidden every one of them (measured: 19 + 27 such slots on pages 14/15, `mediaFills: 0`) | `placeholder_media` |
+| 41 | **§12 (gate G17)** — *screen pages only*: a top-level content board at a tier baseline width with **no durable `nl:sc` / `nl:rec` stamp** — it was composed freehand, so there is no record of the source material it claims to recreate and the gate cannot be re-read in a later session. Rebuild with `SC.record(…)` then `SC.build(…)`. The **page-level half** of the same rule reports a Screens page where `storage.SC` was never seeded: **unprovable is REPORTED, not passed** — the contract rule 31 applies to G16. Judges top-level boards only, because a full-bleed band inside a screen is the same width as its host and would otherwise be counted as a second screen | `no_source_record` |
 
 **Rules 1/2 judge authored numbers, not arithmetic.** In a flow board the numbers the designer chose are the padding,
 the gap and the sizing declaration; the resulting coordinates and hug boxes are sums over font metrics (a 13px label is
@@ -486,7 +502,7 @@ each field by readback and is idempotent; `TP.apply` exists for consumers, but *
 text** — `applyToText` rewrites `lineHeight` to `1.2` whatever the record says (capabilities §6), so it flattens the
 rhythm rule 21/22 just tuned.
 
-`storage.designGate()` verdict is computed from these 37 (`out.rules`); the 15 defect signatures
+`storage.designGate()` verdict is computed from these 38 (`out.rules`); the 15 defect signatures
 (`out_of_bounds`, `board_overlap`, `text_overlap`, `text_overlap_x`, `header_collision`, `malformed_text`, `align_missing`,
 `crash_100x100`, `degenerate_size`, `root_stray`, `text_centre_residue`, `loose_assembly`, `stroke_covered`, `stroke_clipped`,
 `duplicate_board`) belong to `audit_layout.js` and are reported as delegated, never double-counted. `text_centre_info` is
@@ -509,3 +525,45 @@ Rules 3/13/15–18 depend on **names, not pixels**: `CF` writes the role (`ctx.t
 (`slotName()` → `IconStart`/`Clear`/`Addon`/…) and the state into the shape name, so the auditor can decide coverage
 from the registry. A hand-built board that draws the same pixels without the name token reads as absent.
 Rules 13 and the variant minimum set are specified in `references/component-library.md`; rules 4/5/6/12 in `references/layout-library.md`.
+
+## 12. A recreated screen is assembled from the system (gate **G17**, rules 39–41)
+
+Everything above §11 describes how a *design system* is drawn. Pages `14–16 · Screens` are where a different promise is
+being made: the user handed over source material — a URL, screenshots, an existing component tree — and asked for it to be
+**imitated / recreated** (仿写 / 复刻). For those pages, matching the pixels is not the deliverable. The deliverable is the
+same UI expressed in **this file's** mechanisms, because that is the only version the user can then edit, re-theme, swap a
+state on, or hand to a developer.
+
+**So on a recreation, a screen is assembled and never drawn (HARD).** Six channels, one legal call each, one signature each:
+
+| The source shows | Assemble it with | Rule that catches the shortcut |
+|---|---|---|
+| a region, column, full-bleed band | `LY.recipe(key,{tier})` → `NL.fromRecipe` (gaps from `LY.BREATH`, §2.1) | `off_grid`, `no_guides`, `pane_filled` |
+| a control (button, field, row, card…) | **a library instance**: `SC.ctl` → `CF.instance` / `CF.swap` | 39 `not_assembled` (no master) · 27 `not_component` (master exists, redrawn anyway) |
+| its colour | a token / library colour (`TK.bindBoard`, `LIB.fill`) | 19–20 `paint_unbound`, `paint_off_palette` |
+| its type | the declared ramp step **plus** the library typography style (`SC.copy` → `TP.apply`) | 21–22 `type_unbound`, `type_off_ramp`, 30 `no_type_styles` |
+| an icon | `IC.place` (catalog) or `CF.glyph` (in-control) | none yet — the record's `icons[]` is the only check, so an emoji placeholder is caught by reading the board, not by the gate |
+| a **photograph, logo or screenshot** | the user's own bytes: `MD.place({parent, slot, path})` → a real `fillImage` media object | 40 `placeholder_media` |
+
+**The record comes before the build (HARD, rule 41).** What the source shows is written down first —
+`SC.record(screen, { src, tier, recipe, sections:[{ region, controls, copy, media, icons }] })` — which *validates while you
+declare*: a recipe outside `LY.keys()`, a control with no master, a raster slot with no source path, copy with no text each
+return as a `gaps` entry instead of becoming a shape. `SC.build` then assembles it and stamps the record **into the board**
+(`nl:sc`/`nl:src`/`nl:recipe`/`nl:tier` + the `nl:rec` digest), so the contract survives the session: `SC.coverage()` re-reads
+it from the file and another person, or a post-crash rebuild, can re-run the same gate without this conversation. A screen
+composed freehand — however good it looks — has no record, and `no_source_record` reports it.
+**Unprovable is reported, not passed**: a Screens page where `storage.SC` was never seeded fails the same signature instead of
+reading CLEAN, exactly as rule 31 does for G16.
+
+**A screen mounts inside `NN-PageRoot`, never at page root (HARD).** `designPage()` walks from the page head, so a root-level
+board is invisible to the gate while `audit_layout` indicts it as `root_stray`: measured 2026-10-22, a 31-shape screen at page
+root audited `shapes: 201` and read **CLEAN**. `SC.pageRoot()` / `SC.nextSlot()` handle the placement.
+
+**What is *not* a shortcut**: a `·Spec` board on `03–09` is *supposed* to be a drawing — that drawing is what gets registered
+as the master. Rules 39–41 are therefore **scoped by page name** (`/^1[4-9] · Screens/`), never by a guess about the board, so
+an identity chapter is untouched; `13 · Component index` hosts masters, and `17 · Reference imitation` shows references. On a
+recreation the order is: build the system (tokens → library → masters on `03–13`), *then* assemble the screens from it.
+
+**G17 proves assembly, not fidelity.** It cannot see that the wording is wrong, that the crop is off, or that the source had
+four testimonials and the board has three. The acceptance for a recreated screen stays the pixel diff against the source
+(`verification.md`, `scripts/pixel_diff.py`), and a board never exported is never described as verified.

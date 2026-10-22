@@ -160,7 +160,11 @@ After reparent, the instance's internal child elements shift (e.g. +30,30) → r
    and the `nl:fn` stamp FN writes, and `storage.designCoverage()` answers the file-level question (block-per-page means
    a chapter spans ~9 pages).
    → `03–09` one `Family·Spec` board per component family, produced by `CF.matrix` and packed by `LY.pack`
-   → `10–12` chrome, grid, recipes → `13 · Component index` → register library components → `14–16` the screen recipes.
+   → `10–12` chrome, grid, recipes → `13 · Component index` → register library components → **`14–16` the screens, built
+   through `SC.record(…)` + `SC.build(…)`** (gate G17, `engines.md` §8): the record is what you learned in step 1 (which
+   component renders in which region, which asset files the page references), and the build places **instances of what step 4
+   just registered** instead of drawing the library again. `MD.config({server})` once before the first build, because a
+   `media[]` entry without a real `path` is a `placeholder_media` finding, not a gray plate.
    When the recreated library has numbers of its own, they **override the consensus defaults** (they are the target);
    where it gives none, keep `LY`/`CF` values.
 5. **Export and accept immediately after each board is built**, don't pile up to the end — layout problems found earlier cost less to rebuild.
@@ -168,8 +172,8 @@ After reparent, the instance's internal child elements shift (e.g. +30,30) → r
 ## 5.5 Driving the build through the engines (the only sanctioned path)
 
 ```js
-// one call = one page. Seed order: seed_storage → layout_engine → component_factory → native_layout → audit_design
-// (token_engine / palette_engine / prototype_engine have no engine deps, seed any time).
+// one call = one page. Seed order: seed_storage → layout_engine → component_factory → native_layout → token_engine
+// → media_engine → screen_engine → audit_design (palette_engine / prototype_engine have no engine deps, seed any time).
 const r = await storage.designNext({ tier: 'web' });       // build/audit the next queued page
 
 // a screen = LY outside (absolute region plan) + NL inside (flow) + CF leaves (controls or instances):
@@ -199,8 +203,15 @@ storage.LY.fold(host, 'web');                             // the 2px accent firs
 - **A missing recipe or factory is a bug in the engine**, not a reason to hand-build: add the recipe to
   `layout_engine.js` and document it in `layout-library.md`, or add the factory to `component_factory.js` and to
   `CF.map()`. The docs and the scripts are diffed mechanically, so an undocumented addition fails.
+- **A screen on a recreation is `SC`, not the snippet above.** The `mkAbsBoard` + `fromRecipe` + `CF.*` sequence draws
+  controls, which is right for a spec board and is gate **G17**'s finding on a screen: `SC.record(screen, {src, tier, recipe,
+  sections:[{region, controls, copy, media, icons}]})` then `await SC.build({page, screen[, sections]})` does the same
+  geometry and *places instances*, so nothing has to be re-learned and the board carries its record (`nl:sc`/`nl:rec`).
+  Idempotent by stamp: a re-run mounts into the existing board (`mode:'mount'`), only `{rebuild:true}` re-creates (§8 S7).
 - **Before delivery**: `storage.designGate({ tier })` (G13) **and** `storage.auditPage()` (positioning) **and**
-  `storage.NL.auditFlow(board)` per screen — three verdicts, all `CLEAN`. Then, if the deliverable ships interactive:
+  `storage.NL.auditFlow(board)` per screen — three verdicts, all `CLEAN` — plus, on a recreation, `SC.audit()` per screen page
+  (`ASSEMBLED`) and `SC.coverage()` (`COMPLETE`). A `14–16` page that reads `CLEAN` while `storage.SC` is unseeded is not a
+  pass: rule 41 reports the missing seed instead. Then, if the deliverable ships interactive:
   wire it with `storage.PR.prototype(links, {flow})` (check every row's `dropped:false` and read `PR.flows()` back),
   and prove the theme with `TK.paint` → `TK.activateTheme` → `TK.changed` (design-tokens §9.1).
 

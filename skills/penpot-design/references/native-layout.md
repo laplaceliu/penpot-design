@@ -94,6 +94,13 @@ Six traps, each measured:
 
 ## 4. The screen build order
 
+> **On a recreation (the user supplied a URL / screenshots / a library tree), this section is the *inside* of `SC.build`,
+> not the entry point.** Call `SC.record(…)` then `SC.build({page, screen})` (`engines.md` §8, gate **G17**): it performs
+> the `fromRecipe` + `LY.guides` calls below, **places controls as library instances** rather than drawing them, carries the
+> library type style on copy, fills raster slots with the user's own asset (`MD.place`), binds tokens, and stamps the record
+> into the board so the gate can be re-read later. Hand-running the snippet below on a screen page yields
+> `not_assembled` (39) / `placeholder_media` (40) / `no_source_record` (41) findings.
+
 ```js
 // one call, one region-level skeleton. `host` = the page board LY already sized.
 // No gap typed: fromRecipe takes `block` (16) for the region stack and `group` (24) for its padding from LY.BREATH.

@@ -16,7 +16,10 @@
 // Output shape mirrors audit_layout.js: { counts, findings, verdict:'CLEAN'|'NEEDS_REPAIR', … }.
 // ONE RULE DOES NOT READ CF/LY: `not_projected` (gate G16) reads `storage.FN`, which the G1 order seeds AFTER this
 // file. It is consulted at AUDIT time, not seed time, so a session that never loads foundations_engine.js gets a
-// finding on every 01/02 page instead of a silent pass.
+// finding on every 01/02 page instead of a silent pass. Same for the gate-G17 trio `not_assembled` /
+// `placeholder_media` / `no_source_record`: they are scoped to the screen pages (`14–16 · Screens`) by page name, so a
+// spec chapter that legitimately *shows a drawing* is never indicted for it, and `no_source_record` also reports a
+// session that never loaded screen_engine.js instead of passing a screen page it cannot read.
 //
 // WHAT CLEAN MEANS: no HARD design-rule violation. It says nothing about positioning (audit_layout.js) or fidelity to
 // the target (the PIL comparison in verification.md). Run all three.
@@ -80,6 +83,10 @@ return (function () {
     radius_off_ladder: '§5.1 + design-tokens §8 · a corner radius that is not one of the declared `borderRadius` token values: the token ladder is the ONLY source of a corner, so an orphan number cannot be retuned, themed or found again (measured 2026-10-21: a radius token writes all four corner props at once)',
     radius_unbound: '§5.1 + design-tokens §8 · a radius equal to a declared `borderRadius` token but with no `tokens.borderRadius*` binding — the corner was typed instead of taken from the set; run TK.bindBoard',
     ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not its host control\'s corner: a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places. Rules 35/36 cannot see it — **both** values are on the ladder and bound. Repair with `TK.roleSweep`',
+    ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
+    not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
+    placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
+    no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
     'align_missing', 'crash_100x100', 'degenerate_size', 'root_stray', 'text_centre_residue', 'loose_assembly', 'spec'];
@@ -271,6 +278,41 @@ return (function () {
   }
   /** A CF control host (one board per control, family-named) — the boundary between "composed layout" and "component internals". */
   const isHostBoard = (s) => typeOf(s) === 'board' && !isSpecBoard(s) && (!!famOf(s) || looksLikeCf(s));
+
+  // ------------------------------------------------------------ gate G17 (recreation): screen-page scope + live family index
+  /** A **screen page** is where "assembled from the design system" is a requirement, not a nicety: a `·Spec` board
+      exists to show a drawing, a screen exists to be built out of what the library already owns. Screens are grouped
+      pages 14/15/16 (`penpot-structure.md` §2), so the predicate is the page name, never a board-level guess. */
+  const SCREEN_PAGE = (nm) => /^1[4-9] · Screens/.test(String(nm || ''));
+  // `CLASS` is the auditor's own state-coverage taxonomy and lags `CF.map()` every time a factory is added, so the
+  // drawn-vs-placed rules index the LIVE factory table and fall back to CLASS. The family is always seg[0] (`CF.name()`
+  // drops the default state), and BOTH spellings are indexed because the map holds camelCase keys (`otp`) while a name
+  // head keeps the authored case (`OTP·Block·Md`).
+  let CFAMS = null;
+  function controlFamily(nm) {
+    const head = String(nm || '').split('·')[0];
+    if (!head) return null;
+    if (!CFAMS) {
+      CFAMS = {};
+      Object.keys(CLASS).forEach((f) => { CFAMS[f] = 1; });
+      let map = null;
+      try { map = CF.map(); } catch (e) { map = null; }
+      Object.keys(map || {}).forEach((g) => {
+        const list = (map && map[g]) || [];
+        for (let i = 0; i < list.length; i++) {
+          const k = String(list[i] || '');
+          if (!k) continue;
+          CFAMS[k] = 1;
+          CFAMS[k.charAt(0).toUpperCase() + k.slice(1)] = 1;
+        }
+      });
+    }
+    return CFAMS[head] ? head : null;
+  }
+  /** The raster-slot grammar, from its single source (`CF.isMediaSlot`, which `MD.isSlot` also calls). A local copy
+      here would let a plate be a slot for the auditor and invisible to the media engine. */
+  const SLOT_RX = /^(img·|image·|media$|media·|thumb$|thumb·|photo|hero·media|cover·|avatar·|og:)/i;
+  const isMediaSlot = (nm) => (CF && CF.isMediaSlot ? CF.isMediaSlot(nm) : SLOT_RX.test(String(nm || '')));
   /** True when the shape sits under a host whose NAME carries the `·Disabled·` **state segment** of the §4 grammar
       (`Button·Disabled·Md`). The segment must be at index ≥1: a shape merely *named or worded* "Disabled" is
       documentation, not a control (measured 2026-10-21 — `FN`'s `02.02` rule sentence "Disabled recedes as a pair…"
@@ -359,6 +401,10 @@ return (function () {
     // judged at the 44 floor, so the tier comes from the audited scope (explicit opts.tier wins).
     const tier = opts.tier || (isHostBoard(top) ? 'web' : LY.tierFor(num(top, 'width', 1440)));
     out.tier = tier;
+    // G17 scope: the three screen-page rules (39/40/41) are page-scoped by contract so a spec chapter that legitimately
+    // displays a drawing is never indicted for it. Computed once per page, not per shape.
+    const SCREEN = SCREEN_PAGE(out.page);
+    out.screenPage = SCREEN;
 
     // ---- region pane map, measured geometrically.
     // A pane is a `region·` board whose box contains another `region·` board: nested (dashboard.content over its
@@ -759,6 +805,12 @@ return (function () {
         add('empty_cell', s, st.top, '"' + nm + '" has no children — its `after` pass never ran, so this block is a '
           + 'frame with no content; re-drive it with spec.replace=true (engines.md §6)');
       }
+      // rule 40 · placeholder_media (gate G17) — a name that CLAIMS a raster slot plus no `fillImage` in the fills is a
+      // gray plate standing in for the user's own photograph. Before the isText/board gates, because the shape that
+      // holds media is a plain rect, not a control host, and `rec()` would have returned on it.
+      if (SCREEN && !isCopy(s) && isMediaSlot(nm) && !arr(s, 'fills').some((f) => f && f.fillImage)) {
+        add('placeholder_media', s, st.top, '"' + nm + '" claims a raster slot but no fill carries `fillImage` — import the source asset with MD.place({ parent, slot, path }) (scripts/media_engine.js); the icon-glyph plate this replaces is a placeholder, not the user\'s image');
+      }
       if (isText(s)) { auditText(s, st, par); return; }
 
       // level 1 (composed layout only): grid + radius nesting
@@ -832,26 +884,72 @@ return (function () {
       // `r9999`, and 194 of the file's 230 rings disagreed with their host. Both numbers sit on the ladder and both are
       // token-bound, so rules 35/36 pass it; only comparing the pair can see the defect the eye sees.
       if (/^ring·/.test(nm) && !isAnno(s) && par) {
+        // The relation is resolved ONCE, by geometry, in `TK.ringHost` — the auditor and the repairer must not own two
+        // tables (api-pitfalls §16). Degraded inline copy for the case where the token engine is not seeded: the same
+        // three questions — which control owns me, do I trace a plate, am I inside my control.
         const host = (function () {
-          const rb = box(s);
-          let best = null;
-          (kidsOf(par) || []).forEach(function (k) {                    // CF.ring() mounts the ring one level UP when the
-            if (k === s || !famOf(k)) return;                           // host clips: then the host is the sibling the ring
-            const kb = box(k);                                          // surrounds by 2px, not the container.
-            if (Math.abs(kb.w + 4 - rb.w) <= 2 && Math.abs(kb.h + 4 - rb.h) <= 2 &&
-                Math.abs((kb.x + kb.w / 2) - (rb.x + rb.w / 2)) <= 2 &&
-                Math.abs((kb.y + kb.h / 2) - (rb.y + rb.h / 2)) <= 2) best = k;
-          });
-          if (best) return best;
-          return famOf(par) ? par : null;                               // ring drawn inside its host control
-        })();
-        if (host) {
-          const rc = cornersOf(s), hc = cornersOf(host);
-          const rv = rc ? Math.max.apply(null, rc) : null, hv = hc ? Math.max.apply(null, hc) : null;
-          if (rv !== null && hv !== null && rv !== hv) {
-            add('ring_off_host', s, st.top, 'ring r' + N(rv) + ' around host "' + nameOf(host).slice(0, 30) + '" r' + N(hv) +
-              ' — a ring takes its host corner (repair: TK.roleSweep)');
+          if (storage.TK && typeof storage.TK.ringHost === 'function') {
+            try { return storage.TK.ringHost(s) || {}; } catch (e) {}
           }
+          const rb = box(s), cx = rb.x + rb.w / 2, cy = rb.y + rb.h / 2;
+          const isCtl = function (k) { return typeOf(k) === 'board' && /·/.test(nameOf(k)) &&
+            !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root /.test(nameOf(k)); };
+          const isOwn = function (k) { return typeOf(k) !== 'svg' && !/^(ring·|hairline·|guide·|axis|Group$)/.test(nameOf(k)); };
+          let control = null, a = par, gd = 0;
+          while (a && gd < 4) { if (isCtl(a)) { control = a; break; } try { a = a.parent; } catch (e) { a = null; } gd++; }
+          if (!control) return { host: null, concentric: false, floating: true, contained: false };
+          const cb = box(control);
+          // a row ring overhangs its control by its own margin, so containment is judged on the expanded box (TK.ringHost)
+          const contained = rb.x >= cb.x - 12 && rb.y >= cb.y - 12 && rb.x + rb.w <= cb.x + cb.w + 12 && rb.y + rb.h <= cb.y + cb.h + 12 &&
+            cx >= cb.x && cx <= cb.x + cb.w && cy >= cb.y && cy <= cb.y + cb.h;
+          let best = null, bestV = Infinity, bestA = Infinity;
+          (function scan(k, d) {
+            if (k !== s && isOwn(k)) {
+              const kb = box(k);
+              if (kb.w > 0 && kb.h > 0) {
+                const v = Math.abs(cx - (kb.x + kb.w / 2)) + Math.abs(cy - (kb.y + kb.h / 2));
+                const ox = (rb.w - kb.w) / 2, oy = (rb.h - kb.h) / 2;
+                const ar = kb.w * kb.h;
+                if (v <= 3 && ox >= -0.01 && oy >= -0.01 && ox <= 12 && oy <= 12 && (v < bestV - 0.5 || (Math.abs(v - bestV) <= 0.5 && ar < bestA))) { best = k; bestV = v; bestA = ar; }
+              }
+            }
+            if (d >= 4) return;
+            (kidsOf(k) || []).forEach(function (c) { scan(c, d + 1); });
+          })(control, 0);
+          return { host: best, concentric: !!best, floating: false, contained: contained, dist: best ? bestV : null };
+        })();
+        const rh = host.host;
+        if (host.floating) {
+          // rule 38 · ring_detached — the plate is mounted on the CONTAINER board, not inside a control. `ctx.ring` can
+          // only produce this when the ring was drawn before a refit moved its host: the outline keeps its old box while
+          // the control it belongs to moves away, and no rule could see it before, because the old host lookup handed
+          // rule 37 the `Family·Spec` shelf itself (corners 0) and a floating plate read CLEAN (measured 2026-10-22:
+          // `Search·Spec`, `MaskedInput·Spec` 244×36 whose `field` owner is 16px above it, `Card·Spec` drifted 72px).
+          add('ring_detached', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' at ' + N(box(s).x) + ',' + N(box(s).y) +
+            ' lies on the container board instead of inside its control' + (rh ? ' (its size matches "' + nameOf(rh).slice(0, 26) + '" ' + N(host.dist) + 'px away)' : ' and matches no plate') +
+            ' — repair with TK.ringSweep');
+        } else if (!rh) {
+          // A ring inside a list-like control (one row of a Tree / Accordion / anchor rail / crumb list) outlines a band
+          // that has no plate of its own. Judged by containment: it must still sit inside its control.
+          if (!host.contained) {
+            add('ring_detached', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' inside "' + nameOf(host.control || par).slice(0, 26) +
+              '" traces no plate and is not contained by it (nearest ' + (host.dist === null || host.dist === Infinity ? 'none' : N(host.dist) + 'px off') +
+              ') — repair with TK.ringSweep');
+          }
+        } else if (host.concentric) {
+          // 37 binds a ring to its control BOARD's corner. A ring hugging a nested plate (an addon's `field`, one crumb
+          // text run, one OTP digit) is §5.1's open role question, not this rule's — judging it would rewrite 100+ outlines in one sweep.
+          if (typeOf(rh) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nameOf(rh))) {
+            const rc = cornersOf(s), hc = cornersOf(rh);
+            const rv = rc ? Math.max.apply(null, rc) : null, hv = hc ? Math.max.apply(null, hc) : null;
+            if (rv !== null && hv !== null && rv !== hv) {
+              add('ring_off_host', s, st.top, 'ring r' + N(rv) + ' around host "' + nameOf(rh).slice(0, 30) + '" r' + N(hv) +
+                ' — a ring takes its host corner (repair: TK.roleSweep)');
+            }
+          }
+        } else {
+          add('ring_detached', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' off host "' + nameOf(rh).slice(0, 30) +
+            '" by ' + N(host.dist) + 'px — a drifted plate, not a corner disagreement (repair: TK.ringSweep)');
         }
       }
       if (!rec(s)) return;
@@ -874,6 +972,16 @@ return (function () {
         if (!main || main.id !== s.id) {
           add('not_component', s, st.top, '"' + nm + '" is a registered master but was drawn again — place it with CF.instance(\'' + nm + '\', { parent, … })');
         }
+      }
+      // rule 39 · not_assembled (gate G17) — the OTHER half, which rule 27 structurally cannot see. `not_component`
+      // needs an exact-name master to compare against, so a screen whose controls were hand-drawn (measured 2026-10-22:
+      // 160 control-shaped hosts on pages 14/15, only 2 of their names have a master) passed the gate while being made
+      // of disposable rectangles: nothing to fix centrally, no variants, no swap, and no relation to the system the
+      // same file just built. On a screen page a family-named board is therefore required to be PLACED, and the repair
+      // is to extend the factory (G12), register what it draws (`CF.autoRegister`), then place instances (`SC.ctl`).
+      // Fires only inside screen scope and only for non-instances, so a `·Spec` chapter that shows a drawing is untouched.
+      if (SCREEN && compos && !isInstance(s) && typeOf(s) === 'board' && controlFamily(nm) && !(CF.get && CF.get(nm))) {
+        add('not_assembled', s, st.top, '"' + nm + '" was drawn on a screen page and no master of that name exists in the library — a recreated screen is assembled from the system: extend the factory (G12), register it (CF.autoRegister), then place it with CF.instance / SC.ctl');
       }
       const board = typeOf(s) === 'board' ? s : null;
       if (board) out.boards++;
@@ -1017,6 +1125,25 @@ return (function () {
       const isScreen = r.w >= LY.TIERS[bt].w * 0.8 && r.h >= 300;
       if (!isScreen) return;
       out.tiers[bt] = (out.tiers[bt] || 0) + 1;
+      // rule 41 · no_source_record (gate G17, proof half) — a recreated screen is assembled from a RECORD of the user's
+      // own source material, stamped durably on the board (`nl:sc` + `nl:rec`, screen_engine.js S6) so the contract
+      // outlives the session that built it and `SC.coverage()` can be re-read by anyone else. No stamp means the gate
+      // has nothing to read, and unprovable is REPORTED, not passed — the same contract rule 31 applies to G16.
+      if (SCREEN) {
+        // Scoped to the board that IS a screen: the stamp contract belongs to the composition a source record produced,
+        // not to a full-bleed band inside it. Without this the first census indicted 45 boards on page 14 for what are
+        // 12 screens, because a `region·` band at tier width and 300+ tall matches `isScreen` too.
+        const parB = (function () { try { return b.parent; } catch (e) { return null; } })();
+        const topLevel = !parB || parB.id === str(root, 'id', '') || /-PageRoot$/.test(nameOf(parB));
+        if (topLevel) {
+          out.screens = (out.screens || 0) + 1;
+          let srec = null; try { srec = storage.NL && storage.NL.readStamp ? storage.NL.readStamp(b) : null; } catch (e) {}
+          if (!srec || !srec.sc || !srec.rec) {
+            add('no_source_record', b, st.top, '"' + nameOf(b) + '" is a ' + bt + ' screen with no ' +
+              (!srec || !srec.sc ? '`nl:sc`' : '`nl:rec`') + ' stamp — it was composed freehand, not assembled from a source record; rebuild it with SC.record(…) then SC.build(…) (scripts/screen_engine.js)');
+          }
+        }
+      }
       // The grid must live ON the board. `board.guides`/`board.rulerGuides` are the writable native collections
       // (measured: only whole-array assignment works, there is no push API), so a screen that carries none was placed
       // against a grid the designer cannot see, snap to, or edit — which is also how a tall element ends up on top of
@@ -1143,6 +1270,14 @@ return (function () {
       }
     } catch (e) { err('provenance', e); }
 
+    // ---- rule 41 (page scope) · no_source_record (gate G17) — a screen page can only be judged assembled when the
+    // screen engine is loaded, exactly as rule 31 refuses to claim G16 without `storage.FN`. A missing SC is reported, not skipped.
+    try {
+      if (SCREEN && (!storage.SC || typeof storage.SC.build !== 'function')) {
+        add('no_source_record', null, top, out.page + ' is a Screens page and `storage.SC` is not seeded — G17 cannot be verified, so it cannot be claimed. Seed scripts/screen_engine.js in the G1 order (engines.md §"Seeding without pasting")');
+      }
+    } catch (e) { err('screenScope', e); }
+
     const fails = Object.keys(out.counts).filter((key) => key.charAt(0) !== '_' && RULES[key]);
     out.verdict = fails.length ? 'NEEDS_REPAIR' : 'CLEAN';
     out.rules = Object.keys(RULES);
@@ -1167,7 +1302,7 @@ return (function () {
     const page = q.shift();
     const r = storage.designPage(opts);
     storage.designReport[page] = { verdict: r.verdict, counts: r.counts, boards: r.boards, shapes: r.shapes,
-      breath: r.breath, radius: r.radius,
+      breath: r.breath, radius: r.radius, screenPage: r.screenPage, screens: r.screens,
       findings: r.findings.slice(0, 12), sizes: r.sizes, tier: r.tier, errors: r.errors, provenance: r.provenance };
     if (q.length) penpot.openPage(penpotUtils.getPageByName(q[0]));
     return { page: page, verdict: r.verdict, counts: r.counts, remaining: q.length };
