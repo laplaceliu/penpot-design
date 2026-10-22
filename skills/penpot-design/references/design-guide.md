@@ -61,12 +61,18 @@ When two things have to be told apart, spend air **before** reaching for any oth
 1. **Whitespace** (`LY.BREATH`) — the gap between flow siblings. The default device for every stack: element↔element,
    section↔section, block↔block.
 2. **Elevation / surface polarity** — a card, a wash, a shadow. Only when the two things are different *kinds* of surface.
-3. **A stroke or a divider** — only where whitespace would be a lie: table rows, pane edges, hairline separators (§1.3 rule 3).
+3. **A stroke** — only as a functional boundary or state indicator (a pane edge, a selected tab underline, an attached button group). A 1px line is **never** a content separator.
 4. **Alignment / reading order** — never a substitute for 1.
 
 Reaching for a divider where a `block` gap would have carried the separation is the failure mode this section exists to
 prevent: dividers multiply, each one then has to be kept aligned, and the page reads as a grid of lines instead of a
 sequence of groups.
+
+**HARD — content separates with a spacing-token gap, not a line (rule 43).** Rows of a list, table, accordion or menu take
+`space.md` (12) or `space.base` (16) as their `rowGap`; no `divider`/`hairline` plate is drawn between them. A line plate
+is absolute geometry: when the host refits, it stays where it was and the separation drifts. A line is legal only as a
+functional boundary or state indicator, and it must be named `boundary·*` or `underline·*` — `divider_separator` fails
+any shape still named `divider`/`hairline`.
 
 **HARD — the gap comes from the ladder, not from a typed number.** `LY.BREATH` names one amount per hierarchy level and
 every value is a `SPACE` member, so a gap taken from the ladder cannot simultaneously be `space_off_scale`:
@@ -447,6 +453,7 @@ rounded: { none: 0px, sm: 4px, md: 8px, lg: 12px, xl: 16px, full: 9999px }
 | 39 | **§12 (gate G17)** — *screen pages only* (`14–16 · Screens`, matched by page name): a family-named board **drawn** where the library has **no master of that name**. Rule 27 `not_component` structurally cannot see this — it needs an exact-name master to compare against — so a screen made of disposable one-off rectangles passed the gate while having nothing to fix centrally, no variants and no swap. The repair is never "draw it again": extend the factory (G12), `CF.autoRegister`, then **place** it (`SC.ctl` → `CF.instance`). The family index is read **live** from `CF.map()` (falling back to the auditor's own `CLASS` table), so a newly added factory is judged the same session it appears | `not_assembled` |
 | 40 | **§12 (gate G17)** — *screen pages only*: a shape whose name claims a raster slot (the **single** grammar `CF.isMediaSlot`, which `MD.isSlot` also calls — a plate cannot be a slot for the gate and invisible to the engine) but carries no `fillImage` in its fills: a gray rectangle standing in for the user's own photograph. Import the source asset with `MD.place({parent, slot, path})`; judged **before** `rec()`, because a rect plate is not a box shape and the text/box early-return would have hidden every one of them (measured: 19 + 27 such slots on pages 14/15, `mediaFills: 0`) | `placeholder_media` |
 | 42 | **§5.1** — a `·Spec` / background plate with a non-zero corner. The plate holds a GROUP, not a control: a large corner (a source ladder's `lg` can be the 100px avatar/pill step) clips the group at the plate's own corners — `FAB·Spec` lost its corner cells this way. Background plates default to **square** (`radius.none`); rounding belongs to controls and cards. Rebuilt by `CF.radius('spec')`; gated here | `plate_rounded` |
+| 43 | **§2.1** — a content separator drawn as a `divider`/`hairline` plate. Content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16 bound as `rowGap`/`columnGap`), never a 1px line whose absolute x/y drifts when the host refits. Functional boundaries and state indicators are named `boundary·*` / `underline·*` and are not judged. Removed from ListItem, TableHeader/Row/State, Accordion, Menu and the spec-matrix row/header hairlines in the Boedoxol file (285 plates total); Accordion/Menu now use a 12px internal gap | `divider_separator` |
 | 41 | **§12 (gate G17)** — *screen pages only*: a top-level content board at a tier baseline width with **no durable `nl:sc` / `nl:rec` stamp** — it was composed freehand, so there is no record of the source material it claims to recreate and the gate cannot be re-read in a later session. Rebuild with `SC.record(…)` then `SC.build(…)`. The **page-level half** of the same rule reports a Screens page where `storage.SC` was never seeded: **unprovable is REPORTED, not passed** — the contract rule 31 applies to G16. Judges top-level boards only, because a full-bleed band inside a screen is the same width as its host and would otherwise be counted as a second screen | `no_source_record` |
 
 **Rules 1/2 judge authored numbers, not arithmetic.** In a flow board the numbers the designer chose are the padding,

@@ -85,6 +85,7 @@ return (function () {
     ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not its host control\'s corner: a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places. Rules 35/36 cannot see it — **both** values are on the ladder and bound. Repair with `TK.roleSweep`',
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
+    divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
@@ -807,6 +808,13 @@ return (function () {
       const spec = isSpecBoard(s);
       const exempt = EXEMPT.test(nm) || isAnno(s);
       if (/[/\n]/.test(nm)) add('name_invalid', s, st.top, '"' + nm + '" contains an illegal / or newline');
+      // Rule 43: a 1px line is not a layout device for separating content. The content gap comes from the spacing
+      // ladder (space.md 12 / space.base 16) so it survives a refit; functional edges are named boundary·* and state
+      // indicators underline·*, which are deliberately outside this rule.
+      if (/^(divider|hairline)(·|$)/.test(nm)) {
+        add('divider_separator', s, st.top, '"' + nm + '" is a 1px content separator — use a spacing-token gap '
+          + '(space.md/space.base); name functional edges boundary·* and indicators underline·*');
+      }
       // §4.3 an anatomy/recipe cell is a container the `after` pass fills with region plates. When a build times out and
       // the stray-heal mounts the bare board, the container survives with NOTHING inside — the board looks present in
       // every structural check and is empty on screen. Only a child count can see that, so it is checked by name.

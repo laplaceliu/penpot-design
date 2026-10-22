@@ -204,7 +204,9 @@ line of their own row, the board grows in height, and the state-axis header is r
 ```
 Button·Spec (measuredW × padY·2 + 40 + 28 + rows·(cellH+gapY))
 ├── title row            20px   "Button · variants"        + optional 13px right-aligned subtitle
-├── state-axis header    11px, role:axis — one label per column (default/hover/focus/…)
+├── state-axis header    11px, role:axis — one label per column (default/hover/focus/…), positioned at the ACTUAL
+│                         column start recorded from the first row, never at the declared `pitch` (a 252-wide host
+│                         advances by 268, so pitch-positioned headers bunch at the left — MiniCalendar·Spec)
 ├── one row per variant  label 13px at labelW=168, then one control host per state column
 │   └── each cell = a CF host, `Family·Type·Size·State·Slot`, vertically centred in cellH
 ├── hairlines            1px, 70% border colour, between rows

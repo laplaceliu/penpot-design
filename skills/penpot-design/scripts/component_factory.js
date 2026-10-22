@@ -992,7 +992,7 @@ return (function () {
       var seg = vert ? B(box.x + 1, box.y + 1 + off, box.w - 2, hs[i] - (i ? 1 : 0)) : B(box.x + 1 + off, box.y + 1, ws[i] - (i ? 1 : 0), box.h - 2);
       if (tn.bg) ctx.plate(seg, { name: 'segment·' + (i + 1), fill: C(tn.bg), fills: CF.fills(C(tn.bg), S, { onDark: tn.onDark }) });
       else if (i && (S === 'hover' || S === 'pressed')) ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
-      if (i) ctx.plate(vert ? B(seg.x, seg.y, seg.w, 1) : B(seg.x, seg.y, 1, seg.h), { name: 'divider', fill: C('border'), opacity: 0.6 });
+      if (i) ctx.plate(vert ? B(seg.x, seg.y, seg.w, 1) : B(seg.x, seg.y, 1, seg.h), { name: 'boundary·segment', fill: C('border'), opacity: 0.6 });
       if (it.label) ctx.text(it.label, seg, { size: L.fs, color: C(tn.ink, P.ink), weight: 500, opacity: stateAlpha(S) });
       else if (it.glyph) ctx.glyph(it.glyph, seg, { color: C(tn.ink, P.ink), opacity: stateAlpha(S) });
       off += (vert ? hs[i] : ws[i]);
@@ -1013,7 +1013,7 @@ return (function () {
     ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : C('surface'), S, { onDark: !!tn.bg && tn.onDark });
     if (!tn.bg) ctx._stroke(ctx.host, C('border'), 1);
     ctx.plate(B(box.x + box.w - cw, box.y, cw, box.h), { name: 'chevron-zone', fill: tn.bg ? '#000000' : C('border'), opacity: tn.bg ? 0.12 : 0.001 });
-    ctx.plate(B(box.x + box.w - cw, box.y + 6, 1, box.h - 12), { name: 'divider', fill: C(tn.ink, P.ink), opacity: tn.bg ? 0.35 : 1 });
+    ctx.plate(B(box.x + box.w - cw, box.y + 6, 1, box.h - 12), { name: 'boundary·zone', fill: C(tn.ink, P.ink), opacity: tn.bg ? 0.35 : 1 });
     ctx.text(o.label || 'Publish', B(box.x, box.y, box.w - cw, box.h), { size: L.fs, color: C(tn.ink, P.ink), weight: 500, opacity: stateAlpha(S) });
     ctx.glyph('chevronDown', B(box.x + box.w - cw, box.y, cw, box.h), { color: C(tn.ink, P.ink), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place();
@@ -1347,7 +1347,7 @@ return (function () {
     if (o.right) ctx.text(String(o.right), B(r.x + r.w - padX - CF.estW(String(o.right), 12) - 4, r.y, CF.estW(String(o.right), 12) + 4, r.h), { size: 12, color: C('muted'), align: 'right', valign: 'middle' });
     if (o.selected) ctx.glyph('check', B(r.x + r.w - padX - icon, r.y + (r.h - icon) / 2, icon, icon), { color: C('primary') });
     if (o.skeleton) ctx.plate(B(r.x + padX, r.y + (r.h - 12) / 2, r.w * 0.6, 12), { name: 'skeleton·bar', fill: C('surfaceAlt'), radius: 'xs' });
-    if (o.divider) ctx.plate(B(r.x + 8, r.y, r.w - 16, 1), { name: 'divider', fill: C('border') });
+    /* content separation is a spacing-token gap; a row divider plate is not drawn */
   }
   /** A menu/select option list inside a host. `rows` = [{label,selected,hover,disabled,group,right,lead,divider,skeleton}]. */
   CF.optionList = async function (ctx, box, rows, o) {
@@ -2080,7 +2080,7 @@ return (function () {
     if (o.mediaLeft) { ctx.plate(B(box.x + pad, y + 2, o.mediaW || 88, bodyH - 6), { name: 'media', fill: C('border'), radius: 'sm' }); }
     y += bodyH;
     if (footerH) {
-      ctx.plate(B(box.x + pad, y + 8, box.w - pad * 2, 1), { name: 'hairline', fill: C('border') });
+      ctx.plate(B(box.x + pad, y + 8, box.w - pad * 2, 1), { name: 'boundary·footer', fill: C('border') });
       if (o.actions) {
         // `actions: true` is the shorthand the spec tables use for "show me an action row"; only an array of labels can
         // be rendered, and reading `.length` off a boolean threw mid-factory, leaving a host that no row owned (the
@@ -2088,7 +2088,7 @@ return (function () {
         var acts = o.actions === true ? ['Details', 'Share'] : o.actions;
         var aw = (box.w - pad * 2) / acts.length;
         acts.forEach(function (a, i) {
-          if (i) ctx.plate(B(box.x + pad + i * aw, y + 8, 1, footerH - 8), { name: 'divider', fill: C('border'), opacity: 0.7 });
+          if (i) ctx.plate(B(box.x + pad + i * aw, y + 8, 1, footerH - 8), { name: 'boundary·action', fill: C('border'), opacity: 0.7 });
           ctx.text(String(a), B(box.x + pad + i * aw, y + 8, aw, footerH - 8), { size: 14, color: C('primary'), weight: 500 });
         });
       } else if (o.footer) {
@@ -2241,7 +2241,6 @@ return (function () {
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('TableHeader', { state: o.sort ? 'Sorted·' + o.sort : (o.filter ? 'FilterActive' : 'Default'), slot: o.align === 'right' ? 'Numeric' : null }), box, { parent: o.parent });
     ctx.host.fills = CF.fills(C('surfaceAlt'), o.state === 'hover' ? 'hover' : null);
-    ctx.plate(B(box.x, box.y + box.h - 1, box.w, 1), { name: 'hairline', fill: C('border') });
     var right = o.align === 'right';
     ctx.text(label, B(box.x + padX, box.y, box.w - padX * 2 - sortW - filtW - resW, box.h),
       { size: 12, color: o.sort || o.filter ? C('primary') : C('muted'), weight: 600, align: right ? 'right' : 'left', refit: false });
@@ -2266,7 +2265,6 @@ return (function () {
     var S = o.state || 'default';
     var ctx = CF.build(CF.name('TableRow', { size: dens, state: S, slot: o.expandable ? 'Expandable' : (o.editing ? 'Editing' : null) }), box, { parent: o.parent });
     ctx.host.fills = S === 'selected' ? CF.fills(C('primary'), 'selected', { tint: 1 }) : (o.zebra ? CF.fills(C('surfaceAlt'), S === 'hover' ? 'hover' : null) : CF.fills(C('surface'), S === 'hover' ? 'hover' : (S === 'disabled' ? 'disabled' : null)));
-    ctx.plate(B(box.x, box.y + box.h - 1, box.w, 1), { name: 'hairline', fill: C('border') });
     if (S === 'selected') ctx.plate(B(box.x, box.y, 2, box.h), { name: 'accent·bar', fill: C('primary') });
     var x = box.x + (o.selectable ? 44 : 0);
     var al = S === 'disabled' ? CF.STATE.disabledContent : 1;
@@ -2335,7 +2333,6 @@ return (function () {
       c2.plate(B(box2.x + 16, yy + (rowH - 12) / 2, (box2.w - 32) * 0.3, 12), { name: 'sk·cell', fill: C('border'), radius: 'xs' });
       c2.plate(B(box2.x + 16 + (box2.w - 32) * 0.36, yy + (rowH - 12) / 2, (box2.w - 32) * 0.16, 12), { name: 'sk·cell', fill: C('border'), radius: 'xs' });
       c2.plate(B(box2.x + 16 + (box2.w - 32) * 0.6, yy + (rowH - 12) / 2, (box2.w - 32) * 0.12, 12), { name: 'sk·cell', fill: C('border'), opacity: 0.7, radius: 'xs' });
-      if (r) c2.plate(B(box2.x + 16, yy - 1, box2.w - 32, 1), { name: 'hairline', fill: C('border') });
     }
     return c2.host;
   };
@@ -2380,7 +2377,6 @@ return (function () {
     else if (o.trailing === 'menu') await CF.iconButton({ parent: ctx.host, x: box.x + box.w - padX - 28, y: box.y + (h - 28) / 2, size: 'xs', glyph: 'dotsV' });
     else if (o.trailing === 'switch') await CF.switch({ parent: ctx.host, x: box.x + box.w - padX - 44, y: box.y + (h - 22) / 2, size: 'sm', checked: o.on });
     else if (o.trailing === 'action') await CF.button({ parent: ctx.host, x: box.x + box.w - padX - 72, y: box.y + (h - 28) / 2, label: String(o.action || 'Open'), size: 'sm', type: 'default' });
-    if (o.divider !== false) ctx.plate(B(tx, box.y + box.h - 1, box.x + box.w - tx - (o.trailing === 'meta' ? padX : 0), 1), { name: 'divider', fill: C('border') });
     await ctx.settle(); ctx.place();
     if (S === 'focus') ctx.ring(box, { radius: CF.radius('sm'), offset: 0 });
     return ctx.host;
@@ -2485,8 +2481,11 @@ return (function () {
     o = o || {};
     var items = o.items || [{ title: 'Shipping', body: 'Free on orders over 80.', open: true }, { title: 'Returns', body: '30 days, unworn.' }, { title: 'Support', disabled: true }];
     var headH = o.headH || 48, padX = o.padX || 16, bodyH = o.bodyH || 44;
+    // Items separate with a row breath (12, `space.md`), NOT a 1px divider: the gap is a layout amount that survives
+    // resizing, while a line plate is absolute geometry that drifts when the host refits.
+    var itemGap = LY && LY.breath ? LY.breath('row') : 12;
     var w = o.w || 360, h = 0;
-    items.forEach(function (it) { h += headH + (it.open && !o.collapsedAll ? bodyH : 0); });
+    items.forEach(function (it, i) { h += headH + (it.open && !o.collapsedAll ? bodyH : 0) + (i < items.length - 1 ? itemGap : 0); });
     var box = B(o.x || 0, o.y || 0, w, max(headH, h));
     var ST = o.state || 'default';
     // `name` lets a screen ship a content-specific composition (Accordion·FAQ·Multi) instead of drawing the registered
@@ -2522,8 +2521,7 @@ return (function () {
             { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
         });
       }
-      y += headH + (it.open ? bodyH : 0);
-      if (i < items.length - 1) ctx.plate(B(box.x, y - 1, w, 1), { name: 'divider', fill: C('border') });
+      y += headH + (it.open ? bodyH : 0) + (i < items.length - 1 ? itemGap : 0);
     }
     try { ctx.host.resize(w, N(y - box.y)); } catch (e) {}
     await ctx.settle(); ctx.place();
@@ -2768,7 +2766,7 @@ return (function () {
     var box = B(rect.x, rect.y, rect.w, rect.h);
     var ctx = CF.build(CF.name('Tabs', { type: o.type || 'line', slot: o.add ? 'Add' : (o.scrollable ? 'Scrollable' : 'Band') }), box, { parent: o.parent });
     var act = o.active === undefined ? 0 : Number(o.active);
-    if ((o.type || 'line') === 'line') ctx.plate(B(box.x, box.y + box.h - 1, box.w, 1), { name: 'hairline', fill: C('border') });
+    if ((o.type || 'line') === 'line') ctx.plate(B(box.x, box.y + box.h - 1, box.w, 1), { name: 'underline·band', fill: C('border') });
     var x = box.x + (o.padX || 0);
     for (var i = 0; i < items.length; i++) {
       var it = typeof items[i] === 'string' ? { label: items[i] } : items[i];
@@ -3003,6 +3001,7 @@ return (function () {
     o = o || {};
     var raw = o.items || ['Edit', 'Duplicate', '-', 'Share', 'Delete'];
     var w = o.w || 220, itemH = o.itemH || 32, padX = o.padX === undefined ? 12 : o.padX, padV = o.padV === undefined ? 4 : o.padV;
+    var itemGap = LY && LY.breath ? LY.breath('row') : 12;   // group separation is a gap, not a divider row
     var hasIcons = o.icon !== false, hasKeys = !!o.keys;
     var rows = raw.map(function (it) {
       if (it === '-' || it === null) return { kind: 'divider' };
@@ -3011,7 +3010,7 @@ return (function () {
       return Object.assign({ kind: 'item' }, it);
     });
     var h = padV * 2;
-    rows.forEach(function (r) { h += r.kind === 'divider' ? 9 : (r.kind === 'group' ? 24 : itemH); });
+    rows.forEach(function (r) { h += r.kind === 'divider' ? itemGap : (r.kind === 'group' ? 24 : itemH); });
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('Menu', { type: o.variant === 'submenu' ? 'Submenu' : (o.selectable ? 'Selectable' : null), state: o.state,
       // the leading 16px glyph column IS the menu's icon slot, so the host name has to say so (§4 coverage reads names).
@@ -3024,7 +3023,7 @@ return (function () {
     var rowB = null;
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      if (r.kind === 'divider') { ctx.plate(B(box.x + 1, y + 4, box.w - 2, 1), { name: 'divider', fill: C('border') }); y += 9; continue; }
+      if (r.kind === 'divider') { y += itemGap; continue; }
       if (r.kind === 'group') {
         ctx.text(String(r.label).toUpperCase(), B(box.x + padX, y, box.w - padX * 2, 24),
           { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
@@ -3422,7 +3421,7 @@ return (function () {
       }
     }
     if (footerH) {
-      ctx.plate(B(rect.x + 1, footer.y, rect.w - 2, 1), { name: 'hairline', fill: C('border') });
+      ctx.plate(B(rect.x + 1, footer.y, rect.w - 2, 1), { name: 'boundary·footer', fill: C('border') });
       var btns = o.buttons || (o.confirm ? ['Cancel', 'Confirm'] : ['Cancel', 'Share']);
       var fx = footer.x + rect.w - pad, bw = [];
       btns.forEach(function (b) { bw.push(CF.estW(String(b), 14) + 32); });
@@ -3472,7 +3471,7 @@ return (function () {
       }
     }
     if (footerH) {
-      ctx.plate(B(rect.x + 1, footer.y, rect.w - 2, 1), { name: 'hairline', fill: C('border') });
+      ctx.plate(B(rect.x + 1, footer.y, rect.w - 2, 1), { name: 'boundary·footer', fill: C('border') });
       var btns = o.buttons || ['Close', 'Save'];
       var fx = footer.x + rect.w - pad;
       for (var k = btns.length - 1; k >= 0; k--) {
@@ -3530,7 +3529,7 @@ return (function () {
     if (title) {
       ctx.text(title, B(box.x + pad, y, box.w - pad * 2, 40), { size: 16, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
       if (o.closable) ctx.glyph('close', B(box.x + box.w - pad - 20, y + 10, 20, 20), { color: C('muted'), strokeW: 1.8 });
-      ctx.plate(B(box.x, y + 39, box.w, 1), { name: 'hairline', fill: C('border') });
+      ctx.plate(B(box.x, y + 39, box.w, 1), { name: 'boundary·header', fill: C('border') });
       y += 40;
     }
     for (var i = 0; i < opts.length; i++) {
@@ -3573,7 +3572,7 @@ return (function () {
     var slot = LY && LY.slots.appBar ? LY.slots.appBar(rect, { actions: nActs, searchW: searchW, logoW: narrow ? 104 : undefined }) : null;
     var ctx = CF.build(CF.name('AppBar', { type: o.dark ? 'Dark' : (o.tier || 'web'), state: o.state, slot: o.sticky ? 'Sticky' : null }), rect,
       { parent: o.parent, fill: o.dark ? C('ink') : C('surface'), radius: 'none' });
-    if (o.shadow !== false && !o.dark) ctx.plate(B(rect.x, rect.y + rect.h - 1, rect.w, 1), { name: 'hairline', fill: C('border') });
+    if (o.shadow !== false && !o.dark) ctx.plate(B(rect.x, rect.y + rect.h - 1, rect.w, 1), { name: 'boundary·edge', fill: C('border') });
     if (!slot) return ctx.host;
     var ink = o.dark ? '#FFFFFF' : C('ink'), sub = o.dark ? '#FFFFFF' : C('muted');
     var lg = slot.logo;
@@ -3630,7 +3629,7 @@ return (function () {
     var rail = !!(slot ? slot.rail : railMode);
     var ctx = CF.build(CF.name('SideNav', { type: rail ? 'Rail' : 'Expanded', state: o.state, slot: o.cta ? 'Cta' : (o.user ? 'User' : null) }), rect,
       { parent: o.parent, fill: o.dark ? C('ink') : C('surfaceAlt'), radius: 'none' });
-    ctx.plate(B(rect.x + rect.w - 1, rect.y, 1, rect.h), { name: 'hairline', fill: o.dark ? '#FFFFFF' : C('border'), opacity: o.dark ? 0.12 : 1 });
+    ctx.plate(B(rect.x + rect.w - 1, rect.y, 1, rect.h), { name: 'boundary·edge', fill: o.dark ? '#FFFFFF' : C('border'), opacity: o.dark ? 0.12 : 1 });
     if (!slot) return ctx.host;
     var ink = o.dark ? '#FFFFFF' : C('ink');
     if (slot.brand) {
@@ -3689,7 +3688,7 @@ return (function () {
     var x = slot.left.x, cy = slot.left.y, limit = slot.left.x + slot.left.w;
     for (var i = 0; i < left.length; i++) {
       if (x > limit) break;                                   // a toolbar never crowds past its own half
-      if (left[i] === '-') { ctx.plate(B(x, cy + 6, 1, slot.controlH - 12), { name: 'divider', fill: C('border') }); x += 12; continue; }
+      if (left[i] === '-') { ctx.plate(B(x, cy + 6, 1, slot.controlH - 12), { name: 'boundary·group', fill: C('border') }); x += 12; continue; }
       if (/^[A-Z]/.test(String(left[i])) || String(left[i]).length > 8) {
         var bw = CF.estW(String(left[i]), 14) + 24;
         await CF.button({ parent: ctx.host, x: N(x), y: N(cy), w: N(bw), h: slot.controlH, label: String(left[i]), size: 'sm', type: 'default' });
@@ -3706,7 +3705,7 @@ return (function () {
       rx -= 10;
     }
     for (var k = right.length - 1; k >= 0; k--) {
-      if (right[k] === '-') { rx -= 12; ctx.plate(B(rx, cy + 6, 1, slot.controlH - 12), { name: 'divider', fill: C('border') }); rx -= 12; continue; }
+      if (right[k] === '-') { rx -= 12; ctx.plate(B(rx, cy + 6, 1, slot.controlH - 12), { name: 'boundary·group', fill: C('border') }); rx -= 12; continue; }
       rx -= rSq;
       await CF.iconButton({ parent: ctx.host, x: N(rx), y: N(cy + (slot.controlH - rSq) / 2), size: rs, glyph: String(right[k]),
         tone: k === (o.view === undefined ? 0 : o.view) ? 'accent' : 'ghost' });
@@ -3773,7 +3772,7 @@ return (function () {
       { parent: o.parent, fill: dark ? C('ink') : C('surfaceAlt'), radius: 'none' });
     if (!slot) return ctx.host;
     var ink = dark ? '#FFFFFF' : C('ink'), sub = dark ? '#FFFFFF' : C('muted');
-    ctx.plate(B(rect.x, rect.y, rect.w, 1), { name: 'hairline', fill: dark ? '#FFFFFF' : C('border'), opacity: dark ? 0.12 : 1 });
+    ctx.plate(B(rect.x, rect.y, rect.w, 1), { name: 'boundary·edge', fill: dark ? '#FFFFFF' : C('border'), opacity: dark ? 0.12 : 1 });
     // column 0 is the brand block, so the link columns never sit under the logo
     var brand = slot.columns[0], top = rect.y + padT, brandW = max(140, brand.w);
     ctx.plate(B(brand.x, top, 32, 32), { name: 'logo·mark', fill: C('primary'), radius: CF.radius('lg') });
@@ -3824,7 +3823,7 @@ return (function () {
     var rect = o.rect || B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('MobileBar', { type: pos === 'bottom' ? 'Tab' : 'Top', size: items.length + 'up', slot: o.centerAction ? 'CenterAction' : null }), rect,
       { parent: o.parent, fill: C('surface'), radius: 'none' });
-    ctx.plate(B(rect.x, pos === 'bottom' ? rect.y : rect.y + rect.h - 1, rect.w, 1), { name: 'hairline', fill: C('border') });
+    ctx.plate(B(rect.x, pos === 'bottom' ? rect.y : rect.y + rect.h - 1, rect.w, 1), { name: 'boundary·edge', fill: C('border') });
     if (pos === 'top') {
       ctx.glyph('chevronLeft', B(rect.x + 16, rect.y + (rect.h - safe - 22) / 2, 22, 22), { color: C('ink'), strokeW: 2 });
       ctx.text(String(o.title === undefined ? 'Project' : o.title), B(rect.x, rect.y, rect.w, rect.h - safe), { size: 16, color: C('ink'), weight: 600, valign: 'middle', refit: false });
@@ -3879,14 +3878,14 @@ return (function () {
     var headH = o.title === false ? 0 : 40, stateRowH = axes.length > 1 ? 28 : 0;
     var h = padY * 2 + headH + stateRowH + bodyH + (o.notes ? 44 : 0);
     var box = B(o.x || 0, o.y || 0, w, h);
-    var ctx = CF.build(CF.name(o.family || 'Component', { slot: 'Spec' }), box,
+    var specName = o.specName || CF.name(o.family || 'Component', { slot: 'Spec' });
+    var ctx = CF.build(specName, box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), stroke: C('border'), strokeW: 1 });
     var titleText = String(o.title === undefined ? (o.family || 'Component') + ' · variants' : o.title);
     if (headH) {
       ctx.text(titleText, B(box.x + padX, box.y + padY, box.w - padX * 2, 28),
         { size: 20, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
     }
-    var hairlines = [];
     var top = box.y + padY + headH;
     var axisX = box.x + padX + labelW + gapX, axisRight = 0;
     var y = top + stateRowH + 4, maxRight = box.x + padX + labelW;
@@ -3894,6 +3893,11 @@ return (function () {
     // row (five-node Steps under five state columns = 5 829px) grows past the page root and every audit calls it
     // out_of_bounds. Cells that no longer fit fold into a second line of the SAME row: the sheet stays band-sized.
     var budgetR = o.maxW ? box.x + o.maxW - padX : Infinity, lineGap = 8, folded = false;
+    // Actual column starts, recorded from the FIRST row as its cells are placed. The state-axis header must sit on
+    // these x values, not on the declared `pitch`: a host wider than the pitch advances the row by `host.width+gapX`
+    // (MiniCalendar: 252+16=268) while the old header stayed on pitch 136, so default/hover/focus/disabled bunched at
+    // the left and never lined up with the four calendars under them (measured 2026-10-22 on `MiniCalendar·Spec`).
+    var colX = null;
     for (var r = 0; r < rows.length; r++) {
       var row = rows[r], rh = rowH(row), lineTop = y, startX = axisX, cx = startX;
       // A row reserves the height of the TALLEST cell it actually produced, not the declared `cellH`. Cells are centred
@@ -3927,6 +3931,7 @@ return (function () {
           folded = true; closeLine(line);
           lineTop = line.top + line.h + lineGap; line = { top: lineTop, h: rh, hosts: [] }; lines.push(line); cx = startX;
         }
+        if (r === 0 && !folded) { if (!colX) colX = []; colX[c] = N(cx); }
         line.hosts.push({ host: host, x: N(cx) });
         line.h = max(line.h, N(host.height));
         maxRight = max(maxRight, cx + host.width);
@@ -3941,22 +3946,22 @@ return (function () {
         { size: 13, color: C('ink'), weight: 500, align: 'left', valign: 'middle', refit: false });
       if (row.note) ctx.text(String(row.note), B(box.x + padX, lines[0].top + blockH, labelW, 14),
         { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
-      if (r < rows.length - 1) hairlines.push(B(box.x + padX, y - gapY / 2, 1, 1));
     }
     // The axis line is drawn LAST because only now is it known whether the columns stayed on one line: a folded sheet
     // has no fixed column set, so it gets the reading order as a caption instead of five headers over nothing.
     if (stateRowH) {
       if (!folded) {
         axes.forEach(function (a, i) {
-          ctx.text(String(a), B(axisX + i * pitch, top, pitch - 8, stateRowH - 6), { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
-          axisRight = max(axisRight, axisX + i * pitch + CF.estW(String(a), 11));
+          var ax = (colX && colX[i] !== undefined) ? colX[i] : axisX + i * pitch;
+          var next = (colX && colX[i + 1] !== undefined) ? colX[i + 1] : ax + pitch;
+          ctx.text(String(a), B(ax, top, max(40, next - ax - 8), stateRowH - 6), { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
+          axisRight = max(axisRight, ax + CF.estW(String(a), 11));
         });
       } else {
         ctx.text('columns fold: ' + axes.join('  ·  ') + ' — each row reads left to right, top line first',
           B(axisX, top, max(160, min(720, budgetR - axisX)), stateRowH - 6),
           { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
       }
-      hairlines.push(B(box.x + padX, top + stateRowH - 8, 1, 1));
     }
     // The header line holds title (20px) + right-aligned subtitle (13px): the fitted width must carry BOTH, or the
     // title renders past the shrunk board and lands on the subtitle (audit_layout text_overlap).
@@ -3970,7 +3975,6 @@ return (function () {
     var innerW = max(1, N(fitW - padX * 2));
     if (headH && o.subtitle) ctx.text(String(o.subtitle), B(box.x + fitW - padX - 320, box.y + padY + 6, min(320, innerW), 20),
       { size: 13, color: C('muted'), align: 'right', valign: 'middle', refit: false });
-    hairlines.forEach(function (hl, i) { ctx.plate(B(hl.x, hl.y, innerW, 1), { name: 'hairline·' + i, fill: C('border'), opacity: 0.7 }); });
     if (o.notes) {
       var nl = CF.wrap(String(o.notes), innerW * 0.94, 12);
       nl.slice(0, 3).forEach(function (ln, i) {
@@ -3979,6 +3983,35 @@ return (function () {
     }
     await ctx.settle(); ctx.place();
     return ctx.host;
+  };
+
+  /** Pre-flight for a heavy matrix: the MCP tool call has a ~30 s wall-clock ceiling, and one CF.matrix call draws
+      every cell of every row. Split the ROWS into parts that each stay under the ceiling, then build ONE part per
+      execute_code. Every part keeps all state axes, so `state_coverage`/`variant_sparse` aggregate across the family's
+      boards (their names all match `·Spec`). Returns parts in visual order; place part N+1 at part N bottom + 32.
+      This is a scheduling helper, not a second designer: the cells are still CF factories and the rows are the same
+      spec rows. */
+  CF.matrixPlan = function (o) {
+    o = o || {};
+    var rows = o.rows || [], axes = o.axes || ['default'];
+    var cells = rows.length * axes.length;
+    var maxCells = o.maxCells || 8;
+    var rowsPer = Math.max(1, Math.floor(maxCells / Math.max(1, axes.length)));
+    var base = o.specName || CF.name(o.family || 'Component', { slot: 'Spec' });
+    var parts = [];
+    for (var i = 0; i < rows.length; i += rowsPer) {
+      var n = parts.length + 1;
+      parts.push({
+        part: n,
+        rows: rows.slice(i, i + rowsPer),
+        axes: axes,
+        specName: n === 1 ? base : base + '·' + n,
+        title: (o.title === undefined ? (o.family || 'Component') + ' · variants' : o.title) + (n > 1 ? ' · part ' + n : '')
+      });
+    }
+    return { cells: cells, axes: axes.length, rows: rows.length, maxCells: maxCells, rowsPer: rowsPer, parts: parts,
+             estMs: cells * 1000,
+             note: 'estMs is a conservative 1 s/cell; if parts.length > 1 build ONE part per execute_code, stacking each board at previous bottom + 32' };
   };
 
   // ---------------------------------------------------------------- components: register / place / switch (C2/C3)

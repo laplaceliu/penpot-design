@@ -24,6 +24,19 @@ Operate Penpot files via the `execute_code` tool of the `penpot` MCP. All code r
 Practical consequence: **30s per call is the real budget**, so every engine in `scripts/` is written as a queue runner
 (`designStart`/`designNext`/`designAll`, `auditAll`, `scaffoldQueue`) that does one page — sometimes one switch — per call.
 
+**Where the 30 s comes from (measured 2026-10-22):** it is the **MCP bridge's** `EVAL_TIMEOUT_MS`, not a Penpot API
+limit and not a SKILL setting; `penpot.*` calls do not expire on their own. The file is saved even when the bridge kills
+the response, so a timed-out call is **not cancelled** — probe residue, never blind-retry. Two ways to live under it:
+
+1. **Pre-flight and split (default).** `CF.matrixPlan({family, axes, rows, maxCells})` returns `parts[]` split by rows,
+   each part keeping all state axes; build **one part per `execute_code`** with `CF.matrix({...part})`. The estimate is a
+   conservative 1 s/cell; a 15-cell family becomes 3 parts of 5. Family coverage aggregates across the parts because
+   every board name still matches `·Spec`.
+2. **Recover a pathologically slow page.** If one factory that takes ~1 s on an empty page takes >10 s on a content
+   page, the backend has accumulated render/undo state, not a geometry bug: `docker compose restart penpot-backend
+   penpot-exporter penpot-mcp penpot-frontend` (stack dir `penpot-ui`), wait ~10 s, then **reconnect the Penpot MCP
+   plugin** — the restart drops the plugin websocket and no `execute_code` works until it reconnects.
+
 ## 1. Session discipline (must obey every call)
 
 1. **Page switching is asynchronous**: after `penpot.openPage(pageObj)`, creating/modifying shapes in the same call may hit the old page. Two reliable patterns:
