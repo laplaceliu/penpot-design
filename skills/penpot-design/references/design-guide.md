@@ -364,6 +364,7 @@ without them is a finding, not a style difference.
 
 - Size ladder (HARD to these steps): **16** inline with 14px text / **20** inside buttons, menu items, inputs / **24** nav, tabs, cards /
   **28–32** empty states, feature blocks / **40–48** hero marks. One size per context, no in-between.
+- **An icon is placed in a SLOT, never stretched to its control box.** `CF.iconSize(host)` returns 16/20/24/32 by host size and `CF.iconBox(host)` centres it; a 32px stepper therefore draws a 20px icon at a 1.7 stroke, not a 32px mark filling the plate (measured 2026-10-22: the old call passed the whole stepper box and produced a 19×19 plus with a 2.72 stroke beside 14px copy). A minus is a **zero-height path**: centre it by its line coordinate, not by resizing a 20×20 box — the line stays at the box top and reads as "not centred".
 - Grid: 24×24 with 2px stroke (Fluent/AntD convention), 2px padding inside the box, `currentColor`-style single fill so the icon follows the text token.
 - Icon + label gap **8** (12 when the label is ≥20px); the icon is optically centered on the label's cap height, not on the line box
   (centering error ≤1px — this is checked in acceptance).

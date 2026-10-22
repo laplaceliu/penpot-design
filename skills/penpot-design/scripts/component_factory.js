@@ -791,6 +791,21 @@ return (function () {
   };
   CF.glyphKinds = Object.keys(G);
 
+  // ---------------------------------------------------------------- icon slots (the glyph must never fill its host)
+  // `CF.glyph` scales the 24-unit drawing to `min(box.w, box.h)`, so passing a CONTROL box (a 32px stepper, a 56px FAB,
+  // a 64px upload tile) silently inflates the mark: measured 2026-10-22 on `NumberField` — a 19×19 plus with a 2.72
+  // stroke beside 14px value copy, i.e. an icon larger and heavier than the text it sits next to. A control owns an
+  // ICON SLOT, not an icon: size it from the host and centre it, and pass THAT box to `CF.glyph`.
+  CF.iconSize = function (host) {
+    var h = min(host.w, host.h);
+    return h >= 80 ? 32 : (h >= 48 ? 24 : (h >= 36 ? 20 : 16));
+  };
+  CF.iconBox = function (box, size) {
+    box = B(box.x, box.y, box.w, box.h);
+    var s = size || CF.iconSize(box);
+    return B(box.x + (box.w - s) / 2, box.y + (box.h - s) / 2, s, s);
+  };
+
   // ---------------------------------------------------------------- subtree move (compensates "board shell moves, content stays")
   /** Move a host together with everything inside it. Measured (2026-10-20): writing `host.x/y` in world coordinates
       already drags the whole subtree, so the children must **not** be offset first — doing both applies the delta
@@ -944,7 +959,7 @@ return (function () {
     var ctx = CF.build(CF.name('IconButton', { type: o.type || 'ghost', size: o.size, state: S, slot: o.badge ? 'Badge' : (o.shape === 'circle' ? 'Circle' : null) }), box, { parent: o.parent });
     ctx.host.fills = CF.fills(C(tn.bg), S, { onDark: tn.onDark });
     if (o.outlined) ctx._stroke(ctx.host, C('border'), 1, S === 'disabled' ? 0.4 : 1);
-    ctx.glyph(o.glyph || 'dots', box, { color: C(o.tone === 'danger' ? 'error' : (tn.ink || 'muted')), opacity: stateAlpha(S) });
+    ctx.glyph(o.glyph || 'dots', CF.iconBox(box), { color: C(o.tone === 'danger' ? 'error' : (tn.ink || 'muted')), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place();
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
     if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: o.shape === 'circle' ? 'control' : L2r(o.size), color: C('primary') });
@@ -1021,7 +1036,7 @@ return (function () {
     if (label) {
       if (!o.iconOnly) ctx.glyph(o.glyph || 'plus', B(box.x + 16, box.y + (d - 24) / 2, 24, 24), { color: C(tn.ink), opacity: stateAlpha(S) });
       ctx.text(label, B(box.x + (o.iconOnly ? 16 : 48), box.y, w - (o.iconOnly ? 32 : 64), d), { size: 14, color: C(tn.ink), weight: 600, opacity: stateAlpha(S) });
-    } else ctx.glyph(o.glyph || 'plus', box, { color: C(tn.ink), opacity: stateAlpha(S) });
+    } else ctx.glyph(o.glyph || 'plus', CF.iconBox(box), { color: C(tn.ink), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place(); ctx.refit(16);
     if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height), { radius: 'control' });
     return ctx.host;
@@ -1303,7 +1318,7 @@ return (function () {
       var dn = B(f.x - btnW, f.y, btnW, f.h), up = B(f.x + f.w, f.y, btnW, f.h);
       [[dn, 'minus', v <= minv], [up, 'plus', v >= maxv]].forEach(function (t) {
         ctx.plate(t[0], { name: 'stepper', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: L.radius });
-        ctx.glyph(t[1], t[0], { color: t[2] ? C('muted') : C('ink'), opacity: t[2] ? CF.STATE.disabledContent : 1 });
+        ctx.glyph(t[1], CF.iconBox(t[0], 20), { color: t[2] ? C('muted') : C('ink'), opacity: t[2] ? CF.STATE.disabledContent : 1, strokeW: 1.7 });
       });
     } else {
       var gh = B(f.x + f.w - 12 - 16, f.y + f.h / 2 - 16, 16, 16);
@@ -1765,7 +1780,7 @@ return (function () {
         var tb = B(gb.x + c2 * (ts + gp), gb.y + r2 * (ts + gp), ts, ts);
         var add = i >= ((o.filled || 5));
         gc.plate(tb, { name: add ? 'thumb·add' : 'thumb', fill: add ? null : C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 'sm', clip: true });
-        if (add) gc.glyph('plus', tb, { color: C('muted') });
+        if (add) gc.glyph('plus', CF.iconBox(tb, 20), { color: C('muted') });
         else gc.glyph('image', B(tb.x + 8, tb.y + 8, ts - 16, ts - 16), { color: C('muted') });
       }
       gc.text((o.filled || 5) + ' of ' + (cols * (o.rows || 2)) + ' files', B(gb.x, gb.y + (o.rows || 2) * (ts + gp), gb.w, 20), { size: 12, color: C('muted'), align: 'left', valign: 'top' });
@@ -3810,7 +3825,7 @@ return (function () {
       var cx = rect.x + cellW * (i + 0.5), on = i === (o.active === undefined ? 0 : o.active);
       if (o.centerAction && i === Math.floor(n / 2)) {
         ctx.ellipse(B(cx - 24, rect.y + barH / 2 - 24, 48, 48), { name: 'fab·center', fill: C('primary'), shadow: 2 });
-        ctx.glyph('plus', B(cx - 11, rect.y + barH / 2 - 11, 22, 22), { color: C('onPrimary'), strokeW: 2.4 });
+        ctx.glyph('plus', B(cx - 10, rect.y + barH / 2 - 10, 20, 20), { color: C('onPrimary'), strokeW: 1.8 });
       } else {
         if (on) ctx.plate(B(cx - cellW / 2 + 8, rect.y + 6, cellW - 16, barH - 18), { name: 'tab·' + i, fills: CF.fills(C('primarySoft'), null), radius: CF.radius('md') });
         ctx.glyph(iconOf(it.glyph, ['home', 'search', 'plus', 'mail', 'user'][i % 5]), B(cx - 12, gy, 24, 24), { color: on ? C('primary') : C('muted'), strokeW: 2 });
