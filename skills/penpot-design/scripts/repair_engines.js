@@ -464,5 +464,82 @@ return (function () {
     return out;
   };
 
-  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize'] };
+  // ---- fitTexts: make every text's BOX its content, and make the RENDER follow the box ----
+  // WHY. `penpot.createText(str)` lays the text out at a transient width, so the shape is born with a height that does
+  // NOT match its content (measured 2026-10-22 on this Penpot 2.17: a 16px/24 label read h=384, a 36px/48 page title
+  // read h=1728 — in both cases `fontSize × lineHeight`), and the glyphs are drawn at the VERTICAL CENTRE of that box.
+  // Three consequences, all visible in an export:
+  //   1. the glyphs sit hundreds of pixels below the shape's own origin — outside their host, and clipped away (the
+  //      export of `01-Header` showed only the right-hand stamp, whose short box happened to keep its glyphs inside);
+  //   2. the audit reads the BOX, so a stale height reads as a 1728-tall label overlapping its neighbours;
+  //   3. the offset is FROZEN at the first layout: `textBounds.y` keeps the first box's centring forever, so moving
+  //      or resizing the shape afterwards does not move the glyphs (measured: the title's `textBounds.y` stayed 882
+  //      through a move, two resizes and a characters rewrite, while its shape `y` was 40).
+  // THE TWO MOVES. (a) resize the box to the content — `textBounds` gives the content's own box once the text has
+  // laid out; (b) force a RE-LAYOUT, because only a real property change re-runs it: writing the line-height twice (a
+  // nudge, then the real value) recomputes the centring against the now-correct box, so `textBounds.y` returns to the
+  // shape's own origin (measured: a label at y=88 saw `textBounds.y` go 219 → 87).
+  // THE ORDER MATTERS, and both halves of it are measured. A `resize` BEFORE a text has ever been laid out leaves it
+  // with EMPTY bounds and it never renders at all (a freshly created label read w=1, h=1 and stayed that way). So the
+  // pass WAITS for the layout — the bounds must report a real width and height — and it never probes: a text that is
+  // still laying out is left alone rather than resized on a guess. A single-line text gets the content's own width plus
+  // 8px of slack (a box of EXACTLY the content's width wraps the last glyph: a 249px title rendered on two lines in a
+  // 249px box); a WRAPPED paragraph keeps its column width and only its height is written.
+  // IDEMPOTENT: a second pass finds every box already at (width + 8, one line) and only re-nudges.
+  storage.fitTexts = async (root) => {
+    root = root || rootOf();
+    const out = { checked: 0, fitted: 0, relaid: 0, settled: 0, pending: 0, errors: [] };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const texts = [];
+    const walk = (node) => { const kids = kidsOf(node); if (!kids) return; for (const c of kids) { if (c.type === 'text') texts.push(c); walk(c); } };
+    walk(root);
+    if (!texts.length) return out;
+    const info = (t) => {
+      let tb = null; try { tb = t.textBounds; } catch (e) {}
+      let lh = 0; try { lh = parseFloat(t.lineHeight) || 0; } catch (e) {}
+      const w = Math.round(t.width || 0), h = Math.round(t.height || 0);
+      const tw = tb ? Math.round(tb.width) : 0, th = tb ? Math.round(tb.height) : 0;
+      return { tb: tb, lh: lh, w: w, h: h, tw: tw, th: th, ok: tw > 1 && th > 0 && w > 1 };
+    };
+    // ---- wait for the layout: a text that has not been laid out is never resized
+    for (let tries = 0; tries < 24; tries++) {
+      await sleep(260);
+      let ok = 0;
+      for (const t of texts) if (info(t).ok) ok++;
+      out.settled = ok;
+      if (ok === texts.length) break;
+    }
+    // ---- fit the box to the content
+    const pending = [];
+    for (const t of texts) {
+      out.checked++;
+      const i = info(t);
+      if (!i.ok) { out.pending++; pending.push(t); continue; }
+      const wrapped = i.lh > 0 && i.th > i.lh * 1.6;
+      const newW = wrapped ? i.w : Math.max(i.w, i.tw + 8);
+      const newH = i.th;
+      if (newW !== i.w || newH !== i.h) {
+        const delta = newW - i.w;
+        try { t.resize(newW, newH); out.fitted++; } catch (e) { out.errors.push(String(e).slice(0, 70)); continue; }
+        // the glyphs keep their own position inside the box, so a box that changed width shifts them: give the slack
+        // back to the side the text is aligned to.
+        if (delta) {
+          let al = 'left'; try { al = t.align || 'left'; } catch (e) {}
+          const shift = al === 'center' ? -delta / 2 : (al === 'right' ? -delta : 0);
+          if (shift) { try { t.x = t.x + shift; } catch (e) {} }
+        }
+      }
+    }
+    // ---- the nudge that re-anchors the glyphs to the (now correct) box
+    const nudged = [];
+    for (const t of texts) { try { const lh = t.lineHeight; if (lh) { nudged.push([t, String(lh)]); t.lineHeight = '1.2'; } } catch (e) {} }
+    if (nudged.length) {
+      await sleep(340);
+      for (const n of nudged) { try { n[0].lineHeight = n[1]; out.relaid++; } catch (e) { out.errors.push(String(e).slice(0, 70)); } }
+      await sleep(440);
+    }
+    return out;
+  };
+
+  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize', 'fitTexts'] };
 })();

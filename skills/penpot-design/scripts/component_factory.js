@@ -469,7 +469,16 @@ return (function () {
       var dis = /·Disabled/.test(String(this.host.name || '')), anc = this.host.parent, guard = 0;
       while (!dis && anc && guard++ < 16) { if (/·Disabled/.test(String(anc.name || ''))) dis = true; else anc = anc.parent || null; }
       this.pend.forEach(function (h) {
-        var t = h.t, box = h.box, o = h.o, tw = t.width || 0, th = t.height || 0;
+        var t = h.t, box = h.box, o = h.o;
+        // §5 the box's HEIGHT is a transient default, the LEADING is the truth. `createText` lays the text out at the
+        // transient 1px width, so the height it computes is the 1px-WRAPPED height (measured 2026-10-22: a 16px
+        // one-line label read h=384 while its textBounds read 20). Placing from `t.height` therefore lands the label
+        // ~180px above its host, and Penpot draws the glyphs at the VERTICAL CENTRE of the box, so the label leaves
+        // the host entirely (an export showed the button with no label at all). The ramp's own leading is what the
+        // text occupies, so the placement uses it; `storage.fitTexts` then shrinks the box to the rendered height.
+        var th = 0, tw = t.width || 0;
+        try { th = parseFloat(t.lineHeight) || 0; } catch (e) {}
+        if (!th) th = t.height || 0;
         h.w = tw; h.h = th;
         var x = o.align === 'left' ? box.x : (o.align === 'right' ? box.x + box.w - tw : box.x + (box.w - tw) / 2);
         var y = o.valign === 'top' ? box.y : (o.valign === 'bottom' ? box.y + box.h - th : box.y + (box.h - th) / 2);
