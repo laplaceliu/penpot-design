@@ -43,6 +43,10 @@ return (function () {
   // ---------- layout contract (all four numbers must be declared spacing, asserted in FN.source) ----------
   FN.layout = { margin: 80, pad: 32, gap: 16, cellGap: 8, canvas: 1920 };
   const up8 = (n) => Math.max(8, Math.round(n / 8) * 8);
+  /** A spacing value is DECLARED, never typed: every pad/gap literal in this engine goes through the file's own
+      spacing token set (`TK.snapSpace`), so an off-scale request snaps to the declared scale instead of rendering
+      as an orphan number (design-guide §1.5; gates `space_off_scale` + `free_layout`). */
+  FN.sp = (v) => (TK.snapSpace ? ((TK.snapSpace(v) || {}).value || v) : v);
 
   // ---------- 1 · the value source, with a refusal contract ----------
   /** `FN.setFilter` (set by `FN.project` from `{ set: '<system> · Dark' }`) scopes a projection to ONE token set: a
@@ -240,7 +244,7 @@ return (function () {
     // Title and caption **stack, always**. Side by side they need a width budget, and `CF.estW` is an estimate: on the
     // probe a 22px semibold title measured 376 and rendered 484, so the caption escaped the row (`out_of_bounds`).
     // A hug column cannot overflow — the platform wraps each line, so there is nothing to predict.
-    const r = FN.row(b, { name: 'row·head', dir: 'column', align: 'start', gap: 4 });
+    const r = FN.row(b, { name: 'row·head', dir: 'column', align: 'start', gap: FN.sp(4) });
     FN.text(r, title, 'type.h3', { weight: 600, size: 22 });
     if (sub) FN.text(r, sub, 'type.caption', { size: 13, color: FN.muted(), axis: true, name: 'axis · head' });
     return r;
@@ -507,7 +511,7 @@ return (function () {
       const lab = FN.cell(r, 200, { name: 'cell·grid·' + k });
       FN.text(lab, k + ' ' + t.w + ' · ' + t.cols + ' cols', 'type.label', { size: 14, weight: 600 });
       FN.text(lab, 'margin ' + t.margin + ' · gutter ' + t.gutter + ' · touch ' + t.touch, 'type.axis', { size: 11, color: FN.muted(), axis: true, name: 'axis · grid ' + k });
-      const strip = FN.row(r, { name: 'row·cols·' + k, align: 'start', gap: 8 });
+      const strip = FN.row(r, { name: 'row·cols·' + k, align: 'start', gap: FN.sp(8) });
       const g = LY.grid({ x: 0, y: 0, w: Math.max(120, Math.round(r.width) - 200 - FN.layout.gap), h: 64 }, t.cols, t.gutter);
       const cw = Math.max(8, up8(g.colW / 4));
       for (let c = 0; c < t.cols; c++) FN.plate(strip, cw, 64, { name: 'col·' + k + '-' + c, fill: FN.hexOf['color.surface-shade'] || FN.muted(), radius: CF.radius('xs') });
@@ -586,7 +590,7 @@ return (function () {
           // A CONTENT alpha dims the label, it is not a container wash — and the copy must sit ON its own ground:
           // white at 38% drawn straight onto the light board ground is invisible (measured in this board's export).
           const tile = FN.cell(c, 160, { name: 'tile·' + g.key + '·' + k, align: 'center', dir: 'row', justify: 'center',
-            pad: { x: 16, y: 12 }, fill: g.hex, radius: CF.radius('sm') });
+            pad: { x: FN.sp(16), y: FN.sp(12) }, fill: g.hex, radius: CF.radius('sm') });
           try { tile.strokes = [{ strokeColor: hair2, strokeWidth: 1, strokeStyle: 'solid', strokeAlignment: 'inner', strokeOpacity: 1 }]; } catch (e) {}
           const t = FN.text(tile, 'Copy', 'type.label', { size: 16, weight: 600, color: g.ink });
           try { t.fills = [{ fillColor: g.ink, fillOpacity: CF.STATE[k] }]; } catch (e) {}
@@ -631,7 +635,7 @@ return (function () {
         FN.text(lab, p.fg.name.replace(/^color\./, '') + ' on ' + p.bg.name.replace(/^color\./, ''), 'type.label', { size: 14, weight: 600 });
         FN.text(lab, p.fg.hex + ' on ' + p.bg.hex, 'type.axis', { size: 11, color: FN.muted(), axis: true, name: 'axis · pair ' + p.fg.name });
         if (p.pass) {
-          const sc = FN.cell(rr, 480, { name: 'cell·sample·' + p.fg.name + '-' + p.bg.name, pad: { x: 16, y: 8 }, fill: p.bg.hex, radius: 0 });
+          const sc = FN.cell(rr, 480, { name: 'cell·sample·' + p.fg.name + '-' + p.bg.name, pad: { x: FN.sp(16), y: FN.sp(8) }, fill: p.bg.hex, radius: 0 });
           FN.text(sc, FN.prose.defaultSample, 'type.body', { size: 16, color: p.fg.hex });
         } else {
           // A CELL of the same 480 the passing band uses, not a fill row: `FN.row` spans the remaining width, so the

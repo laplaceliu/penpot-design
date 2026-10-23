@@ -259,19 +259,34 @@ and reports `fix` on both axes, so declare the sizing you want **after** the ref
 
 ## 9. When to stay absolute
 
-* Anatomy/diagram boards whose box *is* the drawing (`Slot·*·Anatomy`, the `11 · Grid & breakpoints` diagrams' own
-  geometry) — those have a fixed reading order. **Not** `01`/`02`: a Foundations board is a hug column of hug rows, the
-  most flow-native artifact in the file (G16, `engines.md` §7). The only thing the shelf pins absolutely is each
-  board's own top on the page, and that pin is declared (`FN.place` → `nl:shelf`).
-* Anything pixel-exact: focus rings at an offset, half-stars under a clip, art, decorative ellipses.
-* `CF` control internals: a control is absolute inside its own host and **that is correct** — the host is what joins flow.
-* Region boards themselves, when their coordinates come from `LY` (G11) — `fromRecipe` is deliberately absolute outside,
-  flow inside.
+**On pages 01–09, arrangement is flow or grid — full stop (design-guide §1.5, lint `free_layout`).** Absolute
+positioning there is legal ONLY for:
 
-If a *screen's* content area is a pile of absolute boards, the deliverable is not editable and this is the file to fix.
+* **Name-declared overlays** — `scrim`/`overlay`/`veil`/`wash·`/`ring·`/`hitpad·`/`connector`/`tail·`/`rail·`/
+  `boundary·`/`underline·`: they cover or connect, they do not arrange, and rule 43 requires them absolute.
+* A **control host's own anatomy** (CF internals): a control is absolute inside its own host and that is correct —
+  the host itself is what joins flow.
+* **Page chrome and shelf** — the `-Header`/`-Footer`/`-PageRoot` internals, the page-level pin of whole boards
+  (`FN.place` → `nl:shelf`), and `LY` region plans, whose coordinates come from the recipe (G11).
 
-Staying absolute does **not** opt a board out of the whitespace contract. Rules 32/33 read `flex.gap`, so they cannot see an
-absolute stack, but the distance between two absolute sibling blocks is still judged by `off_scale_gap`, and the ladder is the
-same `LY.SPACE` scale underneath. `storage.breathe()` repairs the **flow** half (gaps + text leading); an absolute gap is a
-coordinate, so it is repaired where it was authored — `storage.reflowRows({gap})` re-shelves at a ladder level, `storage.moveSubtree`
-for one subtree. Whitespace is the separation device either way; flow is only how you *declare* it.
+Everything else — spec-sheet rows/columns, cell grids, label stacks, foundation rows, diagram PARTS — is arranged with
+`rowGap`/`columnGap`, padding or a grid, values on the declared spacing scale. Spec boards were previously permitted to
+stay absolute (old §9 wording); that permission is revoked, on measured grounds: **a board's absolute children hold
+world coordinates and do not follow the shell** (api-pitfalls §coordinates), so an absolute sheet cannot re-flow after
+a token change and cannot be repaired in place — only rebuilt. `CF.matrix` now builds the sheet as a flow column of
+grid rows (token gaps/padding) and attaches each drawn host into its settled slot with `CF.move` — the one proven way
+to move a board whose anatomy is world-absolute.
+
+Not `01`/`02` either way: a Foundations board is a hug column of hug rows, the most flow-native artifact in the file
+(G16, `engines.md` §7); the only absolute pin there is each board's own top on the page, and that pin is declared.
+
+On screens (14–16), the content area is flow (§4); absolute stays legal only for pixel-exact decoration and the
+`LY`-placed region shells outside. If a screen's content area is a pile of absolute boards, the deliverable is not
+editable and this is the file to fix.
+
+Staying absolute (where it is legal) does **not** opt a board out of the whitespace contract. Rules 32/33 read
+`flex.gap`, so they cannot see an absolute stack, but the distance between two absolute sibling blocks is still judged
+by `off_scale_gap`, and the ladder is the same `LY.SPACE` scale underneath. `storage.breathe()` repairs the **flow**
+half (gaps + text leading); an absolute gap is a coordinate, so it is repaired where it was authored —
+`storage.reflowRows({gap})` re-shelves at a ladder level, `storage.moveSubtree` for one subtree. Whitespace is the
+separation device either way; flow is only how you *declare* it.

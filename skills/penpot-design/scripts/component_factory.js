@@ -4494,120 +4494,180 @@ return (function () {
     o = o || {};
     var rows = o.rows || [];
     var axes = o.axes || ['default'];
-    var padX = o.padX === undefined ? 24 : o.padX, padY = o.padY === undefined ? 24 : o.padY;
-    var labelW = o.labelW === undefined ? 168 : o.labelW, gapX = o.gapX === undefined ? 16 : o.gapX, gapY = o.gapY === undefined ? 16 : o.gapY;
-    var pitch = o.colW || 136, cellH = o.cellH || 40, w = o.w || 1000;
-    // A row may raise its own cell height (`row.cellH`) — an open panel and a 32px field share one sheet without
-    // forcing every row to the tallest cell.
+    // SPACING IS TOKEN-SOURCED (design-guide §1.5; gates `free_layout` + `space_off_scale`): the sheet arranges its
+    // content with flow rowGap/columnGap/padding or a grid — never free coordinates. Every gap/pad resolves through
+    // LY.breath to an LY.SPACE member; a caller override is snapped to the scale, never trusted raw. The cell hosts
+    // keep world-absolute interiors (measured: a board's absolute children do NOT follow its shell), so each host is
+    // attached to its flow slot the one proven way: appendChild (drag, world preserved) + CF.move (delta repair).
+    var SPACE = (storage.LY && storage.LY.SPACE) || [0, 2, 4, 8, 12, 16, 20, 24, 32, 48, 64, 96, 128];
+    var onScale = function (v) {
+      var n = Number(v), best = SPACE[0];
+      for (var i = 0; i < SPACE.length; i++) if (Math.abs(SPACE[i] - n) < Math.abs(best - n)) best = SPACE[i];
+      return best;
+    };
+    var br = function (lv) {
+      return (storage.LY && storage.LY.breath) ? storage.LY.breath(lv, 'web') : ({ inline: 8, block: 16, group: 24 }[lv]);
+    };
+    var GAPC = onScale(o.gapX === undefined ? br('block') : o.gapX);    // cell ↔ cell (default breath block = 16)
+    var GAPR = onScale(o.gapY === undefined ? br('block') : o.gapY);    // row ↔ row
+    var PADX = onScale(o.padX === undefined ? br('group') : o.padX);    // board padding, horizontal
+    var PADY = onScale(o.padY === undefined ? br('group') : o.padY);    // board padding, vertical
+    var labelW = o.labelW === undefined ? 168 : o.labelW;               // a WIDTH, not a gap: stays a size
+    var pitch = o.colW || 136, cellH = o.cellH || 40;
     var rowH = function (r) { return N((r && r.cellH) || cellH); };
-    var bodyH = rows.reduce(function (a, r) { return a + rowH(r) + gapY; }, 0);
     var headH = o.title === false ? 0 : 40, stateRowH = axes.length > 1 ? 28 : 0;
-    var h = padY * 2 + headH + stateRowH + bodyH + (o.notes ? 44 : 0);
-    var box = B(o.x || 0, o.y || 0, w, h);
-    var specName = o.specName || CF.name(o.family || 'Component', { slot: 'Spec' });
+    var fam = o.family || 'Component';
+    var box = B(o.x || 0, o.y || 0, o.w || 1000, 100);
+    var specName = o.specName || CF.name(fam, { slot: 'Spec' });
     var ctx = CF.build(specName, box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), stroke: C('border'), strokeW: 1 });
-    var titleText = String(o.title === undefined ? (o.family || 'Component') + ' · variants' : o.title);
-    if (headH) {
-      ctx.text(titleText, B(box.x + padX, box.y + padY, box.w - padX * 2, 28),
-        { size: 20, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
-    }
-    var top = box.y + padY + headH;
-    var axisX = box.x + padX + labelW + gapX, axisRight = 0;
-    var y = top + stateRowH + 4, maxRight = box.x + padX + labelW;
-    // `maxW` is the band the shelf can grant. A matrix is fitted to its content, so without a hard right edge one wide
-    // row (five-node Steps under five state columns = 5 829px) grows past the page root and every audit calls it
-    // out_of_bounds. Cells that no longer fit fold into a second line of the SAME row: the sheet stays band-sized.
-    var budgetR = o.maxW ? box.x + o.maxW - padX : Infinity, lineGap = 8, folded = false;
-    // Actual column starts, recorded from the FIRST row as its cells are placed. The state-axis header must sit on
-    // these x values, not on the declared `pitch`: a host wider than the pitch advances the row by `host.width+gapX`
-    // (MiniCalendar: 252+16=268) while the old header stayed on pitch 136, so default/hover/focus/disabled bunched at
-    // the left and never lined up with the four calendars under them (measured 2026-10-22 on `MiniCalendar·Spec`).
-    var colX = null;
+    var titleText = String(o.title === undefined ? fam + ' · variants' : o.title);
+    // ---- phase 1: draw every cell host (absolute, provisional token slot) and measure it.
+    var drawn = [], maxCells = 0;
     for (var r = 0; r < rows.length; r++) {
-      var row = rows[r], rh = rowH(row), lineTop = y, startX = axisX, cx = startX;
-      // A row reserves the height of the TALLEST cell it actually produced, not the declared `cellH`. Cells are centred
-      // on the row midline, so advancing the cursor by `rh` alone made a 200px Card on a 40px row bleed 80px into the
-      // row below and the two overlapped — the reported "大号按钮 / 竖直排列的按钮叠在一起". The horizontal axis already
-      // measured its cells (`max(pitch, host.width + gapX)`); height was the one axis still trusted to an estimate.
-      var lines = [], line = { top: lineTop, h: rh, hosts: [] };
-      lines.push(line);
-      var closeLine = function (ln) {
-        ln.hosts.forEach(function (hh) { CF.move(hh.host, hh.x, N(ln.top + ln.h / 2 - hh.host.height / 2)); });
-      };
-      var cells = row.cells && row.cells.length ? row.cells : [{}];
+      var row = rows[r], cells = row.cells && row.cells.length ? row.cells : [{}];
+      drawn[r] = []; maxCells = max(maxCells, cells.length);
       for (var c = 0; c < cells.length; c++) {
         var opts = Object.assign({}, row.props || {}, cells[c] || {});
         if (!opts.size) opts.size = 'md';
-        opts.parent = ctx.host; opts.x = N(cx); opts.y = N(line.top + line.h / 2);
+        opts.parent = ctx.host;
+        opts.x = N(PADX + labelW + GAPC + c * (pitch + GAPC));
+        opts.y = N(PADY + headH + stateRowH + r * (rowH(row) + GAPR));
         var fn = CF[row.factory];
-        if (!fn) { matrixWarn(row.factory); cx += pitch; continue; }
-        var host;
+        if (!fn) { matrixWarn(row.factory); continue; }
+        var host = null;
         var kidCount = ctx.host.children ? Array.from(ctx.host.children).length : 0;
         try { host = await fn(opts); } catch (e) {
+          // A factory creates its host before it draws content, so a throw half-way leaves an orphan owned by no
+          // row: it lands on top of the next row (audit_layout stroke_covered). Remove what the throw produced.
           matrixWarn(row.factory + ' threw ' + e.message);
-          // A factory creates its host before it draws content, so a throw half-way leaves an orphan: it is owned by no
-          // row, never centred on the row midline, and lands on top of the next row (audit_layout stroke_covered).
-          var kids = Array.from(ctx.host.children || []);
-          for (var k = kidCount; k < kids.length; k++) { try { kids[k].remove(); } catch (e2) {} }
+          var orphanKids = Array.from(ctx.host.children || []);
+          for (var k = kidCount; k < orphanKids.length; k++) { try { orphanKids[k].remove(); } catch (e2) {} }
           continue;
         }
         if (!host) { matrixWarn(row.factory + ' returned null'); continue; }
-        if (cx + host.width > budgetR && cx > startX + 1) {
-          folded = true; closeLine(line);
-          lineTop = line.top + line.h + lineGap; line = { top: lineTop, h: rh, hosts: [] }; lines.push(line); cx = startX;
-        }
-        if (r === 0 && !folded) { if (!colX) colX = []; colX[c] = N(cx); }
-        line.hosts.push({ host: host, x: N(cx) });
-        line.h = max(line.h, N(host.height));
-        maxRight = max(maxRight, cx + host.width);
-        cx += axes.length > 1 ? max(pitch, host.width + gapX) : (host.width + gapX);
+        drawn[r][c] = host;
       }
-      closeLine(line);
-      y = line.top + line.h + gapY;
-      // The label is drawn after the cells because it has to span the row's *reserved* block: a folded or tall row is
-      // three lines deep, and a label centred on the declared 40px row sits at the top of a 200px band.
-      var blockH = N(y - gapY - lines[0].top);
-      ctx.text(String(row.label === undefined ? row.factory : row.label), B(box.x + padX, lines[0].top, labelW, blockH),
+    }
+    await ctx.settle();
+    // ---- phase 2: the sheet's own copy, queued through ctx (pend → place). Creation order is the contract the
+    // skeleton consumes: [title, subtitle?] axis×N (per row: label, note?) … note lines.
+    if (headH) {
+      ctx.text(titleText, B(box.x + PADX, box.y + PADY, 400, 28),
+        { size: 20, color: C('ink'), weight: 600, align: 'left', valign: 'middle', refit: false });
+      if (o.subtitle) ctx.text(String(o.subtitle), B(box.x + PADX + 420, box.y + PADY + 6, 320, 20),
+        { size: 13, color: C('muted'), align: 'right', valign: 'middle', refit: false });
+    }
+    if (stateRowH) axes.forEach(function (a) {
+      ctx.text(String(a), B(box.x + PADX + labelW, box.y + PADY + headH, pitch, stateRowH - 6),
+        { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
+    });
+    rows.forEach(function (row, i) {
+      ctx.text(String(row.label === undefined ? row.factory : row.label), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR), labelW, rowH(row)),
         { size: 13, color: C('ink'), weight: 500, align: 'left', valign: 'middle', refit: false });
-      if (row.note) ctx.text(String(row.note), B(box.x + padX, lines[0].top + blockH, labelW, 14),
+      if (row.note) ctx.text(String(row.note), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR) + rowH(row), labelW, 14),
         { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+    });
+    var innerW = max(1, N((o.maxW || o.w || 1000) - PADX * 2));
+    if (o.notes) CF.wrap(String(o.notes), innerW * 0.94, 12).slice(0, 3).forEach(function (ln) {
+      ctx.text(ln, B(box.x + PADX, box.y + PADY, innerW, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+    });
+    var pendTs = (ctx.pend || []).map(function (h) { return h.t; });   // creation order
+    await ctx.settle(); ctx.place();
+    // ---- phase 3: flow skeleton. Frames (slots) are the flow children — they own no world-pinned interior, so the
+    // engine may position them freely; the drawn hosts are attached into their settled slot afterwards.
+    var colN = Math.max(axes.length, maxCells), colW = [];
+    for (var ci = 0; ci < colN; ci++) {
+      var mw = pitch;
+      for (var ri = 0; ri < rows.length; ri++) if (drawn[ri] && drawn[ri][ci]) mw = max(mw, N(drawn[ri][ci].width));
+      colW[ci] = N(mw);
     }
-    // The axis line is drawn LAST because only now is it known whether the columns stayed on one line: a folded sheet
-    // has no fixed column set, so it gets the reading order as a caption instead of five headers over nothing.
-    if (stateRowH) {
-      if (!folded) {
-        axes.forEach(function (a, i) {
-          var ax = (colX && colX[i] !== undefined) ? colX[i] : axisX + i * pitch;
-          var next = (colX && colX[i + 1] !== undefined) ? colX[i + 1] : ax + pitch;
-          ctx.text(String(a), B(ax, top, max(40, next - ax - 8), stateRowH - 6), { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
-          axisRight = max(axisRight, ax + CF.estW(String(a), 11));
-        });
-      } else {
-        ctx.text('columns fold: ' + axes.join('  ·  ') + ' — each row reads left to right, top line first',
-          B(axisX, top, max(160, min(720, budgetR - axisX)), stateRowH - 6),
-          { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
+    var needW = PADX * 2 + labelW + (colN ? GAPC + colW.reduce(function (a, w) { return a + w + GAPC; }, -GAPC) : 0);
+    var fitW = N(max(160, needW));
+    if (o.maxW) fitW = min(fitW, N(o.maxW));
+    try { ctx.host.resize(fitW, ctx.host.height); } catch (e) {}
+    var attach = [], flowKids = [], ti = 0;
+    if (headH) {
+      var headRow = NL.row('head·' + fam, { justify: 'space-between', align: 'center', rowGap: GAPC, columnGap: GAPC });
+      NL.add(ctx.host, headRow, 'fill', 'auto');
+      flowKids.push(headRow);
+      var ht = pendTs.slice(ti, ti + (o.subtitle ? 2 : 1)); ti += ht.length;
+      ht.forEach(function (t) { try { headRow.appendChild(t); NL.sizing(t, 'auto', 'auto'); } catch (e) {} });
+    }
+    var axisTs = stateRowH ? pendTs.slice(ti, ti + axes.length) : []; ti += axisTs.length;
+    var useGrid = axes.length > 1 && needW <= (o.maxW || Infinity);
+    if (useGrid) {
+      var gcols = [['fixed', labelW]].concat(colW.map(function (w) { return ['fixed', w]; }));
+      var grows = [];
+      for (var gi = 0; gi < rows.length + (stateRowH ? 1 : 0); gi++) grows.push(['auto', 1]);
+      var grid = NL.gridFrame('grid·' + fam, { cols: gcols, rows: grows, rowGap: GAPR, columnGap: GAPC });
+      NL.add(ctx.host, grid, 'fill', 'auto');
+      flowKids.push(grid);
+      var gr = 1;
+      if (stateRowH) { axisTs.forEach(function (t, i) { NL.cell(grid, t, 1, i + 2); NL.sizing(t, 'fix', 'auto'); }); gr = 2; }
+      for (var r2 = 0; r2 < rows.length; r2++) {
+        var lab = pendTs[ti], note = rows[r2].note ? pendTs[ti + 1] : null; ti += rows[r2].note ? 2 : 1;
+        if (lab || note) {
+          var labBox = NL.col('label·' + fam + '·' + r2, { rowGap: br('inline'), sizing: 'auto' });
+          if (lab) { labBox.appendChild(lab); NL.sizing(lab, 'auto', 'auto'); }
+          if (note) { labBox.appendChild(note); NL.sizing(note, 'auto', 'auto'); }
+          NL.cell(grid, labBox, gr + r2, 1);
+        }
+        var cellsR = drawn[r2] || [];
+        for (var c2 = 0; c2 < cellsR.length; c2++) {
+          if (!cellsR[c2]) continue;
+          var slot = NL.frame('slot·' + fam + '·' + r2 + '.' + c2, { w: colW[c2], h: N(cellsR[c2].height), sizing: 'fix' });
+          slot.fills = [];
+          NL.cell(grid, slot, gr + r2, c2 + 2);
+          attach.push({ slot: slot, host: cellsR[c2] });
+        }
+      }
+    } else {
+      // Single-axis sheets and overflow sheets: rows with wrap — folding is the engine's, not a cursor's.
+      if (stateRowH) {
+        var axisRow2 = NL.row('axis·' + fam, { rowGap: GAPC, columnGap: GAPC });
+        NL.add(ctx.host, axisRow2, 'fill', 'auto');
+        flowKids.push(axisRow2);
+        var spacer = NL.frame('labelspace·' + fam, { w: labelW, h: stateRowH, sizing: 'fix' });
+        spacer.fills = [];
+        NL.add(axisRow2, spacer, 'fix', 'fix');
+        axisTs.forEach(function (t) { NL.add(axisRow2, t, 'fix', 'auto'); try { t.resize(pitch, t.height); } catch (e) {} NL.sizing(t, 'fix', 'auto'); });
+      }
+      for (var r3 = 0; r3 < rows.length; r3++) {
+        var rl = NL.row('row·' + fam + '·' + r3, { rowGap: GAPC, columnGap: GAPC, align: 'center', wrap: o.maxW ? 'wrap' : undefined });
+        NL.add(ctx.host, rl, 'fill', 'auto');
+        flowKids.push(rl);
+        var lab3 = pendTs[ti], note3 = rows[r3].note ? pendTs[ti + 1] : null; ti += rows[r3].note ? 2 : 1;
+        if (lab3 || note3) {
+          var labBox3 = NL.col('label·' + fam + '·' + r3, { rowGap: br('inline'), sizing: 'auto' });
+          if (lab3) { labBox3.appendChild(lab3); NL.sizing(lab3, 'auto', 'auto'); }
+          if (note3) { labBox3.appendChild(note3); NL.sizing(note3, 'auto', 'auto'); }
+          NL.add(rl, labBox3, 'fix', 'auto');
+        }
+        var cells3 = drawn[r3] || [];
+        for (var c3 = 0; c3 < cells3.length; c3++) {
+          if (!cells3[c3]) continue;
+          var slot3 = NL.frame('slot·' + fam + '·' + r3 + '.' + c3, { w: colW[c3], h: N(cells3[c3].height), sizing: 'fix' });
+          slot3.fills = [];
+          NL.add(rl, slot3, 'fix', 'fix');
+          attach.push({ slot: slot3, host: cells3[c3] });
+        }
       }
     }
-    // The header line holds title (20px) + right-aligned subtitle (13px): the fitted width must carry BOTH, or the
-    // title renders past the shrunk board and lands on the subtitle (audit_layout text_overlap).
-    var titleW = CF.estW(titleText, 20);
-    var subW = (headH && o.subtitle) ? CF.estW(String(o.subtitle), 13) + 24 : 0;
-    var need = max(maxRight + padX, axisRight + 8, box.x + padX + titleW + 8 + subW) - box.x;
-    var fitW = N(o.shrink === false ? box.w : max(need, 160));   // a spec board is exactly as wide as its content, even past o.w
-    if (o.maxW) fitW = min(fitW, N(o.maxW));
-    var fitH = N(box.h + (y - (top + stateRowH + 4)) - bodyH);    // the fold grew the body; the board has to grow with it
-    if (fitW !== box.w || fitH !== box.h) { try { ctx.host.resize(fitW, fitH); } catch (e) {} }
-    var innerW = max(1, N(fitW - padX * 2));
-    if (headH && o.subtitle) ctx.text(String(o.subtitle), B(box.x + fitW - padX - 320, box.y + padY + 6, min(320, innerW), 20),
-      { size: 13, color: C('muted'), align: 'right', valign: 'middle', refit: false });
-    if (o.notes) {
-      var nl = CF.wrap(String(o.notes), innerW * 0.94, 12);
-      nl.slice(0, 3).forEach(function (ln, i) {
-        ctx.text(ln, B(box.x + padX, y + 8 + i * 16, innerW, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
-      });
-    }
-    await ctx.settle(); ctx.place();
+    var noteTs = pendTs.slice(ti);
+    noteTs.forEach(function (t) { NL.add(ctx.host, t, 'fill', 'auto'); });
+    // child ORDER is append order in flow: head → axis → grid/rows → notes.
+    flowKids.concat(noteTs).forEach(function (k) { try { ctx.host.appendChild(k); } catch (e) {} });
+    NL.applyFlex(ctx.host, { dir: 'column', rowGap: GAPR, columnGap: GAPC,
+      topPadding: PADY, bottomPadding: PADY, leftPadding: PADX, rightPadding: PADX,
+      horizontalSizing: 'fix', verticalSizing: 'auto' });
+    await NL.settle();
+    attach.forEach(function (a) { try { a.slot.appendChild(a.host); a.host.layoutChild.absolute = true; } catch (e) {} });
+    await NL.settle();
+    // The slot has its engine position by now; CF.move writes the shell AND delta-repairs its world-absolute
+    // anatomy — the same move the old matrix used for row centring (production-proven on nested hosts).
+    attach.forEach(function (a) { try { CF.move(a.host, N(a.slot.x), N(a.slot.y)); } catch (e) {} });
+    await ctx.settle();
     return ctx.host;
   };
 

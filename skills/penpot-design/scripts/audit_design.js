@@ -104,6 +104,7 @@ return (function () {
     surface_missing: '§5 + gate G18 · a screen record declares `surface`/`elevation` for a section but the board has no `surface·<region>` plate — the section was assembled as bare text/frames with nothing to cast a shadow (measured 2026-10-23: 143 shapes, 0 shadows on `15 · Screens · content`). Mount it with `SC.surface` / `EL.surfacePass`',
     spec_unregistered: 'gate G10s · a control-shaped board on a spec page (`03`–`09`) that is not a Penpot component (neither a master nor an instance); repair with CF.autoRegister({states:true}).',
     label_off_axis: '§2.3 · a control\'s label is not on the control\'s own vertical axis: its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
+    free_layout: '§1.5 + native-layout §9 · on pages 01–09 a content board positions its elements ONLY as flow or grid children — rowGap/columnGap/padding (values judged by space_off_scale) or a grid cell: an absolutely-positioned child that is not a name-declared overlay (scrim/overlay/veil/wash·/ring·/hitpad·/connector/tail·/rail·/boundary·/underline·) is free layout. A control host\'s own anatomy is exempt, but the host itself must still be a flow/grid child; page chrome (-Header/-Footer/-PageRoot) and page-level shelf placement are outside the rule. The measured platform fact behind it (api-pitfalls §coordinates): a board\'s absolute children hold WORLD coordinates and do not follow the shell, so free layout cannot re-flow after a token change and cannot be repaired in place. Producers: CF.matrix (grid/flow rows) and the FN row builders; the repair is a rebuild from the record, never a nudge',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
     'align_missing', 'crash_100x100', 'degenerate_size', 'root_stray', 'text_centre_residue', 'loose_assembly', 'spec'];
@@ -1898,6 +1899,38 @@ return (function () {
         }
       }
     } catch (e) { err('reference', e); }
+
+    // ---- rule 59 · free_layout — pages 01–09 judge ARRANGEMENT, not just values: a content board's elements are
+    // flow or grid children (rowGap/columnGap/padding — values already judged by space_off_scale — or grid cells).
+    // An absolutely-positioned non-overlay child is the defect: measured (api-pitfalls §coordinates), a board's
+    // absolute children hold world coordinates and do NOT follow the shell, so free layout cannot re-flow after a
+    // token change and cannot be nudged into compliance — only rebuilt. Control-host interiors are the declared
+    // anatomy exemption (the host itself is still judged as a child of its board).
+    try {
+      const pF = String(out.page || '');
+      if (/^0[1-9](?:\.| ·)/.test(pF) && /-PageRoot$/.test(nameOf(top))) {
+        const OVL_RE = /^(scrim|overlay|veil|wash·|ring·|hitpad·|connector|tail·|rail·|boundary·|underline·)/;
+        let flN = 0;
+        const walkFL = (b, depth) => {
+          (kidsOf(b) || []).forEach((c) => {
+            const nm = nameOf(c);
+            if (OVL_RE.test(nm) || /-Header$|-Footer$|-PageRoot$/.test(nm)) return;   // overlays + chrome, by contract
+            const isArr = (c.layoutChild && c.layoutChild.absolute === false) || !!(c.layoutCell);
+            if (!isArr) {
+              flN++;
+              if (flN <= 8) add('free_layout', c, b, '"' + nm.slice(0, 40) + '" is absolutely positioned inside "' +
+                nameOf(b).slice(0, 32) + '" — on pages 01–09 arrange elements only with rowGap/columnGap/padding or a grid (values on the spacing scale); absolute is legal only for a named overlay');
+              return;   // a free-laid subtree is already off-contract; its interior is judged by its own producer
+            }
+            if (typeOf(c) === 'board' && depth < 6 && !controlFamily(nm)) walkFL(c, depth + 1);   // host interiors exempt
+          });
+        };
+        (kidsOf(top) || []).forEach((b) => {
+          if (typeOf(b) === 'board' && !/-Header$|-Footer$|-PageRoot$/.test(nameOf(b))) walkFL(b, 0);
+        });
+        if (flN > 8) add('free_layout', null, top, (flN - 8) + ' more free-laid children on this page (first 8 reported)');
+      }
+    } catch (e) { err('freeLayout', e); }
 
     const fails = Object.keys(out.counts).filter((key) => key.charAt(0) !== '_' && RULES[key]);
     out.verdict = fails.length ? 'NEEDS_REPAIR' : 'CLEAN';

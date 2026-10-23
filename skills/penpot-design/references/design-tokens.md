@@ -270,8 +270,11 @@ await nap(500);                                 // ⏳ async, must wait before r
 6. **`spacing` has no default property**, omitting props does nothing. To act on a flex container, specify explicitly:
    ```js
    spacingToken.applyToShapes([flexBoard], ['rowGap', 'columnGap']);
-   // also 'paddingLeft' / 'marginTop' / 'layoutItemMinW' … (see TokenSpacingProps)
    ```
+   **Measured limit (2026-10-23): only `rowGap`/`columnGap` bind.** The four padding props are REJECTED by
+   `applyToShapes` in the connected build, so padding can never carry a binding: it is authored from the scale and
+   judged as a VALUE (`space_off_scale`); `space_unbound` covers the two gap props only. The upstream
+   `TokenSpacingProps` type still lists 'paddingLeft'/'marginTop' — writing them reads back and does nothing.
 7. **`borderRadius` writes FOUR corner keys and rewrites the drawn value** (measured 2026-10-22). A scalar `shape.borderRadius`
    is one number, but the token map is `{borderRadiusTopLeft, TopRight, BottomRight, BottomLeft}`; applying the token to only one
    key leaves a partial map, so `TK.bindBoard` applies all four together — and that apply is not a no-op on the geometry, it
