@@ -59,6 +59,36 @@ return (function () {
   const _latin = penpot.fonts.findByName((T && T.bodyFont) || 'Nunito');
   const _display = penpot.fonts.findByName((T && T.displayFont) || 'Anton');
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
+  /** The FAMILY the token ramp declares, for a (size, weight) pair. A JS fallback family is only legal when the file
+      has no ramp at all: measured 2026-10-23 on aigocy, every factory label was born Nunito while the file declared
+      Urbanist, because `T.bodyFont` was never set and `mkText` trusted the fallback — then `TK.bindBoard` still bound
+      `type.label-lg` by size/weight, so the wrong family passed the type gate. The token set is the single source of
+      the family, exactly as it is for colour. */
+  const _declaredFamily = function (size, weight, leading) {
+    try {
+      var tk = storage.TK;
+      if (!tk || !tk.activeTokens || !tk.tokenValue) return null;
+      var wantS = parseFloat(size) || null, wantW = parseFloat(weight) || null, wantL = parseFloat(leading) || null;
+      if (!wantS) return null;
+      var list = tk.activeTokens('typography').map(function (e) {
+        var v = tk.tokenValue(e.token) || {};
+        var f = Array.isArray(v.fontFamily) ? v.fontFamily[0] : v.fontFamily;
+        return { family: f ? String(f) : null, size: parseFloat(v.fontSize) || 0,
+                 weight: parseFloat(v.fontWeight) || 400, leading: parseFloat(v.lineHeight) || 0 };
+      }).filter(function (x) { return x.family && x.size; });
+      if (!list.length) return null;
+      // exact step first; else the nearest declared size, then the nearest weight at that size. A 13px label is
+      // off-ramp, but it still belongs to the design's family — it must not fall back to another typeface.
+      var best = null, score = Infinity;
+      list.forEach(function (x) {
+        var s = Math.abs(x.size - wantS) * 10 + Math.abs(x.weight - (wantW || 400)) / 100
+              + (wantL && x.leading ? Math.abs(x.leading - wantL) : 0);
+        if (x.size === wantS && wantW && x.weight === wantW) s -= 1000;
+        if (s < score) { score = s; best = x; }
+      });
+      return best ? best.family : null;
+    } catch (e) { return null; }
+  };
   storage.mkText = function (str, x, y, size, color, weight, fontRole) {
     // `penpot.createText('')` returns null in 2.17 (measured 2026-10-20), so an empty label crashed on the very next
     // line with "Cannot set properties of null (setting 'x')" — half-way through a factory, which then left an orphan
@@ -68,16 +98,18 @@ return (function () {
     t.x = x; t.y = y;
     const cjk = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/.test(str);
     // CJK first: display fonts usually have no CJK glyphs, Chinese always falls back to Noto
-    const font = cjk ? _noto : (fontRole === 'display' && _display ? _display : _latin);
+    let lh0 = null;
+    try { lh0 = parseFloat(t.lineHeight); if (isNaN(lh0)) lh0 = null; } catch (e) {}
+    const explicit = fontRole === 'display' ? ((T && T.displayFont) || null) : ((T && T.bodyFont) || null);
+    const declared = explicit ? null : _declaredFamily(size, weight || 400, lh0);
     const famName = cjk ? ((T && T.cjkFont) || 'Noto Sans SC')
-      : (fontRole === 'display' ? ((T && T.displayFont) || 'Anton') : ((T && T.bodyFont) || 'Nunito'));
+      : (explicit || declared || (fontRole === 'display' ? 'Anton' : 'Nunito'));
+    const font = cjk ? _noto : (penpot.fonts.findByName(famName) || (fontRole === 'display' ? _display : _latin));
     // §3.2 enforcement at birth: a size the declared type ramp does not contain is snapped onto the nearest step of
     // the SAME family before the font variant is applied, so the drawn shape can never hold an undeclared step.
     // (audit_design `type_off_ramp` catches the same thing after the fact; TK.bindBoard then turns the snapped values
     // into a real token binding — the batch is what binds, this is what makes the batch a no-op.)
     const st = storage.mkText._stat = storage.mkText._stat || { texts: 0, snapped: 0, drift: {} };
-    let lh0 = null;
-    try { lh0 = parseFloat(t.lineHeight); if (isNaN(lh0)) lh0 = null; } catch (e) {}
     let step = null;
     if (size && storage.TK && storage.TK.snapType) {
       try { step = storage.TK.snapType(famName, size, weight || 400, lh0); } catch (e) { step = null; }
@@ -89,7 +121,7 @@ return (function () {
       st.drift[k] = (st.drift[k] || 0) + 1;
     }
     if (step) st.texts++;
-    try { font.applyToText(t, _variant(font, useWeight)); } catch (e) {}
+    if (font) { try { font.applyToText(t, _variant(font, useWeight)); } catch (e) {} }
     const fs = step && step.size !== null ? step.size : size;
     if (fs) { try { t.fontSize = String(fs); } catch (e) {} }
     if (step) {

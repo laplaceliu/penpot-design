@@ -21,7 +21,10 @@ return (function () {
   // Chrome, not assembly: a state overlay is authored to sit over/under the control it describes, so S11 must not
   // demand it be grouped with the copy. `wash·` is §1.3's focus/state wash (component-library §1.3) — same class as
   // `state·layer`; without it every reserved-family Focus host reads as 49 "loose" shapes.
-  const OVER = /^(ring·|hitpad·|shadow|glow|scrim|state·layer|wash·|fold·|region·)/;
+  // `surface·` / `sheen·` are DERIVED plates (elevation_engine): a surface is the floor of its region and therefore
+  // covers the region's own title by design. Judging it as a header collision indicted every card on the screen
+  // (measured 2026-10-23: 8 header_collision findings, all background surfaces).
+  const OVER = /^(ring·|hitpad·|shadow|glow|scrim|state·layer|wash·|surface·|sheen·|fold·|region·)/;
   // A painted box a shape can sit on or in. Penpot reports rectangles as 'rect'; older code compared 'rectangle'.
   // Accepting both is not hedging — a missed spelling silently disables every plate-based signature below.
   const PLATE = (s) => s.type === 'rect' || s.type === 'rectangle' || s.type === 'ellipse';

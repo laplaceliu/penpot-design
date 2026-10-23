@@ -41,7 +41,7 @@ Union verified across M3 (state layers), MUI (class names), Carbon (focus mixin)
 
 | Axis | What changes | Consensus value |
 |---|---|---|
-| hover | +state layer tint (bg tinted), elevation unchanged for filled, +1 level for outlined card | **8%** overlay [spec M3 `hover-state-layer-opacity`] |
+| hover | +state layer tint **and** the family's `hover` elevation recipe when `storage.EL` declares one — a control/card **lifts** (the source's own stack grows 2 → 6 drop layers and keeps its inset lip), not just tints | **8%** overlay [spec M3 `hover-state-layer-opacity`] + the EL lift (gate **G18**, rule 54 `hover_flat`) |
 | focus | state layer **12%** + **focus ring** (atomic control) **or** state layer **12%** + a boundary reserved at alpha **0** (composition — §1.3) | ring **2px** thick, **2px offset**, contrast **≥3:1** vs adjacent, drawn **tight on the focus unit** [spec WCAG 2.4.11 AA] |
 | pressed | state layer **12%** (+ label/icon shifts 1px down for tactile systems) | [spec M3 `pressed-state-layer-opacity` .12] |
 | dragged | state layer **16%** + elevation level 3 + slight scale | [spec M3 `dragged-state-layer-opacity` .16] |
@@ -52,11 +52,18 @@ Union verified across M3 (state layers), MUI (class names), Carbon (focus mixin)
 **HARD**: the focus ring is drawn as its own layer/shape (or a 2px inner stroke), never as a change of the control's own border
 color at 1px. `state_coverage` fails a board whose only "focus" is a darker border.
 
+**HARD (G18)**: when a family has an elevation role (`EL.roles`), its `·Hover` cell must carry the **lift** recipe and its
+`·Pressed` cell the press recipe — a hover cell with 0 shadows is `hover_flat` (rule 54). Focus/Selected/Disabled are
+neutral states: they keep the base stack (the fill alpha carries the state). The role is resolved from the host name,
+and a name with no type segment (`Button·MD`) is the default type, not an unknown `Md` type.
+
 ### 1.2 State layers, mechanically (what `CF` does)
 
 Overlay tint = base fill + a second fill at the alpha above, same hue. On dark surfaces the overlay is **white**, on light surfaces
 it is the **ink** color — that is the only polarity swap. A component board must show the tint applied to the *same* base color,
-so the reviewer can see that hover is not a different blue.
+so the reviewer can see that hover is not a different blue. The elevation delta is layered on top of the tint by `CF.elevate`
+(when EL is seeded): base/hover/pressed come from `EL.roleFor(host.name, family)`, so a factory cannot ship a flat hover
+while the system declares a lift (the same "a rule that is not measured is not enforced" discipline as the radius gate).
 
 ### 1.3 The two focus expressions (`CF.FOCUS`, chosen by family role)
 
@@ -74,6 +81,12 @@ with "host board + 2px", so every composition got one rectangle around the whole
 whose focused item is 32px, a 128×200 rail around a 28px active row. The factories already computed the unit
 (`CF.steps` → the active node, `CF.menu` → the highlighted row, `CF.otp` → the digit, `CF.anchor` → the active line,
 `CF.miniCalendar` → the selected day); the bug threw it away.
+
+**HARD — a ring takes the corner of the VISIBLE plate, not a transparent wrapper.** `TK.ringHost` resolves the owner by enclosure + concentricity, and when a wrapper board and its visible plate share the same box (a `Switch` host 44×22 r0 around a `track` 44×22 r9999, a `Checkbox` host around its `box`, an `Input` host around its `field`) the tie is broken by depth — the innermost plate wins. Decorative layers (`sheen·`, `hitpad·`, `wash·`, `clip·`, `surface·`, `hairline·`, `state·layer`) are never owners. A nested owner's corner is trusted by the sweeps only when it is on the live radius ladder; a wrapper's `r0` must never square the ring. This is what keeps a pill switch's focus outline pill-shaped after `roleSweep`/`ringSweep`, not only at birth.
+
+**HARD — a circular unit gets a circular ring.** If the resolved owner is an ellipse, the ring's two margins must agree. A 20×20 radio inside a 20×24 host gets a **24×24** ring, not a 24×28 oval: `ctx.ring` compares the requested unit to `this.box` (what the factory asked for), never to the host box with a 6px tolerance, and `TK.ringSweep` refits an ellipse-owned ring to the smaller measured margin. Rule 37 `ring_off_host` reports an oval whose margins disagree.
+
+**HARD — one hit pad per control.** `ctx.hitPad` is idempotent by name and size: `place()`'s `autoHit()` reuses the explicit pad instead of stacking a second identical `hitpad·44×32`. Two pads are a duplicate layer, not extra touch safety.
 
 **HARD — `reserved` is never only a hidden border.** A boundary at alpha 0 reserves a slot; it is not an indicator
 (WCAG 2.4.7 needs one to be *perceivable*). Rule 44 `focus_invisible` fails a ghost boundary whose control carries no visible
@@ -138,11 +151,17 @@ Every variant row also carries the state columns from §3.0.
 |---|---|---|---|---|
 | **Button** | h per ladder · pad-X · radius · label centered-left with icon · gap 8 · stroke 1px inner (outlined) · shadow only for elevated [spec AntD padding-inline 7/15/15 for 24/32/40; MUI 6×16 md] | `type` (primary · default/outlined · dashed · text · link · ghost · danger) × `size` (xs–2xl) × `icon` (none · start · end · only) × `block` × `shape` (square · round · circle) | primary **×3 sizes**, outlined, dashed, text, link, **danger**, **icon-start**, **icon-end**, **icon-only**, **loading**, **disabled**, **block/full-width** | `CF.button` |
 | **IconButton** | square 28/40/52, icon 16–18/24/28, radius 6–8 or circle, state layer = hit area | `edge` (start · end), `shape`, `size`, `tone` (neutral · accent · danger) | 3 sizes × default/hover/focus/pressed/disabled + one **badge-on-icon** + one **selected/toggle** | `CF.iconButton` |
+
+**IconButton tone is a graphic tone.** `type`/`tone` `primary` resolves to `TONE.brand` (`color.primary`, white glyph), because an icon is a 3:1 graphic and the source paints its red square red; the copy-bearing `primaryInk` step is reserved for surfaces that carry white text. `secondary` is the control surface (`surface` + `border`), `ghost` is transparent. The name still comes from `type`, so name and paint cannot diverge.
+
 | **ButtonGroup / Compact** | attached: inner radius 0, outer radius kept; `boundary·segment` 1px at 40% between same-tone; gap 0 [spec AntD `Space.Compact`] | horizontal · vertical · with dropdown item · mixed type | 3 attached buttons (primary+outlined+icon), one **split attached** pair, one vertical stack | `CF.buttonGroup` |
 | **Split button** | action + 40-wide chevron zone divided by a 1px rule (or 4px gap for the M3 style), total h = ladder | `tone` (primary · outlined), `menuPlacement` | primary split, outlined split, both in hover | `CF.splitButton` |
 | **FAB** | **56** (small **40**, large **96**) [spec M3], margin 16, radius full, icon 24, elevation level 3 · extended: label 14/500 pad-X 16–20 h 56 | `size` (sm/md/lg) × `extended` × `tone` (primary · surface · branded) | sm, md, **extended**, lg, docked-over-content | `CF.fab` |
 | **Link** | 14–15, underline on hover only (never a permanent underline inside body text at 14), gap 4 with icon | plain · with-icon · muted/disabled | inline-in-paragraph sample, nav link, **visited/disabled** | `CF.link` |
 | **Toggle / Segmented** | track = row of `md` segments, active segment filled + radius, h 32–40, pad 4 inside the container [obs; M3 segmented 48dp h] | `count` (2–4), `iconOnly`, `size`, `fullWidth` | 3-segment default + selected variant, icon-only 4-segment, disabled segment | `CF.segmented` |
+
+**HARD — a recreation builds the SOURCE's action inventory, not `CF.map().actions`.** Read the source before the page: Aigocy's `.tf-btn`/`.tf-btn-2` are 99px pills (#272727 / #F5F5F5), its process tile is 72×72 r16, feature tiles are 44×44 r12 and social/arrow controls are 48–52px circles; its nav actions are text links. There is **no** ButtonGroup, SplitButton, Segmented or FAB. Seed `CF.setReference({actions:{families,shapes,variants}})` (stamped as `nl:ref` on the PageRoot) before page 03; `reference_drift` fails any spec family the source lacks and any host whose corner is not one of the family's pinned roles. `variants` can pin a family's minimum variant count and `iconSlot:false`, so the gate does not demand a variant the source never shows.
+
 
 ### 3.2 B · Text fields
 

@@ -32,6 +32,17 @@ rounded:
   <level>: <dimension>
 spacing:
   <level>: <dimension | number>
+elevation:              # optional but REQUIRED for gate G18 when the design is physical
+  <recipe-name>:
+    drop:  [<layer>]    # outer layers
+    inner: [<layer>]    # inset layers: the dark lip + top highlight
+    sheen: <sheen | true>
+  roles:                # family → recipe; hover/pressed are the LIFT
+    <Family>:
+      base: <recipe>
+      hover: <recipe>
+      pressed: <recipe>
+      types: [<type-segment>, …]
 components:
   <component-name>: <component>
 ```
@@ -62,6 +73,45 @@ typography:
 ### Color
 Any valid CSS color string: `#RGB/#RGBA/#RRGGBB/#RRGGBBAA`, named colors, `rgb()/rgba()/hsl()/hsla()/hwb()`, `oklch()/oklab()/lch()/lab()`, `color-mix(in srgb, ...)`.
 - Internally normalized to sRGB for WCAG contrast checking; the original format is kept for display/export.
+
+### Elevation (recipe + role)
+
+`elevation:` is a machine-readable block: one **recipe** per named shadow stack, plus a **role map**. It is not prose.
+Every recipe is a list of layers; a layer is `{x, y, blur, spread, color, opacity}` (px; `color` defaults `#000000`).
+
+```yaml
+elevation:
+  card:
+    drop:
+      - { x: 0, y: 7.77, blur: 16, spread: 0, color: "#000000", opacity: 0.0588 }
+      - { x: 0, y: 3,    blur: 3,  spread: 0, color: "#000000", opacity: 0.102 }
+    inner:                                    # the physical lip + highlight
+      - { x: 0, y: -8, blur: 0, spread: 0, color: "#000000", opacity: 0.051 }
+      - { x: 0, y: 4,  blur: 0, spread: 0, color: "#FFFFFF", opacity: 0.6 }
+  cardHover:
+    drop: [ … ]                               # the LIFT, not a tint
+    inner: [ … ]                              # the lip survives hover
+  control:
+    drop: [ … ]
+    inner: [ … ]
+    sheen: { opacity: 0.2, width: 0.62, cx: 0.28, cy: -0.10 }
+  roles:
+    Button:  { base: control, hover: controlHover, pressed: controlPressed,
+               types: ["primary", "default", "secondary"] }
+    Card:    { base: card, hover: cardHover, pressed: cardPressed }
+```
+
+Rules:
+- **Measure the source**, do not reuse the generic e1/e2/e3 table when recreating a real product. A recipe with one
+  layer, or with no `inner` for a card/control, is the defect G18 exists to catch.
+- `roles` keys are family names as `CF.name()` writes them (`Button`, `IconButton`, `Card`…); matching is
+  case-insensitive (`FAB` works). `types` restricts elevation to the listed type segments; omit it to apply to all.
+  A name with no type segment (`Button·MD`) is treated as the `default` type, not as an unknown `Md`.
+- `hover`/`pressed` must be recipes, not `true`: the difference from `base` is the **elevation delta** (the lift).
+- `sheen: true` uses the default radial (`opacity .2`, `width .62`, centre `.28 / −.10`); the object form overrides.
+- These values are seeded by `storage.EL.seed({set, recipes, roles})`; `EL.seed` refuses a recipe with no layers and
+  verifies the token's layer count on readback. `design-tokens.json` must carry the same `shadow` section (DTCG
+  `$type: 'shadow'`, `$value` an array) — a token export without shadows is why codegen shipped flat cards.
 - **Default recommended `#RRGGBB` hex**.
 
 ### Typography

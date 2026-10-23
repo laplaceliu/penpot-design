@@ -278,6 +278,7 @@ Each tone the kit can paint ships as three coordinated steps, and only the two e
 | 4–5 | level-3 stronger | modal, command palette, full-screen sheet |
 
 - A shadow implies "floating above something". Never stack a shadow on a section that is not floating (the classic "everything is a card" disease).
+- **When recreating a source, these defaults do not apply.** Measure the source's own stack — its layer offsets, opacities **and insets** — and record it in DESIGN.md's `elevation:` block (§5.4). A system measured from a real site is almost never a single drop shadow: the 2026-10-23 recreation had `drop 0 7.77 16 .0588 + 0 3 3 .102` **plus** `inset 0 -8 0 .051 + 0 4 0 rgba(255,255,255,.6)` on every card, and a hover that added six more drop layers. Declaring only the e1/e2/e3 drops (the old DEFAULT translation) threw away exactly what made the source feel physical.
 - **Border vs divider**: containers get 1px `border` or a tone step; items *inside* a container get 1px dividers with `colorSplit`
   (`rgba(5,5,5,.06)` light) — a visible gray hairline inside a card reads as a table.
 - **A corner is taken from the `borderRadius` token set and nowhere else (HARD).** The ladder exists as tokens
@@ -370,6 +371,51 @@ without them is a finding, not a style difference.
   **Never on a `01.xx`/`02.xx` chapter page** — those boards are `FN` projections and the stamp (`nl:fn=<kind>`) is the only
   way one exists there (gate G16, rule 31 `not_projected`).
 - Anything that needs a *declared* role (11px `axis`/`overline`/`kbd`) works the same way: the role lives in the name.
+
+### 5.4 Physicality: the stack, the inset pair, the sheen, the lift (HARD, gate G18)
+
+A "shadow" in this skill is a **recipe**, not a number. `storage.EL` (`elevation_engine.js`) owns it; the recipe is
+declared in DESIGN.md (`elevation:` frontmatter) and seeded as a **multi-layer `shadow.<recipe>` token**. Nothing else
+may write `shape.shadows`.
+
+**The stack.** A raised object carries a *drop ladder* **and** an *inset pair*:
+
+| Recipe (Aigocy, measured from the source stylesheet) | Layers |
+|---|---|
+| `card` — light card, FAQ row, accordion | drop `0 7.77 16 .0588` + `0 3 3 .102`; inner `0 -8 0 .051` (dark bottom lip) + `0 4 0 rgba(255,255,255,.6)` (top highlight) |
+| `control` — dark button / FAB / icon button | drop `0 2.77 2.21 .12` + `0 3 3 .14`; inner `0 -3 0 #080808` + `0 1 0 rgba(255,255,255,.3)`; sheen `.2` |
+| `nav` — floating white pill | `e2` drops + `edgeSoft` insets |
+| `panel` — dark band / toast | `e3` drops + `0 -8 0 #2E2E2E` + `0 4 0 rgba(255,255,255,.3)`; sheen `.2` |
+| `e1/e2/e3` | pure drop ladder for unnamed objects (segment thumb, slider handle, foundations swatch) |
+
+**Why the inset pair is HARD.** A drop shadow says "this floats"; the inset pair says "this is a **moulded object**"
+— the bottom lip catches the eye and the top highlight catches the light. Measured 2026-10-23: of 3020 shapes, 49 had a
+shadow and **0** had an inner layer; the file read CLEAN under every rule the gate had at the time because **none of them measured material**.
+Penpot renders mixed drop/inset arrays (proved by export), so this is a gate gap, not a renderer limit.
+
+**Hover is a LIFT.** `controlHover` keeps the lip/highlight and grows the drop stack from 2 to 6 layers (up to
+`0 100 80 .149`); `cardHover` swaps `e2` for `e3`; `controlPressed`/`cardPressed` collapse to `e1` and deepen the lip.
+A state modelled only as an 8% fill tint is `hover_flat`. The engine picks the recipe from the host name
+(`Button·MD·Hover`), including the **no-type** form (`Button·MD` = default type, not an unknown `Md` type) and the
+case-insensitive family (`FAB` vs `Fab`). Sizes never change.
+
+**Sheen** is a separate `sheen·` rectangle with a **radial gradient** (white `.2` at 28% / −10%). Penpot fills are
+solid **or** gradient — mixing `fillColor` and `fillColorGradient` in one fill throws `Value not valid … :fills` — so the
+sheen sits **above the surface and below the content**. A component **copy** cannot be authored; its master carries the
+sheen and the copy inherits it (measured: a 128×32 Button master's sheen appeared on its screen copies).
+
+**Surfaces.** A card shadow needs something to cast it. A section declares `surface` (a live colour token) +
+`elevation` (a recipe) + `radius` in the SC record; `SC.build` mounts `surface·<region>` **before** the copy. A
+screen with bare text regions is `surface_missing`, and a page with no plates is how 143 shapes shipped with **0**
+shadows. A surface is a plain rectangle (not a board): it must sit behind content, and a text card does not clip. The
+positioning audit exempts `surface·`/`sheen·` from `header_collision` — a floor legitimately covers its own title.
+
+**What the gate cannot see.** It proves *assembly*, not *fidelity*: a recipe can be present and still use the wrong
+source values, and a hover variant can be drawn without being reachable in a prototype. Penpot has no "switch variant
+on mouse-enter" action, so runtime hover is not authorable in a Penpot prototype; hover states are delivered as
+**state variants / matrix cells** and the motion is documented. The PIL diff against the source remains the
+fidelity check. Repairs: `EL.apply` (one shape), `EL.sweepPage({page, apply})` (family/state pass),
+`EL.surfacePass({surfaces})` (missing plates), `EL.bindStamped` (tokens), `EL.audit` (census).
 
 ## 6. Controls, targets and density
 
@@ -485,6 +531,13 @@ rounded: { none: 0px, sm: 4px, md: 8px, lg: 12px, xl: 16px, full: 9999px }
 | 46 | **§3.3 + §2** — a control host whose border reserves a band its content never fills: the bottom content inset is ≥ 32px AND ≥ 3× the top inset (the frame is taller than what it frames). Only the BOTTOM axis is judged — a `TableRow`, `ListItem` or `Timeline` stretches to its column, so a right-hand band is the design (a 4-side test produced 30 page-06 findings, 29 of them legitimate containers). Measured on `MiniCalendar·32cell`: the height formula used a hardcoded `rows: 6` while the drawn month needs 5, and every out-of-month slot was `continue`d, so the 6th row was empty and the grid's leading/trailing cells were never painted (inset bottom 49 vs top 7). It was NOT a reservation for adjacent-month days — a reservation nobody fills is dead space. Repair: derive the frame from the content (`need = ceil((firstWeekday + days) / 7)`) and paint adjacent-month cells muted | `frame_dead_band` |
 | 45 | **§2.3** — a horizontal connector (`tail·*` / `rail·*` / `connector`) whose centre is not the centre of the nodes it joins. One row has ONE axis: the node, its connector and its copy are all centred on `max(node, line-height)`. A node anchored to the band's TOP slips out of its own line whenever it is smaller than the copy beside it — `Steps·Dot·LG` (a 12px dot under a 20px label) measured node centres 6 vs connector and label centres 10, which is what a reviewer calls "these are not aligned". `CF.steps` centres `nyNode`; a hand-built row must place the node ON the line | `row_axis_off` |
 | 49 | **§2.1** — repeated row labels inside one control host must share ONE pitch: the tightest gap must REPEAT (that is the established rhythm) and a wider gap with nothing drawn in it is a hole, not grouping. Measured on `Menu·IconStart`: label gaps **12 / 24 / 12** around DUPLICATE — `CF.menu` gave a `'-'` divider a `space.md` of empty space, and rule 43 had already removed the line that used to justify it, so what a reviewer sees is "the padding is uneven". A semantic boundary must be SEEN (a `group` label row, or a functional `boundary·*` line, which rule 43 exempts) or cost NOTHING, which is what `CF.menu` does now. Two disciplines keep the gate honest: copy is read **one level deep** (a hovered row's label lives inside its `row·` group, so direct-children measurement reported a 4-row menu as 3), and a host with **no repeating pitch is not judged** — an Accordion's 26/39/40 are header→body, body→header and header→header, three different relationships, not three rows with a hole (the first version of this rule indicted all 5 Accordion hosts on page 06). Repair: `TK.gapStart`/`TK.gapSweep` (dry first; it moves whole row units, takes the same amount off the host and re-centres the host on its `CF.matrix` row midline via `TK.centreOnRow`) | `list_gap_split` |
+| 50 | **§5.4 (gate G18)** — a shape that paints a shadow while the token set declares `shadow.*` tokens but carries **no `tokens.shadow` binding**: the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes, **0** bound; every one was a single hand-typed drop. Repair: `EL.sweepPage({page, apply:true})` → `EL.bindStamped` | `shadow_unbound` |
+| 51 | **§5.4 (gate G18)** — a shape stamped `nl:el=<recipe>` whose `shadows` has **fewer layers than that recipe** (a 4-layer card collapsed to one, or a rebuild that dropped the insets). The stamp is the durable contract; this rule compares it to the render. Repair: `EL.apply(shape, recipe)` | `elevation_flat` |
+| 52 | **§5.4 (gate G18)** — a stamped recipe declares **INNER** layers (the dark bottom lip / white top highlight that make a card read as a physical object) but the shape paints drop shadows only. A drop alone is the flat "everything is a card" look this rule exists to stop | `edge_missing` |
+| 53 | **§5.4 (gate G18)** — a stamped recipe declares a **radial sheen** but the host carries no `sheen·*` plate: the top-light that sells the material is absent. Component **copies** are exempt (a child cannot be authored on a copy; the master carries it). Repair: `EL.sheenFor(host, recipe)` | `sheen_missing` |
+| 54 | **§5.4 + §5.2 (gate G18)** — a component state board named `·Hover`/`·Pressed` whose family declares a hover/press recipe but paints **0 shadows**: hover was modelled as an 8% fill tint, not as the source's elevation lift. Measured 2026-10-23: every Button/Card hover cell in the file read 0 shadows while the source adds 4–6 drop layers. Repair: `EL.sweepPage` | `hover_flat` |
+| 55 | **§5.4 (gate G18)** — a screen record declares `surface`/`elevation` for a section but the board has no **`surface·<region>`** plate: the section is bare, so it has nothing to cast a shadow. Reads the durable `nl:rec` digest, not session memory. Measured: `15 · Screens · content` had 143 shapes and **0** surfaces/shadows. Repair: `SC.surface` / `EL.surfacePass` | `surface_missing` |
+| 56 | **§3.1 + component-library §3.1** — a recreation's Actions page is the SOURCE's action inventory, not the factory's family list: a `·Spec` board whose family is not in the reference profile, a reference family with no spec, or a family host whose corner role is not one the source pins. The source Aigocy page has Button (99px pill), IconButton (tile 16 / circle 50%) and Link (text) — no ButtonGroup, SplitButton, Segmented or FAB. The profile is `CF.setReference(...)` / `nl:ref`; `variants` in the profile can pin a family's variant count and icon-slot expectation so the gate never demands an invented variant | `reference_drift` |
 
 **Rules 1/2 judge authored numbers, not arithmetic.** In a flow board the numbers the designer chose are the padding,
 the gap and the sizing declaration; the resulting coordinates and hug boxes are sums over font metrics (a 13px label is

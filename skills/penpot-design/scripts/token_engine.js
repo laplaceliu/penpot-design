@@ -933,6 +933,10 @@ return (function () {
   // instance, so skipping "instances" would skip every master and fix nothing. Only a COPY is a consumer whose interior
   // belongs to the master (`isComponentCopyInstance()`); repairing the master is what propagates to the copies.
   TK.CONTROL_FAMS = { button: 1, iconbutton: 1, splitbutton: 1, fab: 1, chip: 1, badge: 1, tag: 1 };
+  // A family's corner is not always the control pill: an icon button is a TILE in systems whose DESIGN.md says so
+  // (Aigocy §Shapes: small icon tiles take `sm`; only an explicit circle uses the control step). The sweep below reads
+  // this map, so a family can carry its own legal corner and a later pass cannot silently re-pill it.
+  TK.ROLE_BY_FAM = { iconbutton: 'tile' };
   // The second half of the same contract: `CF.ROLE.ring = 'host'` — a ring is a derived outline, so its corner is the
   // host's corner. A ring at 10 around a host at 0 (or 9999) is the defect the user pointed at on `Button·Primary·MD·Focus·Pill`.
   TK.roleStart = function (names, o) {
@@ -989,8 +993,8 @@ return (function () {
           // rewrite 100+ rings to a value no token bound them to.
           const r = TK.ringHost ? TK.ringHost(s) : { host: host, floating: false };
           const rh = r.host;
-          if (rh && !r.floating && String(rh.type) === 'board' && isControlBoard(rh)) {
-            const hv = maxC(rh), rv = maxC(s);
+          if (rh && !r.floating) {
+            const hv = ringCornerOf(rh), rv = maxC(s);
             if (hv !== null && rv !== null && hv !== rv) { rings++; if (!o.dry) { try { s.borderRadius = hv; } catch (e) { rings--; } } }
           }
         } else if (String(s.type) === 'board') {
@@ -998,10 +1002,12 @@ return (function () {
           const base = nm.split('·')[0].toLowerCase();
           if (TK.CONTROL_FAMS[base] && !/·Spec$|-PageRoot$|-Header$|-Footer$/.test(nm)) {
             const v = maxC(s);
-            if (v !== null && v !== FULL) {
+            let want = FULL;
+            try { const CFs = storage.CF; const rk = TK.ROLE_BY_FAM[base]; if (rk && CFs && CFs.radius) want = CFs.radius(rk); } catch (e) {}
+            if (v !== null && v !== want) {
               hosts++;
               if (isCop) copies++; else if (isMaster(s)) masters++;
-              if (!o.dry) { try { s.borderRadius = FULL; } catch (e) { hosts--; if (isCop) copies--; else if (isMaster(s)) masters--; } }
+              if (!o.dry) { try { s.borderRadius = want; } catch (e) { hosts--; if (isCop) copies--; else if (isMaster(s)) masters--; } }
             }
           }
         }
@@ -1050,7 +1056,7 @@ return (function () {
   TK.RING_OFF = 2;
   TK.RING_MAX_MARGIN = 12;
   const RING_CONTAINER = /·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root /;
-  const RING_DECOR = /^(ring·|hairline·|guide·|axis|Group$)/;
+  const RING_DECOR = /^(ring·|hairline·|guide·|axis|Group$|sheen·|hitpad·|wash·|clip·|surface·|fold·|scrim·|overlay·|veil·|boundary·|underline·|state·layer)/;
   function ringName(sh) { try { return String(sh.name || ''); } catch (e) { return ''; } }
   function ringBox(sh) {
     try {
@@ -1066,8 +1072,24 @@ return (function () {
     return n.indexOf('·') >= 0;
   }
   function isOwnable(sh) {
-    if (String(sh.type) === 'svg') return false;
+    const t = String(sh.type);
+    if (t === 'svg' || t === 'text' || t === 'group') return false;
     return !RING_DECOR.test(ringName(sh));
+  }
+  /** The corner a ring takes from its resolved owner. A control BOARD is always trusted; a NESTED plate is trusted
+      only when its corner is on the live radius ladder (a wrapper's r0 is not the visible unit's shape). An ELLIPSE
+      owner is a circle, so its ring uses the control step. This is the half roleSweep/ringSweep used to skip — which
+      left a pill track's ring square after the tie-break returned the nested plate. */
+  function ringCornerOf(host) {
+    if (!host) return null;
+    if (String(host.type) === 'ellipse') {
+      try { return storage.CF && storage.CF.radius ? storage.CF.radius('control') : 9999; } catch (e) { return 9999; }
+    }
+    const cs = TK.cornersOf(host); if (!cs) return null;
+    const hv = Math.max.apply(null, cs);
+    if (String(host.type) === 'board' && isControlBoard(host)) return hv;
+    try { const CFs = storage.CF; if (CFs && CFs.radiusToken && CFs.radiusToken(hv) !== null) return hv; } catch (e) {}
+    return null;
   }
   function N2(v) { return Math.round(v * 100) / 100; }
 
@@ -1133,7 +1155,7 @@ return (function () {
           if (b && b.w > 0 && b.h > 0) {
             const v = Math.abs(cx - (b.x + b.w / 2)) + Math.abs(cy - (b.y + b.h / 2));
             const ox = (rb.w - b.w) / 2, oy = (rb.h - b.h) / 2;
-            if (v <= tol && ox >= -0.01 && oy >= -0.01 && ox <= margin && oy <= margin) good.push({ sh: k, v: v, ox: ox, oy: oy });
+            if (v <= tol && ox >= -0.01 && oy >= -0.01 && ox <= margin && oy <= margin) good.push({ sh: k, v: v, ox: ox, oy: oy, d: d });
           }
         }
         if (d >= (o.depth === undefined ? 4 : o.depth)) return;
@@ -1141,7 +1163,10 @@ return (function () {
         ks.forEach((c) => scan(c, d + 1));
       })(control, 0);
       // a composite's ring hugs the SMALLER thing it outlines, so the innermost concentric plate wins.
-      good.sort((p, q) => (p.v - q.v) || (p.sh.width * p.sh.height - q.sh.width * q.sh.height));
+      // A transparent control wrapper and its visible plate can share the SAME box (Switch: host 44×22 r0 around
+      // a track 44×22 r9999). v and area tie, so the wrapper used to win and every sweep copied its square corner
+      // onto the ring. The innermost plate is the one the eye sees; it wins the tie.
+      good.sort((p, q) => (p.v - q.v) || (p.sh.width * p.sh.height - q.sh.width * q.sh.height) || ((q.d || 0) - (p.d || 0)));
       if (good.length) {
         const w = good[0];
         return { host: w.sh, control: control, concentric: true, floating: false, contained: contained,
@@ -1214,11 +1239,20 @@ return (function () {
           else { unresolved++; anomalies.push({ page: n, ring: ringName(s), err: 'inside control, fits nothing' }); }
           return;
         }
+        // A CIRCLE gets a CIRCLE: when the resolved owner is an ellipse, the two margins must agree. The old code
+        // accepted a 24×28 ring around a 20×20 radio as `concentric` (centre Δ 0) and never refitted it, so the oval
+        // survived every sweep and the gate only compared corners. Treat non-uniform margins as drift and refit to the
+        // smaller measured margin (2 on Radio·Focus), which turns 24×28 into 24×24.
+        if (res.concentric && !res.floating && host && String(host.type) === 'ellipse') {
+          const ob = ringBox(host);
+          const mx = (s.width - ob.w) / 2, my = (s.height - ob.h) / 2;
+          if (Math.abs(mx - my) > 1) { res.concentric = false; res.ox = Math.max(0, Math.min(mx, my)); res.oy = res.ox; res.via = 'oval'; }
+        }
         if (res.concentric && !res.floating) {
           ok++;
-          if (String(host.type) === 'board' && isControlBoard(host)) {
-            const cs = TK.cornersOf(host), rs = TK.cornersOf(s);
-            const hv = cs ? Math.max.apply(null, cs) : null, rv = rs ? Math.max.apply(null, rs) : null;
+          {
+            const hv = ringCornerOf(host), rs = TK.cornersOf(s);
+            const rv = rs ? Math.max.apply(null, rs) : null;
             if (hv !== null && rv !== null && hv !== rv) { corners++; if (!o.dry) { try { s.borderRadius = hv; } catch (e) { corners--; } } }
           }
           return;
@@ -1238,9 +1272,8 @@ return (function () {
         s.resize(hb.w + ox * 2, hb.h + oy * 2);
         if (target !== s.parent) reparented++;
         refit++;
-        if (String(host.type) === 'board' && isControlBoard(host)) {
-          const cs = TK.cornersOf(host);
-          const hv = cs ? Math.max.apply(null, cs) : null;
+        {
+          const hv = ringCornerOf(host);
           if (hv !== null) { const rs = TK.cornersOf(s); const rv = rs ? Math.max.apply(null, rs) : null; if (rv !== hv) { corners++; try { s.borderRadius = hv; } catch (e) {} } }
         }
       });
@@ -1877,8 +1910,17 @@ return (function () {
     // Measured 2026-10-21: `applyToText` transmits family/size/weight/tracking but rewrites **lineHeight to 1.2**
     // whatever the record holds (1.05 → 1.2, 1.4 → 1.2), so the leading is re-asserted from the style here — otherwise
     // applying a style silently flattens the ramp's rhythm.
+    // Measured 2026-10-23: the same call DROPS `tokens.typography`, so after a style apply the run is correct-looking
+    // but unbound (the next gate reads type_unbound). Re-bind the token the style is named after, then re-assert the
+    // leading: `applyToShapes` may write the style's font metrics again, and the ramp's leading is the contract.
     let styleLh = null; try { styleLh = st.lineHeight; } catch (e) {}
     if (styleLh !== null && styleLh !== undefined && String(styleLh) !== '') { try { shape.lineHeight = String(styleLh); } catch (e) {} }
+    try {
+      const tok2 = TK.find(name);
+      const got = (shape.tokens || {}).typography;
+      if (tok2 && tok2.applyToShapes && got !== name) tok2.applyToShapes([shape], ['typography']);
+      if (styleLh !== null && styleLh !== undefined && String(styleLh) !== '') { try { shape.lineHeight = String(styleLh); } catch (e) {} }
+    } catch (e) {}
     return { step: name, changed: JSON.stringify(before) !== JSON.stringify(TP.read(shape)), after: TP.read(shape) };
   };
 

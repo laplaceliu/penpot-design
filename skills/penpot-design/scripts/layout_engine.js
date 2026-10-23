@@ -657,6 +657,27 @@ return (function () {
     };
   };
 
+  // Aigocy one-page AI-agency landing, measured at 1440 on the live source (2026-10-23). The band heights are the
+  // source's own document flow, so a band that merely contains another region is not a region here; the screen record
+  // fills these 17 leaves. Total 17,665 = the source's body scrollHeight at 1440.
+  RECIPES.aigocyLanding = function (o) {
+    o = o || {};
+    var w = o.w || 1440;
+    var bandsSpec = [
+      { key: 'hero', h: 900 }, { key: 'about', h: 1096 }, { key: 'partner', h: 168 },
+      { key: 'services', h: 1068 }, { key: 'works', h: 3836 }, { key: 'process', h: 680 },
+      { key: 'benefits', h: 1195 }, { key: 'features', h: 1192 }, { key: 'tools', h: 800 },
+      { key: 'team', h: 1112 }, { key: 'statistic', h: 692 }, { key: 'awards', h: 772 },
+      { key: 'testimonials', h: 756 }, { key: 'pricing', h: 1033 }, { key: 'faqs', h: 844 },
+      { key: 'contact', h: 800 }, { key: 'footer', h: 721 }
+    ];
+    var totalH = bandsSpec.reduce(function (a, b) { return a + b.h; }, 0);
+    var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
+    return { frame: { w: w, h: totalH }, bands: fl.bands, order: fl.order, totalH: totalH,
+             inner: LY.container(R(0, 0, w, totalH), { margin: 60, maxW: 1320 }),
+             notes: 'Aigocy landing: 17 bands at 1440 (900/1096/168/1068/3836/680/1195/1192/800/1112/692/772/756/1033/844/800/721); content column 1320 (x=60), raised plates inset 16 (1408 wide, r40); ink bands full-bleed.' };
+  };
+
   // ---------------------------------------------------------------- one-page portfolio recreation recipes
   // The source is a dark one-page portfolio plus two index pages. These three recipes encode its band stack and the
   // leaf regions the screen record fills; a band that merely contains another region is NOT a region here (overlapping
@@ -1127,6 +1148,7 @@ return (function () {
     heroCenter:      { tiers: ['web', 'pad', 'mobile'] },
     heroSplit:       { tiers: ['web', 'pad'],        mobile: 'heroCenter' },
     landing:         { tiers: ['web', 'pad'],        mobile: 'heroCenter' },
+    aigocyLanding:   { tiers: ['web'],               pad: null, mobile: null },
     blogArticle:     { tiers: ['web', 'pad', 'mobile'] },
     docsLayout:      { tiers: ['web', 'pad'],        mobile: 'blogArticle' },
     chat:            { tiers: ['web', 'pad'],        mobile: 'mobileListDetail' },

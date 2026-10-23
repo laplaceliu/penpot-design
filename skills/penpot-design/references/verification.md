@@ -65,3 +65,17 @@ for xy in [(x, y)]:          # sample key points of the design image
 ```
 
 After quantifying the main colors, backfill DESIGN.md; mark estimated values in prose as "estimated from image".
+
+## Elevation acceptance (gate G18, measured 2026-10-23)
+
+A visual diff of a flat page can still match a flat export pixel-perfectly, so shadows need their own acceptance:
+
+- **Read the census**: `storage.EL.audit()` → `unbound: 0`, `flat: 0`; on a page with cards/nav/panels `inner > 0`;
+  `SC.audit()` → `ASSEMBLED`; `SC.coverage()` → `COMPLETE`.
+- **Read the render, not the count**: export one card, one control and one hover cell. The card must show the **bottom
+  lip** and **top highlight** (the inset pair) in addition to the drop; the hover cell must show a visibly larger shadow
+  than its default. `shadows.length` is a claim; the PNG is the proof.
+- **Two known false positives are fixed**: a `sheen·` rectangle created with a `{w,h}` box used to stay 100×100
+  (`audit_layout.crash_100x100` catches it), and background `surface·` plates are exempt from `header_collision`.
+- **Hover reachability**: Penpot has no switch-variant-on-hover action, so a runtime hover is not authorable. Acceptance is
+  the **state variant / matrix cell**, not a click test. Do not claim a working hover prototype.

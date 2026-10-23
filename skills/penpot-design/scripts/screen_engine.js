@@ -131,6 +131,19 @@ return (async function () {
     return { ok: true, step: style, chars: String(req.text).slice(0, 28), w: Math.round(t.width), h: Math.round(t.height) };
   };
 
+  /** §elevation — the surface a section sits on. A card is not a shadow floating on nothing: the plate comes
+      first (token fill + radius), then its recipe (multi-layer drop + inset) and its sheen. `section.surface` is a
+      declared colour token, `section.elevation` a declared EL recipe; both are optional and independent. */
+  SC.surface = function (parent, sec) {
+    sec = sec || {};
+    if (!sec.surface && !sec.elevation) return { skipped: true };
+    if (!storage.EL || !storage.EL.seeded) return { err: 'EL is not seeded — load scripts/elevation_engine.js and EL.seed() before a surfaced screen' };
+    return storage.EL.surface(parent, {
+      name: 'surface·' + (sec.region || 'section'), role: sec.elevation || 'card',
+      fill: sec.surface || null, radius: sec.radius || 'card', sheen: sec.sheen
+    });
+  };
+
   /** S2 — a raster slot. With `path` it is a real media object; without it the placeholder is recorded as a gap. */
   SC.media = async function (parent, req) {
     req = req || {};
@@ -167,7 +180,10 @@ return (async function () {
         controls: (s.controls || []).map((c) => c.name || SC.master(c).name || c.family || null),
         copy: (s.copy || []).length,
         media: (s.media || []).map((m) => ({ slot: m.slot || 'media', path: m.path || null })),
-        icons: (s.icons || []).map((i) => i.kind || i.name || null)
+        icons: (s.icons || []).map((i) => i.kind || i.name || null),
+        // §elevation: the surface and the stack are part of the record, not a post-build decoration —
+        // coverage re-reads them from the board so a screen built without a card's plate reports it.
+        surface: s.surface || null, elevation: s.elevation || null, radius: s.radius || null
       }))
     });
   };
@@ -184,6 +200,18 @@ return (async function () {
       (sec.controls || []).forEach((c) => { const m = SC.master(c); if (m.err) gaps.controls.push((c.name || c.family) + ' → ' + m.tried.join(' | ')); });
       (sec.media || []).forEach((md) => { if (!md.path) gaps.media.push('slot "' + (md.slot || 'media') + '" has no source path'); });
       (sec.copy || []).forEach((cp) => { if (!cp.text) gaps.copy.push('copy entry #' + i + ' has no text'); });
+      // §elevation validation: a surface must name a live colour token, an elevation a live recipe. A typo used
+      // to be discovered as a white/blank plate 20 sections into a build.
+      if (sec.surface) {
+        let ok = false;
+        try { ok = !!(storage.TK && storage.TK.find && storage.TK.find(sec.surface)); } catch (e) {}
+        if (!ok) gaps.copy.push('section "' + (sec.region || i) + '" surface "' + sec.surface + '" is not a live colour token');
+      }
+      if (sec.elevation) {
+        let ok = false;
+        try { ok = !!(storage.EL && storage.EL.has && storage.EL.has(sec.elevation)); } catch (e) {}
+        if (!ok) gaps.copy.push('section "' + (sec.region || i) + '" elevation "' + sec.elevation + '" is not a live EL recipe (seed elevation_engine.js)');
+      }
     });
     rec.gaps = gaps;
     rec.empty = !gaps.controls.length && !gaps.media.length && !gaps.copy.length && !gaps.regions.length;
@@ -242,7 +270,7 @@ return (async function () {
     const plan0 = rec.recipe && LY.recipe ? LY.recipe(rec.recipe, { tier }) : null;
     const h0 = o.h || rec.h || (plan0 && plan0.frame && plan0.frame.h) || (LY.viewportHeight ? LY.viewportHeight(tier) : 900);
 
-    const census = { screen, src: rec.src || null, tier, recipe: rec.recipe || null, mode: resume ? 'mount' : 'new', regions: [], placed: { instances: 0, copy: 0, media: 0, glyphs: 0 }, gaps: [] };
+    const census = { screen, src: rec.src || null, tier, recipe: rec.recipe || null, mode: resume ? 'mount' : 'new', regions: [], placed: { instances: 0, copy: 0, media: 0, glyphs: 0, surfaces: 0, elevated: 0 }, gaps: [] };
     let board, plan = null;
     if (resume) {
       board = existing[0];
@@ -281,6 +309,13 @@ return (async function () {
       if (!host) { census.gaps.push({ ch: 'region', want: sec.region, got: census.regions.slice(0, 12) }); continue; }
       if (!sec._host && plan && plan.panes && plan.panes.indexOf(String(sec.region)) >= 0 && (sec.copy || []).length)
         census.gaps.push({ ch: 'pane', region: sec.region, note: 'copy onto a pane — land it on a leaf region or a band you create' });
+      // §elevation: the plate is mounted BEFORE the section's content, so it is the floor of the region rather
+      // than a rectangle covering the copy. Idempotent by `surface·<region>` on a mount.
+      if (sec.surface || sec.elevation) {
+        const sr = SC.surface(host, sec);
+        if (sr && !sr.err) { census.placed.surfaces++; if (sr.elevation && sr.elevation.ok) census.placed.elevated++; }
+        else census.gaps.push({ ch: 'surface', region: sec.region, err: (sr && sr.err) || 'surface failed' });
+      }
       for (const c of sec.controls || []) {
         const r = SC.ctl(host, c);
         if (r.ok) census.placed.instances++; else census.gaps.push({ ch: 'control', want: c.name || c.family, err: r.err, tried: r.tried });
@@ -303,6 +338,13 @@ return (async function () {
     }
 
     NL.stamp(board, { sc: screen, src: String(rec.src || ''), recipe: String(rec.recipe || ''), tier, assembled: '1' });
+    // durable elevation census: how many shapes of this screen carry the `nl:el` contract. The gate compares this
+    // stamp to the shapes it can actually see, so "0 shadows on a 3000-shape file" can never read CLEAN again.
+    try {
+      let els = 0;
+      (function count(s) { if (storage.EL && storage.EL.readStamp && storage.EL.readStamp(s)) els++; Array.from(s.children || []).forEach(count); })(board);
+      board.setPluginData('nl:els', String(els));
+    } catch (e) { census.gaps.push({ ch: 'els', err: String(e).slice(0, 60) }); }
     try { const d = SC.digest(rec); board.setPluginData('nl:rec', d.length > 16000 ? d.slice(0, 16000) + '…' : d); } catch (e) { census.gaps.push({ ch: 'digest', err: String(e).slice(0, 80) }); }
     if (NL.guide && rec.recipe) NL.guide(board, Object.assign({ type: 'column' }, LY.guides ? LY.guides(tier) : {}));
     // A band that spans the tier width IS a grid host at that width, so it gets the same native column grid the screen
@@ -318,6 +360,8 @@ return (async function () {
       });
     } catch (e) { census.gaps.push({ ch: 'guides', err: String(e).slice(0, 60) }); }
     if (TK && TK.bindBoard) { try { await TK.bindBoard(board); } catch (e) { census.gaps.push({ ch: 'bind', err: String(e).slice(0, 90) }); } }
+    // the shadow half of the birth pass: every `nl:el` stamp (surfaces + controls) gets its token binding.
+    if (storage.EL && storage.EL.bindStamped) { try { census.elevationBind = await storage.EL.bindStamped(board); } catch (e) { census.gaps.push({ ch: 'bind-shadow', err: String(e).slice(0, 90) }); } }
     if (NL.whenSettled) { try { await NL.whenSettled(); } catch (e) {} }
     census.board = String(board.name || ''); census.id = board.id;
     // what is still empty is read off the board, not out of a session memory: a region with no children is a section
@@ -349,10 +393,12 @@ return (async function () {
     if (!root) return { err: 'no current page root' };
     const out = { page: penpot.currentPage && penpot.currentPage.name, boards: 0, stamped: 0, screens: [],
                   drawnHosts: 0, drawnNames: [], instances: 0, slots: 0, filled: 0, placeholders: [],
-                  copy: 0, copyBound: 0, paint: 0, paintBound: 0 };
+                  copy: 0, copyBound: 0, paint: 0, paintBound: 0, surfaces: 0, elevated: 0, sheen: 0, flat: [] };
     const note = (s) => { const nm = String(s.name || ''); out.drawnNames.push(nm); if (out.drawnNames.length > (o.samples || 14)) out.drawnNames.pop(); };
     const walk = (s, inBoard) => {
       let nm = ''; try { nm = String(s.name || ''); } catch (e) {}
+      // a fold marker is an ANNOTATION, not screen copy: its label must not count against `copyBound`
+      if (s.type === 'text' && s.parent && /^fold·/.test(String(s.parent.name || ''))) return;
       let isInst = false; try { isInst = !!(s.isComponentInstance && s.isComponentInstance()); } catch (e) {}
       let tk = {}; try { tk = s.tokens || {}; } catch (e) {}
       if (isInst) { out.instances++; return; }   // a master's internals belong to the master, not to this screen
@@ -363,6 +409,16 @@ return (async function () {
           emptyRegions: Array.from(s.children || []).filter((c) => { const r = NL.readStamp(c); return r && r.region && !Array.from(c.children || []).length; }).map((c) => String(c.name)) }); }
       }
       if (s.type === 'board' && SC.isControlName(nm)) { out.drawnHosts++; note(s); }
+      // §elevation: a surface is declared by the record; a stamped shape without its recipe's layers is flat.
+      const el = (storage.EL && storage.EL.readStamp) ? storage.EL.readStamp(s) : null;
+      if (el) {
+        out.elevated++;
+        if (/^surface·/.test(nm)) out.surfaces++;
+        const rec = storage.EL.recipe ? storage.EL.recipe(el) : null;
+        let sh = []; try { sh = Array.from(s.shadows || []); } catch (e) {}
+        if (rec && sh.length < rec.layers.length) out.flat.push({ name: nm, stamp: el, got: sh.length, want: rec.layers.length });
+      }
+      if (Array.from(s.children || []).some((c) => /^sheen·/.test(String(c.name || '')))) out.sheen++;
       if (s.type === 'text') { out.copy++; let b = false; try { b = !!(tk.typography); } catch (e) {} if (b) out.copyBound++; }
       let fl = []; try { fl = Array.from(s.fills || []); } catch (e) {}
       fl.forEach((f) => {
@@ -377,7 +433,7 @@ return (async function () {
     Array.from(root.children || []).forEach((b) => walk(b, false));
     out.placeholderCount = out.placeholders.length;
     out.verdict = (out.drawnHosts === 0 && out.placeholders.length === 0 && out.copy === out.copyBound &&
-                   (o.stampedRequired === false || out.stamped > 0)) ? 'ASSEMBLED' : 'NOT_ASSEMBLED';
+                   out.flat.length === 0 && (o.stampedRequired === false || out.stamped > 0)) ? 'ASSEMBLED' : 'NOT_ASSEMBLED';
     return out;
   };
 
@@ -424,18 +480,25 @@ return (async function () {
       const noSource = secs.reduce((a, s) => a.concat((s.media || []).filter((m) => !m.path).map((m) => m.slot || 'media')), []);
       const emptyRegions = Array.from(b.children || []).filter((c) => { const r = NL.readStamp(c); return r && r.region && !Array.from(c.children || []).length; }).map((c) => String(c.name));
       const placeholders = [];
+      const names = new Set();
       (function walk(s) {
         const nm = String(s.name || '');
+        names.add(nm);
         let fl = []; try { fl = Array.from(s.fills || []); } catch (e) {}
         if (MD && MD.isSlot(nm) && !fl.some((f) => !!f.fillImage)) placeholders.push(nm);
         Array.from(s.children || []).forEach(walk);
       })(b);
+      // A declared surface/elevation is a promise the record makes; coverage checks the PLATE it promised, not
+      // just the region's child count (an empty region and an untextured one are different failures).
+      const wantSurfaces = secs.filter((s) => s.surface || s.elevation);
+      const missingSurfaces = wantSurfaces.filter((s) => !names.has('surface·' + s.region)).map((s) => s.region);
       out.push({ screen: st.sc, src: st.src || null, recipe: st.recipe || null, tier: st.tier || null,
                  entries: secs.length ? sum(secs) : null, digest: d ? 'yes' : (dErr || 'absent'),
                  declaredRegions: secs.map((s) => s.region), emptyRegions,
+                 declaredSurfaces: wantSurfaces.length, missingSurfaces,
                  notInLibrary, mediaWithoutSource: noSource, placeholderSlots: placeholders });
     });
-    const bad = out.filter((s) => s.entries === null || s.notInLibrary.length || s.placeholderSlots.length || s.emptyRegions.length);
+    const bad = out.filter((s) => s.entries === null || s.notInLibrary.length || s.placeholderSlots.length || s.emptyRegions.length || s.missingSurfaces.length);
     return { page: penpot.currentPage && penpot.currentPage.name, screens: out.length, coverage: out, verdict: out.length && !bad.length ? 'COMPLETE' : (out.length ? 'INCOMPLETE' : 'NO SCREENS') };
   };
 

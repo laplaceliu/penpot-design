@@ -32,6 +32,7 @@ return (function () {
     ink: T.onSurface || '#0F172A', surface: T.surface || '#FFFFFF',
     surfaceAlt: T.neutral || '#F8FAFC', muted: T.secondary || '#475569',
     border: T.border || '#E2E8F0', borderStrong: '#CBD5E1',
+    darkRaised: T.darkRaised || '#272727',
     error: T.error || '#DC2626', success: T.success || '#16A34A',
     warning: T.warning || '#D97706', info: T.info || '#0284C7',
     // soft tint pairs (§4.1 triple): the wash is the background the matching `*Ink` copy sits on.
@@ -139,11 +140,39 @@ return (function () {
   var ELEV = [null, { y: 1, b: 2, o: 0.06 }, { y: 2, b: 4, o: 0.08 }, { y: 6, b: 16, o: 0.12 },
               { y: 12, b: 28, o: 0.18 }, { y: 20, b: 44, o: 0.26 }];
   CF.ELEV = ELEV;
+  /** Elevation is a DESIGN fact, not a factory default: when `storage.EL` is seeded (elevation_engine.js),
+      its recipe is the only source of a shadow — multi-layer, insets included. The old single-layer ELEV
+      stays as the fallback for a file that never declared an elevation record (2026-10-23). */
   CF.shadow = function (level) {
     if (!level) return [];
+    if (storage.EL && storage.EL.seeded && storage.EL.shadow) {
+      var a = storage.EL.shadow(level);
+      if (a && a.length) return a;
+    }
     var e = ELEV[Math.min(5, Math.max(1, level))] || ELEV[1];
     return [{ style: 'drop-shadow', offsetX: 0, offsetY: e.y, blur: e.b, spread: 0,
              color: { color: P.ink, opacity: e.o } }];
+  };
+  /** Apply the family's declared elevation (base/hover/pressed) to a freshly built control host, plus its
+      sheen. A no-op unless EL is seeded and the family has a role, so a foreign system keeps its old look. */
+  CF.elevate = function (host, family, o) {
+    o = o || {};
+    var EL = storage.EL;
+    if (!EL || !EL.seeded || !EL.roleFor || !host) return null;
+    var role = EL.roleFor(host.name, family);
+    if (!role) return null;
+    var r = EL.apply(host, role);
+    if (r && r.ok && EL.sheen(role) && o.sheen !== false) {
+      var isCopy = false;
+      try { isCopy = !!(host.isComponentCopyInstance && host.isComponentCopyInstance()); } catch (e) {}
+      if (!isCopy) {
+        try {
+          var hb = { x: host.x, y: host.y, w: host.width, h: host.height };
+          EL.sheenFor(host, role, { parent: host, box: hb, radius: host.borderRadius });
+        } catch (e) {}
+      }
+    }
+    return r;
   };
   // ---------------------------------------------------------------- §2.1 radius = the token ladder, and nothing else
   // The ladder is the source site's own `border-radius` steps (DESIGN.md §Shapes), measured off its stylesheet and
@@ -198,6 +227,16 @@ return (function () {
     }
     var k = String(key);
     if (ROLE[k]) k = ROLE[k];
+    // The LADDER IS THE TOKEN SET's, not this file's fallback table. The static RAD below is a generic kit
+    // (0/2/3/5/100); a source ladder can be 0/8/12/16/24/32/40/9999, and answering `tile` with the fallback's 3
+    // while the file's `radius.sm` is 12 made a legal tile read as an off-reference corner (measured 2026-10-23 on
+    // page 03: 12 `reference_drift` findings, all r12 tiles). Read the live declared value first.
+    if (storage.TK && storage.TK.declared) {
+      try {
+        var decl = storage.TK.declared().radii || [];
+        for (var ri = 0; ri < decl.length; ri++) if (decl[ri].name === 'radius.' + k) return decl[ri].value;
+      } catch (e) {}
+    }
     if (RAD[k] !== undefined) return RAD[k];
     if (/^radius\./.test(k)) { var kk = k.slice(7); if (RAD[kk] !== undefined) return RAD[kk]; }
     return CF.radius(Number(k));
@@ -476,9 +515,13 @@ return (function () {
         // ~180px above its host, and Penpot draws the glyphs at the VERTICAL CENTRE of the box, so the label leaves
         // the host entirely (an export showed the button with no label at all). The ramp's own leading is what the
         // text occupies, so the placement uses it; `storage.fitTexts` then shrinks the box to the rendered height.
-        var th = 0, tw = t.width || 0;
+        // `lineHeight` reads back as the ramp's UNITLESS ratio (1.25), not pixels: `parseFloat` alone treated it as
+        // 1.25px and centred every button label ~9px low (measured 2026-10-23 on all 21 Button masters). Resolve a
+        // ratio below 4 against fontSize before measuring the vertical centre.
+        var th = 0, tw = t.width || 0, tfs = parseFloat(t.fontSize) || 0;
         try { th = parseFloat(t.lineHeight) || 0; } catch (e) {}
-        if (!th) th = t.height || 0;
+        if (th > 0 && th < 4 && tfs > 0) th = th * tfs;
+        if (!th) th = tfs ? CF.lineH(tfs, parseFloat(t.fontWeight) || 400, t.fontFamily) : (t.height || 0);
         h.w = tw; h.h = th;
         var x = o.align === 'left' ? box.x : (o.align === 'right' ? box.x + box.w - tw : box.x + (box.w - tw) / 2);
         var y = o.valign === 'top' ? box.y : (o.valign === 'bottom' ? box.y + box.h - th : box.y + (box.h - th) / 2);
@@ -557,8 +600,12 @@ return (function () {
       if (!src) return null;
       if (hb && this.box) {
         src = B(src.x + (hb.x - this.box.x), src.y + (hb.y - this.box.y), src.w, src.h);
-        // a caller that asked for (nearly) the whole host follows the host through a resize refit as well
-        if (Math.abs(src.w - hb.w) <= 6 && Math.abs(src.h - hb.h) <= 6) src = B(hb.x, hb.y, hb.w, hb.h);
+        // A caller that asked for the BUILD host follows the host through a resize refit. Do NOT use a blanket 6px
+        // threshold: a 20×20 radio circle inside a 20×24 host differs by only 4px, and the old test inflated its ring to
+        // 20×24 → a 24×28 OVAL around a circular control (measured 2026-10-23, Radio·Focus). Compare against `this.box`
+        // (what the factory asked for), not against the current host box.
+        var wasHostBox = Math.abs(src.w - this.box.w) <= 1 && Math.abs(src.h - this.box.h) <= 1;
+        if (wasHostBox) src = B(hb.x, hb.y, hb.w, hb.h);
         else {
           // A unit may legitimately overhang its host by its own halo (a 3px ring around a node at the host's edge) and
           // the clip is released, so a small escape is left alone. A LARGE escape means the box was authored before a
@@ -609,10 +656,23 @@ return (function () {
     /** empty hit pad so a 24px control still meets the touch floor (§2 HARD, signature touch_target). It is invisible,
         so it must keep its real size: only the clip is released, the box is never clamped (a 24px pad fails the floor). */
     hitPad: function (box, minSide) {
-      var m = max(minSide || 32, box.w), mh = max(minSide || 32, box.h);
+      var m = max(minSide || 32, box.w), mh = max(minSide || 32, box.h), nm = 'hitpad·' + m + '×' + mh;
+      var px = box.x + (box.w - m) / 2, py = box.y + (box.h - mh) / 2;
       CF.fitToClip(this.host, box, 0, { clamp: false });
-      return this.plate(B(box.x + (box.w - m) / 2, box.y + (box.h - mh) / 2, m, mh),
-        { name: 'hitpad·' + m + '×' + mh, fill: null });
+      // Idempotent: `place()` calls autoHit(), and a factory that already placed an explicit pad used to get a SECOND
+      // identical plate (measured on Switch·Focus: two hitpad·44×32). One pad per control: reuse it and let autoHit
+      // re-centre the same shape.
+      var existing = null;
+      try { existing = Array.from(this.host.children || []).find((c) => String(c.name || '') === nm); } catch (e) {}
+      if (existing) {
+        try { existing.resize(m, mh); } catch (e) {}
+        try { storage.absMount(this.host, existing, N(px), N(py)); } catch (e) {}
+        this._hit = existing;
+        return existing;
+      }
+      var pad = this.plate(B(px, py, m, mh), { name: nm, fill: null });
+      this._hit = pad;
+      return pad;
     },
     glyph: function (kind, box, o) { return CF.glyph(this, kind, box, o); },
     /** clip box: a board with clipContent=true crops what is mounted inside (half stars, avatars, cover media). */
@@ -928,6 +988,9 @@ return (function () {
     // §4.1: a solid tone surface carries white copy only at its **ink** step (white on the 6-level hue is 3.19–5.17:1
     // — success/warning/info fail AA). The hue stays for graphics, rings, bars and borders.
     primary: { bg: 'primaryInk', ink: 'onPrimary', onDark: 1 },
+    brand: { bg: 'primary', ink: '#FFFFFF', onDark: 1 },
+    secondary: { bg: 'surfaceAlt', ink: 'ink', line: 'border' },
+    ink: { bg: 'darkRaised', ink: '#FFFFFF', onDark: 1 },
     danger: { bg: 'errorInk', ink: 'onPrimary', onDark: 1 },
     success: { bg: 'successInk', ink: 'onPrimary', onDark: 1 },
     default: { bg: 'surface', ink: 'ink', line: 'border' },
@@ -1018,16 +1081,27 @@ return (function () {
     var round = o.shape === 'circle' || o.shape === 'round' || o.shape === 'pill';
     var rad = o.shape === 'square' ? 0 : CF.radius('control');
     var box = B(o.x || 0, o.y || 0, w, o.h || L.h);
+    // A secondary action is a LIGHT RAISED CHIP, not an outlined control: the source's `.tf-btn-2` has no border, a
+    // 4-layer chip shadow (inset -3 #E9E9E9, inset +1 #FFF, two small drops) and a radial top-light; its hover is a
+    // TEXT change to brand, not a grey wash. `outlined` remains the bordered form. Encoding that here (rather than
+    // leaving TONE.secondary's `line` to every factory) is what stops a 1px border + control stack being inferred
+    // from a generic "secondary" token — measured 2026-10-23 on the aigocy Button·Secondary cell.
+    var chip = type === 'secondary' && !o.outlined;
     // `shape` is a real axis in this kit (a source may draw every CTA as a pill), so it belongs in the name: without it a
     // pill and a radius-6 button of the same type/size/state would share one name and the size axis would lie.
     var shapeV = o.shape === 'pill' || o.shape === 'round' || o.shape === 'circle' ? 'Pill' : (o.shape === 'square' ? 'Square' : null);
-    var ctx = CF.build(CF.name('Button', { type: type, size: o.size, state: S, variant: shapeV, slot: slotName(o) }), box, { parent: o.parent });
-    ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : null, S, { onDark: tn.onDark });
-    if (tn.line) ctx._stroke(ctx.host, C(tn.line), 1, S === 'disabled' ? 0.4 : 1);
+    var ctx = CF.build(CF.name('Button', { type: type, size: o.size, state: S, variant: shapeV, slot: slotName(o) }), box, { parent: o.parent, radius: rad });
+    // A chip's state is carried by ink + elevation; a grey overlay on a #F5F5F5 plate is the harsh transition the
+    // eye reads as a disabled/active mismatch. Disabled keeps its container overlay (the control must recede).
+    var fillState = chip && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected') ? 'default' : S;
+    ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : null, fillState, { onDark: tn.onDark });
+    if (tn.line && !chip) ctx._stroke(ctx.host, C(tn.line), 1, S === 'disabled' ? 0.4 : 1);
     if (tn.dashed && tn.line) ctx.host.strokes = [Object.assign({}, ctx.host.strokes[0], { strokeStyle: 'dashed' })];
     if (type === 'text' || type === 'link' || type === 'ghost') { /* no border, fill only carries the state tint */ }
     if (o.elevated) ctx.host.shadows = CF.shadow(1);
     var ink = C(tn.ink, P.ink), al = stateAlpha(S);
+    // `.tf-btn-2:hover { color: var(--brand) }` — the source's hover lives in the label, so the label is what moves.
+    if (chip && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ink = C('primary');
     if (iconOnly) ctx.glyph(o.glyph || 'search', B(box.x, box.y, box.w, box.h), { color: ink, opacity: al, anchor: 'center' });
     else {
       if (o.lead && !o.loading) ctx.glyph(o.glyph || 'download', B(box.x + L.padX, box.y + (box.h - L.icon) / 2, L.icon, L.icon), { color: ink, opacity: al, anchor: 'left' });
@@ -1037,8 +1111,11 @@ return (function () {
       if (o.trail) ctx.glyph(o.glyphEnd || 'chevronDown', B(box.x + box.w - L.padX - L.icon, box.y + (box.h - L.icon) / 2, L.icon, L.icon), { color: ink, opacity: al, anchor: 'right' });
     }
     await ctx.settle(); ctx.place(); if (!o.noRefit) ctx.refit(L.padX);
+    CF.elevate(ctx.host, 'Button');
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
-    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: rad, color: o.ring ? C(o.ring) : C('primary') });
+    // A chip has no border to stand the halo off; a 2px offset reads as a detached outline with a gap between it and
+    // the pill (reported 2026-10-23). Bind the ring FLUSH to the chip's own edge; filled solid buttons keep the halo.
+    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: rad, offset: chip ? 0 : 2, color: o.ring ? C(o.ring) : C('primary') });
     if (S === 'selected' && !tn.bg) ctx.host.fills = CF.fills(C('primary'), 'selected', { tint: 1 });
     if (o.hit) ctx.hitPad(final, o.hit);
     return ctx.host;
@@ -1048,15 +1125,23 @@ return (function () {
   CF.iconButton = async function (o) {
     o = o || {};
     var sq = CF.iconSquare(o.size), ic = CF.iconInSquare(o.size), S = o.state || 'default';
-    var tn = TONE[o.tone] || TONE.ghost;
+    // The NAME comes from `type`; the paint must come from the same axis. A primary icon button is a GRAPHIC
+    // container (the source draws it in the brand hue with a white glyph), so `primary` resolves to the brand
+    // tone — not to `TONE.primary` (the ink step reserved for copy-bearing surfaces). Unknown types fall to ghost.
+    var toneKey = o.tone || o.type;
+    var tn = toneKey === 'primary' ? TONE.brand : (TONE[toneKey] || TONE.ghost);
     var box = B(o.x || 0, o.y || 0, o.w || sq, o.h || sq);
-    var ctx = CF.build(CF.name('IconButton', { type: o.type || 'ghost', size: o.size, state: S, slot: o.badge ? 'Badge' : (o.shape === 'circle' ? 'Circle' : null) }), box, { parent: o.parent });
+    // An icon button is a TILE by default (DESIGN.md §Shapes: small icon tiles take `sm`); only an explicit
+    // circle takes the control step. The corner is set at birth so a later role sweep has a value to preserve.
+    var icoR = o.shape === 'circle' ? 'control' : 'tile';
+    var ctx = CF.build(CF.name('IconButton', { type: o.type || 'ghost', size: o.size, state: S, slot: o.badge ? 'Badge' : (o.shape === 'circle' ? 'Circle' : null) }), box, { parent: o.parent, radius: icoR });
     ctx.host.fills = CF.fills(C(tn.bg), S, { onDark: tn.onDark });
-    if (o.outlined) ctx._stroke(ctx.host, C('border'), 1, S === 'disabled' ? 0.4 : 1);
+    if (o.outlined || tn.line) ctx._stroke(ctx.host, C(o.outlined ? 'border' : tn.line), 1, S === 'disabled' ? 0.4 : 1);
     ctx.glyph(o.glyph || 'dots', CF.iconBox(box), { color: C(o.tone === 'danger' ? 'error' : (tn.ink || 'muted')), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place();
+    CF.elevate(ctx.host, 'IconButton');
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
-    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: o.shape === 'circle' ? 'control' : L2r(o.size), color: C('primary') });
+    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: icoR, color: C('primary') });
     // The dot is pinned to the corner **inside** the square: a board clips its own export box, so a badge that
     // overhangs is cut in half the moment the control is exported or turned into a component.
     if (o.badge) CF.badge({ parent: ctx.host, x: final.x + final.w - 8, y: final.y, dot: true, tone: o.badgeTone || 'error' });
@@ -1132,6 +1217,7 @@ return (function () {
       ctx.text(label, B(box.x + (o.iconOnly ? 16 : 48), box.y, w - (o.iconOnly ? 32 : 64), d), { size: 14, color: C(tn.ink), weight: 600, opacity: stateAlpha(S) });
     } else ctx.glyph(o.glyph || 'plus', CF.iconBox(box), { color: C(tn.ink), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place(); ctx.refit(16);
+    CF.elevate(ctx.host, 'Fab');
     if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height), { radius: 'control' });
     return ctx.host;
   };
@@ -2143,6 +2229,7 @@ return (function () {
     else ctx.host.fills = [{ fillColor: C('surface'), fillOpacity: 1 }];
     if (S === 'hover' && tone === 'elevated') ctx.host.shadows = CF.shadow((o.elev || 1) + 1);
     if (S === 'hover' && tone !== 'elevated') ctx.host.fills = CF.fills(C('surface'), 'hover');
+    CF.elevate(ctx.host, 'Card');
     var y = box.y;
     if (o.cover) {
       // the outlined host carries its border on its own box, and a board paints children over that stroke: a flush cover
@@ -4409,6 +4496,36 @@ return (function () {
       m[fam].forEach(function (k) { if (typeof CF[k] !== 'function') out.push(fam + '.' + k); });
     });
     return out;
+  };
+  /** The REFERENCE inventory: what the source site actually shows, measured, not what this factory can draw.
+      On a recreation the agent MUST call this before building a component chapter, and the audit's `reference_drift`
+      rule (page 03) enforces it. The profile stamps the PageRoot (`nl:ref`) so it survives a plugin reload.
+        CF.setReference({ source:'https://…', actions:{ families:['Button','IconButton','Link'],
+          shapes:{ Button:['full'], IconButton:['tile','full'], Link:['none'] } } });
+      Families absent from the source are NOT drawn or registered — a factory existing is not a reason to invent UI. */
+  CF.setReference = function (o, root) {
+    storage.REF = o || null;
+    // The measured source SHAPES are also the design's radius ROLES: if the reference draws Button as a pill, then
+    // `control` is `full` at birth (not the generic kit's 3px step), and an IconButton explicitly pinned to `tile`
+    // keeps the tile step. Without this, every factory build went back to the fallback ladder on a fresh session and
+    // the role sweep had to repair corners after the fact (measured 2026-10-23: a probe button was born r0).
+    try {
+      var sh = (o && o.actions && o.actions.shapes) || {};
+      (sh.Button || []).forEach(function (role) {
+        if (role === 'full' || role === 'none' || role === 'tile') CF.ROLE.control = role;
+      });
+      if (sh.IconButton && sh.IconButton.length === 1 && /^(tile|full|none)$/.test(String(sh.IconButton[0]))) CF.ROLE.tile = sh.IconButton[0];
+    } catch (e) {}
+    try {
+      var pr = root || penpotUtils.findShape(function (s) { return /-PageRoot$/.test(String(s.name || '')); }, penpot.currentPage.root);
+      if (pr && pr.setPluginData) pr.setPluginData('nl:ref', JSON.stringify(o || {}));
+    } catch (e) {}
+    return storage.REF;
+  };
+  CF.reference = function (group) { var r = storage.REF; return r && r[group] ? r[group] : null; };
+  CF.referenceFamilies = function (group) {
+    var r = CF.reference(group);
+    return r && r.families ? r.families : (CF.map()[group] || []);
   };
 
   /*__CF_MORE__*/

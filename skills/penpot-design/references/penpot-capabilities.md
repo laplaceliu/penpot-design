@@ -470,6 +470,28 @@ The slot grammar (`img·*`, `media*`, `thumb*`, `photo`, `cover·*`, `avatar·*`
 `CF.isMediaSlot(name)` — which `MD.isSlot` and auditor rule 40 `placeholder_media` both call, so a plate cannot be a
 media slot for the gate and invisible to the engine.
 
+### 9.2 Elevation: multi-layer shadows, insets, sheen (measured 2026-10-23, `scripts/elevation_engine.js` → `storage.EL`)
+
+The question that opened this section was "can Penpot even do skeuomorphism?" The answer is **yes**, measured on a
+probe board that was exported and eyeballed: a 2-drop + 2-inner stack rendered its bottom lip and top highlight, and a
+radial-gradient sheen rendered on a dark pill. These are the facts the engine is built on.
+
+| # | Call | Measured |
+|---|---|---|
+| S1 | `shape.shadows = [ … ]` | Accepts a **mixed array**: `style: 'drop-shadow'` and `style: 'inner-shadow'` in one list, four layers round-trip and render. `spread` works; a hard lip uses `blur: 0`. |
+| S2 | shadow `color` | Must be the object `{color:'#RRGGBB', opacity:0..1}`. A string is **silently black** (the old 3D-shadow bug). |
+| S3 | `token.applyToShapes(shapes, ['shadow'])` | An `addToken({type:'shadow', value:[…]})` value is an **array** of `{offsetX, offsetY, blur, spread, color:'#RRGGBBAA', inset}`; applying it writes all layers and binds `tokens.shadow`. **One shape per call**: a 4-shape chip batch bound **0/4**, the same call per shape bound every time. |
+| S4 | a shadow token's raw value | The stored form uses string offsets (`"7.77"`) and an 8-digit hex (`"#0000000F"`); `resolvedValue` normalises to numbers + opacity. Both were accepted; match the file's existing form when replacing. |
+| S5 | gradient fill | `fillColorGradient` needs **normalised** coords (0..1) — `{type:'radial', startX:.28, startY:-.10, endX:.28, endY:-.10, width:.62, stops:[{color,opacity,offset}]}` — and the fill must carry **no `fillColor`**: mixing both throws `Value not valid … :fills`. A fill is solid **or** gradient. |
+| S6 | sheen as a sibling | Because of S5 a sheen is a **separate rectangle** above the surface and below the content. Insert it by index (`insertChild(surfaceIndex+1, …)`), not `appendChild` (which puts it over the copy). |
+| S7 | hover at runtime | Penpot's interactions support `mouse-enter` / `mouse-leave` (`addInteraction(trigger, action)`), but there is **no "switch variant" action** — an instance cannot change its variant on hover. Hover is therefore delivered as a **state variant / matrix cell** (design-time), not as a runtime prototype transition. Do not claim a clickable hover. |
+| S8 | a master child propagates | Adding a `sheen·` child to a **master** appeared on its existing screen **copies** (128×32 on both). Shadow/token writes do **not** reliably sync (the radius pass learned the same); `EL.bindStamped` still binds copies directly. |
+
+Two bugs this probe caught in the engine, both worth remembering: a `{w,h}` plain box read through a shape-only
+reader became `0×0`, so every sheen stayed at Penpot's **100×100** default (caught by `audit_layout`'s
+`crash_100x100`); and a batched shadow-token apply silently bound nothing. A gate that only counts shapes would have
+passed both.
+
 ## 10. API-surface facts that cost a probe each
 
 * **`penpot.currentPage` is a `Page`, and a `Page` has no `children`.** The shape tree starts at

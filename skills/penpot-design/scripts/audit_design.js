@@ -76,13 +76,14 @@ return (function () {
     caption_stale: '§4 · a `wash|hue|ink #RRGGBB` caption that does not match the paint of the swatch beside it — a token-bound plate follows the token while its label keeps the hex authored at build time, so a board built before a theme overlay documents values it no longer shows',
     empty_cell: '§4.3 · a `cell·slot·*` / `cell·recipe·*` container with zero children — the region plates an `after` pass draws are missing, which is what a timed-out build whose bare board was later mounted looks like; the block renders as an empty frame',
     no_type_styles: '§3.2 + design-tokens §5 · the ramp declares `typography` tokens and this board draws text, but `penpot.library.local.typographies` is EMPTY — the Assets → Typography panel lists style records, not token sets, so consumers have nothing to pick; seed them with `storage.TP.seed()`',
+    reference_drift: 'recreation reference inventory · on page 03, the ·Spec boards must be exactly the families the source shows, and each family may use only the corner roles measured from the source. A factory existing is not a reason to invent a family: the source Aigocy page has Button (99px pill), IconButton (tile 16 / circle 50%) and Link (text) — no ButtonGroup, SplitButton, Segmented or FAB. The profile is seeded through CF.setReference (stamped as nl:ref on the PageRoot, so it survives a storage wipe); a missing profile is REPORTED, not passed',
     not_projected: 'gate G16 · a Foundations / Color-in-use chapter page (FN.CHAPTER) whose boards were not PROJECTED from the token records: this board carries no durable `nl:fn` stamp, or the chapter is missing a kind it contractually requires, or `storage.FN` is not seeded so the gate cannot be read at all',
     cramped_gap: '§2 · two block-level (≥24) flow siblings separated by less than `LY.breath("inline")` — the whitespace that carries the hierarchy was simply omitted, so the blocks touch. Reads the same LY.BREATH table a builder writes',
     hierarchy_gap: '§2 2× rule · a composition-level container whose gap between groups is under 2× the largest gap inside those groups — related things are not closer than unrelated ones, so the page cannot be grouped by eye',
     text_cramped: '§2 + §3.2 · running copy whose `lineHeight` is below the leading its own ramp step declares (multi-line, or under 1.0), or two prose siblings closer than one line of the upper block — vertical rhythm is typography, not just layout',
     radius_off_ladder: '§5.1 + design-tokens §8 · a corner radius that is not one of the declared `borderRadius` token values: the token ladder is the ONLY source of a corner, so an orphan number cannot be retuned, themed or found again (measured 2026-10-21: a radius token writes all four corner props at once)',
     radius_unbound: '§5.1 + design-tokens §8 · a radius equal to a declared `borderRadius` token but with no `tokens.borderRadius*` binding — the corner was typed instead of taken from the set; run TK.bindBoard',
-    ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not its host control\'s corner: a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places. Rules 35/36 cannot see it — **both** values are on the ladder and bound. Repair with `TK.roleSweep`',
+    ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not the corner of the unit it outlines, or whose two margins disagree around a circular owner (an oval ring around an ellipse): a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places, and a 24×28 ring around a 20×20 radio is an oval that does not say what it focuses. Rules 35/36 cannot see the corner case — **both** values are on the ladder and bound — and the corner test cannot see an ellipse (no borderRadius). Repair with `TK.roleSweep` for corners, `TK.ringSweep` for ovals.',
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
@@ -95,6 +96,13 @@ return (function () {
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
+    shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
+    elevation_flat: '§5 + gate G18 · a shape stamped `nl:el=<recipe>` whose `shadows` has fewer layers than that recipe (a multi-layer stack collapsed to one, or a rebuild that dropped the insets), OR whose stamp names a different recipe than its NAME resolves to (a `Button·Secondary` still carrying `control` while its role is `chip`). The stamp is the durable contract; this rule compares it to the render and to the role. Repair with `EL.apply(shape, recipe)` / `EL.sweepPage`',
+    edge_missing: '§5 + gate G18 · a stamped recipe declares INNER layers (the dark bottom lip / white top highlight that make a card read as a physical object) but the shape paints only drop shadows. A drop shadow alone is the flat "everything is a card" look this rule exists to stop',
+    sheen_missing: '§5 + gate G18 · a stamped recipe declares a radial sheen but the host carries no `sheen·*` plate — the top-light that sells the material is absent. Repair with `EL.sheenFor(host, recipe)`',
+    hover_flat: '§5.2 + gate G18 · a component state board named `·Hover`/`·Pressed` whose family declares a hover/press recipe but carries ZERO shadows — hover was modelled as an 8% fill tint, not as the source\'s elevation lift (measured 2026-10-23: every Button/Card hover state in the file read 0 shadows while the source adds 4–6 drop layers). Repair with `EL.sweepPage`',
+    surface_missing: '§5 + gate G18 · a screen record declares `surface`/`elevation` for a section but the board has no `surface·<region>` plate — the section was assembled as bare text/frames with nothing to cast a shadow (measured 2026-10-23: 143 shapes, 0 shadows on `15 · Screens · content`). Mount it with `SC.surface` / `EL.surfacePass`',
+    label_off_axis: '§2.3 · a control\'s label is not on the control\'s own vertical axis: its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
     'align_missing', 'crash_100x100', 'degenerate_size', 'root_stray', 'text_centre_residue', 'loose_assembly', 'spec'];
@@ -168,7 +176,7 @@ return (function () {
   const STATE_ONLY_FAMS = ['Checkbox', 'Radio'];
   const PRIMARY_FAMS = /^(Button|IconButton|SplitButton|ButtonGroup|FAB)$/;
   // Deliberate-overflow / decoration layers — the same prefix set the factories use as their escape hatch.
-  const EXEMPT = /^(ring·|hitpad·|state·layer|scrim|shadow|glow|clip·|hairline|divider|guide|connector|underline|tick|shimmer|dot·|arrow|bubble|value·bubble|now-line|now·|resizer|resize-handle|grabber|handle|track|caret|ripple|mask|skeleton|bar·)/;
+  const EXEMPT = /^(ring·|hitpad·|state·layer|scrim|shadow|glow|clip·|sheen·|hairline|divider|guide|connector|underline|tick|shimmer|dot·|arrow|bubble|value·bubble|now-line|now·|resizer|resize-handle|grabber|handle|track|caret|ripple|mask|skeleton|bar·)/;
   // Audit annotations (LY.fold / LY.drawStart): meta copy about the layout, not design copy → judged by no type rule either.
   const ANNO = /^(fold·|region·)/;
   // The numbers rules 32/33/34 judge by, published for the repair engine (`storage.breathe`, fix_geometry.js) so the
@@ -388,6 +396,12 @@ return (function () {
     const out = { page: str(penpot.currentPage, 'name', 'single-board'), boards: 0, shapes: 0,
       counts: {}, findings: [], errors: [], sizes: {}, fonts: {}, tiers: {}, families: {}, skipped: {}, verdict: 'CLEAN' };
     out.ramp = rampSrc + ' · ' + RAMP.join(',');   // say which ramp a `off_ramp_size` verdict was measured against
+    // §5 elevation is measured against the LIVE record: the shadow tokens the set declares and the EL engine
+    // that owns the recipes. A file with no shadow tokens is judged by the old rules only (no false positives).
+    const HAS_EL = !!(storage.EL && storage.EL.seeded && typeof storage.EL.readStamp === 'function');
+    let SHADOW_TOKENS = 0;
+    try { const d3 = storage.TK && storage.TK.declared ? storage.TK.declared() : null; SHADOW_TOKENS = (d3 && d3.shadows ? d3.shadows.length : 0); } catch (e) {}
+    out.elevation = { engine: HAS_EL, shadowTokens: SHADOW_TOKENS };
 
     const add = (kind, s, where, detail) => {
       out.counts[kind] = (out.counts[kind] || 0) + 1;
@@ -487,7 +501,29 @@ return (function () {
           ? 'stroke ' + h + ' is token ' + e.surface + ' but carries no tokens.strokeColor'
           : 'stroke ' + h + ' names no colour token');
       }
-      if (!isTxt || tk.typography) return;
+      if (!isTxt) return;
+      // A BOUND token is not proof the run matches it: `TK.bindBoard` keys on size+weight, so a Nunito 16/600 run
+      // was bound to the Urbanist `type.label-lg` and passed every type rule (measured 2026-10-23 on all Button
+      // labels). Judge the binding against the token's own family/size/weight/leading, not just its presence.
+      if (tk.typography) {
+        const e = TOK.ti && TOK.ti.ramp ? TOK.ti.ramp.filter((r) => r.name === tk.typography)[0] : null;
+        if (e) {
+          const f = String(str(s, 'fontFamily', '')).toLowerCase();
+          // `fontSize`/`fontWeight` read back as STRINGS on a text shape; `num()` only accepts finite numbers, so it
+          // reported 0 for every bound run and this new check indicted the whole type ramp (measured immediately).
+          const fs = parseFloat(str(s, 'fontSize', '0')) || 0, fw = parseFloat(str(s, 'fontWeight', '0')) || 0;
+          const lhRaw = parseFloat(str(s, 'lineHeight', '0')) || 0;
+          const lhPx = lhRaw > 0 && lhRaw < 4 ? lhRaw * fs : lhRaw;
+          const wantPx = e.leading && e.size ? e.leading * e.size : 0;
+          const bad = [];
+          if (e.family && f && e.family !== f) bad.push('family ' + str(s, 'fontFamily', '?') + ' ≠ ' + e.family);
+          if (e.size && Math.abs(fs - e.size) > 0.6) bad.push('size ' + N(fs) + ' ≠ ' + N(e.size));
+          if (e.weight && Math.abs(fw - e.weight) > 1) bad.push('weight ' + N(fw) + ' ≠ ' + N(e.weight));
+          if (wantPx && lhPx && Math.abs(lhPx - wantPx) > 1.5) bad.push('leading ' + N(lhPx) + 'px ≠ ' + N(wantPx) + 'px');
+          if (bad.length) add('type_off_ramp', s, st.top, '"' + tk.typography + '" is bound but the run does not match it: ' + bad.join(' · ') + ' — the binding is a name, not the type');
+        }
+        return;
+      }
       const k = storage.TK.shapeTypeKey(s), pretty = k.replace(/\|/g, ' ');
       if (TOK.ti.exact[k]) add('type_unbound', s, st.top, pretty + ' is a declared step carried with no tokens.typography binding');
       else {
@@ -850,6 +886,43 @@ return (function () {
       if (SCREEN && !isCopy(s) && isMediaSlot(nm) && !arr(s, 'fills').some((f) => f && f.fillImage)) {
         add('placeholder_media', s, st.top, '"' + nm + '" claims a raster slot but no fill carries `fillImage` — import the source asset with MD.place({ parent, slot, path }) (scripts/media_engine.js); the icon-glyph plate this replaces is a placeholder, not the user\'s image');
       }
+      // rules 50–54 · ELEVATION (gate G18). Physics is not decoration: a shadow is a token-bound multi-layer
+      // stack, a card carries its inset pair, a declared sheen is drawn, and hover is a LIFT. Each of these
+      // was absent from the file while every other rule read CLEAN (measured 2026-10-23).
+      try {
+        const shs = arr(s, 'shadows');
+        let tokMap = {}; try { tokMap = s.tokens || {}; } catch (e) {}
+        if (SHADOW_TOKENS > 0 && shs.length && !tokMap.shadow) {
+          add('shadow_unbound', s, st.top, '"' + nm.slice(0, 30) + '" paints ' + shs.length + ' shadow layer(s) with no `tokens.shadow` binding — the stack was typed, not taken from the elevation record. Repair: EL.sweepPage({ page, apply: true })');
+        }
+        if (HAS_EL) {
+          const stamp = storage.EL.readStamp(s);
+          if (stamp) {
+            const rec = storage.EL.recipe(stamp);
+            if (rec) {
+              if (shs.length < rec.layers.length) add('elevation_flat', s, st.top, 'stamp `nl:el=' + stamp + '` wants ' + rec.layers.length + ' layer(s), the shape paints ' + shs.length + ' — the stack collapsed. Repair: EL.apply(shape, \'' + stamp + '\')');
+              if (rec.inner.length && !shs.some((x) => x.style === 'inner-shadow')) add('edge_missing', s, st.top, 'recipe "' + stamp + '" declares ' + rec.inner.length + ' INNER layer(s) (the dark lip / top highlight) but the shape paints drop shadows only — the object loses its material');
+              // a component COPY cannot be authored (adding a child to it is not a legal write); its master carries
+              // the sheen. The copy still paints the drop+inset stack, which is what the eye reads as material.
+              if (rec.sheen && !isCopy(s) && !(kidsOf(s) || []).some((k) => /^sheen·/.test(nameOf(k)))) add('sheen_missing', s, st.top, 'recipe "' + stamp + '" declares a radial sheen and the host has no `sheen·*` plate — the top-light that sells the material is absent. Repair: EL.sheenFor(host, \'' + stamp + '\')');
+            }
+          }
+          if (typeOf(s) === 'board' && /·(Hover|Pressed)(·|$)/.test(nm) && !shs.length) {
+            const role = storage.EL.roleFor ? storage.EL.roleFor(nm, nm.split('·')[0]) : null;
+            if (role) add('hover_flat', s, st.top, '"' + nm + '" is a ' + (String(nm).indexOf('·Pressed') >= 0 ? 'Pressed' : 'Hover') + ' state with 0 shadows while its family declares "' + role + '" — the state was modelled as a fill tint, not the source\'s elevation ' + (String(nm).indexOf('·Pressed') >= 0 ? 'press-down' : 'lift') + '. Repair: EL.sweepPage');
+          }
+          // The stamp must agree with the NAME's current role. A type-specific material (secondary → chip) introduced
+          // after a cell was built left the stale `control` stamp and its 9-layer dark stack in place, and the layer
+          // count matched its own stamp, so every G18 rule read CLEAN (measured 2026-10-23). Judge only CONTROL families:
+          // a chrome shape named `nav·settings` is an icon button that legitimately carries `control`, and the `Nav`
+          // surface role is not the role of that 48×48 control (measured 2026-10-23 on page 15).
+          if (storage.EL.roleFor && /^(Button|IconButton|Fab|Chip|Badge)·/.test(nm)) {
+            const want = storage.EL.roleFor(nm, String(nm).split('·')[0]);
+            const have = storage.EL.readStamp(s);
+            if (want && have && want !== have) add('elevation_flat', s, st.top, '"' + nm.slice(0, 40) + '" is stamped "' + have + '" but its family/type resolves to "' + want + '" — the material was not re-derived after the role changed. Repair: EL.sweepPage');
+          }
+        }
+      } catch (e) { err('elevation', e); }
       // rule 49 · list_gap_split — repeated labels in one host share ONE rhythm. A wider gap is legal only when
       // something is DRAWN in it (a group label, a boundary line); an empty wider gap is what the owner reads as
       // "the padding is uneven" once rule 43 has removed the line that used to justify it.
@@ -1011,13 +1084,16 @@ return (function () {
                 const v = Math.abs(cx - (kb.x + kb.w / 2)) + Math.abs(cy - (kb.y + kb.h / 2));
                 const ox = (rb.w - kb.w) / 2, oy = (rb.h - kb.h) / 2;
                 const ar = kb.w * kb.h;
-                if (v <= 3 && ox >= -0.01 && oy >= -0.01 && ox <= 12 && oy <= 12 && (v < bestV - 0.5 || (Math.abs(v - bestV) <= 0.5 && ar < bestA))) { best = k; bestV = v; bestA = ar; }
+                // A ring whose centre is 4–6px off a same-size plate is an OFF-CENTRE ring, not a ring around some
+                // other band. The old v≤3 owner match missed it and the fallback read "no plate here", so a ring
+                // 4px left of its button passed CLEAN (measured 2026-10-23). Own it within 6px, then judge centre.
+                if (v <= 6 && ox >= -0.01 && oy >= -0.01 && ox <= 12 && oy <= 12 && (v < bestV - 0.5 || (Math.abs(v - bestV) <= 0.5 && ar < bestA))) { best = k; bestV = v; bestA = ar; }
               }
             }
             if (d >= 4) return;
             (kidsOf(k) || []).forEach(function (c) { scan(c, d + 1); });
           })(control, 0);
-          return { host: best, concentric: !!best, floating: false, contained: contained, dist: best ? bestV : null };
+          return { host: best, concentric: !!best && bestV <= 1, offBy: best ? bestV : null, floating: false, contained: contained, dist: best ? bestV : null };
         })();
         const rh = host.host;
         // rule 44 · focus_invisible — §1.3: a `reserved` family's boundary is authored at alpha 0 (the slot a runtime
@@ -1056,7 +1132,23 @@ return (function () {
               '" traces no plate and is not contained by it (nearest ' + (host.dist === null || host.dist === Infinity ? 'none' : N(host.dist) + 'px off') +
               ') — repair with TK.ringSweep');
           }
+        } else if (host.offBy !== null && host.offBy > 1) {
+          // 37 · off-centre — a ring is DERIVED from its owner: same centre is the whole contract. A ring refit that
+          // read a stale host box lands 2–6px off, which the eye sees as "the border is not around the button".
+          add('ring_off_host', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' is ' + N(host.offBy) +
+            'px off the centre of "' + nameOf(rh).slice(0, 30) + '" — a ring takes its host box exactly (repair: TK.ringSweep)');
         } else if (host.concentric) {
+          // A circle gets a CIRCLE. The corner test below cannot see an ellipse owner (it has no borderRadius), so a
+          // 24×28 ring around a 20×20 Radio passed every gate while reading as "what is this focusing?". Margins on the
+          // two axes must agree within 1px; repair is TK.ringSweep (it refits to the smaller measured margin).
+          if (typeOf(rh) === 'ellipse') {
+            const ob = box(rh), sb = box(s);
+            const mx = (sb.w - ob.w) / 2, my = (sb.h - ob.h) / 2;
+            if (Math.abs(mx - my) > 1) {
+              add('ring_off_host', s, st.top, 'ring ' + N(sb.w) + '×' + N(sb.h) + ' is oval around the circular unit "' + nameOf(rh).slice(0, 30) +
+                '" (' + N(ob.w) + '×' + N(ob.h) + '), margins ' + N(mx) + '/' + N(my) + ' — repair: TK.ringSweep');
+            }
+          }
           // 37 binds a ring to its control BOARD's corner. A ring hugging a nested plate (an addon's `field`, one crumb
           // text run, one OTP digit) is §5.1's open role question, not this rule's — judging it would rewrite 100+ outlines in one sweep.
           if (typeOf(rh) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nameOf(rh))) {
@@ -1085,6 +1177,24 @@ return (function () {
             const d = Math.abs((cb.y + cb.h / 2) - (nb.y + nb.h / 2));
             if (d > 1) add('row_axis_off', s, st.top, 'connector centre ' + N(cb.y + cb.h / 2) + ' is ' + N(d) +
               'px off the "' + nameOf(big).slice(0, 20) + '" centre ' + N(nb.y + nb.h / 2) + ' — a row has one axis (§2.3)');
+          }
+        }
+      }
+      // rule 57 · label_off_axis — a control's label belongs on the control's own axis. A unitless leading read as
+      // pixels centres the text box on a 1.25px band instead of a 20px one, which lands every label ~9px low while the
+      // host, padding and typography all read correct (measured 2026-10-23 on all 21 Button masters). Only a label that
+      // is clearly MEANT to be centred (inside the host band, within one line of its centre) is judged.
+      if (typeOf(s) === 'text' && par && !isAnno(s)) {
+        let owner = par, steps = 0;
+        while (owner && owner !== top && steps < 3 && !(typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner)))) {
+          owner = owner.parent || null; steps++;
+        }
+        if (owner && owner !== top && typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner))) {
+          const ob = box(owner), tb = box(s), fs = num(s, 'fontSize', 0);
+          const dy = (tb.y + tb.h / 2) - (ob.y + ob.h / 2);
+          if (Math.abs(dy) > 2 && Math.abs(dy) <= Math.max(12, fs) && tb.y >= ob.y - 1 && tb.y + tb.h <= ob.y + ob.h + 1) {
+            add('label_off_axis', s, st.top, 'label centre is ' + N(Math.abs(dy)) + 'px ' + (dy > 0 ? 'below' : 'above') +
+              ' the axis of "' + nameOf(owner).slice(0, 34) + '" — centre it on the final host box (resolved leading = ratio × fontSize)');
           }
         }
       }
@@ -1392,6 +1502,10 @@ return (function () {
       // a 5-state TableHeader spec from a table that is only ever drawn once, in place, inside a real Table host.
       const only = opts.families && opts.families.length ? {} : null;
       if (only) opts.families.forEach((f) => { only[f] = 1; });
+      // The source profile pins a family's variant set. A recreation must not be forced to invent a variant the
+      // reference never shows (Aigocy buttons have no icon slot; its nav links are default+underline only).
+      let REF = null;
+      try { REF = (storage.CF && storage.CF.reference) ? storage.CF.reference('actions') : (storage.REF && storage.REF.actions); } catch (e) {}
       Object.keys(out.families).forEach((k) => {
         const F = out.families[k], cls = CLASS[k], need = SETS[cls];
         const where = { name: Object.keys(F.boards)[0] || k };
@@ -1405,10 +1519,14 @@ return (function () {
         }
         if (cls !== 'display' && STATE_ONLY_FAMS.indexOf(k) < 0) {
           const variants = Object.keys(F.variants).length, sizes = Object.keys(F.sizes).length;
+          const refFam = REF && Array.isArray(REF.families) && REF.families.some((f) => String(f).toLowerCase() === String(k).toLowerCase());
+          const refV = refFam && REF.variants ? (REF.variants[k] || REF.variants[Object.keys(REF.variants).find((x) => x.toLowerCase() === String(k).toLowerCase())]) : null;
+          const minV = refV && refV.min !== undefined ? Number(refV.min) : CFG.variantsMin;
+          const needIcon = refV ? refV.iconSlot !== false : true;
           const sparse = [];
-          if (variants < CFG.variantsMin) sparse.push(variants + ' variant(s) < ' + CFG.variantsMin);
+          if (variants < minV) sparse.push(variants + ' variant(s) < ' + minV);
           if (F.sizesAny && sizes < CFG.sizesMin) sparse.push(sizes + ' size(s) < ' + CFG.sizesMin);
-          if (ICON_FAMS.indexOf(k) >= 0 && variants >= CFG.variantsMin && !F.icons.lead && !F.icons.trail) sparse.push('no icon slot variant');
+          if (needIcon && ICON_FAMS.indexOf(k) >= 0 && variants >= minV && !F.icons.lead && !F.icons.trail) sparse.push('no icon slot variant');
           if (sparse.length) add('variant_sparse', null, where, k + ': ' + sparse.join(', '));
         }
         if (cls !== 'display' && F.focus > 0 && F.rings === 0 && F.thickBorder === 0) {
@@ -1478,6 +1596,98 @@ return (function () {
         add('no_source_record', null, top, out.page + ' is a Screens page and `storage.SC` is not seeded — G17 cannot be verified, so it cannot be claimed. Seed scripts/screen_engine.js in the G1 order (engines.md §"Seeding without pasting")');
       }
     } catch (e) { err('screenScope', e); }
+
+    // ---- rule 55 (page scope) · surface_missing (gate G18) — a recorded surface/elevation that never became a plate.
+    // Reads the durable `nl:rec` digest, not session memory, so a screen built in another session is still judged.
+    try {
+      if (SCREEN && storage.SC && storage.NL) {
+        (storage.SC.scope ? storage.SC.scope() : []).forEach((b) => {
+          const st = storage.NL.readStamp && storage.NL.readStamp(b);
+          if (!st || !st.sc) return;
+          let d = null;
+          try { d = JSON.parse(b.getPluginData('nl:rec') || 'null'); } catch (e) { d = null; }
+          if (!d || !d.sections) return;
+          const names = new Set();
+          (function walkNames(s) { names.add(nameOf(s)); (kidsOf(s) || []).forEach(walkNames); })(b);
+          (d.sections || []).forEach((sec) => {
+            if (!sec || (!sec.surface && !sec.elevation)) return;
+            const plate = 'surface·' + sec.region;
+            if (!names.has(plate)) {
+              add('surface_missing', b, top, 'record section "' + sec.region + '" declares surface=' + (sec.surface || '—') + ' / elevation=' + (sec.elevation || '—') + ' but the board has no `' + plate + '` plate — the section is bare, so it has nothing to cast a shadow. Mount it with SC.surface / EL.surfacePass');
+            }
+          });
+        });
+      }
+    } catch (e) { err('surfaceScope', e); }
+
+    // ---- rule 56 · reference_drift — a recreation's Actions page is the SOURCE's action inventory, not the factory's
+    // family list. A family the source never shows is not drawn; a family's corner roles are pinned by the measured
+    // source (Aigocy: Button=pill, IconButton=tile/circle, Link=none). The profile is durable on the PageRoot (`nl:ref`).
+    try {
+      const pname = String(out.page || '');
+      if (/^03(?:\.| ·)/.test(pname) && /-PageRoot$/.test(nameOf(top))) {
+        let ref = null;
+        try { ref = (storage.CF && storage.CF.reference) ? storage.CF.reference('actions') : (storage.REF && storage.REF.actions); } catch (e) {}
+        if (!ref) { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; if (raw) { const d = JSON.parse(raw); ref = d && d.actions; } } catch (e) {} }
+        if (!ref || !ref.families || !ref.families.length) {
+          add('reference_drift', null, top, 'no reference action profile on page 03 — seed CF.setReference({actions:{families,shapes}}) from DESIGN.md before building the Actions chapter; a factory list is not a reference inventory');
+        } else {
+          const want = ref.families.map((f) => String(f).toLowerCase());
+          const shapes = {};
+          Object.keys(ref.shapes || {}).forEach((k) => { shapes[String(k).toLowerCase()] = ref.shapes[k]; });
+          const specs = (kidsOf(top) || []).filter((c) => typeOf(c) === 'board' && /^[A-Za-z][A-Za-z0-9]*·Spec(?:·|$)/.test(nameOf(c)));
+          const seen = {};
+          specs.forEach((b) => {
+            const fam = String(nameOf(b)).split('·')[0], key = fam.toLowerCase();
+            seen[key] = 1;
+            if (want.indexOf(key) < 0) add('reference_drift', b, top, 'Actions spec "' + nameOf(b) + '" belongs to ' + fam + ', which the reference inventory does not contain (' + ref.families.join(', ') + ') — do not invent a family the source never shows');
+            const allowed = shapes[key];
+            if (allowed && allowed.length) {
+              const vals = allowed.map((role) => { try { return (storage.CF && storage.CF.radius) ? storage.CF.radius(role) : ({ none: 0, tile: 12, full: 9999 }[role]); } catch (e) { return null; } });
+              (function walk(k) {
+                const nm = nameOf(k);
+                if (k !== b && typeOf(k) === 'board' && new RegExp('^' + fam + '·').test(nm)) {
+                  const cs = cornersOf(k), v = cs ? Math.max.apply(null, cs) : null;
+                  if (v !== null && vals.indexOf(v) < 0) add('reference_drift', k, top, nm.slice(0, 44) + ' uses r' + N(v) + '; the reference pins ' + fam + ' to ' + allowed.join('/') + ' — use the measured shape role, not a new radius');
+                }
+                (kidsOf(k) || []).forEach(walk);
+              })(b);
+            }
+          });
+          ref.families.forEach((f) => { if (!seen[String(f).toLowerCase()]) add('reference_drift', null, top, 'reference action family ' + f + ' has no ·Spec board on page 03'); });
+          // ANATOMY — the family list is only the first half of the source contract. A family that IS in the inventory
+          // can still be drawn with the wrong material: the Aigocy secondary action is a borderless light chip, but the
+          // generic "secondary" tone gave it a 1px border, a `control` stack and a detached halo. These facts live in the
+          // profile until the factory can read them; the gate checks the render against them, so a rebuild cannot drift.
+          const anat = ref.anatomy || {};
+          Object.keys(anat).forEach(function (head) {
+            const rule = anat[head] || {};
+            (function walkAnat(k) {
+              const kn = nameOf(k);
+              if (typeOf(k) === 'board' && kn.indexOf(head) === 0 && !/·Spec(·|$)/.test(kn)) {
+                if (rule.stroke === false && arr(k, 'strokes').length) {
+                  const sw = num(arr(k, 'strokes')[0], 'strokeWidth', 1);
+                  add('reference_drift', k, top, kn.slice(0, 44) + ' carries a ' + N(sw) + 'px stroke; the reference ' + head + ' is borderless — its edge is the chip inset, not a line');
+                }
+                if (rule.elevation && storage.EL && storage.EL.readStamp) {
+                  const stp = storage.EL.readStamp(k);
+                  if (stp && String(stp).indexOf(rule.elevation) !== 0) add('reference_drift', k, top, kn.slice(0, 44) + ' is stamped `' + stp + '`, the reference material is `' + rule.elevation + '` (repair: EL.sweepPage)');
+                }
+                if (rule.focusRing === 'flush') {
+                  const ring = (kidsOf(k) || []).filter((c) => /^ring·/.test(nameOf(c)))[0];
+                  if (ring) {
+                    const rb = box(ring), kb = box(k);
+                    const gap = Math.max(Math.abs(rb.x - kb.x), Math.abs(rb.y - kb.y), Math.abs(rb.w - kb.w), Math.abs(rb.h - kb.h));
+                    if (gap > 1) add('reference_drift', k, top, kn.slice(0, 44) + ' focus ring is ' + N(gap) + 'px off the chip edge; the reference focus is flush (no gap between outline and pill)');
+                  }
+                }
+              }
+              (kidsOf(k) || []).forEach(walkAnat);
+            })(top);
+          });
+        }
+      }
+    } catch (e) { err('reference', e); }
 
     const fails = Object.keys(out.counts).filter((key) => key.charAt(0) !== '_' && RULES[key]);
     out.verdict = fails.length ? 'NEEDS_REPAIR' : 'CLEAN';

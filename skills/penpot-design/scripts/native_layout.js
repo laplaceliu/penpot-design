@@ -614,7 +614,12 @@ return (function () {
         if (!lc) { push('no_layoutChild', b.name + ' › ' + c.name, 'parent has no flex/grid (R2)'); return; }
         const cm = NL._meta(c) || {};
         if (lc.absolute) {
-          if (!drawingHost && (o.strict || !cm.declaredAbsolute)) push('absolute_child', b.name + ' › ' + c.name, 'pinned inside a flow board');
+          // Derived layers (an elevation surface, its sheen, a media crop mask) are BY CONSTRUCTION absolute:
+          // they must not consume a flow slot. The note registry is session-memory, so the name is the durable
+          // declaration — same contract as `CF.keepClip` for `clip·` (measured 2026-10-23: 11 surface plates +
+          // 3 media masks were reported as undeclared on `15 · Screens`).
+          const derived = /^(surface·|sheen·|clip·)/.test(String(c.name || ''));
+          if (!derived && !drawingHost && (o.strict || !cm.declaredAbsolute)) push('absolute_child', b.name + ' › ' + c.name, 'pinned inside a flow board');
           else declAbs++;
           if (c.children && c.children.length) walk(c, d + 1);
           return;

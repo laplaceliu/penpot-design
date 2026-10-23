@@ -55,7 +55,7 @@ Three consequences that make the contract checkable instead of aspirational:
 | **L0** | `00 · Cover` | 1 identity board (name, version+date, style-keyword chips, the 6 tone ramps as wash/hue/ink triples, the 18-page table of contents) | default |
 | | `01 · Foundations` | 8 boards — **one `01.MM` page each, each projected by `storage.FN` and carrying the durable `nl:fn=<kind>` stamp (gate G16; `designCoverage()` judges the chapter across pages, engines.md §7)**: `Palette` (every declared colour token, dual polarity when a dark scheme exists) · `Type ramp` (one line per **`TK.declared().types`** step — `storage.T.fontRamp` only when the system overrides it, else design-guide §3.2 `[11,12,13,14,16,20,24,32,40,56,64]` — each with its role) · `Spacing` (`LY.SPACE` bars) · `Grid` (12/8/4 diagrams) · `Radius` · `Elevation` · `Icons` (`CF.glyphKinds` on `CF.iconSquare` pitches; the one **declared exemption** `FN.EXEMPT['01']`, it draws a catalog) · `Strokes & dividers`. **No board here takes a height argument**: the value comes from the hug sum | default |
 | | `02 · Color in use` | 5 boards: `Semantic roles` (tone → wash / hue / **ink**, the triples derived from token *names*, design-guide §4) · `State layers` (the `CF.STATE` alphas drawn on one base) · `Contrast matrix` (every text/background pair the kit can produce, WCAG ratio + verdict **computed** from the palette) · `Light vs dark` (scheme boards only, §2.2) · `Data colors` (categorical ramp). All but `Light vs dark` are `FN` projections | default |
-| **L1** | `03 · Actions` | one `Family·Spec` per `CF.map().actions` (button, iconButton, buttonGroup, splitButton, fab, link, segmented) | default |
+| **L1** | `03 · Actions` | on a recreation, one `Family·Spec` per **reference action family** (call `CF.setReference` from DESIGN.md; a family the source never shows is not drawn or registered — e.g. Aigocy has Button, IconButton, Link only). A generic system may use all `CF.map().actions`. | default |
 | | `04 · Text fields` | `CF.map().forms` ∩ fields: field, fieldBox, input, textarea, searchField, passwordField, maskedInput, otpInput, numberField, upload, colorPicker | default |
 | | `05 · Selection & pickers` | the rest of `CF.map().forms`: select, combobox, multiSelect, datePicker, timePicker, switch, checkbox, radio, slider, rating, transfer, tree — plus the shared `OptionList` composite they mount (judged inside its own board, §4.1) | default |
 | | `06 · Data & lists` | tableHeader, tableRow, tableState, listItem, descriptions, timeline, accordion, carousel, miniCalendar | default |
@@ -307,6 +307,12 @@ This is where amateur output is most visible, so the rules are explicit:
    auditor now indicts it (`not_assembled`, rule 39), along with a placeholder plate (`placeholder_media`, 40) and a screen
    with no source record (`no_source_record`, 41). `13 · Component index` and the `03–09` `·Spec` boards keep drawing: that
    drawing is what gets registered. Rules 39–41 are scoped by **page name** (`14–16 · Screens`), so no other chapter is judged by them.
+4b. **Every section that the source shows as a card/nav/panel declares its material in the record** — `surface` (a live colour
+   token), `elevation` (an `EL` recipe), `radius` — and `SC.build` mounts a `surface·<region>` plate under the content
+   (`SC.surface` → `EL.surface`), token-filled, radius-bound, with a multi-layer drop + inset stack and a `sheen·` plate when
+   the recipe declares one. A region with copy but no plate has nothing to cast a shadow: measured 2026-10-23,
+   `15 · Screens · content` shipped 143 shapes with **0 shadows** because no section ever declared a surface. Rule 55
+   `surface_missing` reads the durable `nl:rec` digest and fails the page; `EL.audit()` must read `unbound:0, flat:0`.
 5. `CF.tier` is set per screen (§2.1) and the board is audited with the matching `{ tier }`.
 6. **A screen board lives INSIDE `NN-PageRoot`** (`SC.pageRoot()` + `SC.nextSlot()`). `designPage()` walks from the page head,
    so a screen at page root is invisible to the design gate while `audit_layout` indicts it as `root_stray` — measured

@@ -286,3 +286,23 @@ so coverage and the lint can see them.
 The layout-approach history (A/B/C) and its measured status — B is fixed and now the default, C stays for spec/art — is
 in api-pitfalls.md §10; the absolute engines are `scripts/seed_storage.js` + `scripts/fix_layout.js`, the flow engine is
 `scripts/native_layout.js`, and the color/prototype channels are `scripts/palette_engine.js` / `scripts/prototype_engine.js`.
+
+## Elevation in the build loop (gate G18, measured 2026-10-23)
+
+A physical design is not finished when the copy lands. The order that works, per page:
+
+1. `EL.seed({set, recipes, roles})` — from DESIGN.md's `elevation:` block. Read `tokens[].ok` for every recipe; a
+   `shadow.<recipe>` token with fewer layers than its recipe is a seed that silently kept the old value.
+2. Build the page as usual. On screens, sections that the source shows as cards declare `surface`/`elevation`/`radius`
+   in the `SC.record`; `SC.build` mounts `surface·<region>` before the copy. For an existing page, `EL.surfacePass`,
+   then **`await TK.bindBoard(board)` + `EL.bindStamped(root)`** — resizing an existing plate can drop its fill/radius binding.
+3. `await EL.bindStamped(root)` — one shape per `applyToShapes` call. A **batch** shadow-token apply bound 0/4 chips
+   while the same call per shape bound every one; the 900 ms settle + verify + retry is the commit.
+4. `EL.audit()` must read `unbound:0, flat:0`; `designPage({})` must show no `shadow_unbound`/`elevation_flat`/
+   `edge_missing`/`sheen_missing`/`hover_flat`/`surface_missing`.
+5. Export a **card**, a **nav/control**, and a **hover cell**. The export is the only proof the inset lip and top
+   highlight are actually painted — a readback of `shadows.length` says nothing about what the renderer did.
+
+Repairs: `EL.sweepPage({page, apply:true})` for a page built before the channel existed; `EL.surfacePass` for missing
+plates; `EL.apply` for one shape. Do not hand-write `shape.shadows = […]` — the stack must come from the recipe, and a
+regex audit (`shadow_unbound`) will indict it.
