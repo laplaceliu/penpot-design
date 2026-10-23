@@ -60,7 +60,7 @@ return (function () {
   const _display = penpot.fonts.findByName((T && T.displayFont) || 'Anton');
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
   /** The FAMILY the token ramp declares, for a (size, weight) pair. A JS fallback family is only legal when the file
-      has no ramp at all: measured 2026-10-23 on aigocy, every factory label was born Nunito while the file declared
+      has no ramp at all: measured 2026-10-23 on the reference, every factory label was born Nunito while the file declared
       Urbanist, because `T.bodyFont` was never set and `mkText` trusted the fallback — then `TK.bindBoard` still bound
       `type.label-lg` by size/weight, so the wrong family passed the type gate. The token set is the single source of
       the family, exactly as it is for colour. */

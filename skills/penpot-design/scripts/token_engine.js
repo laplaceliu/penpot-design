@@ -934,7 +934,7 @@ return (function () {
   // belongs to the master (`isComponentCopyInstance()`); repairing the master is what propagates to the copies.
   TK.CONTROL_FAMS = { button: 1, iconbutton: 1, splitbutton: 1, fab: 1, chip: 1, badge: 1, tag: 1 };
   // A family's corner is not always the control pill: an icon button is a TILE in systems whose DESIGN.md says so
-  // (Aigocy §Shapes: small icon tiles take `sm`; only an explicit circle uses the control step). The sweep below reads
+  // (the reference §Shapes: small icon tiles take `sm`; only an explicit circle uses the control step). The sweep below reads
   // this map, so a family can carry its own legal corner and a later pass cannot silently re-pill it.
   TK.ROLE_BY_FAM = { iconbutton: 'tile' };
   // The second half of the same contract: `CF.ROLE.ring = 'host'` — a ring is a derived outline, so its corner is the

@@ -657,10 +657,10 @@ return (function () {
     };
   };
 
-  // Aigocy one-page AI-agency landing, measured at 1440 on the live source (2026-10-23). The band heights are the
-  // source's own document flow, so a band that merely contains another region is not a region here; the screen record
-  // fills these 17 leaves. Total 17,665 = the source's body scrollHeight at 1440.
-  RECIPES.aigocyLanding = function (o) {
+  // a one-page editorial landing recipe measured at 1440 (example band flow, no brand). The band heights are the
+  // reference's own document flow, so a band that merely contains another region is not a region here; the screen record
+  // fills these 17 leaves. Total 17,665 at 1440. A project may pass its own bandsSpec.
+  RECIPES.editorialLanding = function (o) {
     o = o || {};
     var w = o.w || 1440;
     var bandsSpec = [
@@ -675,7 +675,7 @@ return (function () {
     var fl = LY.flow(R(0, 0, w, totalH), { bands: bandsSpec });
     return { frame: { w: w, h: totalH }, bands: fl.bands, order: fl.order, totalH: totalH,
              inner: LY.container(R(0, 0, w, totalH), { margin: 60, maxW: 1320 }),
-             notes: 'Aigocy landing: 17 bands at 1440 (900/1096/168/1068/3836/680/1195/1192/800/1112/692/772/756/1033/844/800/721); content column 1320 (x=60), raised plates inset 16 (1408 wide, r40); ink bands full-bleed.' };
+             notes: 'editorial landing example: 17 bands at 1440, one measured document flow (900/1096/168/1068/3836/680/1195/1192/800/1112/692/772/756/1033/844/800/721). A project passes its OWN `bandsSpec` — these heights are an example, not a rule; content column 1320 at margin 60; ink bands full-bleed.' };
   };
 
   // ---------------------------------------------------------------- one-page portfolio recreation recipes
@@ -1148,7 +1148,7 @@ return (function () {
     heroCenter:      { tiers: ['web', 'pad', 'mobile'] },
     heroSplit:       { tiers: ['web', 'pad'],        mobile: 'heroCenter' },
     landing:         { tiers: ['web', 'pad'],        mobile: 'heroCenter' },
-    aigocyLanding:   { tiers: ['web'],               pad: null, mobile: null },
+    editorialLanding:   { tiers: ['web'],               pad: null, mobile: null },
     blogArticle:     { tiers: ['web', 'pad', 'mobile'] },
     docsLayout:      { tiers: ['web', 'pad'],        mobile: 'blogArticle' },
     chat:            { tiers: ['web', 'pad'],        mobile: 'mobileListDetail' },

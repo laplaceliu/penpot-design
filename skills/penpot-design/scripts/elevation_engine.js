@@ -6,7 +6,7 @@
    A design system's "physical" look is not one shadow: the source sites this
    skill recreates stack a DROP ladder (2–6 layers) with an INSET pair (a dark
    bottom lip + a white top highlight) and often a radial sheen. Measured
-   2026-10-23 on wpriverthemes/aigocy: every card is
+   2026-10-23 on the reference: every card is
        drop 0 7.77 16 .0588 + 0 3 3 .102
        inner 0 -8 0 .051 + 0 4 0 rgba(255,255,255,.6)
    and every dark control adds 6 more drop layers on hover (2.77→100px).
@@ -59,7 +59,7 @@
 
    USAGE (after the G1 seed order; needs storage.TK + storage.CF)
    --------------------------------------------------------------
-     EL.seed({ set:'Aigocy · Core', recipes:{card:{drop:[…],inner:[…]}}, roles:{…} })
+     EL.seed({ set:'Reference · Core', recipes:{card:{drop:[…],inner:[…]}}, roles:{…} })
      await EL.sweepPage({ page:'03 · Actions', apply:true })
      EL.surface(parent, { name:'surface·nav', role:'nav', fill:'color.surface', radius:'full' })
      EL.audit()
@@ -242,19 +242,19 @@
     // Disabled is a NEUTRAL state: the control keeps its physical stack (the fill alpha makes it recede). A
     // disabled board with a stale hand-drawn shadow was the last `shadow_unbound` on page 03.
     var types = def.types;
+    // The TYPE segment is parsed for `byType` even when the role has no allow-list: `IconButton·Primary` needs the
+    // brandTile material while `IconButton·Ink` keeps the control stack. `Button·MD` has NO type segment — the second
+    // segment is a SIZE — so a missing type resolves to `default`.
+    var SIZES = { xs: 1, sm: 1, md: 1, lg: 1, xl: 1, '2xl': 1 };
+    var NEUTRAL = { focus: 1, selected: 1, loading: 1, open: 1, disabled: 1 };
+    var tv = null;
+    for (var i = 1; i < segs.length; i++) {
+      var seg = String(segs[i]).toLowerCase();
+      if (seg === state || SIZES[seg] || NEUTRAL[seg]) continue;
+      tv = seg; break;
+    }
+    if (!tv) tv = 'default';
     if (types && types.length) {
-      // `Button·MD` has NO type segment — the second segment is a SIZE. Reading it as a type made the
-      // default button (the screen's secondary CTA) skip its role entirely (measured 2026-10-23: the two
-      // `Button·SM` footer copies and `Button·MD` carried 0 shadows while the named Primary did).
-      var SIZES = { xs: 1, sm: 1, md: 1, lg: 1, xl: 1, '2xl': 1 };
-      var NEUTRAL = { focus: 1, selected: 1, loading: 1, open: 1, disabled: 1 };   // states that keep the base elevation
-      var tv = null;
-      for (var i = 1; i < segs.length; i++) {
-        var seg = String(segs[i]).toLowerCase();
-        if (seg === state || SIZES[seg] || NEUTRAL[seg]) continue;
-        tv = seg; break;
-      }
-      if (!tv) tv = 'default';
       var ok = types.some(function (t) { return String(t).toLowerCase() === tv; });
       if (!ok) return null;
     }

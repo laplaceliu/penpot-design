@@ -30,9 +30,10 @@ return (function () {
   var P = {
     primary: T.primary || '#2563EB', onPrimary: T.onPrimary || '#FFFFFF',
     ink: T.onSurface || '#0F172A', surface: T.surface || '#FFFFFF',
-    surfaceAlt: T.neutral || '#F8FAFC', muted: T.secondary || '#475569',
+    surfaceAlt: T.neutral || '#F8FAFC', surfaceRaised: T.surfaceRaised || '#FFFFFF', muted: T.secondary || '#475569',
     border: T.border || '#E2E8F0', borderStrong: '#CBD5E1',
-    darkRaised: T.darkRaised || '#272727',
+    // a raised dark panel (an inverse card, a dark toast): DESIGN.md declares it; with no declaration it IS the ink.
+    darkRaised: T.darkRaised || T.onSurface || '#2A2A2A',
     error: T.error || '#DC2626', success: T.success || '#16A34A',
     warning: T.warning || '#D97706', info: T.info || '#0284C7',
     // soft tint pairs (§4.1 triple): the wash is the background the matching `*Ink` copy sits on.
@@ -110,6 +111,36 @@ return (function () {
     return state === 'disabled' ? CF.STATE.disabledContent : (state === 'placeholder' ? base * 0.6 : base);
   };
 
+  /** The ONE way a gradient fill is written. A linear gradient needs `width:1` in this build or Penpot rejects the
+      whole fill (`Value not valid … :fills`); offsets are derived from the stop order when not declared; every stop
+      colour resolves through `C()`, so a profile can name a token or a hex. `o.opacity` washes the whole fill (the
+      disabled state), because a gradient fill cannot take a `fillOpacity` of its own. */
+  CF.gradFill = function (stops, o) {
+    o = o || {};
+    var s = (stops || []).filter(function (x) { return x !== null && x !== undefined; });
+    if (!s.length) return null;
+    var n = max(1, s.length - 1);
+    return [{ fillColorGradient: {
+      type: o.type || 'linear',
+      startX: o.startX !== undefined ? o.startX : 0.5, startY: o.startY !== undefined ? o.startY : 0,
+      endX: o.endX !== undefined ? o.endX : 0.5, endY: o.endY !== undefined ? o.endY : 1, width: 1,
+      stops: s.map(function (st, i) {
+        var c = (st && typeof st === 'object') ? st : { color: st };
+        return { color: C(c.color, c.color),
+                 opacity: c.opacity !== undefined ? c.opacity : (o.opacity !== undefined ? o.opacity : 1),
+                 offset: c.offset !== undefined ? c.offset : i / n };
+      }) } }];
+  };
+  /** The gradient a profile declares for one variant/state, or null — a flat token fill is the fallback, never an
+      invented pair of hexes. `grad` may be a stop list, `{default:[…], hover:[…]}`, or a token name. */
+  CF.gradOf = function (holder, state) {
+    if (!holder) return null;
+    var g = holder.gradient || holder.grad;
+    if (g && typeof g === 'object' && !Array.isArray(g)) g = g[state] || g.default || g.base || null;
+    if (typeof g === 'string') g = [g];
+    return (Array.isArray(g) && g.length >= 2) ? g : null;
+  };
+
   // ---------------------------------------------------------------- §2 geometry ladder
   // `radius` is the CONTROL role: every control of one system takes the same corner token at every size, because the
   // size axis changes height, type and padding, not the shape. Which step that is (a pill, a 3px rectangle, anything
@@ -175,30 +206,30 @@ return (function () {
     return r;
   };
   // ---------------------------------------------------------------- §2.1 radius = the token ladder, and nothing else
-  // The ladder is the source site's own `border-radius` steps (DESIGN.md §Shapes), measured off its stylesheet and
-  // nothing else: `0` (flat bands and section plates), `2` (small inner boxes), `3` (the dominant control step —
-  // buttons, tags, chips, segmented nav), `5` (the dominant surface step — cards, work items, image plates, hero
-  // cards) and `100` (dots, ornaments and avatars — the circle step).
+  // The ladder is the file's own `borderRadius` token set (DESIGN.md §Shapes). For a recreation that means the source
+  // site's measured steps; for an invented system it means the steps DESIGN.md declared. `CF.radius(key)` reads the
+  // LIVE declared value first — this table is only the fallback for a file whose tokens were never seeded, so its
+  // numbers are a generic kit, not any one source's ladder.
   // `full` (9999) is the pill the radius FORGE needs and a source may not declare: `TK.radiusFor` reads it to bind a
   // corner that is `min(w,h)/2` or larger, and the renderer clamps it to a clean pill (measured 2026-10-21: a 320×32
   // and a 320×8 at 9999 both export as clean pills). It is a forge affordance, labelled as such — every DRAWN corner
-  // in this file comes from the five source steps above.
-  var RAD = { none: 0, xs: 2, sm: 3, md: 5, lg: 100, full: 9999 };
+  // in this file comes from a declared ladder step.
+  var RAD = { none: 0, xxs: 4, xs: 2, sm: 3, md: 5, lg: 100, full: 9999 };
   CF.RAD = RAD;
   // role → ladder key. A factory asks for the ROLE it is drawing; the number and the token name both come from here,
   // so "which radius is legal where" has exactly one answer in the file.
-  // The default ladder's controls are 3px RECTANGLES, not pills: `control` is `sm`, and `TK.CONTROL_FAMS`'s repair pass reads
+  // A control takes the ladder's small step, not a pill: `control` is `sm`, and `TK.CONTROL_FAMS`'s repair pass reads
   // `CF.radius('control')`, so the sweep and the factories agree on the same number.
   // A background plate (a spec sheet, a modal, a command palette) holds a GROUP; it is not a control and not a card.
   // It defaults to square because a large corner CLIPS the group at the plate's own corners — measured 2026-10-22 on
-  // `FAB·Spec`, where the ladder's `lg` (the source's 100px avatar/pill step) cut the corner cells. Rounding belongs to
+  // `FAB·Spec`, where the ladder's `lg` (a large circle/pill step) cut the corner cells. Rounding belongs to
   // controls and cards; `spec` is the plate role, and audit_design rule 42 (`plate_rounded`) gates it.
-  var ROLE = { control: 'sm', box: 'xs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
+  var ROLE = { control: 'sm', box: 'xxs', tile: 'sm', badge: 'sm', card: 'md', field: 'md', panel: 'md',
                spec: 'none', slab: 'none', inverse: 'none', hero: 'md', flat: 'none', ring: 'host', clip: 'host' };
   CF.ROLE = ROLE;
-  var TOKEN_OF = { none: 'radius.none', xs: 'radius.xs', sm: 'radius.sm', md: 'radius.md', lg: 'radius.lg',
+  var TOKEN_OF = { none: 'radius.none', xxs: 'radius.xxs', xs: 'radius.xs', sm: 'radius.sm', md: 'radius.md', lg: 'radius.lg',
                    full: 'radius.full' };
-  var VALUE_OF = { 0: 'radius.none', 2: 'radius.xs', 3: 'radius.sm', 5: 'radius.md', 100: 'radius.lg',
+  var VALUE_OF = { 0: 'radius.none', 4: 'radius.xxs', 2: 'radius.xs', 3: 'radius.sm', 5: 'radius.md', 100: 'radius.lg',
                    9999: 'radius.full' };
   /** The token name a radius value belongs to, read from the LIVE set when the token engine is seeded (so a file that
       renamed its ladder still resolves), falling back to the table above. null = the value is not the ladder. */
@@ -1079,29 +1110,47 @@ return (function () {
     var w = o.block ? (o.w || 240) : (o.w || (iconOnly ? L.h : L.padX * 2 + leadW + trailW + lw));
     w = max(w, iconOnly ? L.h : L.h + 8);
     var round = o.shape === 'circle' || o.shape === 'round' || o.shape === 'pill';
-    var rad = o.shape === 'square' ? 0 : CF.radius('control');
+    // The MATERIAL and the hover idiom are the profile's, not the factory's: `actions.button.variants[type]` may declare
+    // `chip:true` (a light raised plate with no border), `hoverInk` (the hover lives in the label, not in a wash) and
+    // `ringInk`. With no profile a secondary button keeps its tone's border and the generic state wash — inferring
+    // "secondary means borderless chip" locally is what made one file's Button·Secondary a bordered control wearing
+    // another family's elevation stack (measured 2026-10-23). `outlined` remains the bordered form either way.
+    var bp = CF.profile('actions', 'button', type) || {};
+    var chip = o.chip !== undefined ? !!o.chip : (bp.chip === true && !o.outlined);
+    // A PILL is `full` by definition. Drawing it at `control` (12) and letting TK.roleSweep repair it to 9999 left the
+    // BIRTH STAMP saying 12 while the render said 9999 — the stamp must be what was drawn, so the corner is right at
+    // build time; a profile may pin the family's own default (`actions.button.radius`) when the shape axis is absent.
+    var rad = o.shape === 'square' ? 0 : (round ? 'full' : (bp.radius !== undefined ? bp.radius : CF.radius('control')));
     var box = B(o.x || 0, o.y || 0, w, o.h || L.h);
-    // A secondary action is a LIGHT RAISED CHIP, not an outlined control: the source's `.tf-btn-2` has no border, a
-    // 4-layer chip shadow (inset -3 #E9E9E9, inset +1 #FFF, two small drops) and a radial top-light; its hover is a
-    // TEXT change to brand, not a grey wash. `outlined` remains the bordered form. Encoding that here (rather than
-    // leaving TONE.secondary's `line` to every factory) is what stops a 1px border + control stack being inferred
-    // from a generic "secondary" token — measured 2026-10-23 on the aigocy Button·Secondary cell.
-    var chip = type === 'secondary' && !o.outlined;
     // `shape` is a real axis in this kit (a source may draw every CTA as a pill), so it belongs in the name: without it a
     // pill and a radius-6 button of the same type/size/state would share one name and the size axis would lie.
     var shapeV = o.shape === 'pill' || o.shape === 'round' || o.shape === 'circle' ? 'Pill' : (o.shape === 'square' ? 'Square' : null);
-    var ctx = CF.build(CF.name('Button', { type: type, size: o.size, state: S, variant: shapeV, slot: slotName(o) }), box, { parent: o.parent, radius: rad });
-    // A chip's state is carried by ink + elevation; a grey overlay on a #F5F5F5 plate is the harsh transition the
-    // eye reads as a disabled/active mismatch. Disabled keeps its container overlay (the control must recede).
-    var fillState = chip && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected') ? 'default' : S;
+    var compName = CF.name('Button', { type: type, size: o.size, state: S, variant: shapeV, slot: slotName(o) });
+    // BUILD-TIME INSTANCE GUARD (component-library §5 / G10): on an application surface, an exact registered Button
+    // must be PLACED, never re-drawn. The previous enforcement was audit-only and exact-name-only, so page 10's raw
+    // `Button·MD` shipped while the library held Button masters (measured 2026-10-23). A `·Spec`/`Masters·` parent is
+    // where masters are authored, so the raw factory is still legal there.
+    var pn = o.parent ? String(o.parent.name || '') : '';
+    if (o.parent && CF.get && CF.get(compName) && !/·Spec(·|$)|^Masters·/.test(pn) && o.asInstance !== false) {
+      var inst = CF.instance(compName, { parent: o.parent, absolute: { x: o.x || 0, y: o.y || 0 }, text: label,
+        resize: (o.w !== undefined || o.h !== undefined) ? [w, o.h || L.h] : undefined });
+      if (inst && inst.ok) return inst.inst;
+    }
+    var ctx = CF.build(compName, box, { parent: o.parent, radius: rad });
+    // A chip's state is carried by ink + elevation; a grey overlay on a light plate reads as the harsh transition the
+    // eye reports as a disabled/active mismatch. The same is true of a FILLED brand/ink button: its hover changes the
+    // shadow and sheen, not the background. Disabled keeps its container overlay (§1.2).
+    var filled = type === 'primary' || type === 'ink' || !!tn.onDark;
+    var fillState = ((chip || filled) && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ? 'default' : S;
     ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : null, fillState, { onDark: tn.onDark });
     if (tn.line && !chip) ctx._stroke(ctx.host, C(tn.line), 1, S === 'disabled' ? 0.4 : 1);
     if (tn.dashed && tn.line) ctx.host.strokes = [Object.assign({}, ctx.host.strokes[0], { strokeStyle: 'dashed' })];
     if (type === 'text' || type === 'link' || type === 'ghost') { /* no border, fill only carries the state tint */ }
     if (o.elevated) ctx.host.shadows = CF.shadow(1);
     var ink = C(tn.ink, P.ink), al = stateAlpha(S);
-    // `.tf-btn-2:hover { color: var(--brand) }` — the source's hover lives in the label, so the label is what moves.
-    if (chip && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ink = C('primary');
+    // where the hover lives is a profile fact: some systems move the LABEL to the brand hue instead of washing the plate.
+    var hoverInk = bp.hoverInk || (bp.states && bp.states.hover && bp.states.hover.ink) || (chip ? 'primary' : null);
+    if (hoverInk && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ink = C(hoverInk);
     if (iconOnly) ctx.glyph(o.glyph || 'search', B(box.x, box.y, box.w, box.h), { color: ink, opacity: al, anchor: 'center' });
     else {
       if (o.lead && !o.loading) ctx.glyph(o.glyph || 'download', B(box.x + L.padX, box.y + (box.h - L.icon) / 2, L.icon, L.icon), { color: ink, opacity: al, anchor: 'left' });
@@ -1113,11 +1162,15 @@ return (function () {
     await ctx.settle(); ctx.place(); if (!o.noRefit) ctx.refit(L.padX);
     CF.elevate(ctx.host, 'Button');
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
-    // A chip has no border to stand the halo off; a 2px offset reads as a detached outline with a gap between it and
-    // the pill (reported 2026-10-23). Bind the ring FLUSH to the chip's own edge; filled solid buttons keep the halo.
-    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: rad, offset: chip ? 0 : 2, color: o.ring ? C(o.ring) : C('primary') });
+    // A focus ring is FLUSH to the control on every button type. An outer halo with a 2px offset reads as a detached
+    // frame, and a same-radius outset ring is not geometrically parallel (wider gap on the straight edges than at the
+    // corners — the reported "border is not aligned / there is a gap"). Flush + host corner is exact; a filled
+    // brand/ink surface takes a light ring because a brand ring on a brand fill is 1:1 and invisible.
+    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: rad, offset: 0, color: o.ring ? C(o.ring) : (filled ? C(bp.ringInk || 'onPrimary') : C('primary')) });
     if (S === 'selected' && !tn.bg) ctx.host.fills = CF.fills(C('primary'), 'selected', { tint: 1 });
     if (o.hit) ctx.hitPad(final, o.hit);
+    if (bp._family) CF.profStamp(ctx.host, bp, { h: final.h, padX: L.padX, fs: L.fs, radius: CF.radius(rad), chip: chip },
+      { family: 'button', type: type, size: L.key, state: S });
     return ctx.host;
   };
 
@@ -1131,23 +1184,76 @@ return (function () {
     var toneKey = o.tone || o.type;
     var tn = toneKey === 'primary' ? TONE.brand : (TONE[toneKey] || TONE.ghost);
     var box = B(o.x || 0, o.y || 0, o.w || sq, o.h || sq);
-    // An icon button is a TILE by default (DESIGN.md §Shapes: small icon tiles take `sm`); only an explicit
-    // circle takes the control step. The corner is set at birth so a later role sweep has a value to preserve.
-    var icoR = o.shape === 'circle' ? 'control' : 'tile';
+    // The MATERIAL is the profile's, never the factory's: a source that paints its brand tile with a gradient declares
+    // `actions.iconbutton.variants.<type>.gradient` (plus its own elevation recipe), and a file with no profile gets the
+    // tone's flat token fill. Inventing a pair of gradient hexes here is what produced a tile that matched nothing.
+    var iv = CF.profile('actions', 'iconbutton', toneKey || o.type) || CF.profile('actions', 'iconbutton') || {};
+    // An icon button is a TILE by default (DESIGN.md §Shapes: small icon tiles take `sm`); an explicit circle is `full`
+    // (a rounded rect at `control` is a 40px square with soft corners, not the source's disc — it only ever looked
+    // circular because TK.roleSweep repaired it afterwards, which the birth stamp could not see).
+    var icoR = o.shape === 'circle' ? 'full' : (iv.radius !== undefined ? iv.radius : 'tile');
     var ctx = CF.build(CF.name('IconButton', { type: o.type || 'ghost', size: o.size, state: S, slot: o.badge ? 'Badge' : (o.shape === 'circle' ? 'Circle' : null) }), box, { parent: o.parent, radius: icoR });
-    ctx.host.fills = CF.fills(C(tn.bg), S, { onDark: tn.onDark });
+    // Filled brand/ink icons keep their base fill in every state; the old black focus overlay turned the red button
+    // into a dark chip with a red-on-red halo. The state is carried by the ring and elevation.
+    var icoFilled = toneKey === 'primary' || toneKey === 'ink' || !!tn.onDark;
+    var icoFill = (icoFilled && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ? 'default' : S;
+    var ibGrad = CF.gradOf(iv, S);
+    if (ibGrad) ctx.host.fills = CF.gradFill(ibGrad, { opacity: S === 'disabled' ? CF.STATE.disabledContent : 1 });
+    else ctx.host.fills = CF.fills(C(tn.bg), icoFill, { onDark: tn.onDark });
     if (o.outlined || tn.line) ctx._stroke(ctx.host, C(o.outlined ? 'border' : tn.line), 1, S === 'disabled' ? 0.4 : 1);
     ctx.glyph(o.glyph || 'dots', CF.iconBox(box), { color: C(o.tone === 'danger' ? 'error' : (tn.ink || 'muted')), opacity: stateAlpha(S) });
     await ctx.settle(); ctx.place();
     CF.elevate(ctx.host, 'IconButton');
+    var ibRole = iv.elevation && typeof iv.elevation === 'object' ? (iv.elevation[S] || iv.elevation.default) : iv.elevation;
+    if (ibRole && storage.EL && storage.EL.has && storage.EL.has(ibRole)) storage.EL.apply(ctx.host, ibRole);
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
-    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: icoR, color: C('primary') });
+    // Flush on the tile/circle (no outer frame, no gap); a filled brand/ink tile gets a light ring for contrast.
+    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: icoR, offset: 0, color: icoFilled ? C(iv.ringInk || 'onPrimary') : C('primary') });
     // The dot is pinned to the corner **inside** the square: a board clips its own export box, so a badge that
     // overhangs is cut in half the moment the control is exported or turned into a component.
     if (o.badge) CF.badge({ parent: ctx.host, x: final.x + final.w - 8, y: final.y, dot: true, tone: o.badgeTone || 'error' });
     ctx.hitPad(final, o.hit || (o.tier === 'web' ? 32 : 44));
+    if (iv._family) CF.profStamp(ctx.host, iv, { size: sq, radius: CF.radius(icoR), gradient: !!ibGrad },
+      { family: 'iconbutton', type: toneKey, size: String(o.size || 'md').toLowerCase(), state: S, elevation: ibRole || null });
     return ctx.host;
   };
+  /**
+   * CF.iconTile — a GRAPHIC icon plate (a section icon, a feature glyph), which is material all the way down: its size,
+   * corner, fill/gradient, glyph ink and elevation are the source's, read from `actions.icontile.variants[variant]`.
+   * There is no generic reading of "how this source glows", so a file with no profile gets a flat token plate and no
+   * variants. `o.variant` is the profile key; the first declared variant is the default.
+   */
+  CF.iconTile = async function (o) {
+    o = o || {};
+    var prof = CF.profile('actions', 'icontile') || {};
+    var vs = prof.variants || {};
+    var keys = CF.variantKeys(vs);
+    var variant = keys.indexOf(String(o.variant)) >= 0 ? String(o.variant) : (o.variant ? String(o.variant) : (keys[0] || 'accent'));
+    var V = CF.profile('actions', 'icontile', variant) || prof;
+    var S = o.state || 'default', dis = S === 'disabled';
+    var size = o.w || V.size || 64;
+    var h = o.h || V.h || size, gs = o.glyphSize || V.glyphSize || Math.round(size * 0.45);
+    var box = B(o.x || 0, o.y || 0, size, h);
+    var rad = o.radius !== undefined ? o.radius : (V.radius !== undefined ? V.radius : 'tile');
+    var name = CF.name(o.family || 'IconButton', { type: o.type || variant.charAt(0).toUpperCase() + variant.slice(1), size: o.size || 'MD', state: S });
+    var ctx = CF.build(name, box, { parent: o.parent, radius: rad });
+    var grad = CF.gradOf(V, S);
+    if (grad) ctx.host.fills = CF.gradFill(grad, { opacity: dis ? CF.STATE.disabledContent : 1 });
+    else ctx.host.fills = [{ fillColor: C(V.fill || 'ink'), fillOpacity: dis ? CF.STATE.disabledContent : 1 }];
+    ctx.glyph(o.glyph || V.glyph || 'chart',
+      B(box.x + (box.w - gs) / 2, box.y + (box.h - gs) / 2, gs, gs),
+      { color: C(V.glyphInk || 'onPrimary'), opacity: dis ? CF.STATE.disabledContent : 1 });
+    await ctx.settle(); ctx.place();
+    var role = V.elevation && typeof V.elevation === 'object' ? (V.elevation[S] || V.elevation.default) : V.elevation;
+    var EL = storage.EL;
+    if (role && EL && EL.seeded && EL.has && EL.has(role)) EL.apply(ctx.host, role);
+    var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
+    if (S === 'focus' || S === 'selected') ctx.ring(final, { radius: rad, offset: 0, color: C(V.ringInk || 'surface') });
+    if (V._family) CF.profStamp(ctx.host, V, { size: size, radius: CF.radius(rad), gradient: !!grad },
+      { family: 'icontile', variant: variant, size: String(o.size || 'md').toLowerCase(), state: S, elevation: role || null });
+    return ctx.host;
+  };
+
   /** Attached buttons (Space.Compact): ONE rounded host with clipContent, square-cornered segments inside. */
   CF.buttonGroup = async function (o) {
     o = o || {};
@@ -1225,18 +1331,23 @@ return (function () {
   /** Link: 14-15, underline appears on hover ONLY (§3.1), optional trailing icon, disabled = .38 content. */
   CF.link = async function (o) {
     o = o || {};
-    var L = CF.ladder(o.size), fs = o.fs || L.fs;
+    // A link has no container to measure, so its whole contract is TYPE: the source's nav/CTA links are 16/600 with a
+    // 1px brand underline on hover, the generic kit 500. The profile owns weight and step; the birth stamp records both.
+    var prof = CF.profile('actions', 'link'), pp = (prof && prof.size) || {};
+    var L = CF.ladder(o.size), fs = o.fs || pp.fs || L.fs;
     var label = String(o.label === undefined ? 'Read the docs' : o.label), S = o.state || 'default';
     // pressed = the ink step of the same hue (§1.2: a state is a step on the ramp, never a new hex)
     var color = C(S === 'pressed' ? (o.tone === 'neutral' ? 'ink' : 'primaryInk') : (o.tone === 'neutral' ? 'ink' : 'primary'));
     var w = CF.estW(label, fs) + (o.trail ? fs + 4 : 0) + 2;
     var box = B(o.x || 0, o.y || 0, o.w || w, o.h || max(L.h, fs + 10));
     var ctx = CF.build(CF.name('Link', { size: o.size, state: S, variant: o.underline ? 'Underline' : null, slot: slotName(o) }), box, { parent: o.parent });
-    ctx.text(label, B(box.x, box.y, max(8, box.w - (o.trail ? fs + 4 : 0)), box.h), { size: fs, color: color, weight: o.weight || 500,
+    var wt = o.weight || pp.weight || 500;
+    ctx.text(label, B(box.x, box.y, max(8, box.w - (o.trail ? fs + 4 : 0)), box.h), { size: fs, color: color, weight: wt,
       opacity: stateAlpha(S), align: 'left', underline: (o.underline || S === 'hover' || S === 'focus' || S === 'pressed') ? (o.underline === true ? color : o.underline) : false });
     if (o.trail) ctx.glyph(iconOf(o.trail, 'arrowRight'), B(box.x + box.w - fs, box.y + (box.h - fs) / 2, fs, fs), { color: color, opacity: stateAlpha(S), anchor: 'right' });
     await ctx.settle(); ctx.place(); ctx.refit(0);
     if (S === 'focus') ctx.ring(B(box.x - 2, box.y + 2, ctx.host.width + 4, box.h - 4), { radius: 'xs', offset: 2, width: 2 });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { fs: fs, radius: 0 }, { family: 'link', size: L.key, state: S, weight: wt });
     return ctx.host;
   };
 
@@ -1302,12 +1413,31 @@ return (function () {
    */
   CF.fieldBox = async function (family, o) {
     o = o || {};
-    var L = CF.ladder(o.size), variant = o.variant || 'outlined', S = o.state || (o.disabled ? 'disabled' : (o.readonly ? 'readonly' : 'default'));
+    // SOURCE PROFILE (source-adaptation §2): a measured forms entry wins over the generic kit — geometry, material,
+    // border and type all come from the reference; the call may still override per-slot. What was drawn is stamped
+    // (`nl:prof`) so rule 56 can judge the render against the profile instead of trusting the builder's memory.
+    // `sizes[size]` (the gate's per-size block) is read FIRST so one structure serves the draw AND the judgment:
+    // the source's measured md step gets its own h/fs while sizes it never measured keep the ladder.
+    var prof = CF.profile('forms', family), pp = (prof && prof.size) || {};
+    var sz = (prof && prof.sizes && prof.sizes[String(o.size || 'md').toLowerCase()]) || {};
+    if (prof && prof.variant && o.variant === undefined) o.variant = prof.variant;
+    if (prof && pp.padX !== undefined && o.padX === undefined) o.padX = pp.padX;
+    var L = CF.ladder(o.size);
+    var fsOf = sz.fs !== undefined ? sz.fs : pp.fs;
+    if (fsOf !== undefined && fsOf !== null) L = Object.assign({}, L, { fs: fsOf });
+    var variant = o.variant || 'outlined', S = o.state || (o.disabled ? 'disabled' : (o.readonly ? 'readonly' : 'default'));
     if (o.status === 'error' && S === 'default') S = 'error';
-    var fv = FIELD[variant] || FIELD.outlined;
-    var fh = o.h || L.h;
-    var aB = o.addonBefore ? L.padX * 2 + CF.estW(String(o.addonBefore), L.fs) : (o.insetLeft ? Number(o.insetLeft) : 0);
-    var aA = o.addonAfter ? L.padX * 2 + CF.estW(String(o.addonAfter), L.fs) : (o.insetRight ? Number(o.insetRight) : 0);
+    var fv = (prof && prof.variants && prof.variants[variant]) || FIELD[variant] || FIELD.outlined;
+    var fh = o.h || (sz.h !== undefined ? sz.h : pp.h) || L.h;
+    var rad = o.radius !== undefined ? CF.radius(o.radius) : CF.radius(pp.radius !== undefined ? pp.radius : L.radius);
+    var padX = o.padX === undefined ? max(12, L.padX) : o.padX;
+    var bW = (prof && prof.border && prof.border.width !== undefined) ? Number(prof.border.width) : 1;
+    var bTok = (prof && prof.border && prof.border.token) ? prof.border.token : null;
+    var inkTok = (prof && prof.ink) ? prof.ink : 'ink';
+    var phTok = (prof && prof.placeholder) ? prof.placeholder : 'muted';
+    var focusTok = (prof && prof.focusToken) ? prof.focusToken : 'primary';
+    var aB = o.addonBefore ? padX * 2 + CF.estW(String(o.addonBefore), L.fs) : (o.insetLeft ? Number(o.insetLeft) : 0);
+    var aA = o.addonAfter ? padX * 2 + CF.estW(String(o.addonAfter), L.fs) : (o.insetRight ? Number(o.insetRight) : 0);
     var fieldW = o.w || 240;
     var totalW = aB + fieldW + aA;
     // Foot area BELOW the plate: the counter and the strength readout are status copy, not field content — inside the
@@ -1316,31 +1446,32 @@ return (function () {
     var box = B(o.x || 0, o.y || 0, totalW, fh + extra);
     var ctx = CF.build(CF.name(family, { type: variant, size: o.size, state: S, slot: slotName(o) }), box, { parent: o.parent });
     var fb = B(box.x + aB, box.y, fieldW, fh);
-    var g = fieldGeom(fb, o);
-    var line = C(fv.line), lineAlpha = 1, lw = 1;
-    if (o.status === 'error') { line = C('error'); lw = variant === 'underlined' ? 2 : 1; }
+    var g = fieldGeom(fb, Object.assign({}, o, { padX: padX }));
+    var line = C(bTok || fv.line), lineAlpha = 1, lw = bW || 1;
+    if (o.status === 'error') { line = C('error'); lw = variant === 'underlined' ? max(2, bW) : max(1, bW); }
     else if (o.status === 'success') { line = C('success'); }
     else if (o.status === 'warning') { line = C('warning'); }
-    if (S === 'hover' && variant === 'outlined') line = C('borderStrong');
+    if (S === 'hover' && variant === 'outlined' && !bTok) line = C('borderStrong');
     if (S === 'disabled') lineAlpha = 0.4;
     ctx.plate(fb, { name: 'field', fill: C(fv.bg), fills: CF.fills(C(fv.bg), S === 'readonly' ? null : (S === 'error' || S === 'success' || S === 'warning' ? null : S)),
-      stroke: variant === 'underlined' ? null : line, strokeW: lw, strokeOpacity: lineAlpha,
-      radius: variant === 'outlined' || variant === 'filled' ? L.radius : 'none' });
-    if (variant === 'underlined') ctx.plate(B(fb.x, fb.y + fb.h - (S === 'focus' ? 2 : 1), fb.w, S === 'focus' ? 2 : 1), { name: S === 'focus' ? 'underline·focus' : 'underline', fill: S === 'focus' ? C('primary') : line, opacity: lineAlpha });
-    if (S === 'disabled') ctx.plate(fb, { name: 'disabled-overlay', fills: [{ fillColor: C('ink'), fillOpacity: CF.STATE.disabledContainer }], radius: L.radius });
+      stroke: (variant === 'underlined' || !lw) ? null : line, strokeW: lw, strokeOpacity: lineAlpha,
+      radius: variant === 'outlined' || variant === 'filled' ? rad : 'none' });
+    if (variant === 'underlined') ctx.plate(B(fb.x, fb.y + fb.h - (S === 'focus' ? max(2, lw) : lw), fb.w, S === 'focus' ? max(2, lw) : lw),
+      { name: S === 'focus' ? 'underline·focus' : 'underline', fill: S === 'focus' ? C(focusTok) : line, opacity: lineAlpha });
+    if (S === 'disabled') ctx.plate(fb, { name: 'disabled-overlay', fills: [{ fillColor: C('ink'), fillOpacity: CF.STATE.disabledContainer }], radius: rad });
     [o.addonBefore ? B(box.x, box.y, aB, fh) : null, o.addonAfter ? B(box.x + aB + fieldW, box.y, aA, fh) : null].forEach(function (ab, i) {
       if (!ab) return;
       ctx.plate(ab, { name: i ? 'addon·after' : 'addon·before', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1,
-        radius: i ? 'none' : L.radius });
+        radius: i ? 'none' : rad });
       ctx.text(String(i ? o.addonAfter : o.addonBefore), ab, { size: L.fs, color: C('muted') });
     });
     var txt = o.value === undefined ? (o.placeholder === undefined ? null : o.placeholder) : String(o.value);
     if (txt !== null) {
       var isPh = o.value === undefined;
-      ctx.text(txt, g.text, { size: L.fs, color: isPh ? C('muted') : (o.status === 'error' ? C('error') : C('ink')),
+      ctx.text(txt, g.text, { size: L.fs, color: isPh ? C(phTok) : (o.status === 'error' ? C('error') : C(inkTok)),
         opacity: isPh ? (S === 'disabled' ? CF.STATE.disabledContent : 0.75) : stateAlpha(S === 'disabled' ? 'disabled' : null), align: o.align || 'left', valign: o.valign || 'middle' });
     }
-    if (o.caret) ctx.plate(B(g.text.x + (o.value ? CF.estW(String(o.value), L.fs) : 0), fb.y + (fh - L.fs * 1.25) / 2, 1.5, N(L.fs * 1.25)), { name: 'caret', fill: C('primary') });
+    if (o.caret) ctx.plate(B(g.text.x + (o.value ? CF.estW(String(o.value), L.fs) : 0), fb.y + (fh - L.fs * 1.25) / 2, 1.5, N(L.fs * 1.25)), { name: 'caret', fill: C(focusTok) });
     if (g.lead) ctx.glyph(iconOf(o.lead, 'search'), g.lead, { color: o.status === 'error' ? C('error') : C('muted'), opacity: stateAlpha(S === 'disabled' ? 'disabled' : null) });
     if (g.trail) ctx.glyph(iconOf(o.trail, 'info'), g.trail, { color: C('muted') });
     if (g.clear && (S === 'focus' || S === 'hover' || o.value !== undefined)) ctx.glyph('close', g.clear, { color: C('muted'), name: 'icon·clear' });
@@ -1350,8 +1481,12 @@ return (function () {
       ctx.text(o.count.v + ' / ' + o.count.max, B(box.x, box.y + fh + 4, box.w, 16), { size: 12, color: over ? C('error') : C('muted'), align: 'right', valign: 'top' });
     }
     await ctx.settle(); ctx.place();
-    if (S === 'focus' && variant !== 'underlined') ctx.ring(fb, { radius: L.radius });
+    if (S === 'focus' && variant !== 'underlined') ctx.ring(fb, { radius: rad });
     if (o.hit) ctx.hitPad(fb, o.hit);
+    CF.profStamp(ctx.host, prof, { h: fh, padX: padX, fs: L.fs, radius: (variant === 'outlined' || variant === 'filled') ? rad : 0,
+      stroke: variant === 'underlined' ? 0 : (bW || 0),
+      fill: fv.bg || 'transparent', variant: variant }, { family: String(family).toLowerCase(), size: L.key, state: S, elevation: (prof && prof.elevation) || null });
+    if (prof && prof.elevation && storage.EL && storage.EL.has && storage.EL.has(prof.elevation)) storage.EL.apply(ctx.host, prof.elevation);
     return { ctx: ctx, host: ctx.host, geom: g, field: fb, box: box, L: L, state: S };
   };
   CF.input = async function (o) { var r = await CF.fieldBox('Input', o); return r.host; };
@@ -1359,10 +1494,13 @@ return (function () {
   /** Multi-line field: min-h = rows × lineHeight + pad-Y, resize handle, counter below (never inside the scroll area). */
   CF.textarea = async function (o) {
     o = o || {};
-    var L = CF.ladder(o.size), rows = o.rows || 3, lh = N(L.fs * 1.45), padY = 8;
-    var h = o.h || (rows * lh + padY * 2);
+    var tp = CF.profile('forms', 'textarea'), tpp = (tp && tp.size) || {};
+    var L = CF.ladder(o.size);
+    if (tp && tpp.fs) L = Object.assign({}, L, { fs: tpp.fs });
+    var rows = o.rows || 3, lh = N(L.fs * 1.45), padY = tpp.padY !== undefined ? Number(tpp.padY) : 8;
+    var h = o.h || tpp.h || (rows * lh + padY * 2);
     var r = await CF.fieldBox('Textarea', Object.assign({}, o, { h: h, valign: 'top', align: 'left', trail: o.trail || false }));
-    if (o.resize !== 'none') {
+    if (o.resize !== 'none' && !(tp && tp.resize === false)) {
       var f = r.field;
       r.ctx.path(' M ' + (f.x + f.w - 13) + ' ' + (f.y + f.h - 5) + ' L ' + (f.x + f.w - 5) + ' ' + (f.y + f.h - 5) + ' L ' + (f.x + f.w - 5) + ' ' + (f.y + f.h - 13) + ' Z',
         { name: 'resize-handle', stroke: C('muted'), strokeW: 1, strokeOpacity: 0.8 });
@@ -1687,23 +1825,30 @@ return (function () {
   /** Form-field wrapper: label above (or beside at 240-280), 6-8 gap, control, helper/error 4 below — uses LY.slots.field. */
   CF.field = async function (o) {
     o = o || {};
-    var L = CF.ladder(o.size || 'md'), label = String(o.label === undefined ? 'Field label' : o.label);
+    // The wrapper is part of the same profile: the reference measures the label (size/weight/gap above the field) as
+    // much as the field itself, and a floating-label source must not be drawn with the generic 13/500 label at 6px.
+    var fp = CF.profile('forms', o.factory || 'input'), fpp = (fp && fp.size) || {}, lp = (fp && fp.label) || {};
+    var L = CF.ladder(o.size || 'md');
+    if (fp && fpp.fs) L = Object.assign({}, L, { fs: fpp.fs });
+    var ctlH = o.h || fpp.h || L.h;
+    var label = String(o.label === undefined ? 'Field label' : o.label);
+    var labFs = lp.fs || 13, labW = lp.weight || 500, labTok = lp.ink || 'ink';
     var helper = o.error ? String(o.error) : (o.success ? String(o.success) : (o.helper ? String(o.helper) : null));
     var beside = o.labelPlacement === 'beside';
-    var labelH = beside ? 0 : 20, helpH = helper ? 18 : 0, gap = 6;
-    var total = L.h + labelH + helpH + (labelH ? gap : 0) + (helpH ? 4 : 0);
-    var box = B(o.x || 0, o.y || 0, o.w || max(240, CF.estW(label, 14) + 24), total);
+    var labelH = beside ? 0 : (lp.h || 20), helpH = helper ? 18 : 0, gap = lp.gap !== undefined ? Number(lp.gap) : 6;
+    var total = ctlH + labelH + helpH + (labelH ? gap : 0) + (helpH ? 4 : 0);
+    var box = B(o.x || 0, o.y || 0, o.w || max(240, CF.estW(label, labFs) + 24), total);
     // §G12: the icon/addon/counter slots below the label are the *field's* slots — the sub-control inherits them, so
     // the wrapper host must carry them in its own name or `variant_sparse` reads a composed Field as one flat variant.
     var slot = [beside ? 'LabelBeside' : null, slotName(o)].filter(Boolean).join('-') || null;
     var ctx = CF.build(CF.name('Field', { state: o.error ? 'Error' : (o.success ? 'Success' : (o.state || 'default')), slot: slot }), box, { parent: o.parent });
-    var labBox = beside ? B(box.x, box.y, min(280, box.w * 0.3), L.h) : B(box.x, box.y, box.w, labelH);
+    var labBox = beside ? B(box.x, box.y, min(280, box.w * 0.3), ctlH) : B(box.x, box.y, box.w, labelH);
     var labAl = (o.state === 'disabled') ? CF.STATE.disabledContent : 1;
-    ctx.text(label, labBox, { size: 13, color: C(o.state === 'disabled' ? 'muted' : 'ink'), weight: 500, opacity: labAl,
+    ctx.text(label, labBox, { size: labFs, color: C(o.state === 'disabled' ? 'muted' : labTok), weight: labW, opacity: labAl,
       align: beside ? 'right' : 'left', valign: beside ? 'middle' : 'top', refit: false });
-    if (o.required) ctx.text('*', B(labBox.x + (beside ? labBox.w + 4 : CF.estW(label, 13) + 4), beside ? labBox.y : box.y, 12, labBox.h),
-      { size: 13, color: C('error'), opacity: labAl, align: 'left', valign: beside ? 'middle' : 'top', refit: false });
-    var ctlBox = beside ? B(labBox.x + labBox.w + 24, box.y, box.w - labBox.w - 24, L.h) : B(box.x, box.y + labelH + gap, min(o.controlW || 360, box.w), L.h);
+    if (o.required) ctx.text('*', B(labBox.x + (beside ? labBox.w + 4 : CF.estW(label, labFs) + 4), beside ? labBox.y : box.y, 12, labBox.h),
+      { size: labFs, color: C('error'), opacity: labAl, align: 'left', valign: beside ? 'middle' : 'top', refit: false });
+    var ctlBox = beside ? B(labBox.x + labBox.w + 24, box.y, box.w - labBox.w - 24, ctlH) : B(box.x, box.y + labelH + gap, min(o.controlW || 360, box.w), ctlH);
     var factory = o.factory || 'input';
     var sub = await (CF[factory] || CF.input)(Object.assign({}, o, { x: ctlBox.x, y: ctlBox.y, w: ctlBox.w, h: ctlBox.h, parent: ctx.host,
       status: o.error ? 'error' : (o.success ? 'success' : o.status), label: undefined }));
@@ -1719,62 +1864,104 @@ return (function () {
   /** Switch — AntD 44×22 / handle 18, or M3 52×32 / handle 16→24→28 pressed [spec]; inner icon, loading, destructive. */
   CF.switch = async function (o) {
     o = o || {};
-    var m3 = o.system === 'm3', sm = o.size === 'sm';
-    var tw = o.trackW || (m3 ? (sm ? 44 : 52) : (sm ? 28 : 44)), th = o.trackH || (m3 ? (sm ? 24 : 32) : (sm ? 16 : 22));
+    // A switch is the clearest example of a family the generic kit gets structurally wrong on a recreation: the generic
+    // track is a 44×22 pill with a 2px-inset knob, while a source can measure a track several times that with a knob the
+    // same proportion, a fixed inset lip and a gradient ON state. Everything below is generic — the numbers come from
+    // `profiles.selection.switch`, and a file with no profile keeps the AntD/M3 presets.
+    var prof = CF.profile('selection', 'switch');
+    var sm = o.size === 'sm';
+    var TR = (prof && (sm ? (prof.trackSm || prof.track) : prof.track)) || {};
+    var HS = (prof && prof.handle) || {};
+    var m3 = !prof && o.system === 'm3';
+    var tw = o.trackW || TR.w || (m3 ? (sm ? 44 : 52) : (sm ? 28 : 44));
+    var th = o.trackH || TR.h || (m3 ? (sm ? 24 : 32) : (sm ? 16 : 22));
     var on = !!o.checked, S = o.state || 'default';
     var pressed = S === 'pressed';
-    var hw = m3 ? (on ? (pressed ? 28 : 24) : 16) : (m3 ? 24 : (pressed ? th - 2 : th - 4));
-    var box = B(o.x || 0, o.y || 0, tw + (o.label ? CF.labelW(o.label, 14) : 0), max(th, 20));
+    var hw = o.handleSize || HS.size || (m3 ? (on ? (pressed ? 28 : 24) : 16) : (pressed ? th - 2 : th - 4));
+    var inset = HS.inset !== undefined ? Number(HS.inset) : (m3 ? 4 : 2);
+    var labelFs = (prof && prof.label && prof.label.fs) || 14;
+    var box = B(o.x || 0, o.y || 0, tw + (o.label ? CF.labelW(o.label, labelFs) : 0), max(th, 20));
     var swSlot = [on ? 'On' : 'Off', slotName({ lead: o.innerIcon ? true : null, loading: o.loading }), o.label ? 'Label' : null].filter(Boolean).join('-');
     var ctx = CF.build(CF.name('Switch', { size: sm ? 'Sm' : 'Md', state: S, slot: swSlot }), box, { parent: o.parent });
     var tr = B(box.x, box.y + (box.h - th) / 2, tw, th);
     ctx.hitPad(tr, o.hit || (m3 ? 40 : 32));                    // bottom-most: the 40dp state layer / touch target
-    var tfill = on ? C('primary') : (m3 ? C('surface') : C('ink'));
-    var tf = [{ fillColor: tfill, fillOpacity: on ? 1 : (m3 ? 1 : 0.28) }];
-    var ov = (S === 'hover' || S === 'pressed' || S === 'selected') ? CF.STATE[S] : (S === 'disabled' ? CF.STATE.disabledContainer : 0);
+    var rad = TR.radius !== undefined ? CF.radius(TR.radius) : CF.radius('control');
+    var fillPr = (prof && prof.fill) || {};
+    var tfill = on ? C(fillPr.on || 'primary') : C(fillPr.off || (m3 ? 'surface' : 'ink'));
+    var grad = on && fillPr.onGradient && fillPr.onGradient.length >= 2 ? fillPr.onGradient : null;
+    var tf = grad
+      ? CF.gradFill(grad, { opacity: S === 'disabled' ? CF.STATE.disabledContent : 1 })
+      : [{ fillColor: tfill, fillOpacity: (on || prof) ? 1 : (m3 ? 1 : 0.28) }];
+    // A source that measures only default/checked does not license an invented hover wash: the profile opts out.
+    var wash = !prof || prof.wash === true;
+    var ov = (S === 'disabled') ? CF.STATE.disabledContainer : ((wash && (S === 'hover' || S === 'pressed' || S === 'selected')) ? CF.STATE[S] : 0);
     if (ov) tf.push({ fillColor: on ? '#FFFFFF' : C('ink'), fillOpacity: ov });
-    var tplate = ctx.plate(tr, { name: 'track', radius: 'control', fills: tf });
-    if (!on && m3) ctx._stroke(tplate, C('borderStrong'), 2);
-    var hx = on ? tr.x + tr.w - hw - (m3 ? 4 : 2) : (m3 ? tr.x + (tr.w - hw) / 2 : tr.x + 2);
+    var tplate = ctx.plate(tr, { name: 'track', radius: rad, fills: tf });
+    if (!on && m3 && !prof) ctx._stroke(tplate, C('borderStrong'), 2);
+    if (TR.stroke && prof) ctx._stroke(tplate, C(TR.stroke), Number(TR.strokeWidth || 1));
+    var hx = on ? tr.x + tr.w - hw - inset : tr.x + inset;
     var hy = tr.y + (tr.h - hw) / 2;
-    ctx.ellipse(B(hx, hy, hw, hw), { name: 'handle', fill: on ? C('onPrimary') : (m3 ? C('ink') : C('surface')),
-      opacity: stateAlpha(S), shadow: m3 ? 0 : 1 });
+    var handle = ctx.ellipse(B(hx, hy, hw, hw), { name: 'handle',
+      fill: on ? C(HS.fillOn || 'onPrimary') : C(HS.fillOff || (m3 ? 'ink' : 'surface')),
+      opacity: stateAlpha(S), shadow: prof ? 0 : (m3 ? 0 : 1) });
+    if (HS.elevation && storage.EL && storage.EL.has && storage.EL.has(HS.elevation)) storage.EL.apply(handle, HS.elevation);
+    var elev = prof && prof.elevation;
+    var elevName = elev && typeof elev === 'object' ? (on ? elev.on : elev.off) : (elev || null);
+    if (elevName && storage.EL && storage.EL.has && storage.EL.has(elevName)) storage.EL.apply(tplate, elevName);
     if (o.innerIcon && on) ctx.glyph('check', B(hx, hy, hw, hw), { color: C('primary'), strokeW: 2 });
     if (o.loading) CF.spinner(ctx, B(hx, hy, hw, hw), on ? C('primary') : C('muted'), 2);
     if (o.label) ctx.text(String(o.label), B(tr.x + tr.w + 8, box.y, box.w - tr.w - 8, box.h),
-      { size: 14, color: S === 'disabled' ? C('muted') : C('ink'), opacity: stateAlpha(S), align: 'left' });
+      { size: labelFs, color: S === 'disabled' ? C('muted') : C((prof && prof.label && prof.label.ink) || 'ink'), opacity: stateAlpha(S), align: 'left', valign: 'middle' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(tr, { radius: 'control' });
+    if (S === 'focus') ctx.ring(tr, { radius: rad, offset: prof ? 0 : 2, color: prof ? C(on ? (prof.focusTokenOn || 'ink') : (prof.focusToken || 'primary')) : undefined });
+    CF.profStamp(ctx.host, prof, { trackW: tw, trackH: th, radius: rad, handle: hw, inset: inset },
+      { family: 'switch', size: sm ? 'sm' : 'md', on: on, state: S, elevation: elevName || null,
+        fill: on ? (fillPr.on || (grad ? 'gradient' : 'primary')) : (fillPr.off || (m3 ? 'surface' : 'ink')) });
     return ctx.host;
   };
 
   /** Checkbox: box 18-20 radius 3-4 border 2, check stroke 2, indeterminate bar, 40×40 state layer, select-all header. */
   CF.checkbox = async function (o) {
     o = o || {};
-    var bs = o.boxSize || 18, S = o.state || 'default', on = o.indeterminate ? 'mixed' : (o.checked ? 'on' : 'off');
-    var labelW = o.label === undefined ? 0 : CF.labelW(o.label, 14);
+    var prof = CF.profile('selection', 'checkbox'), pp = (prof && prof.size) || {};
+    var bs = o.boxSize || pp.box || 18, S = o.state || 'default', on = o.indeterminate ? 'mixed' : (o.checked ? 'on' : 'off');
+    var cfs = pp.fs || 14;
+    var labelW = o.label === undefined ? 0 : CF.labelW(o.label, cfs);
     // The label's rendered line is taller than the 18px box (14px type → 21px line): sizing the host to max(bs,20)
     // clipped the label's bottom 2px out of the host — the large-height-overlap class, seen by auditPage as out_of_bounds.
-    var lh = o.label ? CF.lineH(14) : 0;
+    var lh = o.label ? CF.lineH(cfs) : 0;
     var box = B(o.x || 0, o.y || 0, max(bs + labelW, bs), o.h || max(bs, 20, lh));
     // A label is a slot, not a decoration: a bare Checkbox master has no text child, and a component copy refuses
     // structural edits. Naming the labelled composition `…·Label` gives it its own master, so instances can carry copy.
     var cbsSlot = [on === 'mixed' ? 'Indeterminate' : (on === 'on' ? 'Checked' : null), o.label ? 'Label' : null].filter(Boolean).join('-');
     var ctx = CF.build(CF.name('Checkbox', { size: o.size, state: S, slot: cbsSlot }), box, { parent: o.parent });
     var bb = B(box.x, box.y + (box.h - bs) / 2, bs, bs);
+    // The box's MATERIAL is the profile's: a source checkbox is a 24px white square with a 1px `line` border that fills
+    // black when checked, not the kit's 18px r3 with a 2px primary stroke. `fillOn`/`border`/`borderWidth`/`radius`
+    // come from the measured entry; with no profile the generic kit keeps its own steps.
+    var cFill = (prof && (on === 'off' ? (prof.fill || 'surface') : (prof.fillOn || 'primary'))) || (on === 'off' ? 'surface' : (S === 'disabled' ? 'ink' : 'primary'));
+    var cLine = (prof && prof.border) ? C(prof.border) : (on === 'off' ? (S === 'disabled' ? C('ink') : C('borderStrong')) : null);
+    var cLW = prof && prof.borderWidth !== undefined ? Number(prof.borderWidth) : 2;
+    var cRad = pp.radius !== undefined ? CF.radius(pp.radius) : 'xxs';
     if (S === 'hover' || S === 'focus' || o.layer) ctx.plate(B(bb.x - (40 - bs) / 2, bb.y - (40 - bs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 'control' });
-    ctx.plate(bb, { name: 'box', fill: (on === 'off') ? C('surface') : (S === 'disabled' ? C('ink') : C('primary')),
-      fills: on === 'off' ? CF.fills(C('surface'), S === 'hover' ? 'hover' : null) : CF.fills(on === 'off' ? C('surface') : C('primary'), S === 'disabled' ? 'disabled' : null, { onDark: on !== 'off' }),
-      stroke: on === 'off' ? (S === 'disabled' ? C('ink') : C('borderStrong')) : null, strokeW: 2, radius: 'xs', strokeOpacity: 1 });
-    if (on === 'off') ctx._stroke(ctx.host.children[ctx.host.children.length - 1], o.checked ? C('primary') : C('borderStrong'), 2);
+    ctx.plate(bb, { name: 'box', fill: C(cFill),
+      fills: CF.fills(C(cFill), on === 'off' ? (S === 'hover' ? 'hover' : null) : (S === 'disabled' ? 'disabled' : null), { onDark: on !== 'off' }),
+      stroke: on === 'off' ? cLine : null, strokeW: cLW, radius: cRad, strokeOpacity: 1 });
+    if (on === 'off' && !prof) ctx._stroke(ctx.host.children[ctx.host.children.length - 1], o.checked ? C('primary') : C('borderStrong'), 2);
+    if (on === 'off' && prof && cLine) ctx._stroke(ctx.host.children[ctx.host.children.length - 1], cLine, cLW);
     if (o.checked || o.indeterminate) {
-      if (o.indeterminate) ctx.plate(B(bb.x + 3, bb.y + bs / 2 - 1, bs - 6, 2.5), { name: 'dash', fill: '#FFFFFF', radius: 'xs' });
-      else ctx.glyph('check', B(bb.x - 2, bb.y - 2, bs + 4, bs + 4), { color: '#FFFFFF', strokeW: max(2, bs * 0.16) });
+      var mInk = (prof && prof.markInk) || 'onDark';
+      if (o.indeterminate) ctx.plate(B(bb.x + 3, bb.y + bs / 2 - 1, bs - 6, 2.5), { name: 'dash', fill: C(mInk), radius: 'xs' });
+      else ctx.glyph('check', B(bb.x - 2, bb.y - 2, bs + 4, bs + 4), { color: C(mInk), strokeW: max(2, bs * 0.16) });
     }
-    if (o.label) ctx.text(String(o.label), B(bb.x + bs + 8, box.y, labelW, box.h), { size: 14, color: C('ink'), opacity: stateAlpha(S), align: 'left' });
+    if (o.label) ctx.text(String(o.label), B(bb.x + bs + 8, box.y, labelW, box.h), { size: cfs, color: C((prof && prof.ink) || 'ink'), opacity: stateAlpha(S), align: 'left' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(bb, { radius: 'xs' });
+    // A checkbox is a small visible box: the ring is FLUSH on it (offset 0, box corner), never a 22×22 halo
+    // around an 18×18 r8 box — the halo is not parallel at the corners and reads as a gap.
+    if (S === 'focus') ctx.ring(bb, { radius: cRad, offset: 0, color: on === 'off' ? C(prof && prof.focusToken || 'primary') : C('onDark') });
     ctx.hitPad(bb, o.hit || 32);
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { box: bs, radius: CF.radius(cRad), border: on === 'off' ? cLW : 0 },
+      { family: 'checkbox', variant: on === 'on' ? 'checked' : (on === 'mixed' ? 'indeterminate' : 'unchecked'), state: S, checked: on });
     return ctx.host;
   };
 
@@ -1785,26 +1972,36 @@ return (function () {
     if (o.asButton) return CF.segmented({ x: o.x, y: o.y, size: o.size, items: o.options || ['A', 'B', 'C'], active: o.checkedIndex || 0, state: S, parent: o.parent, itemW: o.itemW });
     if (o.card) return CF.card(Object.assign({ x: o.x, y: o.y, w: o.w || 240, h: o.h || 96, selectable: true, checked: on, state: S, parent: o.parent,
       title: o.title || 'Card option', body: o.meta || 'Supporting line, one line, ellipsised' }));
-    var rs = o.ring || 20, labelW = o.label === undefined ? 0 : CF.labelW(o.label, 14);
+    var prof = CF.profile('selection', 'radio'), pp = (prof && prof.size) || {};
+    var rs = o.ring || pp.ring || 20, rfs = pp.fs || 14;
+    var labelW = o.label === undefined ? 0 : CF.labelW(o.label, rfs);
     var box = B(o.x || 0, o.y || 0, max(rs + labelW, rs), o.h || 24);
     var rdoSlot = [on ? 'Checked' : null, o.label ? 'Label' : null].filter(Boolean).join('-') || null;
     var ctx = CF.build(CF.name('Radio', { state: S, slot: rdoSlot }), box, { parent: o.parent });
     var rb = B(box.x, box.y + (box.h - rs) / 2, rs, rs);
     if (S === 'hover' || S === 'focus') ctx.plate(B(rb.x - (40 - rs) / 2, rb.y - (40 - rs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 'control' });
-    ctx.ellipse(rb, { name: 'ring', fill: C('surface'), stroke: on ? C('primary') : (S === 'disabled' ? C('muted') : C('borderStrong')), strokeW: on ? 2 : 1.5 });
-    if (on) ctx.ellipse(B(rb.x + (rs - 10) / 2, rb.y + (rs - 10) / 2, 10, 10), { name: 'dot', fill: S === 'disabled' ? C('muted') : C('primary') });
-    if (o.label) ctx.text(String(o.label), B(rb.x + rs + 8, box.y, labelW, box.h), { size: 14, color: C('ink'), opacity: stateAlpha(S), align: 'left' });
+    // The radio's ring weight and dot size are the profile's: the source draws a hairline ring with a solid dot,
+    // the kit a 2px primary ring — a source without a radio rule keeps the generic one (derived material).
+    var rLine = on ? C((prof && prof.ringInk) || 'primary') : (S === 'disabled' ? C('muted') : C((prof && prof.border) || 'borderStrong'));
+    var rLW = Number(prof && prof.ringWidth !== undefined ? prof.ringWidth : (on ? 2 : 1.5));
+    var dotD = pp.dot || 10;
+    ctx.ellipse(rb, { name: 'ring', fill: C((prof && prof.fill) || 'surface'), stroke: rLine, strokeW: rLW });
+    if (on) ctx.ellipse(B(rb.x + (rs - dotD) / 2, rb.y + (rs - dotD) / 2, dotD, dotD), { name: 'dot', fill: S === 'disabled' ? C('muted') : C((prof && prof.ringInk) || 'primary') });
+    if (o.label) ctx.text(String(o.label), B(rb.x + rs + 8, box.y, labelW, box.h), { size: rfs, color: C((prof && prof.ink) || 'ink'), opacity: stateAlpha(S), align: 'left' });
     await ctx.settle(); ctx.place();
     if (S === 'focus') ctx.ring(rb, { radius: 'control' });
     ctx.hitPad(rb, o.hit || 32);
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { ring: rs, dot: dotD, border: rLW },
+      { family: 'radio', variant: on ? 'checked' : 'unchecked', state: S, checked: on });
     return ctx.host;
   };
 
   /** Slider: track 4-6, handle 20 (+40 state layer), marks 2px ticks + 11px labels, range = two handles, value label on drag. */
   CF.slider = async function (o) {
     o = o || {};
+    var prof = CF.profile('selection', 'slider'), pp = (prof && prof.size) || {};
     var vert = o.direction === 'vertical';
-    var len = (vert ? o.h || 200 : o.w || 240), th = o.trackH || 4, hs = o.handle || 20;
+    var len = (vert ? o.h || 200 : o.w || 240), th = o.trackH || pp.track || 4, hs = o.handle || pp.handle || 20;
     var lo = o.min === undefined ? 0 : Number(o.min), hi = o.max === undefined ? 100 : Number(o.max);
     var raw2 = o.value2 === undefined ? lo + (hi - lo) * 0.7 : Number(o.value2);
     var raw = o.value === undefined ? lo + (hi - lo) * 0.4 : Number(o.value);
@@ -1821,14 +2018,16 @@ return (function () {
     var railY = vert ? box.y + len / 2 : box.y + topPad + 20;
     var trackBox = vert ? B(box.x + (box.w - bubW - th) / 2, box.y + hs / 2, th, len - hs)
       : B(box.x + hs / 2, railY - th / 2, len - hs, th);
-    ctx.plate(trackBox, { name: 'track', fills: [{ fillColor: C('ink'), fillOpacity: 0.12 }], radius: 'control' });
+    var trkInk = (prof && prof.trackInk) || 'ink', trkOp = prof && prof.trackOpacity !== undefined ? Number(prof.trackOpacity) : 0.12;
+    ctx.plate(trackBox, { name: 'track', fills: [{ fillColor: C(trkInk), fillOpacity: trkOp }], radius: 'control' });
     var span = vert ? { a: trackBox.y, b: trackBox.y + trackBox.h, axis: 'y' } : { a: trackBox.x, b: trackBox.x + trackBox.w, axis: 'x' };
     var posOf = function (p) { return span.a + (span.b - span.a) * p; };
     var seg = function (pa, pb) {
       var a0 = posOf(min(pa, pb)), a1 = posOf(max(pa, pb));
       return vert ? B(trackBox.x, a0, trackBox.w, a1 - a0) : B(a0, trackBox.y, a1 - a0, trackBox.h);
     };
-    ctx.plate(o.range ? seg(v, v2) : seg(0, v), { name: 'track·active', fill: o.state === 'disabled' ? C('muted') : C('primary'), radius: 'control' });
+    var actInk = (prof && prof.activeInk) || 'primary';
+    ctx.plate(o.range ? seg(v, v2) : seg(0, v), { name: 'track·active', fill: o.state === 'disabled' ? C('muted') : C(actInk), radius: 'control' });
     var handle = function (p) {
       var c = posOf(p);
       var b = vert ? B(trackBox.x + trackBox.w / 2 - hs / 2, c - hs / 2, hs, hs) : B(c - hs / 2, railY - hs / 2, hs, hs);
@@ -1860,6 +2059,8 @@ return (function () {
       ctx.text(String(Math.round(raw)), lb, { size: 12, color: '#FFFFFF', weight: 600, refit: false });
     }
     await ctx.settle(); ctx.place();
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { track: th, handle: hs },
+      { family: 'slider', state: o.state || 'default', range: !!o.range });
     return ctx.host;
   };
 
@@ -2218,24 +2419,35 @@ return (function () {
   /** Card — pad 24 (16 compact) · header 56 · body · footer 64 · cover full-bleed · action row · selectable · skeleton. */
   CF.card = async function (o) {
     o = o || {};
-    var tone = o.tone || 'outlined', S = o.state || 'default', pad = o.pad || (tone === 'elevated' ? 24 : 20);
-    var w = o.w || 320, headerH = o.title ? 56 : 0, coverH = o.cover ? (o.coverH || Math.round(w * 0.5)) : 0;
+    // The generic card kit is one recipe: a white plate, a 1px hairline, `md` corners, one drop. A recreation's cards
+    // are MEASURED — plate colour, corner, padding and the drop+inset stack come from the source material, and the
+    // drawn result is stamped so rule 56 can judge it. `o.cardType` picks the measured entry (feature/pricing/work…).
+    var prof = CF.profile('data', o.cardType || 'card'), pp = (prof && prof.size) || {};
+    var tone = o.tone || (prof && prof.tone) || 'outlined', S = o.state || 'default';
+    var pad = o.pad || pp.pad || (tone === 'elevated' ? 24 : 20);
+    var w = o.w || pp.w || 320, headerH = o.title ? 56 : 0, coverH = o.cover ? (o.coverH || Math.round(w * 0.5)) : 0;
     var bodyH = o.h ? 0 : (o.bodyH || (o.body ? max(28, Math.ceil(CF.estW(String(o.body), 13) / max(80, w - pad * 2)) * 20 + 8) : 24));
     var footerH = (o.actions || o.footer) ? 56 : 0;
+    var rad = CF.radius(o.radius !== undefined ? o.radius : (pp.radius !== undefined ? pp.radius : 'md'));
+    var fillTok = o.fill || (prof && prof.fill) || (tone === 'outlined' ? 'surface' : (tone === 'filled' ? 'surfaceAlt' : 'surface'));
+    var bW = prof && prof.border ? Number(prof.border.width || 0) : (tone === 'outlined' ? 1 : 0);
+    var bTok = (prof && prof.border && prof.border.token) ? prof.border.token : 'border';
     var box = B(o.x || 0, o.y || 0, w, coverH + headerH + bodyH + footerH + pad * (coverH ? 1 : 2));
     var ctx = CF.build(CF.name('Card', { type: tone, state: S, slot: o.cover ? 'Cover' : (o.selectable ? 'Selectable' : null) }), box,
-      { parent: o.parent, radius: CF.radius(o.radius || 'md'), stroke: tone === 'outlined' ? C('border') : null, strokeW: 1, shadow: tone === 'elevated' ? (o.elev || 1) : 0, clip: true });
-    if (tone !== 'outlined') ctx.host.fills = [{ fillColor: C(tone === 'filled' ? 'surfaceAlt' : 'surface'), fillOpacity: 1 }];
-    else ctx.host.fills = [{ fillColor: C('surface'), fillOpacity: 1 }];
-    if (S === 'hover' && tone === 'elevated') ctx.host.shadows = CF.shadow((o.elev || 1) + 1);
-    if (S === 'hover' && tone !== 'elevated') ctx.host.fills = CF.fills(C('surface'), 'hover');
+      { parent: o.parent, radius: rad, stroke: bW ? C(bTok) : null, strokeW: bW || 1, shadow: prof ? 0 : (tone === 'elevated' ? (o.elev || 1) : 0), clip: true });
+    ctx.host.fills = [{ fillColor: C(fillTok), fillOpacity: 1 }];
+    if (S === 'hover' && !prof && tone === 'elevated') ctx.host.shadows = CF.shadow((o.elev || 1) + 1);
+    if (S === 'hover' && !prof && tone !== 'elevated') ctx.host.fills = CF.fills(C(fillTok), 'hover');
     CF.elevate(ctx.host, 'Card');
+    var elevName = prof && prof.elevation;
+    if (S === 'hover' && prof && prof.hoverElevation) elevName = prof.hoverElevation;
+    if (elevName && storage.EL && storage.EL.has && storage.EL.has(elevName)) storage.EL.apply(ctx.host, elevName);
     var y = box.y;
     if (o.cover) {
       // the outlined host carries its border on its own box, and a board paints children over that stroke: a flush cover
       // plate erases the card's L/T/R border (stroke_covered). Inset it on the three bordered sides only — the cover's
       // bottom edge is interior, so it may run to the full height.
-      var ci = tone === 'outlined' ? 1 : 0;
+      var ci = bW ? bW : 0;
       ctx.plate(B(box.x + ci, y + ci, box.w - ci * 2, coverH - ci), { name: 'cover', fill: C(o.coverTone || 'border'), stroke: null });
       ctx.glyph('image', B(box.x + box.w / 2 - 24, y + coverH / 2 - 24, 48, 48), { color: C('muted') });
       if (o.coverLabel) ctx.text(String(o.coverLabel), B(box.x + 12, y + coverH - 32, box.w - 24, 24), { size: 12, color: CF.onTone(o.coverTone || 'border'), align: 'left' });
@@ -2285,19 +2497,24 @@ return (function () {
     }
     if (o.loading) { ctx.plate(B(contentX, box.y + pad + (coverH || 0) + 4, contentW, 12), { name: 'skeleton·line', fill: C('border'), radius: 'xs' }); }
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(box, { radius: CF.radius(o.radius || 'md') });
+    if (S === 'focus') ctx.ring(box, { radius: rad });
+    CF.profStamp(ctx.host, prof, { pad: pad, radius: rad, stroke: bW, w: w, fill: fillTok },
+      { family: 'card', cardType: o.cardType || 'card', state: S, elevation: elevName || null });
     return ctx.host;
   };
 
   /** KPI / statistic — label 12-13 muted · value 28-36 tabular · delta 13 + arrow (colour AND sign) · sparkline 60-80×24. */
   CF.kpi = async function (o) {
     o = o || {};
-    var pad = o.pad || 20, w = o.w || 240, vs = o.valueFs || 32;
+    var prof = CF.profile('data', 'kpi'), pp = (prof && prof.size) || {};
+    var pad = o.pad || pp.pad || 20, w = o.w || pp.w || 240, vs = o.valueFs || pp.valueFs || 32;
+    var kRad = pp.radius !== undefined ? CF.radius(pp.radius) : CF.radius('md');
     var delta = o.delta === undefined ? null : Number(o.delta);
     var h = o.h || (pad * 2 + 18 + vs + (delta !== null ? 20 : 0) + (o.spark ? 26 : 0));
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('KPI', { type: o.spark ? 'Sparkline' : (delta !== null ? 'Delta' : 'Compact'), state: o.state }), box,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: o.bordered === false ? null : C('border'), strokeW: 1 });
+      { parent: o.parent, fill: C((prof && prof.fill) || 'surface'), radius: kRad,
+        stroke: (prof && prof.border) ? C(prof.border) : (o.bordered === false ? null : C('border')), strokeW: 1 });
     ctx.text(String(o.label === undefined ? 'Active users' : o.label), B(box.x + pad, box.y + pad - 2, w - pad * 2, 18),
       { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
     var value = String(o.value === undefined ? '1,284' : o.value);
@@ -2326,6 +2543,10 @@ return (function () {
       ctx.path(d, { name: 'sparkline', stroke: C('primary'), strokeW: 2 });
     }
     await ctx.settle(); ctx.place();
+    var kElev = prof && prof.elevation;
+    if (kElev && storage.EL && storage.EL.has && storage.EL.has(kElev)) storage.EL.apply(ctx.host, kElev);
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { pad: pad, radius: kRad, valueFs: vs },
+      { family: 'kpi', state: o.state || 'default' });
     return ctx.host;
   };
 
@@ -2335,8 +2556,9 @@ return (function () {
     var type = o.type || 'line', p = o.value === undefined ? 0.62 : (Number(o.value) > 1 ? Number(o.value) / 100 : Number(o.value));
     p = max(0, min(1, p));
     var st = o.status || (p >= 1 ? 'success' : 'normal'), L = CF.ladder(o.size || 'md');
-    var th = o.thick || (type === 'line' ? (o.size === 'lg' ? 8 : 4) : 4);
-    var col = st === 'exception' || st === 'error' ? C('error') : (st === 'success' ? C('success') : C('primary'));
+    var prof = CF.profile('data', 'progress'), pp = (prof && prof.size) || {};
+    var th = o.thick || pp.track || (type === 'line' ? (o.size === 'lg' ? 8 : 4) : 4);
+    var col = st === 'exception' || st === 'error' ? C('error') : (st === 'success' ? C('success') : C((prof && prof.activeInk) || 'primary'));
     if (type === 'circle' || type === 'dashboard') {
       var d = o.diameter || 48, cx = (o.x || 0) + d / 2, cy = (o.y || 0) + d / 2, r = d / 2 - th;
       var a0 = type === 'dashboard' ? 135 : -90, sweep = type === 'dashboard' ? 270 : 360;
@@ -2358,13 +2580,21 @@ return (function () {
     var w = o.w || 240, showLabel = o.format !== false && !o.hideLabel, labW = showLabel ? 42 : 0;
     var box3 = B(o.x || 0, o.y || 0, w, max(th, 16));
     var ctx3 = CF.build(CF.name('Progress', { type: 'line', state: st, slot: o.indeterminate ? 'Indeterminate' : null }), box3, { parent: o.parent });
-    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, box3.w - labW, th), { name: 'track', fill: C('ink'), opacity: 0.12, radius: 'control' });
+    var pRad = pp.radius !== undefined ? CF.radius(pp.radius) : 'control';
+    var pOp = prof && prof.trackOpacity !== undefined ? Number(prof.trackOpacity) : 0.12;
+    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, box3.w - labW, th), { name: 'track', fill: C((prof && prof.trackInk) || 'ink'), opacity: pOp, radius: pRad });
     var fw = o.indeterminate ? (box3.w - labW) * 0.34 : (box3.w - labW) * p;
-    ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, max(2, fw), th), { name: 'bar', fill: col, radius: 'control' });
+    var bar = ctx3.plate(B(box3.x, box3.y + (box3.h - th) / 2, max(2, fw), th), { name: 'bar', fill: col, radius: pRad });
+    // The source's brand fill GLOWS (a 2px brand drop). A profiled glow recipe is applied here so the bar is a light
+    // source, not a painted stripe; without one the generic bar stays flat.
+    var pElev = prof && prof.elevation;
+    if (pElev && storage.EL && storage.EL.has && storage.EL.has(pElev)) storage.EL.apply(bar, pElev);
     if (o.indeterminate) ctx3.plate(B(box3.x + max(2, fw) - 12, box3.y + (box3.h - th) / 2, 12, th), { name: 'bar·shimmer', fill: '#FFFFFF', opacity: 0.55, radius: 'xs' });
     if (showLabel) ctx3.text(st === 'success' ? 'Done' : Math.round(p * 100) + '%', B(box3.x + box3.w - labW, box3.y, labW, box3.h),
       { size: 12, color: st === 'normal' ? C('ink') : col, align: 'right' });
     await ctx3.settle(); ctx3.place();
+    if (prof && prof._family) CF.profStamp(ctx3.host, prof, { track: th },
+      { family: 'progress', state: st, kind: 'line' });
     return ctx3.host;
   };
 
@@ -2414,14 +2644,15 @@ return (function () {
   /** Table header cell — h 40-48 · 12-13/600 muted · sort chevron 16 · filter icon (accent) · resize handle · pad-X 16. */
   CF.tableHeader = async function (o) {
     o = o || {};
+    var prof = CF.profile('data', 'table'), pp = (prof && prof.size) || {};
     var L = CF.ladder(o.density === 'dense' ? 'sm' : (o.size || 'md'));
-    var h = o.h || (o.density === 'dense' ? 32 : 40), padX = o.padX || (o.density === 'dense' ? 8 : 16);
+    var h = o.h || pp.rowH || (o.density === 'dense' ? 32 : 40), padX = o.padX || pp.padX || (o.density === 'dense' ? 8 : 16);
     var label = String(o.label === undefined ? 'Column' : o.label);
     var sortW = o.sort ? 16 + 4 : 0, filtW = o.filter ? 16 + 4 : 0, resW = o.resizable ? 6 : 0;
     var w = o.w || max(80, padX * 2 + CF.estW(label, 12) + sortW + filtW + resW);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('TableHeader', { state: o.sort ? 'Sorted·' + o.sort : (o.filter ? 'FilterActive' : 'Default'), slot: o.align === 'right' ? 'Numeric' : null }), box, { parent: o.parent });
-    ctx.host.fills = CF.fills(C('surfaceAlt'), o.state === 'hover' ? 'hover' : null);
+    ctx.host.fills = CF.fills(C((prof && prof.headerFill) || 'surfaceAlt'), o.state === 'hover' ? 'hover' : null);
     var right = o.align === 'right';
     ctx.text(label, B(box.x + padX, box.y, box.w - padX * 2 - sortW - filtW - resW, box.h),
       { size: 12, color: o.sort || o.filter ? C('primary') : C('muted'), weight: 600, align: right ? 'right' : 'left', refit: false });
@@ -2430,22 +2661,26 @@ return (function () {
     if (o.sort) { x -= sortW; ctx.glyph(o.sort === 'asc' ? 'caretUp' : 'caretDown', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: C('primary'), fill: C('primary') }); }
     if (o.resizable) ctx.plate(B(box.x + box.w - 1, box.y + 8, 1, box.h - 16), { name: 'resize·handle', fill: C('borderStrong') });
     await ctx.settle(); ctx.place();
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { padX: padX, rowH: h }, { family: 'table', part: 'header', state: o.state || 'default' });
     return ctx.host;
   };
 
   /** Table row — 48/40/32 by density · cells pad 16/12/8 · hairline · hover 8% · selected 12% + 2px accent bar · checkbox col 44. */
   CF.tableRow = async function (o) {
     o = o || {};
+    var prof = CF.profile('data', 'table');
     var dens = o.density || 'default';
+    var tPad = (prof && prof.padX) || null;
     var h = o.h || ({ dense: 32, middle: 40, default: 48 }[dens] || 48);
-    var padX = { dense: 8, middle: 12, default: 16 }[dens] || 16;
+    var padX = tPad !== undefined && tPad !== null ? tPad : ({ dense: 8, middle: 12, default: 16 }[dens] || 16);
     var cells = o.cells || ['Row label', '1,024', 'Active', '—'];
     var widths = o.widths || cells.map(function (c, i) { return i === 0 ? max(160, (o.w || 720) * 0.34) : Math.floor(((o.w || 720) - (o.selectable ? 44 : 0) - max(160, (o.w || 720) * 0.34)) / (cells.length - 1)); });
     var w = o.w || widths.reduce(function (a, b) { return a + b; }, 0) + (o.selectable ? 44 : 0) + padX;
     var box = B(o.x || 0, o.y || 0, w, h);
     var S = o.state || 'default';
     var ctx = CF.build(CF.name('TableRow', { size: dens, state: S, slot: o.expandable ? 'Expandable' : (o.editing ? 'Editing' : null) }), box, { parent: o.parent });
-    ctx.host.fills = S === 'selected' ? CF.fills(C('primary'), 'selected', { tint: 1 }) : (o.zebra ? CF.fills(C('surfaceAlt'), S === 'hover' ? 'hover' : null) : CF.fills(C('surface'), S === 'hover' ? 'hover' : (S === 'disabled' ? 'disabled' : null)));
+    var tFill = (prof && prof.fill) || 'surface', tZebra = (prof && prof.zebra) || 'surfaceAlt';
+    ctx.host.fills = S === 'selected' ? CF.fills(C('primary'), 'selected', { tint: 1 }) : (o.zebra ? CF.fills(C(tZebra), S === 'hover' ? 'hover' : null) : CF.fills(C(tFill), S === 'hover' ? 'hover' : (S === 'disabled' ? 'disabled' : null)));
     if (S === 'selected') ctx.plate(B(box.x, box.y, 2, box.h), { name: 'accent·bar', fill: C('primary') });
     var x = box.x + (o.selectable ? 44 : 0);
     var al = S === 'disabled' ? CF.STATE.disabledContent : 1;
@@ -2484,6 +2719,7 @@ return (function () {
     }
     await ctx.settle(); ctx.place();
     if (S === 'focus') ctx.ring(B(box.x, box.y, box.w, box.h), { radius: 'none', offset: 0, width: 2 });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { padX: padX }, { family: 'table', density: dens, state: S });
     return ctx.host;
   };
 
@@ -2521,15 +2757,16 @@ return (function () {
   /** List item — 1/2/3 lines (40-48 / 64 / 88) · leading media 24/40/48/56 · trailing meta/action/chevron/switch/menu · divider indented to the text. */
   CF.listItem = async function (o) {
     o = o || {};
+    var prof = CF.profile('data', 'list'), pp = (prof && prof.size) || {};
     var lines = o.lines || (o.sub ? 2 : 1);
     var media = (!o.leading || o.leading === 'none') ? 0 : (o.mediaSize || ({ 1: 24, 2: 40, 3: 48 }[lines] || 40));
-    var h = o.h || ({ 1: 48, 2: 64, 3: 88 }[lines] || 48);
-    var padX = o.padX || 16, padY = 12, gap = o.gap === undefined ? 12 : o.gap;
+    var h = o.h || pp.h || ({ 1: 48, 2: 64, 3: 88 }[lines] || 48);
+    var padX = o.padX || pp.padX || 16, padY = 12, gap = o.gap === undefined ? 12 : o.gap;
     var w = o.w || 360, trailW = o.trailing ? (o.trailing === 'meta' ? 90 : o.trailing === 'chevron' ? 24 : o.trailing === 'switch' ? 48 : 32) : 0;
     var S = o.state || 'default';
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('ListItem', { size: lines + 'line', state: S, slot: o.trailing ? ('Trail·' + o.trailing) : null }), box, { parent: o.parent });
-    ctx.host.fills = S === 'selected' ? CF.fills(C('primary'), 'selected', { tint: 1 }) : CF.fills(C('surface'), S === 'hover' ? 'hover' : null);
+    ctx.host.fills = S === 'selected' ? CF.fills(C('primary'), 'selected', { tint: 1 }) : CF.fills(C((prof && prof.fill) || 'surface'), S === 'hover' ? 'hover' : null);
     var tx = box.x + padX + (media ? media + gap : 0);
     if (o.leading === 'avatar') await CF.avatar({ parent: ctx.host, x: box.x + padX, y: box.y + (h - media) / 2, size: media, name: o.title, tone: o.tone });
     else if (o.leading === 'icon' || o.leading === 'checkbox') {
@@ -2560,6 +2797,8 @@ return (function () {
     else if (o.trailing === 'action') await CF.button({ parent: ctx.host, x: box.x + box.w - padX - 72, y: box.y + (h - 28) / 2, label: String(o.action || 'Open'), size: 'sm', type: 'default' });
     await ctx.settle(); ctx.place();
     if (S === 'focus') ctx.ring(box, { radius: CF.radius('sm'), offset: 0 });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { padX: padX, radius: 0 },
+      { family: 'list', lines: lines, state: S });
     return ctx.host;
   };
 
@@ -2626,24 +2865,26 @@ return (function () {
       { title: 'Pipeline failed', time: '09:12', tone: 'error', icon: 'error' },
       { title: 'Changes pushed', time: '08:40' }
     ];
-    var rowH = o.rowH || 56, nodeW = o.node || 20, padL = nodeW + 16, w = o.w || 320;
+    var prof = CF.profile('data', 'timeline'), pp = (prof && prof.size) || {};
+    var rowH = o.rowH || pp.rowH || 56, nodeW = o.node || pp.node || 20, padL = nodeW + 16, w = o.w || 320;
     var h = items.length * rowH + (o.pending ? rowH : 0);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('Timeline', { slot: o.alternate ? 'Alternate' : (o.labelLeft ? 'LabelLeft' : null) }), box, { parent: o.parent });
     var nx = box.x + (o.labelLeft ? 92 : 0);
+    var tlInk = (prof && prof.ink) || 'ink', tlNode = (prof && prof.nodeInk) || 'surface', tlLine = (prof && prof.connectorInk) || 'border';
     items.forEach(function (it, i) {
       var cy = box.y + i * rowH + 12, cx = nx + nodeW / 2;
       if (i < items.length - 1 || o.pending) ctx.plate(B(cx - (o.width || 2) / 2, cy + nodeW, o.width || 2, rowH - nodeW + 6),
-        { name: 'connector' + (i === items.length - 1 ? '·pending' : ''), fill: C('border'), dashed: i === items.length - 1 });
+        { name: 'connector' + (i === items.length - 1 ? '·pending' : ''), fill: C(tlLine), dashed: i === items.length - 1 });
       if (it.dot === false || it.icon || it.avatar) {
-        ctx.ellipse(B(nx, cy, nodeW, nodeW), { name: 'node·' + i, fill: it.icon ? C(it.tone || 'primary') : C('surface'), stroke: C(it.tone || 'border'), strokeW: 1 });
+        ctx.ellipse(B(nx, cy, nodeW, nodeW), { name: 'node·' + i, fill: it.icon ? C(it.tone || 'primary') : C(tlNode), stroke: C(it.tone || tlLine), strokeW: 1 });
         if (it.icon) ctx.glyph(iconOf(it.icon, 'check'), B(nx + 2, cy + 2, nodeW - 4, nodeW - 4), { color: C('onPrimary'), strokeW: 1.6 });
       } else {
         var d = o.dot || 10;
-        ctx.ellipse(B(cx - d / 2, cy + nodeW / 2 - d / 2, d, d), { name: 'node·' + i, fill: C(it.tone || (i === 0 ? 'primary' : 'border')), stroke: it.hollow ? C(it.tone || 'primary') : null, strokeW: 2 });
+        ctx.ellipse(B(cx - d / 2, cy + nodeW / 2 - d / 2, d, d), { name: 'node·' + i, fill: C(it.tone || (i === 0 ? 'primary' : tlLine)), stroke: it.hollow ? C(it.tone || 'primary') : null, strokeW: 2 });
       }
       var tx = nx + nodeW + 16;
-      ctx.text(String(it.title), B(tx, cy - 2, box.w - (tx - box.x) - 8, 20), { size: 14, color: C('ink'), weight: 500, align: 'left', valign: 'top', refit: false });
+      ctx.text(String(it.title), B(tx, cy - 2, box.w - (tx - box.x) - 8, 20), { size: pp.fs || 14, color: C(tlInk), weight: 500, align: 'left', valign: 'top', refit: false });
       if (it.body) ctx.text(String(it.body), B(tx, cy + 18, box.w - (tx - box.x) - 8, 18), { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
       if (o.labelLeft) ctx.text(String(it.time || ''), B(box.x, cy, 80, 20), { size: 12, color: C('muted'), align: 'right', valign: 'top', refit: false });
       else if (it.time) ctx.text(String(it.time), B(tx, cy + (it.body ? 38 : 20), 120, 16), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
@@ -2654,6 +2895,8 @@ return (function () {
       ctx.text(String(o.pending === true ? 'Pending…' : o.pending), B(nx + nodeW + 16, py - 2, box.w - nodeW - 24, 20), { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
     }
     await ctx.settle(); ctx.place();
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { rowH: rowH, node: nodeW, fs: pp.fs || 14 },
+      { family: 'timeline', state: o.state || 'default' });
     return ctx.host;
   };
 
@@ -2661,7 +2904,8 @@ return (function () {
   CF.accordion = async function (o) {
     o = o || {};
     var items = o.items || [{ title: 'Shipping', body: 'Free on orders over 80.', open: true }, { title: 'Returns', body: '30 days, unworn.' }, { title: 'Support', disabled: true }];
-    var headH = o.headH || 48, padX = o.padX || 16, bodyH = o.bodyH || 44;
+    var prof = CF.profile('navigation', 'accordion'), pp = (prof && prof.size) || {};
+    var headH = o.headH || pp.headH || 48, padX = o.padX || pp.padX || 16, bodyH = o.bodyH || pp.bodyH || 44;
     // Items separate with a row breath (12, `space.md`), NOT a 1px divider: the gap is a layout amount that survives
     // resizing, while a line plate is absolute geometry that drifts when the host refits.
     var itemGap = LY && LY.breath ? LY.breath('row') : 12;
@@ -2671,15 +2915,20 @@ return (function () {
     var ST = o.state || 'default';
     // `name` lets a screen ship a content-specific composition (Accordion·FAQ·Multi) instead of drawing the registered
     // master's anatomy again under the master's name, which the design gate reads as not_component.
+    var aFill = (prof && prof.fill) || (o.ghost ? null : 'surface');
+    var aRad = pp.radius !== undefined ? CF.radius(pp.radius) : CF.radius('md');
     var ctx = CF.build(o.name || CF.name('Accordion', { type: o.ghost ? 'Ghost' : 'Bordered', state: ST, slot: o.accordion ? 'Single' : 'Multi' }), box,
-      { parent: o.parent, fill: o.ghost ? null : C('surface'), radius: CF.radius('md'), stroke: o.ghost ? null : C('border') });
+      { parent: o.parent, fill: aFill ? C(aFill) : null, radius: aRad, stroke: (o.ghost || (prof && prof.border === false)) ? null : C((prof && prof.border) || 'border') });
+    var aElev = prof && prof.elevation;
+    if (aElev && storage.EL && storage.EL.has && storage.EL.has(aElev)) storage.EL.apply(ctx.host, aElev);
     var y = box.y;
     for (var i = 0; i < items.length; i++) {
       var it = items[i], S = it.disabled ? 'disabled' : (it.open ? 'open' : 'default');
       if (i === (o.cursor === undefined ? 0 : Number(o.cursor)) && (ST === 'hover' || ST === 'pressed'))
         ctx.plate(B(box.x + 1, y, w - 2, headH), { name: 'header·' + (ST === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, ST), radius: CF.radius('sm') });
       ctx.text(String(it.title), B(box.x + padX + (o.icon ? 24 : 0), y, w - padX * 2 - 24 - (o.chip ? 90 : 0) - (o.icon ? 24 : 0), headH),
-        { size: 14, color: it.disabled ? C('muted') : C('ink'), weight: 500, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
+        { size: it.open ? (pp.fsOpen || pp.fs || 14) : (pp.fs || 14), color: it.disabled ? C('muted') : C((prof && (it.open ? (prof.inkOpen || prof.ink) : prof.ink)) || 'ink'),
+          weight: pp.weight || 500, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
       ctx.glyph(it.open ? 'chevronUp' : 'chevronDown', B(box.x + w - padX - 16, y + (headH - 16) / 2, 16, 16), { color: it.disabled ? C('muted') : C('ink'), opacity: stateAlpha(S) });
       if (o.icon) ctx.glyph(iconOf(o.icon, 'tag'), B(box.x + padX, y + (headH - 18) / 2, 18, 18), { color: C('muted') });
       if (o.chip && it.chip) await CF.chip({ parent: ctx.host, x: box.x + w - padX - 96, y: y + (headH - 24) / 2, label: it.chip, size: 'sm', kind: 'tag', tone: it.chipTone || 'success' });
@@ -2706,7 +2955,9 @@ return (function () {
     }
     try { ctx.host.resize(w, N(y - box.y)); } catch (e) {}
     await ctx.settle(); ctx.place();
-    if (ST === 'focus') ctx.ring(B(box.x, box.y, w, headH), { radius: CF.radius('md') });
+    if (ST === 'focus') ctx.ring(B(box.x, box.y, w, headH), { radius: aRad });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { headH: headH, padX: padX, radius: aRad, fs: pp.fs || 14 },
+      { family: 'accordion', state: ST });
     return ctx.host;
   };
 
@@ -2791,8 +3042,9 @@ return (function () {
       selected disc · range wash · 4px event dots. 238 wide fits a 240–300 panel. */
   CF.miniCalendar = async function (o) {
     o = o || {};
-    var cell = o.cell || 32, gap = o.gap === undefined ? 2 : o.gap;
-    var headH = o.headH || 32, weekH = o.weekH || 20, padX = 8, padB = 8;
+    var prof = CF.profile('data', 'calendar'), pp = (prof && prof.size) || {};
+    var cell = o.cell || pp.cell || 32, gap = o.gap === undefined ? (pp.gap !== undefined ? pp.gap : 2) : o.gap;
+    var headH = o.headH || pp.headH || 32, weekH = o.weekH || pp.weekH || 20, padX = 8, padB = 8;
     var dim = o.days || 31, first = o.firstWeekday || 0;
     var today = o.today === undefined ? 14 : o.today, sel = o.selected === undefined ? 18 : o.selected;
     // §3.3 `range` is not a label, it is a DRAWING: the soft band only exists when the selection has two ends, so a
@@ -2813,9 +3065,11 @@ return (function () {
     var h = o.h || (headH + weekH + rows * (cell + gap) - gap + padB);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ST = o.state || 'default';
+    var calRad = pp.radius !== undefined ? CF.radius(pp.radius) : CF.radius('md');
     var ctx = CF.build(CF.name('MiniCalendar', { size: cell + 'cell', state: ST,
       slot: [o.range ? 'Range' : null, o.events === false ? 'NoEvents' : null, rows + 'row'].filter(Boolean).join('-') }), box,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border'), strokeW: 1 });
+      { parent: o.parent, fill: C((prof && prof.fill) || 'surface'), radius: calRad,
+        stroke: (prof && prof.border === false) ? null : C((prof && prof.border) || 'border'), strokeW: 1 });
     if (!LY) return ctx.host;
     var grid = LY.grid(B(box.x + padX, box.y + headH + weekH, w - padX * 2, rows * (cell + gap) - gap), 7, gap);
     ctx.glyph('chevronLeft', B(box.x + 8, box.y + (headH - 16) / 2, 16, 16), { color: C('muted'), strokeW: 2 });
@@ -2855,6 +3109,8 @@ return (function () {
     }
     await ctx.settle(); ctx.place();
     if (ST === 'focus') ctx.ring(fcell || box, { radius: CF.radius('control') });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { cell: cell, radius: calRad },
+      { family: 'calendar', state: ST });
     return ctx.host;
   };
 
@@ -2863,21 +3119,30 @@ return (function () {
   /** Nav item — row 40 · icon 20 + 12 gap · collapsed rail 48 square · selected = soft container + 3px bar · group label 32 · count · submenu. */
   CF.navItem = async function (o) {
     o = o || {};
-    var L = CF.ladder(o.size || 'md'), S = o.state || 'default';
+    // A dark app-shell row keeps the generic recipe (its material is the shell's, measured on page 10); a LIGHT nav row
+    // on a recreation reads the source's own measurement — text weight, gap, corner, and how selection is expressed
+    // (a wash + accent bar is an app idiom; a source header may select with ink + a 1px rule instead).
+    var prof = o.onDark ? null : CF.profile('navigation', o.navType || 'navitem');
+    var np = (prof && prof.size) || {};
+    var L = CF.ladder(o.size || 'md');
+    if (prof && np.fs) L = Object.assign({}, L, { fs: np.fs });
+    var S = o.state || 'default';
     var rail = !!o.rail, group = !!o.group;
-    var h = o.h || (group ? 32 : (rail ? 48 : (o.size === 'sm' ? 32 : 40)));
-    var padX = group || rail ? (rail ? 0 : 12) : (o.padX === undefined ? 12 : o.padX);
+    var h = o.h || np.h || (group ? 32 : (rail ? 48 : (o.size === 'sm' ? 32 : 40)));
+    var padX = group || rail ? (rail ? 0 : 12) : (o.padX !== undefined ? o.padX : (np.padX !== undefined ? np.padX : 12));
+    var rad = o.radius !== undefined ? CF.radius(o.radius) : CF.radius(np.radius !== undefined ? np.radius : (rail ? 'control' : 'md'));
     var ic = o.iconSize || (rail ? 22 : 20);
     var label = String(o.label === undefined ? (group ? 'Workspace' : 'Overview') : o.label);
     var badge = o.badge === undefined || o.badge === false ? null : String(o.badge);
     var badgeW = badge ? CF.estW(badge, 12) + 10 : 0;
     var subW = o.submenu ? 24 : 0;
     var hasIcon = !group && o.icon !== false;
-    var w = o.w || (rail ? 48 : max(88, padX * 2 + (hasIcon ? ic + 12 : 0) + CF.estW(label, group ? 11 : L.fs) + badgeW + subW + 4));
+    var minW = np.minW !== undefined ? Number(np.minW) : (rail ? 48 : 88);
+    var w = o.w || (rail ? 48 : max(minW, padX * 2 + (hasIcon ? ic + 12 : 0) + CF.estW(label, group ? 11 : L.fs) + badgeW + subW + 4));
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('NavItem', { type: group ? 'Group' : (rail ? 'Rail' : null), size: o.size, state: S,
              slot: [o.selected ? 'Selected' : null, slotName({ lead: hasIcon ? true : null, badge: badge ? true : null, submenu: o.submenu })].filter(Boolean).join('-') || null }), box,
-      { parent: o.parent, radius: rail ? 'control' : 'md' });
+      { parent: o.parent, radius: rad });
     if (group) {
       ctx.text(label.toUpperCase(), B(box.x + padX, box.y, box.w - padX * 2, box.h),
         { size: 12, color: o.onDark ? C('mutedOnInk') : C('muted'), weight: 600, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
@@ -2885,25 +3150,36 @@ return (function () {
       return ctx.host;
     }
     var sel = !!o.selected;
+    var selStyle = (prof && prof.selected) || {};
+    var selFillTok = selStyle.fill !== undefined ? selStyle.fill : 'primarySoft';
+    var selInkTok = selStyle.ink || (prof && prof.ink ? prof.ink : 'primary');
+    var indicator = o.indicator === false ? false : (selStyle.indicator || (prof ? 'none' : 'bar'));
+    var allowWash = !prof || prof.wash === true;
     // A nav row mounted on an ink shell (`o.onDark`, set by CF.sideNav for its dark variant) has to lift its copy: the
     // palette ink is the same #161616 as the panel (1.00:1) and the palette muted is 2.54:1. The light `primarySoft`
     // selection wash would also invert the panel polarity, so a dark row selects with a white state layer instead and
     // lets the accent bar carry the brand.
-    ctx.host.fills = sel && !o.onDark ? CF.fills(C('primarySoft'), S === 'default' ? null : S)
-      : CF.fills(null, S === 'default' ? null : S, o.onDark ? { onDark: true } : undefined);
+    ctx.host.fills = (sel && selFillTok && !o.onDark) ? CF.fills(C(selFillTok), (allowWash && S !== 'default') ? S : null)
+      : CF.fills(null, (allowWash && S !== 'default') ? S : null, o.onDark ? { onDark: true } : undefined);
     var ink = o.onDark ? (S === 'disabled' ? C('mutedOnInk') : TONE.onDark.ink)
-      : (S === 'disabled' ? C('muted') : (sel ? C('primary') : C('ink')));
+      : (S === 'disabled' ? C('muted') : (sel ? C(selInkTok) : C(np.ink || 'ink')));
     var x = box.x + padX;
     if (hasIcon) {
       if (rail) ctx.glyph(iconOf(o.icon, 'home'), B(box.x + (w - ic) / 2, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 2 });
       else { ctx.glyph(iconOf(o.icon, 'home'), B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 1.8 }); x += ic + 12; }
     }
-    if (sel && o.indicator !== false)
+    var labelW = CF.estW(label, L.fs);
+    if (sel && indicator === 'bar')
       ctx.plate(rail ? B(box.x + w - 3, box.y + (h - 20) / 2, 3, 20) : B(box.x, box.y + (h - 20) / 2, 3, 20),
-        { name: 'accent·bar', fill: C('primary'), radius: 'xs' });
+        { name: 'accent·bar', fill: C(selInkTok), radius: 'xs' });
     if (!rail) {
       ctx.text(label, B(x, box.y, box.w - (x - box.x) - padX - badgeW - subW, h),
-        { size: L.fs, color: ink, weight: sel ? 500 : 400, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
+        { size: L.fs, color: ink, weight: sel ? (prof && prof.selectedWeight ? prof.selectedWeight : 500) : (prof && prof.weight ? prof.weight : 400),
+          opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
+      // `underline` is a real selection idiom (a 1px rule under the label), not a decoration: sources that select a
+      // nav item with colour + rule have no wash and no bar, and drawing a bar would be an invented idiom.
+      if (sel && indicator === 'underline')
+        ctx.plate(B(x, box.y + h - 1, max(8, labelW), 1), { name: 'accent·underline', fill: C(selInkTok) });
       var rx = box.x + box.w - padX;
       if (o.submenu) { rx -= 16; ctx.glyph(o.expanded ? 'chevronUp' : 'chevronRight', B(rx, box.y + (h - 16) / 2, 16, 16), { color: o.onDark ? C('mutedOnInk') : C('muted'), anchor: 'right' }); rx -= 8; }
       if (badge) {
@@ -2913,18 +3189,23 @@ return (function () {
     }
     await ctx.settle(); ctx.place();
     if (!rail && !group) ctx.refit(padX);
-    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: CF.radius('md') });
+    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: rad });
     if (rail) ctx.hitPad(B(box.x, box.y, w, h), 44);
+    CF.profStamp(ctx.host, prof, { h: h, padX: padX, radius: rad, fs: L.fs },
+      { family: 'navitem', size: L.key, selected: sel, indicator: indicator, state: S, ink: sel ? selInkTok : (np.ink || 'ink') });
     return ctx.host;
   };
 
   /** One tab — line (2px ink bar) · enclosed · card · pill · vertical · icon · count · closable · disabled. */
   CF.tabs = async function (o) {
     o = o || {};
-    var type = o.type || 'line', S = o.state || 'default', L = CF.ladder(o.size || 'md');
+    var prof = CF.profile('navigation', 'tabs'), pp = (prof && prof.size) || {};
+    var type = o.type || (prof && prof.type) || 'line', S = o.state || 'default';
+    var L = CF.ladder(o.size || 'md');
+    if (prof && pp.fs) L = Object.assign({}, L, { fs: pp.fs });
     var vert = o.direction === 'vertical';
-    var h = o.h || (type === 'pill' ? (o.size === 'sm' ? 28 : 32) : (o.size === 'sm' ? 32 : 40));
-    var padX = o.padX === undefined ? (type === 'pill' ? 14 : 16) : o.padX;
+    var h = o.h || pp.h || (type === 'pill' ? (o.size === 'sm' ? 28 : 32) : (o.size === 'sm' ? 32 : 40));
+    var padX = o.padX === undefined ? (pp.padX !== undefined ? pp.padX : (type === 'pill' ? 14 : 16)) : o.padX;
     var ic = o.icon === false ? 0 : (o.iconSize || 16);
     var label = String(o.label === undefined ? 'Tab' : o.label);
     var countW = o.count === undefined || o.count === false ? 0 : CF.estW(String(o.count), 12) + 8;
@@ -2935,20 +3216,22 @@ return (function () {
     var ctx = CF.build(CF.name('Tabs', { type: type, size: o.size, state: S,
              slot: [sel ? 'Selected' : null, slotName({ lead: ic ? true : null, count: countW ? true : null, closable: o.closable })].filter(Boolean).join('-') || null }), box,
       { parent: o.parent, radius: type === 'pill' ? 'control' : (type === 'card' ? 'sm' : 'none') });
-    if (type === 'pill') ctx.host.fills = sel ? CF.fills(C('primarySoft'), S === 'default' ? null : S) : CF.fills(null, S === 'default' ? null : S);
+    var tSel = (prof && prof.selected) || {};
+    var tInk = tSel.ink || 'primary', tFill = tSel.fill;
+    if (type === 'pill') ctx.host.fills = sel ? CF.fills(tFill ? C(tFill) : C('primarySoft'), S === 'default' ? null : S) : CF.fills(null, S === 'default' ? null : S);
     else if (type === 'enclosed' || type === 'card') ctx.host.fills = CF.fills(sel && type === 'enclosed' ? C('surface') : null, S === 'default' ? null : S);
     else ctx.host.fills = CF.fills(null, S === 'default' ? null : S);
     if (type === 'enclosed' || type === 'card') {
       var blH = (type === 'card' && !sel) ? 1 : 2;
-      ctx.plate(B(box.x, box.y + box.h - blH, box.w, blH), { name: 'base·line', fill: sel ? C('primary') : C('border') });
+      ctx.plate(B(box.x, box.y + box.h - blH, box.w, blH), { name: 'base·line', fill: sel ? C(tInk) : C('border') });
     }
     else if (sel) ctx.plate(vert ? B(box.x, box.y + 6, 3, box.h - 12) : B(box.x + (type === 'line' ? padX * 0.4 : 0), box.y + box.h - 2, box.w - (type === 'line' ? padX * 0.8 : 0), 2),
-      { name: 'ink·bar', fill: C('primary'), radius: 'xs' });
-    var ink = S === 'disabled' ? C('muted') : (sel ? C('primary') : C('ink'));
+      { name: 'ink·bar', fill: C(tInk), radius: 'xs' });
+    var ink = S === 'disabled' ? C('muted') : (sel ? C(tSel.labelInk || tInk) : C('ink'));
     var x = box.x + padX;
     if (ic) { ctx.glyph(iconOf(o.icon, 'grid'), B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 1.8 }); x += ic + 8; }
     ctx.text(label, B(x, box.y, box.w - (x - box.x) - padX - countW - closeW + 4, h),
-      { size: L.fs, color: ink, weight: sel ? 500 : 400, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
+      { size: L.fs, color: ink, weight: sel ? (tSel.weight || 500) : ((prof && prof.weight) || 400), opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
     var rx = box.x + box.w - padX;
     if (o.closable) { rx -= 14; ctx.glyph('close', B(rx, box.y + (h - 14) / 2, 14, 14), { color: C('muted'), strokeW: 1.6, anchor: 'right' }); }
     if (countW) { rx -= countW; ctx.plate(B(rx, box.y + (h - 18) / 2, countW, 18), { name: 'count', fill: C('surfaceAlt'), radius: 'control' });
@@ -2956,6 +3239,9 @@ return (function () {
     await ctx.settle(); ctx.place();
     if (!o.w) ctx.refit(padX);
     if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: CF.radius('sm') });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { h: h, padX: padX, fs: L.fs,
+      radius: type === 'pill' ? CF.radius('control') : (type === 'card' ? CF.radius('sm') : 0) },
+      { family: 'tabs', size: L.key, type: type, selected: sel, state: S });
     return ctx.host;
   };
 
@@ -2991,8 +3277,9 @@ return (function () {
   /** Breadcrumb — 13-14 · chevron or slash separator 16 · links tint on hover · last = current (ink 500, not a link) · truncation menu. */
   CF.breadcrumb = async function (o) {
     o = o || {};
+    var prof = CF.profile('navigation', 'breadcrumb'), pp = (prof && prof.size) || {};
     var items = o.items || ['Workspace', 'Projects', CF.brandName + ' design'];
-    var fs = o.fs || 13, sepKind = o.sep || 'chevron', h = o.h || max(22, fs + 8);
+    var fs = o.fs || pp.fs || 13, sepKind = o.sep || (prof && prof.sep) || 'chevron', h = o.h || max(22, fs + 8);
     var sepW = sepKind === 'slash' ? 10 : 16 + 8;
     var backW = o.back ? 24 + 8 : 0;
     var cells = items.map(function (it, i) {
@@ -3016,7 +3303,7 @@ return (function () {
       else if (i === o.hover) ctx.plate(B(cellBox.x, cellBox.y, cellBox.w, cellBox.h), { name: 'tint·' + i, fills: CF.fills(null, 'hover'), radius: CF.radius('xs') });
       if (c.glyph) { ctx.glyph(iconOf(c.glyph, 'folder'), B(x + 2, box.y + (h - 14) / 2, 14, 14), { color: C('muted') }); x += 18; }
       ctx.text(txt, B(x + (tint ? 2 : 0), box.y, max(8, cellBox.w - (tint ? 4 : 0)), h),
-        { size: fs, color: c.last ? C('ink') : C(o.onDark ? 'onPrimary' : 'muted'), weight: c.last ? 500 : 400,
+        { size: fs, color: c.last ? C((prof && prof.ink) || 'ink') : C(o.onDark ? 'onPrimary' : ((prof && prof.linkInk) || 'muted')), weight: c.last ? ((prof && prof.weight) || 500) : 400,
           opacity: o.state === 'disabled' ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle', refit: false });
       x += tw;
       if (c.menu) { ctx.glyph('dots', B(x - 14, box.y + (h - 12) / 2, 12, 12), { color: C('muted'), fill: C('muted'), anchor: 'right' }); }
@@ -3029,14 +3316,18 @@ return (function () {
     });
     await ctx.settle(); ctx.place();
     if (o.state === 'focus') ctx.ring(focusB || B(box.x, box.y, box.w, h), { radius: CF.radius('xs') });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { fs: fs, sep: sepKind },
+      { family: 'breadcrumb', state: o.state || 'default' });
     return ctx.host;
   };
 
   /** Pagination — cell 32 (24 sm / 40 lg) · prev/next chevron with disabled ends · boundary+sibling window · ellipsis · quick jump · size changer · total. */
   CF.pagination = async function (o) {
     o = o || {};
+    var prof = CF.profile('navigation', 'pagination'), pp = (prof && prof.size) || {};
     var L = CF.ladder(o.size || 'md');
-    var cell = o.cell || (o.size === 'sm' ? 24 : (o.size === 'lg' ? 40 : 32));
+    if (prof && pp.fs) L = Object.assign({}, L, { fs: pp.fs });
+    var cell = o.cell || pp.cell || (o.size === 'sm' ? 24 : (o.size === 'lg' ? 40 : 32));
     var cur = o.current === undefined ? 3 : Number(o.current), total = o.total === undefined ? 10 : Number(o.total);
     var sib = o.siblings === undefined ? 1 : Number(o.siblings), bound = o.boundary === undefined ? 1 : Number(o.boundary);
     var jumpW = o.quickJumper ? 56 : 0, sizeW = o.showSizeChanger ? 96 : 0, totalW = o.showTotal ? CF.estW(String(o.showTotal === true ? '92 items' : o.showTotal), 13) + 8 : 0;
@@ -3060,10 +3351,18 @@ return (function () {
     var cy = box.y + (H - cell) / 2, x = box.x;
     var disabled = S === 'disabled', al = disabled ? CF.STATE.disabledContent : 1;
     var fxB = null;
+    var cellRad = pp.radius !== undefined ? CF.radius(pp.radius) : CF.radius('sm');
+    var selFill = (prof && prof.activeFill) || 'primary';
     var cellBtn = function (bx, kind, sel) {
       var st = disabled ? 'disabled' : (sel ? 'selected' : (kind === 'num' && i === o.hover ? 'hover' : 'default'));
-      ctx.plate(B(bx, cy, cell, cell), { name: 'cell·' + (sel ? 'active' : kind), fills: sel ? CF.fills(C('primary'), null) : CF.fills(null, st === 'hover' ? 'hover' : null),
-        radius: CF.radius('sm'), stroke: !sel && !disabled && o.outlined ? C('border') : null, strokeW: 1 });
+      var cb = ctx.plate(B(bx, cy, cell, cell), { name: 'cell·' + (sel ? 'active' : kind), fills: sel ? CF.fills(C(selFill), null) : CF.fills(null, st === 'hover' ? 'hover' : null),
+        radius: cellRad, stroke: !sel && !disabled && (prof ? prof.border !== false : o.outlined) ? C((prof && prof.border) || 'border') : null, strokeW: 1 });
+      // A source pagination cell is a RAISED ink tile wearing the control stack; the generic kit paints it flat. The
+      // profile's elevation recipe is applied here so the active cell reads as the same object as the page's buttons.
+      if (sel) {
+        var eL = prof && prof.elevation;
+        if (eL && storage.EL && storage.EL.has && storage.EL.has(eL)) storage.EL.apply(cb, eL);
+      }
       if (S === 'focus' && sel && !fxB) fxB = B(bx, cy, cell, cell);
     };
     var prevOff = disabled || cur <= 1, nextOff = disabled || cur >= total;
@@ -3094,8 +3393,10 @@ return (function () {
       x += CF.estW('Go to', 13) + 8;
       await CF.input({ parent: ctx.host, x: x, y: box.y + (H - L.h) / 2, w: jumpW, size: o.size, placeholder: String(cur) });
     }
-    if (S === 'focus') ctx.ring(fxB || B(box.x, cy, cell, cell), { radius: CF.radius('sm') });
+    if (S === 'focus') ctx.ring(fxB || B(box.x, cy, cell, cell), { radius: cellRad });
     await ctx.settle(); ctx.place();
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { cell: cell, radius: cellRad, fs: L.fs },
+      { family: 'pagination', size: String(o.size || 'md').toLowerCase(), state: S });
     return ctx.host;
   };
 
@@ -3209,8 +3510,10 @@ return (function () {
   /** Dropdown menu — panel 200-280 pad 4-8 · item 32 · icon 16 + label + shortcut (muted, right) + submenu chevron · group label · divider · danger · selectable. */
   CF.menu = async function (o) {
     o = o || {};
+    var prof = CF.profile('navigation', 'menu'), pp = (prof && prof.size) || {};
     var raw = o.items || ['Edit', 'Duplicate', '-', 'Share', 'Delete'];
-    var w = o.w || 220, itemH = o.itemH || 32, padX = o.padX === undefined ? 12 : o.padX, padV = o.padV === undefined ? 4 : o.padV;
+    var w = o.w || 220, itemH = o.itemH || pp.itemH || 32, padX = o.padX === undefined ? (pp.padX !== undefined ? pp.padX : 12) : o.padX,
+      padV = o.padV === undefined ? (pp.padV !== undefined ? pp.padV : 4) : o.padV;
     // §2.1 A `'-'` in the items list is a SEMANTIC group boundary, not a spacer: it draws nothing and takes no
     // vertical space, so every command row keeps the same rhythm. Measured on `Menu·IconStart`, giving it a
     // `space.md` gap made the label gaps 12 / 24 / 12 — the owner read that as uneven padding, and with rule 43
@@ -3226,10 +3529,14 @@ return (function () {
     var h = padV * 2;
     rows.forEach(function (r) { h += r.kind === 'divider' ? 0 : (r.kind === 'group' ? 24 : itemH); });
     var box = B(o.x || 0, o.y || 0, w, h);
+    var mFill = (prof && prof.fill) || 'surface';
+    var mRad = pp.radius !== undefined ? CF.radius(pp.radius) : CF.radius('md');
     var ctx = CF.build(CF.name('Menu', { type: o.variant === 'submenu' ? 'Submenu' : (o.selectable ? 'Selectable' : null), state: o.state,
       // the leading 16px glyph column IS the menu's icon slot, so the host name has to say so (§4 coverage reads names).
       slot: [hasKeys ? 'Shortcuts' : null, hasIcons ? 'IconStart' : 'NoIcon'].filter(Boolean).join('-') || null }), box,
-      { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border'), strokeW: 1, shadow: o.flat ? 0 : 3 });
+      { parent: o.parent, fill: C(mFill), radius: mRad, stroke: (prof && prof.border === false) ? null : C((prof && prof.border) || 'border'), strokeW: 1, shadow: o.flat ? 0 : 3 });
+    var mElev = prof && prof.elevation;
+    if (mElev && storage.EL && storage.EL.has && storage.EL.has(mElev)) storage.EL.apply(ctx.host, mElev);
     var y = box.y + padV;
     var firstItem = -1;
     for (var fi = 0; fi < rows.length; fi++) { if (rows[fi].kind === 'item') { firstItem = fi; break; } }
@@ -3270,6 +3577,8 @@ return (function () {
     }
     await ctx.settle(); ctx.place();
     if (o.state === 'focus') ctx.ring(rowB || B(box.x + 4, box.y + padV, box.w - 8, itemH), { radius: CF.radius('sm') });
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { itemH: itemH, padX: padX, padV: padV, radius: mRad },
+      { family: 'menu', state: o.state || 'default' });
     return ctx.host;
   };
 
@@ -3404,19 +3713,29 @@ return (function () {
   };
   var SEVERITY_GLYPH = { error: 'error', danger: 'error', warning: 'warning', info: 'info', processing: 'info', success: 'success', neutral: 'info' };
 
-  /** Alert — severity icon 20 · title 14/500 + body 13 · close 16 · action row · soft tint or filled · banner = full-bleed, no radius. */
+  /** Alert — severity icon 20 · title 14/500 + body 13 · close 16 · action row · soft tint or filled · banner = full-bleed, no radius.
+      A source with no alert component declares a DERIVED material in `feedback.alert` (`{material, fill, radius,
+      derived:true}` — source-adaptation §4): a plate built from a material the source does own. With no profile the
+      generic path is the tone's own wash, and no elevation recipe is invented. */
   CF.alert = async function (o) {
     o = o || {};
     var tone = o.tone || 'info', banner = o.variant === 'banner', filled = o.variant === 'filled';
     var soft = TONEMAP[tone] || TONEMAP.info;
+    var A = CF.profile('feedback', 'alert') || {};
     // §4: a tinted alert is ink copy on the wash, a filled alert is white copy on the ink surface. The base hue stays on
     // the accent bar and the icon — graphics need 3:1, copy needs 4.5, and the base hue never reaches it on its own tint.
-    var deep = C(soft[2]), fg = C(soft[1]), bgc = filled ? deep : C(soft[0]);
-    var ink = filled ? C('onPrimary') : deep;
+    var deep = C(soft[2]), fg = C(soft[1]);
+    // A derived material is a NEUTRAL plate with a tone-coloured icon; the generic default is the tone wash itself.
+    var bgc = filled ? deep : C(A.fill || (A.material ? 'surfaceAlt' : soft[0]));
+    var rad = banner ? 0 : (A.radius === undefined ? CF.radius('lg') : CF.radius(Number(A.radius)));
+    var ink = filled ? C('onPrimary') : C('ink');
+    var iconInk = A.icon === false ? null : (filled ? C('onPrimary') : (A.iconInk ? C(A.iconInk) : deep));
     var title = o.title !== undefined ? String(o.title) : (o.message !== undefined ? String(o.message) : 'Changes published');
     var desc = o.description !== undefined ? String(o.description) : (o.title !== undefined && o.message !== undefined ? String(o.message) : null);
-    var fs = 14, dfs = 13, padX = o.padX === undefined ? 16 : o.padX, padY = o.padY === undefined ? 12 : o.padY;
-    var iconW = o.icon === false ? 0 : 20 + 12, closeW = o.closable ? 16 + 12 : 0;
+    var fs = o.fs || A.fs || 14, dfs = o.descFs || A.descFs || 13;
+    var padX = o.padX === undefined ? (A.padX !== undefined ? A.padX : 16) : o.padX;
+    var padY = o.padY === undefined ? (A.padY !== undefined ? A.padY : 12) : o.padY;
+    var iconW = (o.icon === false || A.icon === false) ? 0 : 20 + 12, closeW = o.closable ? 16 + 12 : 0;
     var acts = o.actions ? (Array.isArray(o.actions) ? o.actions : [String(o.actions)]) : null;
     var actW = acts ? acts.reduce(function (a, s) { return a + CF.estW(String(s), 13) + 24; }, 0) : 0;
     var contentW = max(CF.estW(title, fs), desc ? CF.estW(desc, dfs) : 0, actW);
@@ -3424,14 +3743,14 @@ return (function () {
     var h = padY * 2 + fs + 4 + (desc ? dfs + 6 : 0) + (acts ? 12 + 20 : 0);
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('Alert', { type: banner ? 'Banner' : (filled ? 'Filled' : (desc ? 'Description' : null)), tone: tone, state: o.state, slot: o.closable ? 'Dismissible' : null }), box,
-      { parent: o.parent, radius: banner ? 0 : CF.radius('md') });
+      { parent: o.parent, radius: rad });
     ctx.host.fills = [{ fillColor: bgc, fillOpacity: 1 }];
-    if (banner || o.leftBar !== false) ctx.plate(B(box.x, box.y, 3, box.h), { name: 'accent·bar', fill: filled ? C('surface') : fg });
+    if (o.leftBar === true && A.bar !== false) ctx.plate(B(box.x, box.y, 3, box.h), { name: 'accent·bar', fill: filled ? C('surface') : fg });
     var x = box.x + padX;
-    if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'info', B(x, box.y + padY + 1, 20, 20), { color: ink, strokeW: 1.8 }); x += 20 + 12; }
+    if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'info', B(x, box.y + padY + 1, 20, 20), { color: iconInk, strokeW: 1.8 }); x += 20 + 12; }
     ctx.text(title, B(x, box.y + padY - 1, contentW, fs + 6), { size: fs, color: ink, weight: 600, align: 'left', valign: 'top', refit: false });
     var yy = box.y + padY + fs + 5;
-    if (desc) { ctx.text(desc, B(x, yy, contentW, dfs + 6), { size: dfs, color: filled ? C('onPrimary') : C('ink'), opacity: filled ? 0.92 : 0.78, align: 'left', valign: 'top', refit: false }); yy += dfs + 6; }
+    if (desc) { ctx.text(desc, B(x, yy, contentW, dfs + 6), { size: dfs, color: filled ? C('onPrimary') : C('muted'), opacity: filled ? 0.92 : 1, align: 'left', valign: 'top', refit: false }); yy += dfs + 6; }
     if (acts) {
       yy += 6;
       var ax = x;
@@ -3443,6 +3762,14 @@ return (function () {
     }
     if (o.closable) ctx.glyph('close', B(box.x + box.w - padX - 16, box.y + padY, 16, 16), { color: ink, opacity: 0.7, strokeW: 1.6, anchor: 'right' });
     await ctx.settle(); ctx.place();
+    var EL = storage.EL;
+    // The recipe is applied only when the profile names one that the elevation engine actually holds: a fallback name
+    // typed here would either no-op or, worse, borrow another family's material.
+    var aRole = A.material && EL && EL.has && EL.has(A.material) ? A.material : null;
+    if (aRole && !filled && !banner) EL.apply(ctx.host, aRole);
+    try { ctx.host.setPluginData('nl:fb', JSON.stringify({ family: 'alert', material: A.material || null, fill: A.fill || null, radius: A.radius === undefined ? CF.radiusToken(rad) : A.radius, derived: !!A.derived })); } catch (e) {}
+    if (A._family) CF.profStamp(ctx.host, A, { radius: rad, fill: A.fill || (A.material ? 'surfaceAlt' : soft[0]), material: A.material || null, padX: padX, padY: padY, fs: fs },
+      { family: 'alert', tone: tone, variant: o.variant || null, derived: !!A.derived, elevation: aRole });
     return ctx.host;
   };
 
@@ -3475,20 +3802,28 @@ return (function () {
     return ctx.host;
   };
 
-  /** Toast — compact dark/light pill · icon 18 + 13-14 copy · optional action link · auto-dismiss meter 2-3px. */
+  /** Toast — compact dark/light pill · icon 18 + 13-14 copy · optional action link · auto-dismiss meter 2-3px.
+      A source with no toast declares a DERIVED material in `feedback.toast` (`{material, fill, radius, derived:true}`);
+      the factory applies that recipe only when the elevation engine holds it, and never names one of its own. */
   CF.toast = async function (o) {
     o = o || {};
     var tone = o.tone || 'neutral', dark = o.surface !== 'light';
+    var T = CF.profile('feedback', 'toast') || {};
     var msg = String(o.message === undefined ? 'Saved to the cloud' : o.message);
-    var fs = 13, padx = 12, pady = 10, iconW = o.icon === false ? 0 : 18 + 8;
+    var fs = o.fs || T.fs || 13;
+    var padx = o.padX === undefined ? (T.padX !== undefined ? T.padX : 12) : o.padX;
+    var pady = o.padY === undefined ? (T.padY !== undefined ? T.padY : 10) : o.padY;
+    var iconW = o.icon === false ? 0 : 18 + 8;
     var actW = o.action ? CF.estW(String(o.action), fs) + 12 : 0;
     var meterH = o.duration ? 3 : 0;
     var w = o.w || (padx * 2 + iconW + CF.estW(msg, fs) + actW + (actW ? 8 : 0));
     var h = pady * 2 + fs + 6 + meterH;
     var box = B(o.x || 0, o.y || 0, max(120, w), h);
+    var tRad = T.radius === undefined ? CF.radius('sm') : CF.radius(Number(T.radius));
+    var tFill = dark ? C(T.fill || 'darkRaised') : C(T.fillLight || 'surface');
     var ctx = CF.build(CF.name('Toast', { type: dark ? 'Dark' : 'Light', tone: tone, slot: o.action ? 'Action' : (o.duration ? 'Timed' : null) }), box,
-      { parent: o.parent, fill: dark ? C('ink') : C('surface'), radius: CF.radius('md'), stroke: dark ? null : C('border'), strokeW: 1, shadow: dark ? 0 : 4 });
-    var ink = dark ? C('onPrimary') : C('ink');
+      { parent: o.parent, fill: tFill, radius: tRad, stroke: dark ? null : C('border'), strokeW: 1, shadow: T.material ? 0 : (dark ? 3 : 2) });
+    var ink = dark ? C(T.ink || 'onPrimary') : C('ink');
     var x = box.x + padx;
     if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'check', B(x, box.y + pady + 1, 18, 18), { color: tone === 'neutral' ? ink : C(TONEMAP[tone] ? TONEMAP[tone][1] : 'success'), strokeW: 1.8 }); x += 18 + 8; }
     ctx.text(msg, B(x, box.y + pady, box.w - (x - box.x) - padx - actW - (actW ? 8 : 0), fs + 6),
@@ -3496,33 +3831,69 @@ return (function () {
     if (actW) ctx.text(String(o.action), B(box.x + box.w - padx - actW + 4, box.y + pady, actW - 4, fs + 6),
       { size: fs, color: dark ? C('onPrimary') : C('primary'), weight: 600, align: 'right', valign: 'top', refit: false, underline: true });
     if (meterH) {
-      ctx.plate(B(box.x + 1, box.y + box.h - meterH, box.w - 2, meterH), { name: 'meter·track', fill: dark ? '#FFFFFF' : C('ink'), opacity: 0.12 });
+      ctx.plate(B(box.x + 1, box.y + box.h - meterH, box.w - 2, meterH), { name: 'meter·track', fill: dark ? ink : C('ink'), opacity: 0.12 });
       ctx.plate(B(box.x + 1, box.y + box.h - meterH, max(4, (box.w - 2) * (o.remaining === undefined ? 0.62 : Number(o.remaining))), meterH),
-        { name: 'meter', fill: dark ? '#FFFFFF' : C('primary'), opacity: dark ? 0.85 : 1 });
+        { name: 'meter', fill: dark ? ink : C('primary'), opacity: dark ? 0.85 : 1 });
     }
     await ctx.settle(); ctx.place();
+    var EL = storage.EL;
+    var tRole = T.material && EL && EL.has && EL.has(T.material) ? T.material : null;
+    if (tRole) EL.apply(ctx.host, tRole);
+    try { ctx.host.setPluginData('nl:fb', JSON.stringify({ family: 'toast', material: T.material || null, fill: dark ? (T.fill || 'darkRaised') : (T.fillLight || 'surface'), radius: T.radius === undefined ? CF.radiusToken(tRad) : T.radius, derived: !!T.derived })); } catch (e) {}
+    if (T._family) CF.profStamp(ctx.host, T, { radius: tRad, fill: dark ? (T.fill || 'darkRaised') : (T.fillLight || 'surface'), material: T.material || null, padX: padx, padY: pady, fs: fs },
+      { family: 'toast', tone: tone, surface: dark ? 'dark' : 'light', derived: !!T.derived, elevation: tRole });
     return ctx.host;
   };
 
-  /** Tooltip — 12-13 copy · pad 8×5 · dark by default · arrow on any side · optional title line. */
+  /** Tooltip — small copy · dark by default · optional arrow on any side · optional title line.
+      Every measurement below is a GENERIC fallback; a recreation reads `feedback.tooltip` (source-adaptation §2), so
+      the padding, corner, leading, shadow and arrow are the source's, not this file's. */
   CF.tooltip = async function (o) {
     o = o || {};
-    var dark = o.surface !== 'light', fs = o.fs || 12;
+    var R = CF.profile('feedback', 'tooltip') || {};
+    var padX = o.padx !== undefined ? o.padx : (R.padX !== undefined ? R.padX : 10);
+    var padY = o.pady !== undefined ? o.pady : (R.padY !== undefined ? R.padY : 7);
+    // `fs` may be declared as a list (a source whose tooltip carries two sizes); the draw takes the first.
+    var rfs = Array.isArray(R.fs) ? R.fs[0] : R.fs;
+    var fs = o.fs || rfs || 12;
+    var lhPx = o.lineHeight || R.lineHeight || Math.round(fs * 1.4);
+    var radius = R.radius === undefined ? CF.radius('sm') : CF.radius(Number(R.radius));
+    var shadow = R.shadow === undefined ? 1 : Number(R.shadow);
+    var depth = R.arrowDepth === undefined ? 5 : Number(R.arrowDepth);
+    var brand = o.brand || o.surface === 'brand';
+    var dark = o.surface !== 'light';
+    var fill = brand ? C('primary') : (dark ? C(R.fill || 'ink') : C('surface'));
+    var ink = (dark || brand) ? C(R.ink || 'onPrimary') : C('ink');
     var title = o.title !== undefined ? String(o.title) : null;
     var msg = String(o.text === undefined ? 'Copy the link first' : o.text);
-    var padx = 10, pady = 7, arrow = o.arrow ? (o.arrowSide || 'top') : null, depth = arrow ? 7 : 0;
-    var panel = B((o.x || 0) + depth * (arrow === 'left' ? 1 : 0), (o.y || 0) + depth * (arrow === 'top' ? 1 : 0),
-                  max(48, padx * 2 + max(CF.estW(msg, fs), title ? CF.estW(title, fs) : 0)),
-                  pady * 2 + fs + 4 + (title ? fs + 4 : 0));
+    var tw = Math.max(CF.estW(msg, fs), title ? CF.estW(title, fs) : 0);
+    var panelW = Math.max(48, padX * 2 + tw);
+    var panelH = padY * 2 + lhPx + (title ? lhPx : 0);
+    // The arrow is a profile decision: a source that draws one gets one, a source that does not gets a plain bubble.
+    var arrow = o.arrow === false ? null : (o.arrowSide || (R.arrow === undefined ? null : (R.arrow ? 'top' : null)));
+    var panel = B((o.x || 0) + (arrow === 'left' ? depth : 0), (o.y || 0) + (arrow === 'top' ? depth : 0), panelW, panelH);
     var bb = arrow ? bubbleBox(panel, arrow, depth) : { host: panel, panel: panel, at: 0, depth: 0, side: null };
-    var ctx = CF.build(CF.name('Tooltip', { type: dark ? 'Dark' : 'Light', slot: title ? 'Title' : null }), bb.host, { parent: o.parent });
-    if (arrow) bubbleDraw(ctx, bb, { fill: dark ? C('ink') : C('surface'), stroke: dark ? null : C('border'), radius: CF.radius('sm'), shadow: dark ? 2 : 4 });
-    else { ctx.host.fills = [{ fillColor: dark ? C('ink') : C('surface'), fillOpacity: 1 }]; ctx.host.borderRadius = CF.radius('sm'); }
-    var ink = dark ? '#FFFFFF' : C('ink');
-    var y = panel.y + pady;
-    if (title) { ctx.text(title, B(panel.x + padx, y, panel.w - padx * 2, fs + 4), { size: fs, color: ink, weight: 600, valign: 'top', refit: false }); y += fs + 4; }
-    ctx.text(msg, B(panel.x + padx, y, panel.w - padx * 2, fs + 4), { size: fs, color: ink, opacity: title ? 0.86 : 1, valign: 'top', refit: false });
+    var ctx = CF.build(CF.name('Tooltip', { type: brand ? 'Brand' : (dark ? 'Dark' : 'Light'), slot: title ? 'Title' : null }), bb.host, { parent: o.parent });
+    if (arrow) bubbleDraw(ctx, bb, { fill: fill, stroke: (dark || brand) ? null : C('border'), radius: radius, shadow: shadow });
+    else {
+      ctx.host.fills = [{ fillColor: fill, fillOpacity: 1 }];
+      ctx.host.borderRadius = radius;
+    }
+    var y = panel.y + padY;
+    if (title) { ctx.text(title, B(panel.x + padX, y, panel.w - padX * 2, lhPx), { size: fs, color: ink, weight: 600, valign: 'top', refit: false }); y += lhPx; }
+    ctx.text(msg, B(panel.x + padX, y, panel.w - padX * 2, lhPx), { size: fs, color: ink, weight: 400, valign: 'top', refit: false });
+    // A profile can pin the leading to something the body ramp does not carry; set the exact ratio before place()
+    // measures the text centre, or the copy lands off-axis.
+    ctx.pend.forEach(function (h) { try { h.t.lineHeight = String(lhPx / fs); } catch (e) {} });
     await ctx.settle(); ctx.place();
+    if (!shadow) {
+      try { ctx.host.shadows = []; } catch (e) {}
+      try { ctx.kids.forEach(function (k) { k.shadows = []; }); } catch (e) {}
+    }
+    var surface = brand ? 'brand' : (dark ? 'dark' : 'light');
+    try { ctx.host.setPluginData('nl:fb', JSON.stringify({ family: 'tooltip', radius: radius, padX: padX, padY: padY, fs: fs, lineHeight: lhPx, shadow: shadow, arrow: !!arrow, surface: surface })); } catch (e) {}
+    CF.profStamp(ctx.host, CF.profile('feedback', 'tooltip'), { padX: padX, padY: padY, radius: radius, shadow: shadow, fs: fs, arrow: !!arrow },
+      { family: 'tooltip', surface: surface });
     return ctx.host;
   };
 
@@ -3648,6 +4019,47 @@ return (function () {
       }
     }
     await ctx.settle(); ctx.place();
+    return ctx.host;
+  };
+
+  /** SourceModal — the SOURCE's media modal, not a generic dialog. Everything that makes it the source's is declared in
+      `feedback.modal`: `{radius, border, bodyPad, scrim, anchor, headerH, panelW/panelH, mediaFill, closeInk, variants}`.
+      `o.variant` selects a profile variant (the first declared one is the default) and also names the master, so the
+      component names stay the project's, not this file's. With no modal profile it delegates to `CF.modal` — inventing a
+      "source" modal out of defaults is exactly the drift rule 56 reports. */
+  CF.sourceModal = async function (o) {
+    o = o || {};
+    var M = CF.profile('feedback', 'modal');
+    if (!M) return CF.modal(o);
+    var vs = M.variants || {};
+    var vkeys = CF.variantKeys(vs);
+    var variant = vkeys.indexOf(String(o.variant)) >= 0 ? String(o.variant) : (o.variant ? String(o.variant) : (vkeys[0] || 'default'));
+    // the merged read: a variant overrides the family, so every value below has exactly one source of truth
+    var V = CF.profile('feedback', 'modal', variant) || M;
+    var W = o.w || V.w || 720, H = o.h || V.h || 620, x = o.x || 0, y = o.y || 0;
+    var anchor = V.anchor || 'center';
+    var rad = V.radius === undefined ? 0 : CF.radius(Number(V.radius));
+    var bw = V.border === undefined ? 0 : Number(V.border);
+    var pad = V.bodyPad === undefined ? 0 : Number(V.bodyPad);
+    var scrim = V.scrim === undefined ? 0.45 : Number(V.scrim);
+    var bar = V.headerH !== undefined ? Number(V.headerH) : 44;
+    var ctx = CF.build(CF.name('Modal', { type: o.type || variant.charAt(0).toUpperCase() + variant.slice(1) }), B(x, y, W, H),
+      { parent: o.parent, radius: 'none' });
+    ctx.host.fills = [{ fillColor: C(V.scrimFill || 'ink'), fillOpacity: scrim }];
+    var pw = Math.round(W * Number(V.panelW !== undefined ? V.panelW : 0.72));
+    var ph = Math.round(H * Number(V.panelH !== undefined ? V.panelH : (anchor === 'right' ? 1 : 0.58)));
+    var px = anchor === 'right' ? W - pw : Math.round((W - pw) / 2);
+    var py = anchor === 'right' ? 0 : Math.round((H - ph) / 2);
+    var pbox = B(x + px, y + py, pw, ph);
+    var panel = ctx.plate(pbox, { name: 'modal·panel', fill: C(V.panelFill || 'surfaceRaised'), radius: rad });
+    if (bw) ctx._stroke(panel, C(V.borderInk || 'border'), bw);
+    if (o.media !== false && ph > bar + 40) ctx.plate(B(pbox.x + bw + pad, pbox.y + bar, pbox.w - (bw + pad) * 2, pbox.h - bar - bw - pad),
+      { name: 'media·modal', fill: C(V.mediaFill || 'ink'), radius: V.mediaRadius === undefined ? rad : CF.radius(Number(V.mediaRadius)) });
+    ctx.glyph('close', B(pbox.x + pbox.w - 16 - 16, pbox.y + (bar - 16) / 2, 16, 16), { color: C(V.closeInk || 'ink'), strokeW: 1.6 });
+    await ctx.settle(); ctx.place();
+    try { ctx.host.setPluginData('nl:fb', JSON.stringify({ family: 'modal', variant: variant, radius: rad, border: bw, bodyPad: pad, scrim: scrim })); } catch (e) {}
+    CF.profStamp(ctx.host, V, { radius: rad, border: bw, bodyPad: pad, scrim: scrim, headerH: bar },
+      { family: 'modal', variant: variant, derived: !!V.derived });
     return ctx.host;
   };
 
@@ -4499,12 +4911,15 @@ return (function () {
   };
   /** The REFERENCE inventory: what the source site actually shows, measured, not what this factory can draw.
       On a recreation the agent MUST call this before building a component chapter, and the audit's `reference_drift`
-      rule (page 03) enforces it. The profile stamps the PageRoot (`nl:ref`) so it survives a plugin reload.
+      rule (spec pages 03–09, one profile group per page) enforces it. The profile is stamped `nl:ref` on every PageRoot, so it survives a plugin reload.
         CF.setReference({ source:'https://…', actions:{ families:['Button','IconButton','Link'],
           shapes:{ Button:['full'], IconButton:['tile','full'], Link:['none'] } } });
       Families absent from the source are NOT drawn or registered — a factory existing is not a reason to invent UI. */
   CF.setReference = function (o, root) {
-    storage.REF = o || null;
+    // A recreation has several source profiles (actions on 03, feedback/forms on 04–09). MERGE instead of replacing,
+    // so seeding feedback on page 09 does not wipe the measured action profile; the profile is one durable object
+    // stamped on the page that owns it.
+    storage.REF = Object.assign({}, storage.REF || {}, o || {});
     // The measured source SHAPES are also the design's radius ROLES: if the reference draws Button as a pill, then
     // `control` is `full` at birth (not the generic kit's 3px step), and an IconButton explicitly pinned to `tile`
     // keeps the tile step. Without this, every factory build went back to the fallback ladder on a fresh session and
@@ -4516,20 +4931,332 @@ return (function () {
       });
       if (sh.IconButton && sh.IconButton.length === 1 && /^(tile|full|none)$/.test(String(sh.IconButton[0]))) CF.ROLE.tile = sh.IconButton[0];
     } catch (e) {}
-    try {
-      var pr = root || penpotUtils.findShape(function (s) { return /-PageRoot$/.test(String(s.name || '')); }, penpot.currentPage.root);
-      if (pr && pr.setPluginData) pr.setPluginData('nl:ref', JSON.stringify(o || {}));
-    } catch (e) {}
+    CF.stampRef(root);
     return storage.REF;
   };
-  CF.reference = function (group) { var r = storage.REF; return r && r[group] ? r[group] : null; };
+  /** Write the MERGED profile to every PageRoot, not the delta from the last call. A recreation owns one file-wide
+      profile; stamping only the group seeded on the current page lost every earlier group after a plugin reload
+      (measured 2026-10-23: seeding feedback on 09 overwrote the actions stamp with `{feedback}`). */
+  CF.stampRef = function (root) {
+    var payload = null;
+    try { payload = JSON.stringify(storage.REF || {}); } catch (e) { return { err: 'ref serialize' }; }
+    var roots = root ? [root] : [];
+    try {
+      (penpot.currentFile ? penpot.currentFile.pages : []).forEach(function (p) {
+        var kids = p && p.root && p.root.children ? p.root.children : [];
+        for (var i = 0; i < kids.length; i++) if (/-?PageRoot$/.test(String(kids[i].name || ''))) { roots.push(kids[i]); break; }
+      });
+    } catch (e) {}
+    var n = 0;
+    roots.forEach(function (pr) { try { if (pr && pr.setPluginData) { pr.setPluginData('nl:ref', payload); n++; } } catch (e) {} });
+    return { stamped: n };
+  };
+  /** Restore the profile from the file after a storage wipe: the PageRoot stamp is the durable copy, `storage.REF`
+      is only the session cache. Called at seed time and lazily by `CF.reference`. */
+  CF.hydrate = function () {
+    if (storage.REF && Object.keys(storage.REF).length) return storage.REF;
+    try {
+      var pr = penpotUtils.findShape(function (s) { return /-?PageRoot$/.test(String(s.name || '')); }, penpot.currentPage.root);
+      var raw = pr && pr.getPluginData ? pr.getPluginData('nl:ref') : null;
+      if (raw) storage.REF = JSON.parse(raw);
+    } catch (e) {}
+    return storage.REF || {};
+  };
+  CF.reference = function (group) {
+    var r = (storage.REF && Object.keys(storage.REF).length) ? storage.REF : CF.hydrate();
+    return r && r[group] ? r[group] : null;
+  };
   CF.referenceFamilies = function (group) {
     var r = CF.reference(group);
     return r && r.families ? r.families : (CF.map()[group] || []);
   };
+  /** One measured family entry from a profile group: `profiles.forms.input`, `profiles.selection.switch`, … .
+      Aliases let one source measurement back several draws of the same control (Textarea/Search are Input fields).
+      The actions inventory keeps `families` as an array; that is not a family entry and is ignored here. */
+  CF.PROFILE_ALIAS = {
+    input: ['input', 'field'], textarea: ['textarea', 'input'], search: ['search', 'searchfield', 'input'],
+    field: ['field', 'input'], switch: ['switch'], checkbox: ['checkbox'], radio: ['radio'], slider: ['slider'],
+    card: ['card'], kpi: ['kpi'], navitem: ['navitem', 'nav'], tabs: ['tabs'], accordion: ['accordion'],
+    breadcrumb: ['breadcrumb'], pagination: ['pagination'], menu: ['menu'],
+    button: ['button'], iconbutton: ['iconbutton', 'icon'], icontile: ['icontile'],
+    tooltip: ['tooltip'], modal: ['modal'], alert: ['alert'], toast: ['toast']
+  };
+  /** Resolve one family entry, optionally merged with one of its `variants[key]` (the variant wins, and may carry its
+      own `expect` block). Returning the merged object is what lets a stamp and the gate resolve the SAME profile: the
+      stamp records `variant`, the gate calls `CF.profile(g, f, stamp.variant)` and compares its `expect` to the geo. */
+  /** The variant NAMES a profile declares: `variants` may be a name list or a map of per-variant overrides. */
+  CF.variantKeys = function (vs) {
+    if (!vs) return [];
+    return Array.isArray(vs) ? vs.map(String) : Object.keys(vs);
+  };
+  CF.profile = function (group, family, variant) {
+    var g = CF.reference(group);
+    if (!g || typeof g !== 'object') return null;
+    var fam = String(family || '').toLowerCase();
+    var keys = [fam].concat(CF.PROFILE_ALIAS[fam] || []).map(function (k) { return k.toLowerCase(); });
+    for (var i = 0; i < keys.length; i++) {
+      var hit = null;
+      Object.keys(g).some(function (gk) {
+        var v = g[gk];
+        if (gk.toLowerCase() === keys[i] && v && typeof v === 'object' && !Array.isArray(v)) { hit = v; return true; }
+        return false;
+      });
+      if (hit) {
+        var base = Object.assign({ _group: group, _family: fam, _key: keys[i] }, hit);
+        // `variants` is either a NAME LIST (the family has these variants, no overrides) or a MAP of overrides; only a
+        // map can be merged. Accepting both keeps a profile that just enumerates variants legal.
+        var vv = (variant && hit.variants && !Array.isArray(hit.variants)) ? hit.variants[variant] : null;
+        if (vv && typeof vv === 'object') Object.assign(base, vv, { _group: group, _family: fam, _key: keys[i], _variant: variant });
+        else if (variant) base._variant = variant;
+        return base;
+      }
+    }
+    return null;
+  };
+  /** Every family entry a group declares, keyed by lower-case name. */
+  CF.profiles = function (group) {
+    var g = CF.reference(group), out = {};
+    if (!g || typeof g !== 'object') return out;
+    Object.keys(g).forEach(function (k) {
+      var v = g[k];
+      if (v && typeof v === 'object' && !Array.isArray(v) && !/^(families|shapes|variants|source|anatomy)$/i.test(k)) {
+        out[k.toLowerCase()] = Object.assign({ _group: group, _key: k }, v);
+      }
+    });
+    return out;
+  };
+  /** The durable birth stamp: what a factory actually drew and which profile it drew from. `geo` uses the same keys
+      as the profile's `expect` block, so a gate compares like with like instead of guessing anatomy. */
+  CF.profStamp = function (host, prof, geo, extra) {
+    if (!host || !prof || !host.setPluginData) return null;
+    var d = Object.assign({ g: prof._group, f: prof._family || prof._key, src: prof.source || null,
+      derived: !!prof.derived, geo: geo || {} }, extra || {});
+    try { host.setPluginData('nl:prof', JSON.stringify(d)); } catch (e) {}
+    return d;
+  };
+  /** Read a host's profile stamp; a component copy answers with its master's stamp (the master is the definition). */
+  CF.profOf = function (s) {
+    if (!s || !s.getPluginData) return null;
+    var read = function (x) { try { var p = x.getPluginData('nl:prof'); return p ? JSON.parse(p) : null; } catch (e) { return null; } };
+    var own = read(s);
+    if (own) return own;
+    try {
+      var r = CF.get && CF.get(s.name);
+      var m = r && r.mainInstance ? r.mainInstance() : null;
+      if (m && m.getPluginData) return read(m);
+    } catch (e) {}
+    return null;
+  };
+  /** Compare a stamp's measured geometry to the profile's declared `expect` block; returns the mismatched keys.
+      A family is measured per SIZE, so the stamp's `size` axis merges its `sizes[size]` block over `expect` — one
+      family-level contract (shape, material) plus one per-size contract (height, type step). */
+  CF.profDiff = function (prof, stamp) {
+    var exp = prof && prof.expect;
+    var bySize = (prof && stamp && stamp.size && prof.sizes && prof.sizes[stamp.size]) || null;
+    if (bySize) exp = Object.assign({}, exp || {}, bySize);
+    var got = (stamp && stamp.geo) || {}, out = [];
+    if (!exp) return out;
+    Object.keys(exp).forEach(function (k) {
+      var want = exp[k], have = got[k];
+      if (want === null || want === undefined) return;
+      if (typeof want === 'number') {
+        if (!Number.isFinite(Number(have)) || Math.abs(Number(have) - want) > 0.75) out.push({ k: k, want: want, got: have });
+      } else if (String(have) !== String(want)) out.push({ k: k, want: want, got: have });
+    });
+    return out;
+  };
+  /** The keys a stamp must MEASURE to satisfy `expect`: the family block plus every per-size block (the stamp knows
+      its size only after it is written, so the whole union is measured). */
+  CF.profKeys = function (prof) {
+    var ks = Object.keys((prof && prof.expect) || {});
+    var ss = (prof && prof.sizes) || {};
+    Object.keys(ss).forEach(function (k) { Object.keys(ss[k] || {}).forEach(function (kk) { if (ks.indexOf(kk) < 0) ks.push(kk); }); });
+    return ks;
+  };
+
+  /** Resolve a host NAME to its profiled family entry (group + family + variant). Three passes, in order: the
+      first path token as a family key (alias-aware); any family in any seeded group that DECLARES the second token
+      as a variant (this is what sends `IconButton·Process·MD` to `icontile`, not `iconbutton`); then a prefix match
+      (`TableRow·` → `table`). Returns {group,family,variant} — or null when no profile claims the name. */
+  CF.profKeyFor = function (name) {
+    var n = String(name || '').toLowerCase();
+    if (!n || /·spec(·|$)|-pageroot$|-header$|-footer$|^masters·/.test(n)) return null;
+    var seg = n.split('·'), tok = seg[0], v2 = seg[1] || null;
+    var groups = ['actions', 'forms', 'selection', 'data', 'navigation', 'feedback'];
+    // A family is measured per SIZE (an xl button is 48/16, an lg one 40/14), so the name's size axis is resolved
+    // against the entry's `sizes` block and returned with it — one `expect` per family plus one merge per size.
+    var sizeOf = function (ent) {
+      var ss = ent && ent.sizes; if (!ss || typeof ss !== 'object') return null;
+      var keys = Object.keys(ss);
+      for (var i = 1; i < seg.length; i++) if (keys.indexOf(seg[i]) >= 0) return seg[i];
+      return null;
+    };
+    var pass = function (i, want) {
+      var ref = CF.reference(groups[i]); if (!ref) return null;
+      if (want === 'variant' && !v2) return null;
+      var fams = CF.profiles(groups[i]);
+      var hit = Object.keys(fams).filter(function (k) {
+        if (want === 'key') {
+          var keyOk = tok === k || (CF.PROFILE_ALIAS[k] && CF.PROFILE_ALIAS[k].indexOf(tok) >= 0);
+          if (!keyOk) return false;
+          // One host prefix can belong to two families: `IconButton·Secondary·XL·Circle` is the TONE family
+          // (iconbutton) while `IconButton·Process·MD` is the TILE family (icontile). `types` is the declaring
+          // family's own list of second-segment tokens — without it the variant match pulls every `IconButton·…`
+          // onto whichever other family happens to declare that word (a circle judged by a button's numbers).
+          var types = fams[k].types;
+          return !types || !v2 || types.map(String).indexOf(v2) >= 0;
+        }
+        if (want === 'variant') return fams[k].variants && !Array.isArray(fams[k].variants) && Object.keys(fams[k].variants).indexOf(v2) >= 0;
+        return tok.indexOf(k) === 0;                              // prefix: listitem → list, tablerow → table
+      })[0];
+      if (!hit) return null;
+      // A VARIANT is any name segment the entry declares as one (first wins): `Card·Outlined·Selectable·Alt2` names a
+      // state slot AND a selectable axis, and only `Selectable` is a declared variant — while `Switch·Md·On` names no
+      // variant at all, so nothing is recorded. Size segments stay in `size`, never here.
+      var vd = fams[hit].variants && !Array.isArray(fams[hit].variants) ? Object.keys(fams[hit].variants) : [];
+      var vary = null;
+      for (var si = 1; si < seg.length && vd.length; si++) { if (vd.indexOf(seg[si]) >= 0) { vary = seg[si]; break; } }
+      return { group: groups[i], family: hit, variant: vary, size: sizeOf(fams[hit]) };
+    };
+    // Pass order: the FIRST TOKEN names the family (it is the host's own prefix), a DECLARED variant is the fallback
+    // that catches a name whose prefix maps to several families (`IconButton·Process·MD` → `icontile`), and a bare
+    // prefix match (`TableRow·` → `table`) only last.
+    for (var w = 0; w < 3; w++) {
+      var kind = ['key', 'variant', 'prefix'][w];
+      for (var i = 0; i < groups.length; i++) { var r = pass(i, kind); if (r) return r; }
+    }
+    return null;
+  };
+  /** The geometry a host can be JUDGED on from its render — never the profile's own numbers. Family-specific keys
+      (`box`, `track`, `handle`…) resolve through the named control plate inside the host; anything else a profile
+      expects must have been written by the factory that drew it, so a host from before the profile exists FAILS that
+      key instead of inheriting it (measured is the only honest source here). */
+  CF.measureProf = function (host, keys) {
+    var geo = {}, texts = [], plates = {}, depthLimit = 5;
+    var hexOf = function (c) {
+      if (!c) return null;
+      if (c.r === undefined) return String(c).slice(0, 7).toLowerCase();
+      return '#' + [c.r, c.g, c.b].map(function (v) { return Math.round(v * 255).toString(16).padStart(2, '0'); }).join('');
+    };
+    // The measured hex goes back into the SAME vocabulary the factories stamp with (a palette key), so a stamp written
+    // by a factory and one written by stampPass are comparable. `P` first (the paint side), then the token index.
+    var tokOf = function (hex) {
+      if (!hex) return null;
+      var h = String(hex).toLowerCase();
+      // The token index first: it resolves a shared hex (white is both `surfaceRaised` and `onPrimary`) to the SURFACE
+      // name, which is the vocabulary a factory stamps for a plate. The palette is the fallback for a literal the
+      // token set does not carry; a still-unknown hex comes back as itself so the gate can quote it.
+      try {
+        var ci = storage.TK && storage.TK.colorIndex && storage.TK.colorIndex();
+        var hit = ci && ci.byHex && ci.byHex[h];
+        if (hit) return String((hit.surface && typeof hit.surface === 'string') ? hit.surface : (hit.all && hit.all[0]) || '').replace(/^color\./, '');
+      } catch (e) {}
+      var idx = tokOf._i || (tokOf._i = (function () {
+        var m = {}; Object.keys(P).forEach(function (k) { var v = String(P[k] || '').toLowerCase(); if (/^#[0-9a-f]{6}$/.test(v) && m[v] === undefined) m[v] = k; }); return m;
+      })());
+      if (idx[h]) return idx[h];
+      return h;
+    };
+    var ORIGIN = /^(field|box|track|panel|item|ring)$/;
+    var walk = function (s, d) {
+      var nm = String(s.name || '');
+      if (s.type === 'text') texts.push(s);
+      // A focus ring is `ring·…`, a radio's own disc is `ring`: only the exact control plate may be the origin, and
+      // only when the host itself carries no paint (a card with a checkbox child must measure the CARD, not the box).
+      if (!plates.origin && (ORIGIN.test(nm) || /^cell·/.test(nm))) plates.origin = s;
+      if (!plates[nm] && /^(box|ring|track|handle)$/.test(nm)) plates[nm] = s;
+      if (!plates.cell && /^cell·/.test(nm)) plates.cell = s;
+      if (d >= depthLimit) return;
+      var kids = s.children; if (!Array.isArray(kids)) return;
+      kids.forEach(function (c) { walk(c, d + 1); });
+    };
+    walk(host, 0);
+    var painted = function (s) { var f = s ? ((s.fills || [])[0] || {}) : {}; return !!(f.fillColorGradient || f.fillColor); };
+    var origin = painted(host) ? host : (plates.origin || host);
+    var want = function (k) { return !keys || keys.indexOf(k) >= 0; };
+    var paintOf = function (s) {
+      if (!s) return 'transparent';
+      var f = (s.fills || [])[0] || {};
+      if (f.fillColorGradient) return 'gradient';
+      var h = hexOf(f.fillColor);
+      if (!h || Number(f.fillOpacity) === 0) return 'transparent';   // no paint IS the source's `transparent` field
+      return tokOf(h);
+    };
+    var strokeOf = function (s) {
+      if (!s) return 0;
+      var st = (s.strokes || [])[0];
+      return st ? Number(st.strokeWidth || 1) : 0;
+    };
+    geo.h = Math.round(host.height);
+    // The corner is the ORIGIN's own (a host painted flat with a rounded child must not borrow the child's radius,
+    // and a nested pill inside a card must not push a 40px card to 9999).
+    if (want('radius')) geo.radius = Number.isFinite(Number(origin.borderRadius)) ? Math.round(Number(origin.borderRadius)) : 0;
+    if (want('fs') && texts.length) geo.fs = Math.round(Number(texts[0].fontSize));
+    // padX is deliberately NOT measured: a Penpot text node is fitted to its INK and `alignPage` then snaps it to the
+    // host's centre, so the left edge reports `pad + (box − ink)/2` — 29 for a button whose factory asked for 24, and
+    // (field − ink)/2 for a left-aligned input. The number would be fiction, so a profile gates pad/fill/stroke/type
+    // through `fill`/`stroke`/`fs`/`h` instead, and the factory's own `padX` claim stays a diagnostic, not a gate.
+    if (want('stroke')) geo.stroke = strokeOf(origin);
+    if (want('fill')) geo.fill = paintOf(origin);
+    // `size` is the tile's own square (icon tiles carry no label), `cell` the pagination cell plate.
+    if (want('size')) geo.size = Math.round(Math.min(Number(host.width), Number(host.height)));
+    if (want('cell')) { var cp = plates.cell || null; if (cp) geo.cell = Math.round(Math.min(Number(cp.width), Number(cp.height))); }
+    // `gradient` and `chip` are material facts the render CAN answer: a gradient fill is visible, and `chip` is the
+    // ELEVATION the source gives that plate — EL's durable stamp names the recipe, so a pre-profile host is judged by
+    // what it wears, not by what the factory claims.
+    if (want('gradient')) geo.gradient = paintOf(origin) === 'gradient';
+    if (want('chip')) {
+      var eS = null;
+      try { eS = storage.EL && storage.EL.readStamp ? storage.EL.readStamp(origin) : null; } catch (e) {}
+      if (eS) geo.chip = /^chip/.test(String(eS));
+    }
+    ['box', 'ring', 'track', 'handle'].forEach(function (k) {
+      if (want(k) && plates[k]) geo[k] = Math.round(Math.min(Number(plates[k].width), Number(plates[k].height)));
+    });
+    if (want('trackW') && plates.track) geo.trackW = Math.round(plates.track.width);
+    if (want('trackH') && plates.track) geo.trackH = Math.round(plates.track.height);
+    if (want('handle') && plates.handle) geo.handle = Math.round(plates.handle.width);
+    return geo;
+  };
+  /** Idempotent birth-stamp REPAIR (source-adaptation §5). Walks `root`, and for every host a profile claims but that
+      carries no `nl:prof`, writes the stamp from what the RENDER measures — so a file built before the profile was
+      seeded is judged against the profile instead of skipped. It never copies profile numbers into the stamp: a host
+      that is still generic keeps its generic measurement, fails `expect`, and is reported for a rebuild. */
+  CF.stampPass = function (root, o) {
+    o = o || {};
+    var out = { scanned: 0, stamped: 0, kept: 0, claimed: 0 };
+    if (!root) return out;
+    (function walk(s, d) {
+      if (d > 12) return;
+      var nm = String(s.name || '');
+      var kids = s.children;
+      var isBoard = s.type === 'board';
+      if (isBoard) {
+        out.scanned++;
+        var key = CF.profKeyFor(nm);
+        if (key) {
+          out.claimed++;
+          var have = null;
+          try { have = s.getPluginData ? s.getPluginData('nl:prof') : null; } catch (e) {}
+          if (!have || o.overwrite) {
+            var prof = CF.profile(key.group, key.family, key.variant);
+            if (prof) {
+              var geo = CF.measureProf(s, CF.profKeys(prof));
+              CF.profStamp(s, prof, geo, { family: key.family, variant: key.variant, size: key.size, measured: true,
+                state: (nm.split('·').filter(function (t) { return /^(default|hover|focus|pressed|selected|disabled|checked|on|off|open)$/.test(t.toLowerCase()); })[0] || 'default').toLowerCase() });
+              out.stamped++;
+            } else out.kept++;
+          } else out.kept++;
+        }
+      }
+      if (Array.isArray(kids)) kids.forEach(function (c) { walk(c, d + 1); });
+    })(root, 0);
+    return out;
+  };
 
   /*__CF_MORE__*/
 
+  try { CF.hydrate(); } catch (e) {}
   storage.CF = CF;
   CF._keys = Object.keys(CF).filter(function (k) { return typeof CF[k] === 'function' && /^[a-z]/.test(k); });
   return { seeded: 'CF', factories: CF._keys.length, glyphs: CF.glyphKinds.length,

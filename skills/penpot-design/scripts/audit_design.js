@@ -17,7 +17,7 @@
 // ONE RULE DOES NOT READ CF/LY: `not_projected` (gate G16) reads `storage.FN`, which the G1 order seeds AFTER this
 // file. It is consulted at AUDIT time, not seed time, so a session that never loads foundations_engine.js gets a
 // finding on every 01/02 page instead of a silent pass. Same for the gate-G17 trio `not_assembled` /
-// `placeholder_media` / `no_source_record`: they are scoped to the screen pages (`14–16 · Screens`) by page name, so a
+// `placeholder_media` / `no_source_record`: they are scoped to the screen and app-shell surfaces (`10`, `12`, `14–16`) by page name, so a
 // spec chapter that legitimately *shows a drawing* is never indicted for it, and `no_source_record` also reports a
 // session that never loaded screen_engine.js instead of passing a screen page it cannot read.
 //
@@ -76,14 +76,14 @@ return (function () {
     caption_stale: '§4 · a `wash|hue|ink #RRGGBB` caption that does not match the paint of the swatch beside it — a token-bound plate follows the token while its label keeps the hex authored at build time, so a board built before a theme overlay documents values it no longer shows',
     empty_cell: '§4.3 · a `cell·slot·*` / `cell·recipe·*` container with zero children — the region plates an `after` pass draws are missing, which is what a timed-out build whose bare board was later mounted looks like; the block renders as an empty frame',
     no_type_styles: '§3.2 + design-tokens §5 · the ramp declares `typography` tokens and this board draws text, but `penpot.library.local.typographies` is EMPTY — the Assets → Typography panel lists style records, not token sets, so consumers have nothing to pick; seed them with `storage.TP.seed()`',
-    reference_drift: 'recreation reference inventory · on page 03, the ·Spec boards must be exactly the families the source shows, and each family may use only the corner roles measured from the source. A factory existing is not a reason to invent a family: the source Aigocy page has Button (99px pill), IconButton (tile 16 / circle 50%) and Link (text) — no ButtonGroup, SplitButton, Segmented or FAB. The profile is seeded through CF.setReference (stamped as nl:ref on the PageRoot, so it survives a storage wipe); a missing profile is REPORTED, not passed',
+    reference_drift: 'recreation source-adaptation gate (source-adaptation.md) · page 03: the ·Spec boards are exactly the source action families and their measured corner roles, a profiled family host must carry the material the profile pins (border/elevation/flush ring), and every action host carries the `nl:prof` birth stamp whose measured geo equals its entry\'s `expect`. pages 04–09: the page\'s profile GROUP (forms/selection/data/navigation/feedback) must be seeded once the file is a recreation, every host of a profiled family must carry its `nl:prof` (or `nl:fb`) birth stamp, and the stamp\'s measured geometry must equal the profile\'s declared `expect` block — a factory default is legal for a blank file, not for a source-backed page. Hosts from before the profile was seeded are measured by `CF.stampPass` (it reads the render, never the profile\'s numbers), so a generic host fails `expect` instead of being skipped. The profile is seeded through CF.setReference and stamped `nl:ref` on every PageRoot, so it survives a storage wipe; a missing profile is REPORTED, not passed',
     not_projected: 'gate G16 · a Foundations / Color-in-use chapter page (FN.CHAPTER) whose boards were not PROJECTED from the token records: this board carries no durable `nl:fn` stamp, or the chapter is missing a kind it contractually requires, or `storage.FN` is not seeded so the gate cannot be read at all',
     cramped_gap: '§2 · two block-level (≥24) flow siblings separated by less than `LY.breath("inline")` — the whitespace that carries the hierarchy was simply omitted, so the blocks touch. Reads the same LY.BREATH table a builder writes',
     hierarchy_gap: '§2 2× rule · a composition-level container whose gap between groups is under 2× the largest gap inside those groups — related things are not closer than unrelated ones, so the page cannot be grouped by eye',
     text_cramped: '§2 + §3.2 · running copy whose `lineHeight` is below the leading its own ramp step declares (multi-line, or under 1.0), or two prose siblings closer than one line of the upper block — vertical rhythm is typography, not just layout',
-    radius_off_ladder: '§5.1 + design-tokens §8 · a corner radius that is not one of the declared `borderRadius` token values: the token ladder is the ONLY source of a corner, so an orphan number cannot be retuned, themed or found again (measured 2026-10-21: a radius token writes all four corner props at once)',
+    radius_off_ladder: '§5.1 + design-tokens §8 · a corner radius that is not one of the declared `borderRadius` token values (a checkbox box above the 4px `radius.xxs` step is included): the token ladder is the ONLY source of a corner, so an orphan number cannot be retuned, themed or found again (measured 2026-10-21: a radius token writes all four corner props at once)',
     radius_unbound: '§5.1 + design-tokens §8 · a radius equal to a declared `borderRadius` token but with no `tokens.borderRadius*` binding — the corner was typed instead of taken from the set; run TK.bindBoard',
-    ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not the corner of the unit it outlines, or whose two margins disagree around a circular owner (an oval ring around an ellipse): a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places, and a 24×28 ring around a 20×20 radio is an oval that does not say what it focuses. Rules 35/36 cannot see the corner case — **both** values are on the ladder and bound — and the corner test cannot see an ellipse (no borderRadius). Repair with `TK.roleSweep` for corners, `TK.ringSweep` for ovals.',
+    ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not the corner of the unit it outlines, or whose two margins disagree around a circular owner (an oval ring around an ellipse), or a checkbox/radio/switch ring that is OUTSET around its visible box (the ring is flush; an outset halo leaves a corner gap): a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places, and a 24×28 ring around a 20×20 radio is an oval that does not say what it focuses. Rules 35/36 cannot see the corner case — **both** values are on the ladder and bound — and the corner test cannot see an ellipse (no borderRadius). Repair with `TK.roleSweep` for corners, `TK.ringSweep` for ovals.',
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
@@ -93,7 +93,7 @@ return (function () {
     list_gap_split: '§2.1 · a control host whose repeated command/row labels are NOT uniformly spaced: the tightest gap REPEATS (that is the established row pitch) and one gap is more than 1px wider with NOTHING drawn in the extra space. A semantic group boundary (a `\'-\'` in a menu) that eats `space.md` after rule 43 removed its line reads as a mistake, not as grouping — measured on `Menu·IconStart`: label gaps 12 / 24 / 12 around DUPLICATE. Either mark the break with something visible (a `group` label row, or a functional `boundary·*` line, which rule 43 exempts) or give it no space at all, which is what `CF.menu` does now. Copy is read one level deep (a hovered row lives inside its `row·` group) and a host with no repeating pitch is NOT judged — an Accordion\'s 26/39/40 are header→body, body→header, header→header, three different relationships, not three rows with a hole',
     media_stretched: 'M8 (media_engine) · a shape carrying a `fillImage` whose box ratio is more than 2% off the asset\'s own ratio — the photograph is being DISTORTED, not cropped. This build cannot ask for the crop: writing `fillFitMode: \'cover\'` succeeds and is silently dropped (the readback keeps only fillColor/fillOpacity/fillColorGradient/fillColorRefFile/fillColorRefId/fillImage), so Penpot falls back to `content` = stretch. Measured 2026-10-22 on `15 · Screens · content`: **30 of 30** images were stretched, worst 62% (a 1440×816 photo in a 468×700 gallery slot). The two legal forms are geometry: `MD.place({mode:\'fit\'})` sizes the shape to the asset ratio, `MD.place({mode:\'cover\'})` — the default when they disagree — builds a real MASK (`clip·` board with `clipContent`, the media inside at its own ratio scaled to cover and centred). Repair an existing file with `MD.refit`',
     frame_dead_band: '§3.3 + §2 · a control host whose border reserves a band its content never fills: one side\'s content inset is >= 32px AND >= 3x the opposite side (the frame is bigger than what it frames). Measured 2026-10-22 on `MiniCalendar·32cell`: the height formula used a hardcoded `rows: 6` while the drawn month (31 days starting on the first column) needs 5, and the loop `continue`d over every out-of-month slot, so the 6th row was empty and the grid\'s leading/trailing cells were never painted — inset bottom 49px vs top 7px. It is NOT a reservation for adjacent-month days: a reservation that is never filled is dead space. Repair: derive the frame from the content (`CF.miniCalendar` computes `need = ceil((firstWeekday + days) / 7)` and paints adjacent-month cells muted) or fill the band',
-    not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen page (`14–16 · Screens`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
+    not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen or app-shell surface (`10`, `12`, `14–16`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
     shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
@@ -102,6 +102,7 @@ return (function () {
     sheen_missing: '§5 + gate G18 · a stamped recipe declares a radial sheen but the host carries no `sheen·*` plate — the top-light that sells the material is absent. Repair with `EL.sheenFor(host, recipe)`',
     hover_flat: '§5.2 + gate G18 · a component state board named `·Hover`/`·Pressed` whose family declares a hover/press recipe but carries ZERO shadows — hover was modelled as an 8% fill tint, not as the source\'s elevation lift (measured 2026-10-23: every Button/Card hover state in the file read 0 shadows while the source adds 4–6 drop layers). Repair with `EL.sweepPage`',
     surface_missing: '§5 + gate G18 · a screen record declares `surface`/`elevation` for a section but the board has no `surface·<region>` plate — the section was assembled as bare text/frames with nothing to cast a shadow (measured 2026-10-23: 143 shapes, 0 shadows on `15 · Screens · content`). Mount it with `SC.surface` / `EL.surfacePass`',
+    spec_unregistered: 'gate G10s · a control-shaped board on a spec page (`03`–`09`) that is not a Penpot component (neither a master nor an instance); repair with CF.autoRegister({states:true}).',
     label_off_axis: '§2.3 · a control\'s label is not on the control\'s own vertical axis: its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
@@ -322,6 +323,16 @@ return (function () {
           CFAMS[k.charAt(0).toUpperCase() + k.slice(1)] = 1;
         }
       });
+      // `shell` composites (AppBar/SideNav/Toolbar/PageTitle/Footer/MobileBar) and the `composer` helpers are
+      // DOCUMENTATION boards on page 10, not leaf controls a screen places. Including them made the strict
+      // not_assembled rule indict all six shell specimens (measured 2026-10-23), which is the noise that would
+      // make the rule get switched off. Only leaf control families are judged.
+      ['shell', 'composer'].forEach((g) => {
+        ((map && map[g]) || []).forEach((k) => {
+          delete CFAMS[k];
+          delete CFAMS[String(k).charAt(0).toUpperCase() + String(k).slice(1)];
+        });
+      });
     }
     return CFAMS[head] ? head : null;
   }
@@ -426,6 +437,13 @@ return (function () {
     // G17 scope: the three screen-page rules (39/40/41) are page-scoped by contract so a spec chapter that legitimately
     // displays a drawing is never indicted for it. Computed once per page, not per shape.
     const SCREEN = SCREEN_PAGE(out.page);
+    // App surfaces are the compositions a user actually operates: the app-shell/chrome showcase, screen recipes and
+    // screens. `not_assembled` was scoped to 14–16 only, so page 10's `Button·MD` / `IconButton·Ghost·XS` raw boards
+    // passed every gate while the library held Button/IconButton masters (measured 2026-10-23). Same contract here.
+    const APP = /^(10 · App shell & chrome|12 · Screen recipes|1[4-6] · Screens)/.test(String(out.page || ''));
+    // Spec pages 03–09 are the library's source of truth: every control host there (including every state cell) must be a
+    // real component, not a raw drawing. This is the G10s contract the user asked for (measured 2026-10-23).
+    const SPEC = /^0[3-9] ·/.test(String(out.page || ''));
     out.screenPage = SCREEN;
 
     // ---- region pane map, measured geometrically.
@@ -767,10 +785,10 @@ return (function () {
       // `auditText`, not the shape pass: text has its own pass, so the same test in the board pass never ran.
       if (par) {
         let owner = par, steps = 0;
-        while (owner && owner !== st.top && steps < 3 && !(typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner)))) {
+        while (owner && owner !== st.top && steps < 3 && !(typeOf(owner) === 'board' && /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner)))) {
           owner = owner.parent || null; steps++;
         }
-        if (owner && owner !== st.top && typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner))) {
+        if (owner && owner !== st.top && typeOf(owner) === 'board' && /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner))) {
           const ob = box(owner), dy = (r.y + r.h / 2) - (ob.y + ob.h / 2);
           if (Math.abs(dy) > 2 && Math.abs(dy) <= Math.max(12, fs) && r.y >= ob.y - 1 && r.y + r.h <= ob.y + ob.h + 1) {
             add('label_off_axis', t, st.top, 'label centre is ' + N(Math.abs(dy)) + 'px ' + (dy > 0 ? 'below' : 'above') +
@@ -1126,6 +1144,12 @@ return (function () {
           return { host: best, concentric: !!best && bestV <= 1, offBy: best ? bestV : null, floating: false, contained: contained, dist: best ? bestV : null };
         })();
         const rh = host.host;
+        // A checkbox is a small VISIBLE box: its focus ring is flush on that box. An outset 22×22 halo around an
+        // 18×18 r4 box is not parallel at the corners and reads as a border with a gap (measured 2026-10-23).
+        const ctlNm = nameOf(host.control || par);
+        if (/^Checkbox(?:·|$)/.test(ctlNm) && rh && (box(s).w > box(rh).w + 1 || box(s).h > box(rh).h + 1)) {
+          add('ring_off_host', s, st.top, 'checkbox focus ring ' + N(box(s).w) + '×' + N(box(s).h) + ' is outset around its ' + N(box(rh).w) + '×' + N(box(rh).h) + ' box — a small control ring is flush (offset 0, box corner); an outset ring leaves a corner gap');
+        }
         // rule 44 · focus_invisible — §1.3: a `reserved` family's boundary is authored at alpha 0 (the slot a runtime
         // raises) and the eye reads the unit's state wash instead. Drop the wash and the focus state is invisible while
         // every name-based check still passes, so a ghost boundary is judged HERE, next to the geometry it belongs to.
@@ -1280,12 +1304,16 @@ return (function () {
       }
       paintAudit(s, st, false);
       spaceAudit(s, st);
+      if (nm === 'box' && par && /^Checkbox(?:·|$)/.test(nameOf(par))) {
+        const rv = radiusOf(s);
+        if (rv !== null && rv > 4) add('radius_off_ladder', s, st.top, 'checkbox box r' + N(rv) + ' — the visible box uses the 4px xxs step (design-guide §5.1); a larger corner turns an 18px checkbox into a pill/circle');
+      }
       radiusAudit(s, st);
       breathAudit(s, st, compos);
       // G10 (point 6): a control that already has a master in the library must be **placed**, not drawn again. The
       // redrawn copy is the maintenance bug — fix the master and every copy stays wrong, and no variant/swap exists.
       // Fires only once the master is registered, so it cannot be noise on a file that has no library yet.
-      if (compos && typeOf(s) === 'board' && fam && CF.get && CF.get(nm)) {
+      if ((SCREEN || APP) && typeOf(s) === 'board' && fam && CF.get && CF.get(nm)) {
         // The main component's own head IS the host named after the master — registering it must not indict it.
         let main = null; try { const rr = CF.get(nm); main = rr && rr.mainInstance ? rr.mainInstance() : null; } catch (e0) {}
         if (!main || main.id !== s.id) {
@@ -1296,11 +1324,35 @@ return (function () {
       // needs an exact-name master to compare against, so a screen whose controls were hand-drawn (measured 2026-10-22:
       // 160 control-shaped hosts on pages 14/15, only 2 of their names have a master) passed the gate while being made
       // of disposable rectangles: nothing to fix centrally, no variants, no swap, and no relation to the system the
-      // same file just built. On a screen page a family-named board is therefore required to be PLACED, and the repair
+      // same file just built. On a screen OR an app surface a family-named board is therefore required to be PLACED, and the repair
       // is to extend the factory (G12), register what it draws (`CF.autoRegister`), then place instances (`SC.ctl`).
-      // Fires only inside screen scope and only for non-instances, so a `·Spec` chapter that shows a drawing is untouched.
-      if (SCREEN && compos && !isInstance(s) && typeOf(s) === 'board' && controlFamily(nm) && !(CF.get && CF.get(nm))) {
-        add('not_assembled', s, st.top, '"' + nm + '" was drawn on a screen page and no master of that name exists in the library — a recreated screen is assembled from the system: extend the factory (G12), register it (CF.autoRegister), then place it with CF.instance / SC.ctl');
+      // Fires only inside app/screen scope and only for non-instances, so a `·Spec`/masters chapter that shows a drawing is untouched.
+      if ((SCREEN || APP) && !isInstance(s) && typeOf(s) === 'board' && controlFamily(nm) && !/^Masters·/.test(nm) && !/·Spec(·|$)/.test(nm) && !(CF.get && CF.get(nm))) {
+        add('not_assembled', s, st.top, '"' + nm + '" was drawn on an app/screen surface and no master of that name exists in the library — assemble from the system: extend the factory (G12), register it (CF.autoRegister / CF.component), then place it with CF.instance / SC.ctl');
+      }
+      // rule 58 · spec_unregistered (gate G10s) — a spec page is the component library's source of truth, so every
+      // control host on 03–09 (including Hover/Focus/Pressed/Disabled state cells) must be a real master. Default cells
+      // were registered in the original build; the state cells were not, and they were therefore unusable as instances.
+      if (SPEC && typeOf(s) === 'board' && controlFamily(nm) && !/·Spec(·|$)|^Masters·/.test(nm) && !isInstance(s)) {
+        // Only a TOP-LEVEL spec element is judged. A nested input/label inside a Field (a control) is anatomy that
+        // belongs to that Field's master, not a second element to register; judging it made a componentized Field
+        // look 'unregistered' forever. The spec board is the container and is not itself a control ancestor.
+        let ctrlAnc = false, a = s.parent;
+        while (a && a !== st.top) {
+          const an = nameOf(a);
+          if (typeOf(a) === 'board' && !/·Spec(·|$)|^Masters·/.test(an) && controlFamily(an)) { ctrlAnc = true; break; }
+          a = a.parent || null;
+        }
+        // A COMPOSITE that already contains component instances (a Field holding an Input instance, a TableRow
+        // holding cell components) is an assembly of components, not a raw leaf. Penpot's createComponent refuses a
+        // board that contains an instance (it returns an empty-shell record), so the legal architecture is the
+        // composition. Register the LEAF controls; never demand the composite wrap itself in a second component.
+        let hasInst = false;
+        (function scan(k, d) {
+          if (hasInst || d > 3) return;
+          for (const c of kidsOf(k) || []) { if (isInstance(c)) { hasInst = true; return; } scan(c, d + 1); }
+        })(s, 0);
+        if (!ctrlAnc && !hasInst) add('spec_unregistered', s, st.top, '"' + nm + '" is a raw control on a spec page — every element on 03–09 must be a component. Repair: CF.autoRegister({states:true}) on this page');
       }
       const board = typeOf(s) === 'board' ? s : null;
       if (board) out.boards++;
@@ -1515,7 +1567,7 @@ return (function () {
       const only = opts.families && opts.families.length ? {} : null;
       if (only) opts.families.forEach((f) => { only[f] = 1; });
       // The source profile pins a family's variant set. A recreation must not be forced to invent a variant the
-      // reference never shows (Aigocy buttons have no icon slot; its nav links are default+underline only).
+      // reference never shows (a reference may pin no icon slot and only default/underline nav links).
       let REF = null;
       try { REF = (storage.CF && storage.CF.reference) ? storage.CF.reference('actions') : (storage.REF && storage.REF.actions); } catch (e) {}
       Object.keys(out.families).forEach((k) => {
@@ -1634,9 +1686,12 @@ return (function () {
 
     // ---- rule 56 · reference_drift — a recreation's Actions page is the SOURCE's action inventory, not the factory's
     // family list. A family the source never shows is not drawn; a family's corner roles are pinned by the measured
-    // source (Aigocy: Button=pill, IconButton=tile/circle, Link=none). The profile is durable on the PageRoot (`nl:ref`).
+    // source (for example Button=pill, IconButton=tile/circle, Link=none). The profile is durable on the PageRoot (`nl:ref`).
     try {
       const pname = String(out.page || '');
+      // One reader for the birth stamp, used by every branch of rule 56: an instance answers with its MASTER's stamp
+      // (the master is the definition), so a placed copy is judged by what it is an instance of, not by its own record.
+      const readProf = (k) => { let st = null; try { st = (storage.CF && storage.CF.profOf) ? storage.CF.profOf(k) : null; } catch (e) {} if (!st) { try { const raw = k.getPluginData ? k.getPluginData('nl:prof') : null; if (raw) st = JSON.parse(raw); } catch (e) {} } return st; };
       if (/^03(?:\.| ·)/.test(pname) && /-PageRoot$/.test(nameOf(top))) {
         let ref = null;
         try { ref = (storage.CF && storage.CF.reference) ? storage.CF.reference('actions') : (storage.REF && storage.REF.actions); } catch (e) {}
@@ -1668,7 +1723,7 @@ return (function () {
           });
           ref.families.forEach((f) => { if (!seen[String(f).toLowerCase()]) add('reference_drift', null, top, 'reference action family ' + f + ' has no ·Spec board on page 03'); });
           // ANATOMY — the family list is only the first half of the source contract. A family that IS in the inventory
-          // can still be drawn with the wrong material: the Aigocy secondary action is a borderless light chip, but the
+          // can still be drawn with the wrong material: the a reference secondary action may be a borderless light chip, but the
           // generic "secondary" tone gave it a 1px border, a `control` stack and a detached halo. These facts live in the
           // profile until the factory can read them; the gate checks the render against them, so a rebuild cannot drift.
           const anat = ref.anatomy || {};
@@ -1697,6 +1752,149 @@ return (function () {
               (kidsOf(k) || []).forEach(walkAnat);
             })(top);
           });
+          // BIRTH STAMP — pages 03 and 04–08 are ONE contract: a profiled host carries the stamp of the entry it was
+          // drawn from and measures what that entry's `expect` declares. A Actions host built before the profile
+          // existed is not exempt — CF.stampPass measures it, and a generic measurement still fails `expect`.
+          if (storage.CF && storage.CF.profKeyFor && storage.CF.profDiff) {
+            (function walkStamp(k) {
+              const nm = nameOf(k);
+              if (typeOf(k) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nm)) {
+                const key = storage.CF.profKeyFor(nm);
+                if (key && key.group === 'actions') {
+                  const st = readProf(k);
+                  if (!st) add('reference_drift', k, top, nm.slice(0, 44) + ' carries no nl:prof stamp — it was not drawn from the actions profile; run CF.stampPass (measures the render) or rebuild it with the profile-aware factory');
+                  else {
+                    const prof = storage.CF.profile(key.group, key.family, key.variant);
+                    if (prof) storage.CF.profDiff(prof, st).forEach(function (b) {
+                      add('reference_drift', k, top, nm.slice(0, 44) + ' draws ' + b.k + '=' + (b.got === undefined || b.got === null ? '—' : b.got) + '; the actions profile measures ' + b.k + '=' + b.want);
+                    });
+                  }
+                }
+              }
+              (kidsOf(k) || []).forEach(walkStamp);
+            })(top);
+          }
+        }
+      } else if (/^09(?:\.| ·)/.test(pname) && /-PageRoot$/.test(nameOf(top))) {
+        // Feedback reference — the source HAS tooltip/modal CSS; Alert/Toast are marked derived in the profile. The
+        // factory stamps `nl:fb` with the material it drew; a raw generic tooltip/modal/alert/toast (or M3 pastel)
+        // cannot read CLEAN. The profile is stamped on the PageRoot, so it survives a storage wipe.
+        let fb = null;
+        try { fb = (storage.CF && storage.CF.reference) ? storage.CF.reference('feedback') : null; } catch (e) {}
+        if (!fb) { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; if (raw) { const d = JSON.parse(raw); fb = d && d.feedback; } } catch (e) {} }
+        if (!fb) {
+          add('reference_drift', null, top, 'no feedback source profile on page 09 — seed CF.setReference({feedback:{tooltip,modal,alert,toast}}) from the reference CSS before building Overlays; generic factory defaults are not the source');
+        } else {
+          const fbOf = (k) => { try { return JSON.parse(k.getPluginData('nl:fb') || 'null'); } catch (e) { return null; } };
+          (function walkFb(k) {
+            const nm = nameOf(k);
+            if (typeOf(k) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nm)) {
+              const f = fbOf(k);
+              if (/^Tooltip·/.test(nm)) {
+                const R = fb.tooltip || {};
+                if (!f || f.family !== 'tooltip') add('reference_drift', k, top, nm + ' has no feedback stamp — a raw tooltip is not the profiled one; draw it with CF.tooltip after seeding feedback.tooltip');
+                else {
+                  const bad = [];
+                  if (R.radius !== undefined && N(f.radius) !== N(R.radius)) bad.push('radius ' + N(f.radius) + '≠' + N(R.radius));
+                  if (R.padX !== undefined && N(f.padX) !== N(R.padX)) bad.push('padX ' + N(f.padX) + '≠' + N(R.padX));
+                  if (R.padY !== undefined && N(f.padY) !== N(R.padY)) bad.push('padY ' + N(f.padY) + '≠' + N(R.padY));
+                  if (R.shadow !== undefined && Number(f.shadow) !== Number(R.shadow)) bad.push('shadow ' + f.shadow + '≠' + R.shadow);
+                  if (R.arrow !== undefined && !!f.arrow !== !!R.arrow) bad.push('arrow ' + !!f.arrow + '≠' + !!R.arrow);
+                  if (R.fs !== undefined) {
+                    const sizes = Array.isArray(R.fs) ? R.fs.map(Number) : [Number(R.fs)];
+                    if (sizes.indexOf(Number(f.fs)) < 0) bad.push('fs ' + f.fs + '≠' + sizes.join('/'));
+                  }
+                  if (bad.length) add('reference_drift', k, top, nm.slice(0, 44) + ' tooltip drifts from the feedback profile: ' + bad.join(', '));
+                }
+              } else if (/^Modal·/.test(nm)) {
+                const R = fb.modal || {};
+                const bad = [];
+                if (!f || f.family !== 'modal') bad.push('no modal stamp');
+                else {
+                  if (R.radius !== undefined && N(f.radius) !== N(R.radius)) bad.push('radius ' + N(f.radius) + '≠' + N(R.radius));
+                  if (R.border !== undefined && N(f.border) !== N(R.border)) bad.push('border ' + N(f.border) + '≠' + N(R.border));
+                  if (R.bodyPad !== undefined && N(f.bodyPad) !== N(R.bodyPad)) bad.push('bodyPad ' + N(f.bodyPad) + '≠' + N(R.bodyPad));
+                }
+                if (bad.length) add('reference_drift', k, top, nm.slice(0, 44) + ' is not the profiled modal (' + bad.join(', ') + ') — rebuild it with the factory that reads feedback.modal');
+              } else if (/^Alert·/.test(nm)) {
+                const R = fb.alert || {};
+                if (!f || f.family !== 'alert' || (R.material && f.material !== R.material)) add('reference_drift', k, top, nm.slice(0, 44) + ' is not using the profiled alert material "' + (R.material || '—') + '" — a derived family takes a source material, never an unrelated pastel');
+              } else if (/^Toast·/.test(nm)) {
+                const R = fb.toast || {};
+                if (!f || f.family !== 'toast' || (R.material && f.material !== R.material)) add('reference_drift', k, top, nm.slice(0, 44) + ' is not using the profiled toast material "' + (R.material || '—') + '" — a derived family takes a source material, never a generic pill');
+              }
+            }
+            (kidsOf(k) || []).forEach(walkFb);
+          })(top);
+        }
+      } else if (/^0[45678](?:\.| ·)/.test(pname) && /-PageRoot$/.test(nameOf(top))) {
+        // GENERIC PROFILE GATE (source-adaptation §5). Pages 04–08 are the same contract as 03/09, but it is DATA that
+        // drives it, not family names hardcoded per page: the page's profile group must exist once the file is a
+        // recreation, every host of a profiled family must carry the `nl:prof` birth stamp, and the stamp's measured
+        // geometry must equal the profile's declared `expect` block. A factory default therefore cannot read CLEAN.
+        const GROUPS = [
+          { re: /^04/, g: 'forms', fams: ['Input', 'Textarea', 'Search'] },
+          { re: /^05/, g: 'selection', fams: ['Switch', 'Checkbox', 'Radio', 'Slider'] },
+          { re: /^0[67]/, g: 'data', fams: ['Card', 'KPI', 'Table', 'List', 'Progress', 'Timeline', 'Calendar'] },
+          { re: /^08/, g: 'navigation', fams: ['NavItem', 'Tabs', 'Breadcrumb', 'Pagination', 'Menu', 'Accordion'] }
+        ];
+        const G = GROUPS.filter((x) => x.re.test(pname))[0];
+        if (G) {
+          const rootRef = () => { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; return raw ? JSON.parse(raw) : null; } catch (e) { return null; } };
+          let groupRef = null;
+          try { groupRef = (storage.CF && storage.CF.reference) ? storage.CF.reference(G.g) : null; } catch (e) {}
+          if (!groupRef) { const d2 = rootRef(); groupRef = d2 && d2[G.g]; }
+          let isRecreation = !!groupRef;
+          if (!isRecreation) {
+            try { if (storage.REF && Object.keys(storage.REF).length) isRecreation = true; } catch (e) {}
+            if (!isRecreation) isRecreation = !!rootRef();
+          }
+          if (isRecreation && !groupRef) {
+            add('reference_drift', null, top, 'no ' + G.g + ' source profile on page ' + pname.slice(0, 2) + ' — seed CF.setReference({' + G.g + ': {…}}) from the reference CSS before building this chapter; a factory default is legal for a blank file, not for a source-backed page');
+          } else if (groupRef) {
+            const ALIAS = { textarea: ['textarea', 'input'], search: ['search', 'searchfield', 'input'], field: ['field', 'input'], navitem: ['navitem', 'nav'],
+              list: ['list', 'listitem'], table: ['table', 'tablerow', 'tableheader'], calendar: ['calendar', 'minicalendar'] };
+            // A family is identified by its HOST-NAME prefix, and one family can own several prefixes (List draws
+            // `ListItem·`, Table draws `TableHeader·`/`TableRow·`). Matching on the bare prefix alone left every
+            // row/header host ungated — the gate passed a page whose rows were still generic (measured 2026-10-23).
+            const FAMPAT = { List: /^(?:List|ListItem|Descriptions)(?:·|$)/, Table: /^(?:Table|TableRow|TableHeader)(?:·|$)/, Calendar: /^(?:MiniCalendar|Calendar)(?:·|$)/ };
+            const keyFor = (fam) => {
+              const ks = [String(fam).toLowerCase()].concat(ALIAS[String(fam).toLowerCase()] || []);
+              for (let i = 0; i < ks.length; i++) {
+                const hit = Object.keys(groupRef).filter((gk) => gk.toLowerCase() === ks[i] && groupRef[gk] && typeof groupRef[gk] === 'object' && !Array.isArray(groupRef[gk]))[0];
+                if (hit) return hit;
+              }
+              return null;
+            };
+            const declared = Object.keys(groupRef).filter((k) => groupRef[k] && typeof groupRef[k] === 'object' && !Array.isArray(groupRef[k]) && !/^(families|shapes|variants|source|anatomy)$/i.test(k));
+            if (!declared.length) add('reference_drift', null, top, 'the ' + G.g + ' profile declares no family entries — every family this page draws needs a measured or explicitly derived entry');
+            (function walkP(k) {
+              const nm = nameOf(k);
+              if (typeOf(k) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Masters·/.test(nm)) {
+                const fam = G.fams.filter((f) => (FAMPAT[f] ? FAMPAT[f].test(nm) : new RegExp('^' + f + '(?:·|$)').test(nm)))[0];
+                const famKey = fam ? keyFor(fam) : null;
+                if (fam && famKey) {
+                  const st = readProf(k);
+                  if (!st) {
+                    const draw = ({ List: 'listItem', Table: 'tableRow', Calendar: 'miniCalendar' })[fam] || fam.toLowerCase();
+                    add('reference_drift', k, top, nm.slice(0, 44) + ' carries no nl:prof stamp — it was drawn from the generic kit, not from the ' + G.g + ' profile; run CF.stampPass (measures the render) or rebuild it with the profile-aware factory (CF.' + draw + ')');
+                  } else {
+                    if (st.g && st.g !== G.g) add('reference_drift', k, top, nm.slice(0, 44) + ' is stamped from the "' + st.g + '" profile on a ' + G.g + ' page');
+                    // Judge against the entry MERGED with the variant the HOST NAME declares (`Card·…·Selectable` — a
+                    // factory stamp may record a different axis, and the name is the one both stamp paths agree on),
+                    // and profDiff merges the stamp's per-size block over `expect`.
+                    const nk = (storage.CF && storage.CF.profKeyFor) ? storage.CF.profKeyFor(nm) : null;
+                    const vary = (nk && nk.variant) || st.variant || null;
+                    const entry = (storage.CF && storage.CF.profile && storage.CF.profile(G.g, famKey, vary)) || groupRef[famKey];
+                    const diff = (storage.CF && storage.CF.profDiff) ? storage.CF.profDiff(entry, st)
+                      : Object.keys(entry.expect || {}).filter((ek) => entry.expect[ek] !== undefined && String((st.geo || {})[ek]) !== String(entry.expect[ek])).map((ek) => ({ k: ek, want: entry.expect[ek], got: (st.geo || {})[ek] }));
+                    diff.forEach((b) => add('reference_drift', k, top, nm.slice(0, 44) + ' draws ' + b.k + '=' + (b.got === undefined || b.got === null ? '—' : b.got) + '; the ' + G.g + ' profile measures ' + b.k + '=' + b.want + (entry.derived ? ' (derived material)' : '')));
+                  }
+                }
+              }
+              (kidsOf(k) || []).forEach(walkP);
+            })(top);
+          }
         }
       }
     } catch (e) { err('reference', e); }
