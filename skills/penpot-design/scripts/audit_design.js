@@ -67,7 +67,7 @@ return (function () {
     paint_unbound: 'design-tokens §8.1 · an opaque solid paint whose hex IS a declared token colour but the shape carries no `tokens.fill` / `tokens.strokeColor` binding — the colour was typed, not chosen from the set',
     paint_off_palette: 'design-tokens §8.1 · a paint whose hex is not any declared colour token: the palette and the token set have drifted apart',
     type_unbound: 'design-tokens §8.1 · copy that matches a declared ramp step but carries no `tokens.typography` binding',
-    type_off_ramp: '§3.2 · the drawn (family,size,weight) is not a declared typography token, so nothing can bind to it — raise it onto the ramp',
+    type_off_ramp: '§3.2 · the drawn (family,size,weight) is not a declared typography token, so nothing can bind to it — raise it onto the ramp. On a SCREEN or inside a control host a BINDING is also judged: a bound token whose run reads a different family/size/weight/leading (a Nunito run bound to Urbanist `type.label-lg`) is this rule, because the binding is a name, not the type. Documentation/spec labels are scoped out of the binding half',
     space_unbound: '§1 + design-tokens §6 · a flow container whose rowGap/columnGap equals a declared `spacing` token but carries no `tokens.rowGap`/`tokens.columnGap` binding (padding cannot be bound: measured, only the two gap props are accepted)',
     space_off_scale: '§1 · a gap or padding written on a flow/grid container that is not any declared `spacing` value — the space scale is a token set, not a habit',
     no_guides: '§2 + native-layout R0 · a tier-viewport composition board with neither native `guides` nor `rulerGuides`: the grid must live on the board (LY.guides), not in hand-drawn column rectangles',
@@ -502,25 +502,37 @@ return (function () {
           : 'stroke ' + h + ' names no colour token');
       }
       if (!isTxt) return;
+      // Scope the bound-drift half to CONSUMER SURFACES: a screen, or copy inside a control host. A foundations/spec
+      // board's annotation is documentation, not a component the user edits; judging it here dragged 185 board labels
+      // into a font migration that shrank auto-height swatch cells (measured 2026-10-23). The family contract still
+      // applies where it matters, and `mkText` now takes its family from the ramp so new documentation is born correct.
+      let inCtrl = false;
+      try {
+        let a = s.parent, g = 0;
+        while (a && a !== st.top && g < 4) { if (typeOf(a) === 'board' && /^(Button|IconButton|Tab|Chip|Link)·/.test(nameOf(a))) { inCtrl = true; break; } a = a.parent || null; g++; }
+      } catch (e) {}
+      const surfaceScope = SCREEN || inCtrl;
       // A BOUND token is not proof the run matches it: `TK.bindBoard` keys on size+weight, so a Nunito 16/600 run
       // was bound to the Urbanist `type.label-lg` and passed every type rule (measured 2026-10-23 on all Button
       // labels). Judge the binding against the token's own family/size/weight/leading, not just its presence.
       if (tk.typography) {
-        const e = TOK.ti && TOK.ti.ramp ? TOK.ti.ramp.filter((r) => r.name === tk.typography)[0] : null;
-        if (e) {
-          const f = String(str(s, 'fontFamily', '')).toLowerCase();
-          // `fontSize`/`fontWeight` read back as STRINGS on a text shape; `num()` only accepts finite numbers, so it
-          // reported 0 for every bound run and this new check indicted the whole type ramp (measured immediately).
-          const fs = parseFloat(str(s, 'fontSize', '0')) || 0, fw = parseFloat(str(s, 'fontWeight', '0')) || 0;
-          const lhRaw = parseFloat(str(s, 'lineHeight', '0')) || 0;
-          const lhPx = lhRaw > 0 && lhRaw < 4 ? lhRaw * fs : lhRaw;
-          const wantPx = e.leading && e.size ? e.leading * e.size : 0;
-          const bad = [];
-          if (e.family && f && e.family !== f) bad.push('family ' + str(s, 'fontFamily', '?') + ' ≠ ' + e.family);
-          if (e.size && Math.abs(fs - e.size) > 0.6) bad.push('size ' + N(fs) + ' ≠ ' + N(e.size));
-          if (e.weight && Math.abs(fw - e.weight) > 1) bad.push('weight ' + N(fw) + ' ≠ ' + N(e.weight));
-          if (wantPx && lhPx && Math.abs(lhPx - wantPx) > 1.5) bad.push('leading ' + N(lhPx) + 'px ≠ ' + N(wantPx) + 'px');
-          if (bad.length) add('type_off_ramp', s, st.top, '"' + tk.typography + '" is bound but the run does not match it: ' + bad.join(' · ') + ' — the binding is a name, not the type');
+        if (surfaceScope) {
+          const e = TOK.ti && TOK.ti.ramp ? TOK.ti.ramp.filter((r) => r.name === tk.typography)[0] : null;
+          if (e) {
+            const f = String(str(s, 'fontFamily', '')).toLowerCase();
+            // `fontSize`/`fontWeight` read back as STRINGS on a text shape; `num()` only accepts finite numbers, so it
+            // reported 0 for every bound run and this new check indicted the whole type ramp (measured immediately).
+            const fs = parseFloat(str(s, 'fontSize', '0')) || 0, fw = parseFloat(str(s, 'fontWeight', '0')) || 0;
+            const lhRaw = parseFloat(str(s, 'lineHeight', '0')) || 0;
+            const lhPx = lhRaw > 0 && lhRaw < 4 ? lhRaw * fs : lhRaw;
+            const wantPx = e.leading && e.size ? e.leading * e.size : 0;
+            const bad = [];
+            if (e.family && f && e.family !== f) bad.push('family ' + str(s, 'fontFamily', '?') + ' ≠ ' + e.family);
+            if (e.size && Math.abs(fs - e.size) > 0.6) bad.push('size ' + N(fs) + ' ≠ ' + N(e.size));
+            if (e.weight && Math.abs(fw - e.weight) > 1) bad.push('weight ' + N(fw) + ' ≠ ' + N(e.weight));
+            if (wantPx && lhPx && Math.abs(lhPx - wantPx) > 1.5) bad.push('leading ' + N(lhPx) + 'px ≠ ' + N(wantPx) + 'px');
+            if (bad.length) add('type_off_ramp', s, st.top, '"' + tk.typography + '" is bound but the run does not match it: ' + bad.join(' · ') + ' — the binding is a name, not the type');
+          }
         }
         return;
       }
@@ -746,6 +758,24 @@ return (function () {
           add('text_cramped', t, st.top, 'lineHeight ' + lhRaw + ' under the declared leading ' + want + ' of the ' + fs +
             'px step' + (r.h >= one * 1.8 ? ' — ' + Math.max(2, Math.round(r.h / (lhRaw * fs))) + ' wrapped lines of copy'
               : ' — clips its own line box') + '. Bind the typography token; the ramp owns the rhythm');
+        }
+      }
+      // rule 57 · label_off_axis — a control's label belongs on the control's own axis. A unitless leading read as
+      // pixels centres the text box on a 1.25px band instead of a 20px one, which lands every label ~9px low while the
+      // host, padding and typography all read correct (measured 2026-10-23 on all 21 Button masters). Only a label that
+      // is clearly MEANT to be centred (inside the host band, within one line of its centre) is judged. This lives in
+      // `auditText`, not the shape pass: text has its own pass, so the same test in the board pass never ran.
+      if (par) {
+        let owner = par, steps = 0;
+        while (owner && owner !== st.top && steps < 3 && !(typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner)))) {
+          owner = owner.parent || null; steps++;
+        }
+        if (owner && owner !== st.top && typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner))) {
+          const ob = box(owner), dy = (r.y + r.h / 2) - (ob.y + ob.h / 2);
+          if (Math.abs(dy) > 2 && Math.abs(dy) <= Math.max(12, fs) && r.y >= ob.y - 1 && r.y + r.h <= ob.y + ob.h + 1) {
+            add('label_off_axis', t, st.top, 'label centre is ' + N(Math.abs(dy)) + 'px ' + (dy > 0 ? 'below' : 'above') +
+              ' the axis of "' + nameOf(owner).slice(0, 34) + '" — centre it on the final host box (resolved leading = ratio × fontSize)');
+          }
         }
       }
       // §4.2 a swatch caption is a *claim about the paint beside it*. A token-bound plate follows the token while its
@@ -1177,24 +1207,6 @@ return (function () {
             const d = Math.abs((cb.y + cb.h / 2) - (nb.y + nb.h / 2));
             if (d > 1) add('row_axis_off', s, st.top, 'connector centre ' + N(cb.y + cb.h / 2) + ' is ' + N(d) +
               'px off the "' + nameOf(big).slice(0, 20) + '" centre ' + N(nb.y + nb.h / 2) + ' — a row has one axis (§2.3)');
-          }
-        }
-      }
-      // rule 57 · label_off_axis — a control's label belongs on the control's own axis. A unitless leading read as
-      // pixels centres the text box on a 1.25px band instead of a 20px one, which lands every label ~9px low while the
-      // host, padding and typography all read correct (measured 2026-10-23 on all 21 Button masters). Only a label that
-      // is clearly MEANT to be centred (inside the host band, within one line of its centre) is judged.
-      if (typeOf(s) === 'text' && par && !isAnno(s)) {
-        let owner = par, steps = 0;
-        while (owner && owner !== top && steps < 3 && !(typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner)))) {
-          owner = owner.parent || null; steps++;
-        }
-        if (owner && owner !== top && typeOf(owner) === 'board' && /^(Button|Tab|Chip)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner))) {
-          const ob = box(owner), tb = box(s), fs = num(s, 'fontSize', 0);
-          const dy = (tb.y + tb.h / 2) - (ob.y + ob.h / 2);
-          if (Math.abs(dy) > 2 && Math.abs(dy) <= Math.max(12, fs) && tb.y >= ob.y - 1 && tb.y + tb.h <= ob.y + ob.h + 1) {
-            add('label_off_axis', s, st.top, 'label centre is ' + N(Math.abs(dy)) + 'px ' + (dy > 0 ? 'below' : 'above') +
-              ' the axis of "' + nameOf(owner).slice(0, 34) + '" — centre it on the final host box (resolved leading = ratio × fontSize)');
           }
         }
       }

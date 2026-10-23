@@ -1133,6 +1133,10 @@ return (function () {
   TK.ringHost = function (s, o) {
     o = o || {};
     const tol = o.tol === undefined ? 3 : o.tol;
+    // OWNERSHIP tolerance is wider than CONCENTRIC tolerance. A ring 4px off a same-size plate is still that plate's
+    // ring (the defect is its offset); with tol=3 the scan found no owner and every ring rule fell into the "row ring
+    // with no plate" branch, so a drifted outline read CLEAN (measured 2026-10-23). Own within 6px, then judge centre.
+    const ownTol = o.ownTol === undefined ? Math.max(tol, 6) : o.ownTol;
     const margin = o.margin === undefined ? TK.RING_MAX_MARGIN : o.margin;
     const rb = ringBox(s);
     if (!rb) return { host: null, concentric: false, err: 'no box' };
@@ -1155,7 +1159,7 @@ return (function () {
           if (b && b.w > 0 && b.h > 0) {
             const v = Math.abs(cx - (b.x + b.w / 2)) + Math.abs(cy - (b.y + b.h / 2));
             const ox = (rb.w - b.w) / 2, oy = (rb.h - b.h) / 2;
-            if (v <= tol && ox >= -0.01 && oy >= -0.01 && ox <= margin && oy <= margin) good.push({ sh: k, v: v, ox: ox, oy: oy, d: d });
+            if (v <= ownTol && ox >= -0.01 && oy >= -0.01 && ox <= margin && oy <= margin) good.push({ sh: k, v: v, ox: ox, oy: oy, d: d });
           }
         }
         if (d >= (o.depth === undefined ? 4 : o.depth)) return;
@@ -1169,7 +1173,7 @@ return (function () {
       good.sort((p, q) => (p.v - q.v) || (p.sh.width * p.sh.height - q.sh.width * q.sh.height) || ((q.d || 0) - (p.d || 0)));
       if (good.length) {
         const w = good[0];
-        return { host: w.sh, control: control, concentric: true, floating: false, contained: contained,
+        return { host: w.sh, control: control, concentric: w.v <= tol, offBy: N2(w.v), floating: false, contained: contained,
           via: w.sh === control ? 'control' : 'descendant', ox: N2(w.ox), oy: N2(w.oy), dist: N2(w.v),
           kind: String(w.sh.type), accepts: good.length };
       }

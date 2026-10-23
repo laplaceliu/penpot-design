@@ -160,7 +160,15 @@ Every variant row also carries the state columns from §3.0.
 | **Link** | 14–15, underline on hover only (never a permanent underline inside body text at 14), gap 4 with icon | plain · with-icon · muted/disabled | inline-in-paragraph sample, nav link, **visited/disabled** | `CF.link` |
 | **Toggle / Segmented** | track = row of `md` segments, active segment filled + radius, h 32–40, pad 4 inside the container [obs; M3 segmented 48dp h] | `count` (2–4), `iconOnly`, `size`, `fullWidth` | 3-segment default + selected variant, icon-only 4-segment, disabled segment | `CF.segmented` |
 
-**HARD — a recreation builds the SOURCE's action inventory, not `CF.map().actions`.** Read the source before the page: Aigocy's `.tf-btn`/`.tf-btn-2` are 99px pills (#272727 / #F5F5F5), its process tile is 72×72 r16, feature tiles are 44×44 r12 and social/arrow controls are 48–52px circles; its nav actions are text links. There is **no** ButtonGroup, SplitButton, Segmented or FAB. Seed `CF.setReference({actions:{families,shapes,variants}})` (stamped as `nl:ref` on the PageRoot) before page 03; `reference_drift` fails any spec family the source lacks and any host whose corner is not one of the family's pinned roles. `variants` can pin a family's minimum variant count and `iconSlot:false`, so the gate does not demand a variant the source never shows.
+**HARD — a recreation builds the SOURCE's action inventory, not `CF.map().actions`.** Read the source before the page: Aigocy's `.tf-btn`/`.tf-btn-2` are 99px pills (#272727 / #F5F5F5), its process tile is 72×72 r16, feature tiles are 44×44 r12 and social/arrow controls are 48–52px circles; its nav actions are text links. There is **no** ButtonGroup, SplitButton, Segmented or FAB. Seed `CF.setReference({actions:{families,shapes,variants,anatomy}})` (stamped as `nl:ref` on the PageRoot) before page 03; `reference_drift` fails any spec family the source lacks, any host whose corner is not one of the family's pinned roles, and — through `anatomy` — a pinned material defect. `variants` can pin a family's minimum variant count and `iconSlot:false`, so the gate does not demand a variant the source never shows.
+
+**Button has TWO materials, and `type` selects the recipe.** `.tf-btn` is the dark machined plate (`control`: 7 drops + 2 insets + sheen); `.tf-btn-2` is a **light chip** (`chip`: 2 drops + 2 insets + sheen), **no border**, ink label, and its hover is `color: var(--brand)` — the label changes, the fill does not. A secondary button that inherits the generic `secondary` tone's 1px border and the `control` stack is not the source: that is exactly the inference measured 2026-10-23 on `Button·Secondary·XL·Focus·Pill` (9 dark layers, a border, a grey focus wash, a detached halo, and a Nunito label 9px low). The reference profile pins it:
+
+```js
+anatomy: { 'Button·Secondary': { stroke: false, elevation: 'chip', focusRing: 'flush' } }
+```
+
+`CF.button` draws a secondary chip borderless, with the chip state expressed by **label ink + elevation** (no grey overlay); its focus ring is flush (offset 0) because a bordered halo with a gap reads as a detached frame. `EL.roles.Button.byType.secondary` supplies `chip`/`chipHover`; `EL.roleFor` resolves the TYPE before the state, so hover lifts `chip → chipHover` instead of inheriting the primary stack.
 
 
 ### 3.2 B · Text fields
