@@ -97,6 +97,7 @@ return (function () {
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
     shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
+    library_drift: 'library-pairing contract (references/library-pairing.md) · when a host component library manifest is active (`storage.LM`, durable `nl:lib` on PageRoots), pages 03–09 must contain EXACTLY the manifest design families assigned to that page — a missing family or an extra family fails, and page 13 audits the live library masters against the manifest (missing visual components / masters that belong to no manifest component). A paired headless library draws anatomy + states, not invented styled variants',
     shadow_clipped: '§5 + gate G18 · a shadowed shape whose painted shadow box is cut by a clipping ancestor — Penpot boards default to clipContent=true, so a slot/grid/Spec/row container slices the drop+inset stack at the cell edge. Layout containers must be authored with clipContent=false; only `clip·` media masks crop. Repair: storage.unclip() on the page, or rebuild the container with the fixed NL.frame/mkAbsBoard default',
     elevation_flat: '§5 + gate G18 · a shape stamped `nl:el=<recipe>` whose `shadows` has fewer layers than that recipe (a multi-layer stack collapsed to one, or a rebuild that dropped the insets), OR whose stamp names a different recipe than its NAME resolves to (a `Button·Secondary` still carrying `control` while its role is `chip`). The stamp is the durable contract; this rule compares it to the render and to the role. Repair with `EL.apply(shape, recipe)` / `EL.sweepPage`',
     edge_missing: '§5 + gate G18 · a stamped recipe declares INNER layers (the dark bottom lip / white top highlight that make a card read as a physical object) but the shape paints only drop shadows. A drop shadow alone is the flat "everything is a card" look this rule exists to stop',
@@ -1392,7 +1393,9 @@ return (function () {
       // so the check reads seg[0] too. Judging seg[1] turned every structural index row (`cell·Accordion·0`, where the
       // family word is the *second* segment by construction) into a claimed typo'd factory.
       const seg0 = nm.split('·')[0] || '';
-      if (board && !fam && !spec && looksLikeCf(board) && /^[A-Z][A-Za-z]+$/.test(seg0)) {
+      let pairedFam = null;
+      try { const L = storage.LM; if (L && (L.active || (L.hydrate && L.hydrate()))) { pairedFam = {}; L.visual().forEach((c) => pairedFam[c.designFamily] = 1); } } catch (e) {}
+      if (board && !fam && !spec && !(pairedFam && pairedFam[seg0]) && looksLikeCf(board) && /^[A-Z][A-Za-z]+$/.test(seg0)) {
         add('spec', s, st.top, 'control host "' + nm + '" names an unknown family "' + seg0 + '" (not in component-library §3.0)');
       }
       const cfHost = !!board && (!!fam || spec || looksLikeCf(board));
@@ -1713,6 +1716,14 @@ return (function () {
     // source (for example Button=pill, IconButton=tile/circle, Link=none). The profile is durable on the PageRoot (`nl:ref`).
     try {
       const pname = String(out.page || '');
+      // Library pairing: an `nl:lib` stamp (or an in-session LM.load) replaces the generic CF.map() catalog with the
+      // host library's exact component inventory. Generic mode has no stamp, so all existing rules are unchanged.
+      const LIB = (storage.LM && storage.LM.ensure) ? (storage.LM.ensure() ? storage.LM : null) : null;
+      if (LIB && /^13(?:\D|$)/.test(pname) && /-PageRoot$/.test(nameOf(top))) {
+        const la = LIB.audit();
+        (la.missing || []).forEach((m) => add('library_drift', null, top, 'paired library "' + la.name + '": visual component ' + m.designFamily + ' (' + m.factory + ') has no master in the Penpot library'));
+        (la.extras || []).forEach((h) => add('library_drift', null, top, 'library master "' + h + '" is not a component (or part) of the paired manifest — the design system may not invent components outside the host library'));
+      }
       // One reader for the birth stamp, used by every branch of rule 56: an instance answers with its MASTER's stamp
       // (the master is the definition), so a placed copy is judged by what it is an instance of, not by its own record.
       const readProf = (k) => { let st = null; try { st = (storage.CF && storage.CF.profOf) ? storage.CF.profOf(k) : null; } catch (e) {} if (!st) { try { const raw = k.getPluginData ? k.getPluginData('nl:prof') : null; if (raw) st = JSON.parse(raw); } catch (e) {} } return st; };
@@ -1720,7 +1731,7 @@ return (function () {
         let ref = null;
         try { ref = (storage.CF && storage.CF.reference) ? storage.CF.reference('actions') : (storage.REF && storage.REF.actions); } catch (e) {}
         if (!ref) { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; if (raw) { const d = JSON.parse(raw); ref = d && d.actions; } } catch (e) {} }
-        if (!ref || !ref.families || !ref.families.length) {
+        if (!LIB && (!ref || !ref.families || !ref.families.length)) {
           add('reference_drift', null, top, 'no reference action profile on page 03 — seed CF.setReference({actions:{families,shapes}}) from DESIGN.md before building the Actions chapter; a factory list is not a reference inventory');
         } else {
           // COMPLETE CATALOG. The source inventory is the measured half, not a licence to delete the other
@@ -1729,7 +1740,8 @@ return (function () {
           const NAMEMAP = { fab: 'FAB', kpi: 'KPI', otpInput: 'OTP', searchField: 'Search', passwordField: 'Password' };
           const capFam = (f) => NAMEMAP[f] || (String(f).charAt(0).toUpperCase() + String(f).slice(1));
           let catalog = ['Button', 'IconButton', 'ButtonGroup', 'SplitButton', 'FAB', 'Link', 'Segmented'];
-          try { const m = storage.CF && storage.CF.map ? storage.CF.map().actions : []; if (m && m.length) catalog = m.map(capFam); } catch (e) {}
+          if (LIB) catalog = LIB.pageFams('03');
+          else try { const m = storage.CF && storage.CF.map ? storage.CF.map().actions : []; if (m && m.length) catalog = m.map(capFam); } catch (e) {}
           const want = catalog.map((f) => String(f).toLowerCase());
           const source = ref.families.map((f) => String(f).toLowerCase());
           const shapes = {};
@@ -1739,7 +1751,7 @@ return (function () {
           specs.forEach((b) => {
             const fam = String(nameOf(b)).split('·')[0], key = fam.toLowerCase();
             seen[key] = 1;
-            if (want.indexOf(key) < 0) add('reference_drift', b, top, 'Actions spec "' + nameOf(b) + '" names family ' + fam + ', which is not in CF.map().actions — the library has no factory to back it');
+            if (want.indexOf(key) < 0) add(LIB ? 'library_drift' : 'reference_drift', b, top, LIB ? 'Actions spec "' + nameOf(b) + '" is not a component of the paired library manifest on page 03' : 'Actions spec "' + nameOf(b) + '" names family ' + fam + ', which is not in CF.map().actions — the library has no factory to back it');
             const allowed = shapes[key];
             if (allowed && allowed.length) {
               const vals = allowed.map((role) => { try { return (storage.CF && storage.CF.radius) ? storage.CF.radius(role) : ({ none: 0, tile: 12, full: 9999 }[role]); } catch (e) { return null; } });
@@ -1753,7 +1765,7 @@ return (function () {
               })(b);
             }
           });
-          catalog.forEach((f) => { if (!seen[String(f).toLowerCase()]) add('reference_drift', null, top, 'complete action catalog: ' + f + ' has no ·Spec board on page 03' + (source.indexOf(String(f).toLowerCase()) >= 0 ? ' (source-measured family)' : ' (derived family — build it from the source material, do not omit it)')); });
+          catalog.forEach((f) => { if (!seen[String(f).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired action catalog: ' : 'complete action catalog: ') + f + ' has no ·Spec board on page 03' + (LIB ? '' : (source.indexOf(String(f).toLowerCase()) >= 0 ? ' (source-measured family)' : ' (derived family — build it from the source material, do not omit it)'))); });
           // ANATOMY — the family list is only the first half of the source contract. A family that IS in the inventory
           // can still be drawn with the wrong material: the a reference secondary action may be a borderless light chip, but the
           // generic "secondary" tone gave it a 1px border, a `control` stack and a detached halo. These facts live in the
@@ -1787,7 +1799,7 @@ return (function () {
           // BIRTH STAMP — pages 03 and 04–08 are ONE contract: a profiled host carries the stamp of the entry it was
           // drawn from and measures what that entry's `expect` declares. A Actions host built before the profile
           // existed is not exempt — CF.stampPass measures it, and a generic measurement still fails `expect`.
-          if (storage.CF && storage.CF.profKeyFor && storage.CF.profDiff) {
+          if (!LIB && storage.CF && storage.CF.profKeyFor && storage.CF.profDiff) {
             (function walkStamp(k) {
               const nm = nameOf(k);
               if (typeOf(k) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nm)) {
@@ -1816,12 +1828,12 @@ return (function () {
         // The complete feedback catalog is the page contract; measured tooltip/modal are checked below, the rest are
         // derived and must still be built and registered (never omitted).
         try {
-          const m = storage.CF && storage.CF.map ? storage.CF.map().feedback : [];
+          const m = LIB ? LIB.pageFams('09') : (storage.CF && storage.CF.map ? storage.CF.map().feedback : []);
           const specHead = {};
           (kidsOf(top) || []).forEach((c) => { if (typeOf(c) === 'board' && /·Spec(?:·|$)/.test(nameOf(c))) specHead[String(nameOf(c)).split('·')[0].toLowerCase()] = 1; });
-          m.forEach((f) => { const cap = String(f).charAt(0).toUpperCase() + String(f).slice(1); if (!specHead[String(cap).toLowerCase()]) add('reference_drift', null, top, 'complete feedback catalog: ' + cap + ' has no ·Spec board on page 09 — measured families use their profile, the rest are derived from the source material and must still be built'); });
+          m.forEach((f) => { const cap = String(f).charAt(0).toUpperCase() + String(f).slice(1); if (!specHead[String(cap).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired feedback catalog: ' : 'complete feedback catalog: ') + cap + ' has no ·Spec board on page 09' + (LIB ? '' : ' — measured families use their profile, the rest are derived from the source material and must still be built')); });
         } catch (e) {}
-        if (!fb) {
+        if (!LIB && !fb) {
           add('reference_drift', null, top, 'no feedback source profile on page 09 — seed CF.setReference({feedback:{tooltip,modal,alert,toast}}) from the reference CSS before building Overlays; generic factory defaults are not the source');
         } else {
           const fbOf = (k) => { try { return JSON.parse(k.getPluginData('nl:fb') || 'null'); } catch (e) { return null; } };
@@ -1882,7 +1894,9 @@ return (function () {
         if (G) {
           // The complete catalog, split by page contract (not a hand-list that lets families disappear):
           // 04 = fields, 05 = selection/pickers, 06 = data lists, 07 = display/metrics, 08 = navigation.
-          try {
+          if (LIB) {
+            G.fams = LIB.pageFams(pname);
+          } else try {
             const m = storage.CF && storage.CF.map ? storage.CF.map() : null;
             const NAMEMAP2 = { fab: 'FAB', kpi: 'KPI', otpInput: 'OTP', searchField: 'Search', passwordField: 'Password' };
             const cap = (f) => NAMEMAP2[f] || (String(f).charAt(0).toUpperCase() + String(f).slice(1));
@@ -1898,7 +1912,13 @@ return (function () {
           } catch (e) {}
           const specHead = {};
           (kidsOf(top) || []).forEach((c) => { if (typeOf(c) === 'board' && /·Spec(?:·|$)/.test(nameOf(c))) specHead[String(nameOf(c)).split('·')[0].toLowerCase()] = 1; });
-          G.fams.forEach((f) => { if (!specHead[String(f).toLowerCase()]) add('reference_drift', null, top, 'complete ' + G.g + ' catalog: ' + f + ' has no ·Spec board on page ' + pname.slice(0, 2) + ' — build the whole family set; a source recreation does not delete the families the site does not show'); });
+          G.fams.forEach((f) => { if (!specHead[String(f).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired ' : 'complete ') + G.g + ' catalog: ' + f + ' has no ·Spec board on page ' + pname.slice(0, 2) + (LIB ? ' — the paired library manifest assigns it to this page' : ' — build the whole family set; a source recreation does not delete the families the site does not show')); });
+          if (LIB) Object.keys(specHead).forEach((h) => {
+            if (G.fams.map((x) => String(x).toLowerCase()).indexOf(h) < 0) {
+              const capH = h.charAt(0).toUpperCase() + h.slice(1);
+              add('library_drift', null, top, 'paired ' + G.g + ' page contains ' + capH + '·Spec, which is not a manifest component for page ' + pname.slice(0, 2));
+            }
+          });
           const rootRef = () => { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; return raw ? JSON.parse(raw) : null; } catch (e) { return null; } };
           let groupRef = null;
           try { groupRef = (storage.CF && storage.CF.reference) ? storage.CF.reference(G.g) : null; } catch (e) {}
@@ -1908,7 +1928,7 @@ return (function () {
             try { if (storage.REF && Object.keys(storage.REF).length) isRecreation = true; } catch (e) {}
             if (!isRecreation) isRecreation = !!rootRef();
           }
-          if (isRecreation && !groupRef) {
+          if (!LIB && isRecreation && !groupRef) {
             add('reference_drift', null, top, 'no ' + G.g + ' source profile on page ' + pname.slice(0, 2) + ' — seed CF.setReference({' + G.g + ': {…}}) from the reference CSS before building this chapter; a factory default is legal for a blank file, not for a source-backed page');
           } else if (groupRef) {
             const ALIAS = { textarea: ['textarea'], search: ['search'], field: ['field'], navitem: ['navitem', 'nav'],

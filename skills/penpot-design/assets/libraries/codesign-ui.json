@@ -1,0 +1,1559 @@
+{
+ "name": "codesign-ui",
+ "mode": "headless",
+ "granularity": "namespace",
+ "source": "https://github.com/codesign-chat/codesign-ui",
+ "package": "refs/codesign-ui/packages/react",
+ "generated": "2026-10-24",
+ "components": [
+  {
+   "name": "Accordion",
+   "dir": "accordion",
+   "parts": [
+    "AccordionItem",
+    "AccordionItemContent",
+    "AccordionItemIndicator",
+    "AccordionItemTrigger",
+    "AccordionRoot"
+   ],
+   "source": "packages/react/src/components/accordion",
+   "designFamily": "Accordion",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "accordion",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "AngleSlider",
+   "dir": "angle-slider",
+   "parts": [
+    "AngleSliderControl",
+    "AngleSliderHiddenInput",
+    "AngleSliderLabel",
+    "AngleSliderMarker",
+    "AngleSliderMarkerGroup",
+    "AngleSliderRoot",
+    "AngleSliderThumb",
+    "AngleSliderValueText"
+   ],
+   "source": "packages/react/src/components/angle-slider",
+   "designFamily": "AngleSlider",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Avatar",
+   "dir": "avatar",
+   "parts": [
+    "AvatarFallback",
+    "AvatarImage",
+    "AvatarRoot"
+   ],
+   "source": "packages/react/src/components/avatar",
+   "designFamily": "Avatar",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "avatar",
+   "kind": "visual",
+   "states": [
+    "default",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Carousel",
+   "dir": "carousel",
+   "parts": [
+    "CarouselAutoplayIndicator",
+    "CarouselAutoplayTrigger",
+    "CarouselControl",
+    "CarouselIndicator",
+    "CarouselIndicatorGroup",
+    "CarouselItem",
+    "CarouselItemGroup",
+    "CarouselNextTrigger",
+    "CarouselPrevTrigger",
+    "CarouselProgressText",
+    "CarouselRoot"
+   ],
+   "source": "packages/react/src/components/carousel",
+   "designFamily": "Carousel",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "carousel",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Checkbox",
+   "dir": "checkbox",
+   "parts": [
+    "CheckboxControl",
+    "CheckboxGroup",
+    "CheckboxHiddenInput",
+    "CheckboxIndicator",
+    "CheckboxLabel",
+    "CheckboxRoot"
+   ],
+   "source": "packages/react/src/components/checkbox",
+   "designFamily": "Checkbox",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "checkbox",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "ClientOnly",
+   "dir": "client-only",
+   "parts": [
+    "ClientOnly"
+   ],
+   "source": "packages/react/src/components/client-only",
+   "designFamily": "ClientOnly",
+   "category": "Utilities",
+   "group": "utility",
+   "page": "13",
+   "factory": "custom",
+   "kind": "nonVisual",
+   "states": []
+  },
+  {
+   "name": "Clipboard",
+   "dir": "clipboard",
+   "parts": [
+    "ClipboardControl",
+    "ClipboardIndicator",
+    "ClipboardInput",
+    "ClipboardLabel",
+    "ClipboardRoot",
+    "ClipboardTrigger",
+    "ClipboardValueText"
+   ],
+   "source": "packages/react/src/components/clipboard",
+   "designFamily": "Clipboard",
+   "category": "Utilities",
+   "group": "actions",
+   "page": "03",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Collapsible",
+   "dir": "collapsible",
+   "parts": [
+    "CollapsibleContent",
+    "CollapsibleIndicator",
+    "CollapsibleRoot",
+    "CollapsibleTrigger"
+   ],
+   "source": "packages/react/src/components/collapsible",
+   "designFamily": "Collapsible",
+   "category": "Utilities",
+   "group": "navigation",
+   "page": "08",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "Collection",
+   "dir": "collection",
+   "parts": [],
+   "source": "packages/react/src/components/collection",
+   "designFamily": "Collection",
+   "category": "Utilities",
+   "group": "utility",
+   "page": "13",
+   "factory": "custom",
+   "kind": "nonVisual",
+   "states": []
+  },
+  {
+   "name": "ColorPicker",
+   "dir": "color-picker",
+   "parts": [
+    "ColorPickerArea",
+    "ColorPickerAreaBackground",
+    "ColorPickerAreaThumb",
+    "ColorPickerChannelInput",
+    "ColorPickerChannelSlider",
+    "ColorPickerChannelSliderLabel",
+    "ColorPickerChannelSliderThumb",
+    "ColorPickerChannelSliderTrack",
+    "ColorPickerChannelSliderValueText",
+    "ColorPickerContent",
+    "ColorPickerControl",
+    "ColorPickerEyeDropperTrigger",
+    "ColorPickerFormatSelect",
+    "ColorPickerFormatTrigger",
+    "ColorPickerHiddenInput",
+    "ColorPickerLabel",
+    "ColorPickerPositioner",
+    "ColorPickerRoot",
+    "ColorPickerSwatch",
+    "ColorPickerSwatchGroup",
+    "ColorPickerSwatchIndicator",
+    "ColorPickerSwatchTrigger",
+    "ColorPickerTransparencyGrid",
+    "ColorPickerTrigger",
+    "ColorPickerValueSwatch",
+    "ColorPickerValueText",
+    "ColorPickerView"
+   ],
+   "source": "packages/react/src/components/color-picker",
+   "designFamily": "ColorPicker",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "colorPicker",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Combobox",
+   "dir": "combobox",
+   "parts": [
+    "ComboboxClearTrigger",
+    "ComboboxContent",
+    "ComboboxControl",
+    "ComboboxEmpty",
+    "ComboboxInput",
+    "ComboboxItem",
+    "ComboboxItemGroup",
+    "ComboboxItemGroupLabel",
+    "ComboboxItemIndicator",
+    "ComboboxItemText",
+    "ComboboxLabel",
+    "ComboboxList",
+    "ComboboxPositioner",
+    "ComboboxRoot",
+    "ComboboxTrigger"
+   ],
+   "source": "packages/react/src/components/combobox",
+   "designFamily": "Combobox",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "combobox",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "DateInput",
+   "dir": "date-input",
+   "parts": [
+    "DateInputControl",
+    "DateInputHiddenInput",
+    "DateInputLabel",
+    "DateInputRoot",
+    "DateInputSegment",
+    "DateInputSegmentGroup"
+   ],
+   "source": "packages/react/src/components/date-input",
+   "designFamily": "DateInput",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+   ]
+  },
+  {
+   "name": "DatePicker",
+   "dir": "date-picker",
+   "parts": [
+    "DatePickerClearTrigger",
+    "DatePickerContent",
+    "DatePickerControl",
+    "DatePickerInput",
+    "DatePickerLabel",
+    "DatePickerMonthSelect",
+    "DatePickerNextTrigger",
+    "DatePickerPositioner",
+    "DatePickerPresetTrigger",
+    "DatePickerPrevTrigger",
+    "DatePickerRangeText",
+    "DatePickerRoot",
+    "DatePickerTable",
+    "DatePickerTableBody",
+    "DatePickerTableCell",
+    "DatePickerTableCellTrigger",
+    "DatePickerTableHead",
+    "DatePickerTableHeader",
+    "DatePickerTableRow",
+    "DatePickerTrigger",
+    "DatePickerValueText",
+    "DatePickerView",
+    "DatePickerViewControl",
+    "DatePickerViewTrigger",
+    "DatePickerWeekNumberCell",
+    "DatePickerWeekNumberHeaderCell",
+    "DatePickerYearSelect"
+   ],
+   "source": "packages/react/src/components/date-picker",
+   "designFamily": "DatePicker",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "datePicker",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Dialog",
+   "dir": "dialog",
+   "parts": [
+    "DialogBackdrop",
+    "DialogCloseTrigger",
+    "DialogContent",
+    "DialogDescription",
+    "DialogPositioner",
+    "DialogRoot",
+    "DialogTitle",
+    "DialogTrigger"
+   ],
+   "source": "packages/react/src/components/dialog",
+   "designFamily": "Dialog",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "modal",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "DownloadTrigger",
+   "dir": "download-trigger",
+   "parts": [
+    "DownloadTrigger"
+   ],
+   "source": "packages/react/src/components/download-trigger",
+   "designFamily": "DownloadTrigger",
+   "category": "Utilities",
+   "group": "actions",
+   "page": "03",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Drawer",
+   "dir": "drawer",
+   "parts": [
+    "DrawerBackdrop",
+    "DrawerCloseTrigger",
+    "DrawerContent",
+    "DrawerDescription",
+    "DrawerGrabber",
+    "DrawerGrabberIndicator",
+    "DrawerIndent",
+    "DrawerIndentBackground",
+    "DrawerPositioner",
+    "DrawerRoot",
+    "DrawerStack",
+    "DrawerSwipeArea",
+    "DrawerTitle",
+    "DrawerTrigger"
+   ],
+   "source": "packages/react/src/components/drawer",
+   "designFamily": "Drawer",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "drawer",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "Editable",
+   "dir": "editable",
+   "parts": [
+    "EditableArea",
+    "EditableCancelTrigger",
+    "EditableControl",
+    "EditableEditTrigger",
+    "EditableInput",
+    "EditableLabel",
+    "EditablePreview",
+    "EditableRoot",
+    "EditableSubmitTrigger"
+   ],
+   "source": "packages/react/src/components/editable",
+   "designFamily": "Editable",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Field",
+   "dir": "field",
+   "parts": [
+    "FieldErrorText",
+    "FieldHelperText",
+    "FieldInput",
+    "FieldItem",
+    "FieldLabel",
+    "FieldRequiredIndicator",
+    "FieldRoot",
+    "FieldSelect",
+    "FieldTextarea"
+   ],
+   "source": "packages/react/src/components/field",
+   "designFamily": "Field",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "field",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Fieldset",
+   "dir": "fieldset",
+   "parts": [
+    "FieldsetErrorText",
+    "FieldsetHelperText",
+    "FieldsetLegend",
+    "FieldsetRoot"
+   ],
+   "source": "packages/react/src/components/fieldset",
+   "designFamily": "Fieldset",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "disabled"
+   ]
+  },
+  {
+   "name": "FileUpload",
+   "dir": "file-upload",
+   "parts": [
+    "FileUploadClearTrigger",
+    "FileUploadDropzone",
+    "FileUploadHiddenInput",
+    "FileUploadItem",
+    "FileUploadItemDeleteTrigger",
+    "FileUploadItemGroup",
+    "FileUploadItemName",
+    "FileUploadItemPreview",
+    "FileUploadItemPreviewImage",
+    "FileUploadItemSizeText",
+    "FileUploadLabel",
+    "FileUploadRoot",
+    "FileUploadTrigger"
+   ],
+   "source": "packages/react/src/components/file-upload",
+   "designFamily": "FileUpload",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "upload",
+   "kind": "visual",
+   "states": [
+    "default",
+    "dragging",
+    "disabled"
+   ]
+  },
+  {
+   "name": "FloatingPanel",
+   "dir": "floating-panel",
+   "parts": [
+    "FloatingPanelBody",
+    "FloatingPanelCloseTrigger",
+    "FloatingPanelContent",
+    "FloatingPanelControl",
+    "FloatingPanelDragTrigger",
+    "FloatingPanelHeader",
+    "FloatingPanelPositioner",
+    "FloatingPanelResizeTrigger",
+    "FloatingPanelRoot",
+    "FloatingPanelStageTrigger",
+    "FloatingPanelTitle",
+    "FloatingPanelTrigger"
+   ],
+   "source": "packages/react/src/components/floating-panel",
+   "designFamily": "FloatingPanel",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "FocusTrap",
+   "dir": "focus-trap",
+   "parts": [
+    "FocusTrap"
+   ],
+   "source": "packages/react/src/components/focus-trap",
+   "designFamily": "FocusTrap",
+   "category": "Utilities",
+   "group": "utility",
+   "page": "13",
+   "factory": "custom",
+   "kind": "nonVisual",
+   "states": []
+  },
+  {
+   "name": "Format",
+   "dir": "format",
+   "parts": [
+    "FormatByte",
+    "FormatNumber",
+    "FormatRelativeTime",
+    "FormatTime"
+   ],
+   "source": "packages/react/src/components/format",
+   "designFamily": "Format",
+   "category": "Data Display",
+   "group": "utility",
+   "page": "13",
+   "factory": "custom",
+   "kind": "nonVisual",
+   "states": []
+  },
+  {
+   "name": "Frame",
+   "dir": "frame",
+   "parts": [
+    "Frame"
+   ],
+   "source": "packages/react/src/components/frame",
+   "designFamily": "Frame",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ]
+  },
+  {
+   "name": "Highlight",
+   "dir": "highlight",
+   "parts": [
+    "Highlight"
+   ],
+   "source": "packages/react/src/components/highlight",
+   "designFamily": "Highlight",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ]
+  },
+  {
+   "name": "HoverCard",
+   "dir": "hover-card",
+   "parts": [
+    "HoverCardArrow",
+    "HoverCardArrowTip",
+    "HoverCardContent",
+    "HoverCardPositioner",
+    "HoverCardRoot",
+    "HoverCardTrigger"
+   ],
+   "source": "packages/react/src/components/hover-card",
+   "designFamily": "HoverCard",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "ImageCropper",
+   "dir": "image-cropper",
+   "parts": [
+    "ImageCropperGrid",
+    "ImageCropperHandle",
+    "ImageCropperImage",
+    "ImageCropperRoot",
+    "ImageCropperSelection",
+    "ImageCropperViewport"
+   ],
+   "source": "packages/react/src/components/image-cropper",
+   "designFamily": "ImageCropper",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "dragging"
+   ]
+  },
+  {
+   "name": "JsonTreeView",
+   "dir": "json-tree-view",
+   "parts": [
+    "JsonTreeViewRoot",
+    "JsonTreeViewTree"
+   ],
+   "source": "packages/react/src/components/json-tree-view",
+   "designFamily": "JsonTreeView",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "Listbox",
+   "dir": "listbox",
+   "parts": [
+    "ListboxContent",
+    "ListboxEmpty",
+    "ListboxInput",
+    "ListboxItem",
+    "ListboxItemGroup",
+    "ListboxItemGroupLabel",
+    "ListboxItemIndicator",
+    "ListboxItemText",
+    "ListboxLabel",
+    "ListboxRoot",
+    "ListboxValueText"
+   ],
+   "source": "packages/react/src/components/listbox",
+   "designFamily": "Listbox",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "select",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Marquee",
+   "dir": "marquee",
+   "parts": [
+    "MarqueeContent",
+    "MarqueeEdge",
+    "MarqueeItem",
+    "MarqueeRoot",
+    "MarqueeViewport"
+   ],
+   "source": "packages/react/src/components/marquee",
+   "designFamily": "Marquee",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ]
+  },
+  {
+   "name": "Menu",
+   "dir": "menu",
+   "parts": [
+    "MenuArrow",
+    "MenuArrowTip",
+    "MenuCheckboxItem",
+    "MenuContent",
+    "MenuContextTrigger",
+    "MenuIndicator",
+    "MenuItem",
+    "MenuItemGroup",
+    "MenuItemGroupLabel",
+    "MenuItemIndicator",
+    "MenuItemText",
+    "MenuPositioner",
+    "MenuRadioItem",
+    "MenuRadioItemGroup",
+    "MenuRoot",
+    "MenuSeparator",
+    "MenuTrigger",
+    "MenuTriggerItem"
+   ],
+   "source": "packages/react/src/components/menu",
+   "designFamily": "Menu",
+   "category": "Utilities",
+   "group": "navigation",
+   "page": "08",
+   "factory": "menu",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "NavigationMenu",
+   "dir": "navigation-menu",
+   "parts": [
+    "NavigationMenuArrow",
+    "NavigationMenuContent",
+    "NavigationMenuIndicator",
+    "NavigationMenuItem",
+    "NavigationMenuItemIndicator",
+    "NavigationMenuLink",
+    "NavigationMenuList",
+    "NavigationMenuRoot",
+    "NavigationMenuTrigger",
+    "NavigationMenuViewport",
+    "NavigationMenuViewportPositioner"
+   ],
+   "source": "packages/react/src/components/navigation-menu",
+   "designFamily": "NavigationMenu",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "NumberInput",
+   "dir": "number-input",
+   "parts": [
+    "NumberInputControl",
+    "NumberInputDecrementTrigger",
+    "NumberInputIncrementTrigger",
+    "NumberInputInput",
+    "NumberInputLabel",
+    "NumberInputRoot",
+    "NumberInputScrubber",
+    "NumberInputValueText"
+   ],
+   "source": "packages/react/src/components/number-input",
+   "designFamily": "NumberInput",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "numberField",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Pagination",
+   "dir": "pagination",
+   "parts": [
+    "PaginationEllipsis",
+    "PaginationFirstTrigger",
+    "PaginationItem",
+    "PaginationLastTrigger",
+    "PaginationNextTrigger",
+    "PaginationPrevTrigger",
+    "PaginationRoot"
+   ],
+   "source": "packages/react/src/components/pagination",
+   "designFamily": "Pagination",
+   "category": "Utilities",
+   "group": "navigation",
+   "page": "08",
+   "factory": "pagination",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "PasswordInput",
+   "dir": "password-input",
+   "parts": [
+    "PasswordInputControl",
+    "PasswordInputIndicator",
+    "PasswordInputInput",
+    "PasswordInputLabel",
+    "PasswordInputRoot",
+    "PasswordInputVisibilityTrigger"
+   ],
+   "source": "packages/react/src/components/password-input",
+   "designFamily": "PasswordInput",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "passwordField",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+   ]
+  },
+  {
+   "name": "PinInput",
+   "dir": "pin-input",
+   "parts": [
+    "PinInputControl",
+    "PinInputHiddenInput",
+    "PinInputInput",
+    "PinInputLabel",
+    "PinInputRoot"
+   ],
+   "source": "packages/react/src/components/pin-input",
+   "designFamily": "PinInput",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "otpInput",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Popover",
+   "dir": "popover",
+   "parts": [
+    "PopoverAnchor",
+    "PopoverArrow",
+    "PopoverArrowTip",
+    "PopoverCloseTrigger",
+    "PopoverContent",
+    "PopoverDescription",
+    "PopoverIndicator",
+    "PopoverPositioner",
+    "PopoverRoot",
+    "PopoverTitle",
+    "PopoverTrigger"
+   ],
+   "source": "packages/react/src/components/popover",
+   "designFamily": "Popover",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "popover",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "Portal",
+   "dir": "portal",
+   "parts": [
+    "Portal"
+   ],
+   "source": "packages/react/src/components/portal",
+   "designFamily": "Portal",
+   "category": "Utilities",
+   "group": "utility",
+   "page": "13",
+   "factory": "custom",
+   "kind": "nonVisual",
+   "states": []
+  },
+  {
+   "name": "Presence",
+   "dir": "presence",
+   "parts": [],
+   "source": "packages/react/src/components/presence",
+   "designFamily": "Presence",
+   "category": "Utilities",
+   "group": "utility",
+   "page": "13",
+   "factory": "custom",
+   "kind": "nonVisual",
+   "states": []
+  },
+  {
+   "name": "Progress",
+   "dir": "progress",
+   "parts": [
+    "ProgressCircle",
+    "ProgressCircleRange",
+    "ProgressCircleTrack",
+    "ProgressLabel",
+    "ProgressRange",
+    "ProgressRoot",
+    "ProgressTrack",
+    "ProgressValueText",
+    "ProgressView"
+   ],
+   "source": "packages/react/src/components/progress",
+   "designFamily": "Progress",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "progress",
+   "kind": "visual",
+   "states": [
+    "default",
+    "indeterminate"
+   ]
+  },
+  {
+   "name": "QrCode",
+   "dir": "qr-code",
+   "parts": [
+    "QrCodeDownloadTrigger",
+    "QrCodeFrame",
+    "QrCodeOverlay",
+    "QrCodePattern",
+    "QrCodeRoot"
+   ],
+   "source": "packages/react/src/components/qr-code",
+   "designFamily": "QrCode",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ]
+  },
+  {
+   "name": "RadioGroup",
+   "dir": "radio-group",
+   "parts": [
+    "RadioGroupIndicator",
+    "RadioGroupItem",
+    "RadioGroupItemControl",
+    "RadioGroupItemHiddenInput",
+    "RadioGroupItemText",
+    "RadioGroupLabel",
+    "RadioGroupRoot"
+   ],
+   "source": "packages/react/src/components/radio-group",
+   "designFamily": "RadioGroup",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "radio",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "RatingGroup",
+   "dir": "rating-group",
+   "parts": [
+    "RatingGroupControl",
+    "RatingGroupHiddenInput",
+    "RatingGroupItem",
+    "RatingGroupLabel",
+    "RatingGroupRoot"
+   ],
+   "source": "packages/react/src/components/rating-group",
+   "designFamily": "RatingGroup",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "rating",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "ScrollArea",
+   "dir": "scroll-area",
+   "parts": [
+    "ScrollAreaContent",
+    "ScrollAreaCorner",
+    "ScrollAreaRoot",
+    "ScrollAreaScrollbar",
+    "ScrollAreaThumb",
+    "ScrollAreaViewport"
+   ],
+   "source": "packages/react/src/components/scroll-area",
+   "designFamily": "ScrollArea",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ]
+  },
+  {
+   "name": "SegmentGroup",
+   "dir": "segment-group",
+   "parts": [
+    "SegmentGroupIndicator",
+    "SegmentGroupItem",
+    "SegmentGroupItemControl",
+    "SegmentGroupItemHiddenInput",
+    "SegmentGroupItemText",
+    "SegmentGroupLabel",
+    "SegmentGroupRoot"
+   ],
+   "source": "packages/react/src/components/segment-group",
+   "designFamily": "SegmentGroup",
+   "category": "Utilities",
+   "group": "selection",
+   "page": "05",
+   "factory": "segmented",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Select",
+   "dir": "select",
+   "parts": [
+    "SelectClearTrigger",
+    "SelectContent",
+    "SelectControl",
+    "SelectHiddenSelect",
+    "SelectIndicator",
+    "SelectItem",
+    "SelectItemGroup",
+    "SelectItemGroupLabel",
+    "SelectItemIndicator",
+    "SelectItemText",
+    "SelectLabel",
+    "SelectList",
+    "SelectPositioner",
+    "SelectRoot",
+    "SelectTrigger",
+    "SelectValueText"
+   ],
+   "source": "packages/react/src/components/select",
+   "designFamily": "Select",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "select",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ]
+  },
+  {
+   "name": "SignaturePad",
+   "dir": "signature-pad",
+   "parts": [
+    "SignaturePadClearTrigger",
+    "SignaturePadControl",
+    "SignaturePadGuide",
+    "SignaturePadHiddenInput",
+    "SignaturePadLabel",
+    "SignaturePadRoot",
+    "SignaturePadSegment"
+   ],
+   "source": "packages/react/src/components/signature-pad",
+   "designFamily": "SignaturePad",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Slider",
+   "dir": "slider",
+   "parts": [
+    "SliderControl",
+    "SliderDraggingIndicator",
+    "SliderHiddenInput",
+    "SliderLabel",
+    "SliderMarker",
+    "SliderMarkerGroup",
+    "SliderRange",
+    "SliderRoot",
+    "SliderThumb",
+    "SliderTrack",
+    "SliderValueText"
+   ],
+   "source": "packages/react/src/components/slider",
+   "designFamily": "Slider",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "slider",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Splitter",
+   "dir": "splitter",
+   "parts": [
+    "SplitterPanel",
+    "SplitterResizeTrigger",
+    "SplitterResizeTriggerIndicator",
+    "SplitterRoot"
+   ],
+   "source": "packages/react/src/components/splitter",
+   "designFamily": "Splitter",
+   "category": "Layout & Navigation",
+   "group": "data",
+   "page": "06",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus"
+   ]
+  },
+  {
+   "name": "Steps",
+   "dir": "steps",
+   "parts": [
+    "StepsCompletedContent",
+    "StepsContent",
+    "StepsIndicator",
+    "StepsItem",
+    "StepsList",
+    "StepsNextTrigger",
+    "StepsPrevTrigger",
+    "StepsProgress",
+    "StepsRoot",
+    "StepsSeparator",
+    "StepsTrigger"
+   ],
+   "source": "packages/react/src/components/steps",
+   "designFamily": "Steps",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "steps",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Swap",
+   "dir": "swap",
+   "parts": [
+    "SwapIndicator",
+    "SwapRoot"
+   ],
+   "source": "packages/react/src/components/swap",
+   "designFamily": "Swap",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on"
+   ]
+  },
+  {
+   "name": "Switch",
+   "dir": "switch",
+   "parts": [
+    "SwitchControl",
+    "SwitchHiddenInput",
+    "SwitchLabel",
+    "SwitchRoot",
+    "SwitchThumb"
+   ],
+   "source": "packages/react/src/components/switch",
+   "designFamily": "Switch",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "switch",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Tabs",
+   "dir": "tabs",
+   "parts": [
+    "TabsRoot"
+   ],
+   "source": "packages/react/src/components/tabs",
+   "designFamily": "Tabs",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "tabs",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "disabled",
+    "selected"
+   ]
+  },
+  {
+   "name": "TagsInput",
+   "dir": "tags-input",
+   "parts": [
+    "TagsInputClearTrigger",
+    "TagsInputControl",
+    "TagsInputHiddenInput",
+    "TagsInputInput",
+    "TagsInputItem",
+    "TagsInputItemDeleteTrigger",
+    "TagsInputItemInput",
+    "TagsInputItemPreview",
+    "TagsInputItemText",
+    "TagsInputLabel",
+    "TagsInputRoot"
+   ],
+   "source": "packages/react/src/components/tags-input",
+   "designFamily": "TagsInput",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "multiSelect",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Timer",
+   "dir": "timer",
+   "parts": [
+    "TimerActionTrigger",
+    "TimerArea",
+    "TimerControl",
+    "TimerItem",
+    "TimerRoot",
+    "TimerSeparator"
+   ],
+   "source": "packages/react/src/components/timer",
+   "designFamily": "Timer",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "running",
+    "paused"
+   ]
+  },
+  {
+   "name": "Toast",
+   "dir": "toast",
+   "parts": [
+    "ToastActionTrigger",
+    "ToastCloseTrigger",
+    "ToastDescription",
+    "ToastRoot",
+    "ToastTitle",
+    "Toaster"
+   ],
+   "source": "packages/react/src/components/toast",
+   "designFamily": "Toast",
+   "category": "Utilities",
+   "group": "feedback",
+   "page": "09",
+   "factory": "toast",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "Toc",
+   "dir": "toc",
+   "parts": [
+    "TocContent",
+    "TocIndicator",
+    "TocItem",
+    "TocLink",
+    "TocList",
+    "TocNav",
+    "TocRoot",
+    "TocTitle"
+   ],
+   "source": "packages/react/src/components/toc",
+   "designFamily": "Toc",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "anchor",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus"
+   ]
+  },
+  {
+   "name": "Toggle",
+   "dir": "toggle",
+   "parts": [
+    "ToggleIndicator",
+    "ToggleRoot"
+   ],
+   "source": "packages/react/src/components/toggle",
+   "designFamily": "Toggle",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "button",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "ToggleGroup",
+   "dir": "toggle-group",
+   "parts": [
+    "ToggleGroupItem",
+    "ToggleGroupRoot"
+   ],
+   "source": "packages/react/src/components/toggle-group",
+   "designFamily": "ToggleGroup",
+   "category": "Forms & Inputs",
+   "group": "selection",
+   "page": "05",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+   ]
+  },
+  {
+   "name": "Tooltip",
+   "dir": "tooltip",
+   "parts": [
+    "TooltipArrow",
+    "TooltipArrowTip",
+    "TooltipContent",
+    "TooltipPositioner",
+    "TooltipRoot",
+    "TooltipTrigger"
+   ],
+   "source": "packages/react/src/components/tooltip",
+   "designFamily": "Tooltip",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "tooltip",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "Tour",
+   "dir": "tour",
+   "parts": [
+    "TourActionTrigger",
+    "TourActions",
+    "TourArrow",
+    "TourArrowTip",
+    "TourBackdrop",
+    "TourCloseTrigger",
+    "TourContent",
+    "TourControl",
+    "TourDescription",
+    "TourPositioner",
+    "TourProgressText",
+    "TourRoot",
+    "TourSpotlight",
+    "TourTitle"
+   ],
+   "source": "packages/react/src/components/tour",
+   "designFamily": "Tour",
+   "category": "Layout & Navigation",
+   "group": "feedback",
+   "page": "09",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ]
+  },
+  {
+   "name": "TreeView",
+   "dir": "tree-view",
+   "parts": [
+    "TreeViewBranch",
+    "TreeViewBranchContent",
+    "TreeViewBranchControl",
+    "TreeViewBranchIndentGuide",
+    "TreeViewBranchIndicator",
+    "TreeViewBranchText",
+    "TreeViewBranchTrigger",
+    "TreeViewItem",
+    "TreeViewItemIndicator",
+    "TreeViewItemText",
+    "TreeViewLabel",
+    "TreeViewNodeCheckbox",
+    "TreeViewNodeCheckboxIndicator",
+    "TreeViewNodeRenameInput",
+    "TreeViewRoot",
+    "TreeViewTree"
+   ],
+   "source": "packages/react/src/components/tree-view",
+   "designFamily": "TreeView",
+   "category": "Layout & Navigation",
+   "group": "data",
+   "page": "06",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "selected",
+    "disabled"
+   ]
+  }
+ ],
+ "summary": {
+  "components": 62,
+  "parts": 461,
+  "visual": 56,
+  "nonVisual": 6
+ }
+}
