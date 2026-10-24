@@ -5,7 +5,7 @@
 >
 > Companion executable engine: `scripts/token_engine.js` (paste and use, includes set build / verify / apply / audit).
 
-## 0. Six iron rules (learn these first; the rest are details)
+## 0. Seven iron rules (learn these first; the rest are details)
 
 1. **`addSet()` defaults to `active: false`; an inactive set causes "silent failure"** — the binding is recorded, the value doesn't take effect, no error thrown.
    Building a set must explicitly activate it: `tokens.addSet({name, active: true})` or `set.toggleActive()` after building.
@@ -19,6 +19,12 @@
 5. **`resolvedValue` is only non-null after the set is activated**. To check if a token is usable, look at whether `resolvedValue`/`resolvedValueString` is empty.
 6. **Split sets by "whether to activate together", never by type**. `type` is the token's own attribute; the UI automatically groups by type **inside each set** (`tokensByType`), one set can hold all 17 kinds. Splitting by `Color`/`Radius`/`Spacing` is
    a category error: these three are always active together, splitting just turns 1 switch into N. See §1.1.
+7. **The 01–02 token capacity is fixed; the values are brand-configurable.** Every project declares exactly
+   `CAT.CAPACITY` (`references/catalog-standard.md`): **57 colours · 12 typography steps · 14 spacing steps · 9 radii ·
+   13 shadow recipes · 2 dimensions · 4 border/divider colour roles · 10 semantic tone triples**. The counts come from
+   the Foundations/Color boards' layout, so a missing or extra token re-flows pages 01/02 and is a `catalog_drift`
+   finding (rule 62). Add a project-only token on a later page, or bump `CAT.CAPACITY` and rebuild 01/02 deliberately —
+   never append it to the standard chapter.
 
 ## 1. Object model
 

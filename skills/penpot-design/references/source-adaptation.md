@@ -19,12 +19,16 @@ the page families:
 
 | Group | Pages | Families to measure |
 |---|---|---|
-| `actions` | 03 | Button, IconButton, Link, any action actually shown |
-| `forms` | 04 | Input, Textarea, Search, Select, field wrapper, form panel |
+| `actions` | 03 | Button, IconButton, ButtonGroup, SplitButton, FAB, Link, Segmented (the 7 canonical families) |
+| `forms` | 04–05 | Input, Textarea, Search, Select, field wrapper, form panel |
 | `selection` | 05 | Checkbox, Radio, Switch, Slider, date/time pickers |
 | `data` | 06–07 | Card, Table, List, Badge, Progress, Timeline, Calendar |
 | `navigation` | 08 | Nav item, Tabs, Breadcrumb, Pagination, Menu, Accordion |
 | `feedback` | 09 | Tooltip, Modal, Drawer/Offcanvas, Alert, Toast (last two often derived) |
+
+The lists above are the **measurement focus**, not the delivered inventory: a profile only describes families that
+already exist on the page's canonical list (`CAT.pageFams`), and every canonical family is still delivered (`derived`
+when the source never shows it).
 
 Each family entry is anatomy data; the factory reads it and stamps the drawn host with `nl:prof`:
 
@@ -91,8 +95,13 @@ The skill must not hardcode which families are derived for a particular site. Th
 `reference_drift` (rule 56) is the source-adaptation gate. It is **data-driven**: one branch per page range, no family
 names hardcoded per page.
 
-- **03 · Actions** — the page is the source's action *inventory*: a `·Spec` board whose family is not in the profile, a
-  profile family with no spec, or a host whose corner role the source does not pin.
+**The catalogue constrains the inventory; the profile constrains the form.** Pages 03–09 deliver exactly `CAT.PLAN`
+(67 families, one page each — rule 62). A profile entry may change a family's material, geometry and variants; it may
+not add a family to a standard page, remove one, or move it to another page. A source-only component is built on
+page `10` or later (or page `17 · Reference imitation`), never as an extra `·Spec` inside 03–09.
+
+- **03 · Actions** — the page is the seven canonical action families (`CAT.PLAN['03']`), each with a `·Spec`: a spec
+  whose family is not in the profile, a profile family with no spec, or a host whose corner role the source does not pin.
 - **04–08 · Forms / Selection / Data / Navigation** — one table maps the page prefix to its group and its profiled
   families (and one family may own several host-name prefixes: `List` claims `ListItem·`, `Table` claims
   `TableRow·`/`TableHeader·`, `Calendar` claims `MiniCalendar·`). A recreation must have the group profile; every host

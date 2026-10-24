@@ -393,26 +393,41 @@ return (function () {
     var L = function (px, py) { return ' L ' + f(px) + ' ' + f(py); };
     var ar = o.arrow, aw = ar && (ar.size || 12), ah = ar && (ar.depth || 6);
     var at = ar ? ar.at : 0;
+    // Clamp the arrow base to the flat part of its edge. Without this a centre `at` on a very small bubble
+    // puts the base under a corner, and the path folds back over itself (the malformed notch this replaces).
+    var cl = function (v, lo, hi) { return max(lo, min(hi, v)); };
     var d = 'M ' + f(x + r) + ' ' + f(y);
-    // top edge (left→right)
+    // top edge (left→right): the arrow is part of THIS edge, not a detour after the left edge
     var topArrow = ar && ar.side === 'top';
+    if (topArrow) {
+      var ta = cl(at, x + r + aw / 2, x + w - r - aw / 2);
+      d += L(ta - aw / 2, y); d += L(ta, y - ah); d += L(ta + aw / 2, y);
+    }
     d += L(x + w - r, y);
     d += C(x + w - r + 0.5523 * r, y, x + w, y + r - 0.5523 * r, x + w, y + r);
     // right edge (top→bottom)
     var rightArrow = ar && ar.side === 'right';
-    if (rightArrow) { d += L(x + w, at - aw / 2); d += L(x + w + ah, at); d += L(x + w, at + aw / 2); }
+    if (rightArrow) {
+      var ra = cl(at, y + r + aw / 2, y + h - r - aw / 2);
+      d += L(x + w, ra - aw / 2); d += L(x + w + ah, ra); d += L(x + w, ra + aw / 2);
+    }
     d += L(x + w, y + h - r);
     d += C(x + w, y + h - r + 0.5523 * r, x + w - r + 0.5523 * r, y + h, x + w - r, y + h);
     // bottom edge (right→left)
     var bottomArrow = ar && ar.side === 'bottom';
-    if (bottomArrow) { d += L(at + aw / 2, y + h); d += L(at, y + h + ah); d += L(at - aw / 2, y + h); }
+    if (bottomArrow) {
+      var ba = cl(at, x + r + aw / 2, x + w - r - aw / 2);
+      d += L(ba + aw / 2, y + h); d += L(ba, y + h + ah); d += L(ba - aw / 2, y + h);
+    }
     d += L(x + r, y + h);
     d += C(x + r - 0.5523 * r, y + h, x, y + h - r + 0.5523 * r, x, y + h - r);
     // left edge (bottom→top)
     var leftArrow = ar && ar.side === 'left';
-    if (leftArrow) { d += L(x, at + aw / 2); d += L(x - ah, at); d += L(x, at - aw / 2); }
-    if (topArrow) { d += L(x + r, y); d += L(at + aw / 2, y); d += L(at, y - ah); d += L(at - aw / 2, y); }
-    else d += L(x, y + r);
+    if (leftArrow) {
+      var la = cl(at, y + r + aw / 2, y + h - r - aw / 2);
+      d += L(x, la + aw / 2); d += L(x - ah, la); d += L(x, la - aw / 2);
+    }
+    d += L(x, y + r);
     d += C(x, y + r - 0.5523 * r, x + r - 0.5523 * r, y, x + r, y);
     return d + ' Z';
   };
@@ -3904,16 +3919,21 @@ return (function () {
     var dark = o.surface !== 'light';
     var fill = brand ? C('primary') : (dark ? C(R.fill || 'ink') : C('surface'));
     var ink = (dark || brand) ? C(R.ink || 'onPrimary') : C('ink');
-    var title = o.title !== undefined ? String(o.title) : null;
+    // Placement is an axis of the family, not a hint: `placement`/`arrowSide` choose the arrow side and the
+    // host expansion. `title` is COPY, so a boolean is a flag (`withTitle`) and never a rendered "true".
+    var placed = String(o.placement || o.arrowSide || (R.arrow ? 'top' : '')).toLowerCase();
+    if (['top', 'bottom', 'left', 'right'].indexOf(placed) < 0) placed = '';
+    var title = (typeof o.title === 'string' && o.title.length) ? o.title
+      : ((o.withTitle || o.title === true) ? String(o.titleText || 'Keyboard shortcut') : null);
     var msg = String(o.text === undefined ? 'Copy the link first' : o.text);
     var tw = Math.max(CF.estW(msg, fs), title ? CF.estW(title, fs) : 0);
     var panelW = Math.max(48, padX * 2 + tw);
     var panelH = padY * 2 + lhPx + (title ? lhPx : 0);
     // The arrow is a profile decision: a source that draws one gets one, a source that does not gets a plain bubble.
-    var arrow = o.arrow === false ? null : (o.arrowSide || (R.arrow === undefined ? null : (R.arrow ? 'top' : null)));
+    var arrow = o.arrow === false ? null : (placed || null);
     var panel = B((o.x || 0) + (arrow === 'left' ? depth : 0), (o.y || 0) + (arrow === 'top' ? depth : 0), panelW, panelH);
     var bb = arrow ? bubbleBox(panel, arrow, depth) : { host: panel, panel: panel, at: 0, depth: 0, side: null };
-    var ctx = CF.build(CF.name('Tooltip', { type: brand ? 'Brand' : (dark ? 'Dark' : 'Light'), slot: title ? 'Title' : null }), bb.host, { parent: o.parent });
+    var ctx = CF.build(CF.name('Tooltip', { type: brand ? 'Brand' : (dark ? 'Dark' : 'Light'), variant: arrow ? cap(arrow) : null, slot: title ? 'Title' : null }), bb.host, { parent: o.parent });
     if (arrow) bubbleDraw(ctx, bb, { fill: fill, stroke: (dark || brand) ? null : C('border'), radius: radius, shadow: shadow });
     else {
       ctx.host.fills = [{ fillColor: fill, fillOpacity: 1 }];
@@ -3931,9 +3951,9 @@ return (function () {
       try { ctx.kids.forEach(function (k) { k.shadows = []; }); } catch (e) {}
     }
     var surface = brand ? 'brand' : (dark ? 'dark' : 'light');
-    try { ctx.host.setPluginData('nl:fb', JSON.stringify({ family: 'tooltip', radius: radius, padX: padX, padY: padY, fs: fs, lineHeight: lhPx, shadow: shadow, arrow: !!arrow, surface: surface })); } catch (e) {}
+    try { ctx.host.setPluginData('nl:fb', JSON.stringify({ family: 'tooltip', radius: radius, padX: padX, padY: padY, fs: fs, lineHeight: lhPx, shadow: shadow, arrow: !!arrow, placement: arrow || 'none', surface: surface })); } catch (e) {}
     CF.profStamp(ctx.host, CF.profile('feedback', 'tooltip'), { padX: padX, padY: padY, radius: radius, shadow: shadow, fs: fs, arrow: !!arrow },
-      { family: 'tooltip', surface: surface });
+      { family: 'tooltip', placement: arrow || 'none', surface: surface });
     return ctx.host;
   };
 

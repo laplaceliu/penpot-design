@@ -98,6 +98,7 @@ return (function () {
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
     shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
     library_drift: 'library-pairing contract (references/library-pairing.md) · when a host component library manifest is active (`storage.LM`, durable `nl:lib` on PageRoots), pages 03–09 must contain EXACTLY the manifest design families assigned to that page — a missing family or an extra family fails, and page 13 audits the live library masters against the manifest (missing visual components / masters that belong to no manifest component). A paired headless library draws anatomy + states, not invented styled variants',
+    catalog_drift: 'standard design-system contract (references/catalog-standard.md) · pages 01–09 are the SAME system across projects: 01/02 must carry the standard token CAPACITY (57 colours / 12 type steps / 14 space steps / 9 radii / 13 shadow recipes / 2 dimensions / 4 border roles / 10 semantic tone triples) so the Foundations and Color boards keep one layout, and each of 03–09 must contain EXACTLY the canonical page → family inventory, in the canonical order, from `storage.CATALOG` (`scripts/catalog_engine.js`). Brand values remain project-specific and a source profile may still change geometry inside a family (the project chose to keep profile behaviour), but the family/page inventory and token capacity are not project-authored. Load catalog_engine.js and call `CAT.seed()` before auditing; a file without the durable `nl:cat` stamp is REPORTED, not passed',
     shadow_clipped: '§5 + gate G18 · a shadowed shape whose painted shadow box is cut by a clipping ancestor — Penpot boards default to clipContent=true, so a slot/grid/Spec/row container slices the drop+inset stack at the cell edge. Layout containers must be authored with clipContent=false; only `clip·` media masks crop. Repair: storage.unclip() on the page, or rebuild the container with the fixed NL.frame/mkAbsBoard default',
     elevation_flat: '§5 + gate G18 · a shape stamped `nl:el=<recipe>` whose `shadows` has fewer layers than that recipe (a multi-layer stack collapsed to one, or a rebuild that dropped the insets), OR whose stamp names a different recipe than its NAME resolves to (a `Button·Secondary` still carrying `control` while its role is `chip`). The stamp is the durable contract; this rule compares it to the render and to the role. Repair with `EL.apply(shape, recipe)` / `EL.sweepPage`',
     edge_missing: '§5 + gate G18 · a stamped recipe declares INNER layers (the dark bottom lip / white top highlight that make a card read as a physical object) but the shape paints only drop shadows. A drop shadow alone is the flat "everything is a card" look this rule exists to stop',
@@ -1979,6 +1980,28 @@ return (function () {
         }
       }
     } catch (e) { err('reference', e); }
+
+    // ---- rule 62 · catalog_drift — the standard 01–09 design-system contract. Token CAPACITY on 01 and the
+    // page → family inventory/order on 03–09 come from `storage.CATALOG` (catalog_engine.js), not from a per-project
+    // spec plan. A profile may still change a family's geometry (project decision), so this rule does NOT judge board
+    // heights/shelf positions; it judges the stable contract: token capacity, family set, page order and the durable
+    // `nl:cat` declaration. A file without the stamp is REPORTED, not passed.
+    try {
+      const pC = String(out.page || '');
+      if (/^0[1-9](?:\.| ·)/.test(pC) && /-PageRoot$/.test(nameOf(top))) {
+        const CAT = storage.CATALOG;
+        if (CAT && typeof CAT.auditFor === 'function') {
+          (CAT.auditFor({ page: pC, root: top }) || []).forEach((x) => add('catalog_drift', x.shape || null, top, x.detail));
+          // The plan itself is whole-file data; judge it once, from the first standard page, so a duplicate family
+          // listing (the same family on two pages) is reported even when every rendered page happens to match.
+          if (/^03(?:\.| ·)/.test(pC) && typeof CAT.planIssues === 'function') {
+            (CAT.planIssues() || []).forEach((x) => add('catalog_drift', null, top, x.detail));
+          }
+        } else {
+          add('catalog_drift', null, top, pC + ' is a standard-system page and `storage.CATALOG` is not seeded — load scripts/catalog_engine.js and call CAT.seed(); its durable `nl:cat` stamp proves the file declared the standard, then build the chapter with CAT.buildPage');
+        }
+      }
+    } catch (e) { err('catalog', e); }
 
     // ---- rule 59 · free_layout — pages 01–09 judge ARRANGEMENT, not just values: a content board's elements are
     // flow or grid children (rowGap/columnGap/padding — values already judged by space_off_scale — or grid cells).
