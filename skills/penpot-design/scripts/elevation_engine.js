@@ -596,6 +596,31 @@
     return res;
   };
 
+  /** Adopt painted-but-unbound shadows: a factory (or a legacy host) that typed a stack gets a declared recipe,
+      stamped and bound. Size/role picks a small (`chip`) or surface (`card`) stack; a caller may override. This is the
+      repair for `shadow_unbound` when the shape has no family role to sweep by. */
+  EL.adopt = function (root, fallback) {
+    root = root || penpot.currentPage.root;
+    var adopted = [], byRecipe = {};
+    (function walk(s) {
+      if (!s) return;
+      var sh = [], tok = {};
+      try { sh = s.shadows || []; } catch (e) {}
+      try { tok = s.tokens || {}; } catch (e) {}
+      if (sh.length && !tok.shadow) {
+        var nm = String(s.name || '');
+        var rec = fallback || 'card';
+        if (/handle|knob|dot|avatar|indicator|switch/i.test(nm) || (s.type === 'ellipse' && s.width <= 96)) rec = 'chip';
+        if (EL.has(rec)) {
+          var r = EL.apply(s, rec);
+          if (r && r.ok) { adopted.push({ shape: nm, recipe: rec }); byRecipe[rec] = (byRecipe[rec] || 0) + 1; }
+        }
+      }
+      Array.from(s.children || []).forEach(walk);
+    })(root);
+    return { adopted: adopted.length, byRecipe: byRecipe, sample: adopted.slice(0, 8) };
+  };
+
   EL.audit = function (root) {
     root = root || (penpot.currentPage && penpot.currentPage.root);
     var out = { page: nm(penpot.currentPage), shapes: 0, shadowed: 0, inner: 0, stamped: 0, bound: 0, unbound: 0, sheen: 0, recipes: {}, flat: [], errors: [] };
@@ -647,6 +672,6 @@
   };
 
   EL.api = ['seed', 'recipe', 'shadow', 'has', 'role', 'roleFor', 'sheen', 'names', 'stamp', 'readStamp', 'stamped',
-    'apply', 'sheenFor', 'surface', 'surfacePass', 'sweepPage', 'bindStamped', 'audit', 'auditAll'];
+    'apply', 'adopt', 'sheenFor', 'surface', 'surfacePass', 'sweepPage', 'bindStamped', 'audit', 'auditAll'];
   return { seeded: EL.seeded, version: EL.VERSION, api: EL.api };
 })(storage, penpot, penpotUtils);

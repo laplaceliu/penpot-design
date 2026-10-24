@@ -27,6 +27,9 @@ return (function () {
   storage.mkAbsBoard = function (name, x, y, w, h, fill, radius) {
     const b = penpot.createBoard();
     b.name = name; b.x = x; b.y = y; b.resize(w, h);
+    // Penpot boards default to clipContent=true; a layout shell must never crop a child's shadow, ring or stroke.
+    // Crops are opt-in (`clip·` media masks set it back to true explicitly).
+    b.clipContent = false;
     b.borderRadius = storage.CF ? storage.CF.radius(radius === undefined ? 0 : radius) : (radius || 0);
     b.fills = fill ? [{ fillColor: fill, fillOpacity: 1 }] : [];
     b.addFlexLayout();

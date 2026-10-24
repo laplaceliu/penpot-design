@@ -31,7 +31,7 @@ return (function () {
     primary: T.primary || '#2563EB', onPrimary: T.onPrimary || '#FFFFFF',
     ink: T.onSurface || '#0F172A', surface: T.surface || '#FFFFFF',
     surfaceAlt: T.neutral || '#F8FAFC', surfaceRaised: T.surfaceRaised || '#FFFFFF', muted: T.secondary || '#475569',
-    border: T.border || '#E2E8F0', borderStrong: '#CBD5E1',
+    border: T.border || '#E2E8F0', borderStrong: T.borderStrong || '#CBD5E1',
     // a raised dark panel (an inverse card, a dark toast): DESIGN.md declares it; with no declaration it IS the ink.
     darkRaised: T.darkRaised || T.onSurface || '#2A2A2A',
     error: T.error || '#DC2626', success: T.success || '#16A34A',
@@ -152,7 +152,10 @@ return (function () {
     md:   { h: 32, fs: 14, padX: 12, icon: 18, radius: 'control', gap: 8 },
     lg:   { h: 40, fs: 14, padX: 16, icon: 20, radius: 'control', gap: 8 },
     xl:   { h: 48, fs: 16, padX: 24, icon: 20, radius: 'control', gap: 8 },
-    '2xl':{ h: 56, fs: 16, padX: 24, icon: 24, radius: 'control', gap: 12 }
+    '2xl':{ h: 56, fs: 16, padX: 24, icon: 24, radius: 'control', gap: 12 },
+    // The source's marketing controls are a measured 52px pill (24px pad, 16/24 label); xl (48) and 2xl (56) are
+    // both wrong by 4px, and a profile may only pin the corner, not the height. A real size step is the honest fix.
+    xl2:  { h: 52, fs: 16, padX: 24, icon: 24, radius: 'control', gap: 12 }
   };
   var ICONSQ = { xs: { s: 28, icon: 16 }, sm: { s: 28, icon: 16 }, md: { s: 40, icon: 24 },
                  lg: { s: 40, icon: 24 }, xl: { s: 52, icon: 28 }, '2xl': { s: 52, icon: 28 } };
@@ -1317,7 +1320,9 @@ return (function () {
     var ctx = CF.build(CF.name('FAB', { size: o.size === 'sm' ? 'Sm' : (o.size === 'lg' ? 'Lg' : 'Md'), tone: o.tone,
       state: S, slot: [label ? 'Extended' : null, label && o.iconOnly ? 'IconOnly' : null].filter(Boolean).join('-') || null }), box, { parent: o.parent, radius: 'control' });
     ctx.host.fills = CF.fills(C(tn.bg), S, { onDark: tn.onDark });
-    ctx.host.shadows = CF.shadow(S === 'pressed' ? 2 : 3);
+    // Material is EL's, not the factory's: a project declares a Fab role, otherwise the control stays flat but
+    // token-clean. A typed `CF.shadow` here made every FAB read `shadow_unbound` on the catalog pages.
+
     if (label) {
       if (!o.iconOnly) ctx.glyph(o.glyph || 'plus', B(box.x + 16, box.y + (d - 24) / 2, 24, 24), { color: C(tn.ink), opacity: stateAlpha(S) });
       ctx.text(label, B(box.x + (o.iconOnly ? 16 : 48), box.y, w - (o.iconOnly ? 32 : 64), d), { size: 14, color: C(tn.ink), weight: 600, opacity: stateAlpha(S) });
@@ -1367,14 +1372,17 @@ return (function () {
       // A toggle group's `selected` is the chosen segment, so it is drawn as the active pill carrying a 12% brand wash
       // (§1.2: a state layer, not a new hex); `hover`/`pressed` tint the segments the pointer can still reach.
       if (on) {
-        ctx.plate(seg, { name: 'segment·active', fill: o.dark ? C('ink') : C('surface'),
+        var segPlate = ctx.plate(seg, { name: 'segment·active', fill: o.dark ? C('ink') : C('surface'),
           fills: S === 'selected' && !o.dark ? CF.fills(C('surface'), 'selected', { overlay: C('primary') }) : null,
-          radius: L.radius, shadow: o.dark ? 0 : 1 });
+          radius: L.radius, shadow: 0 });
+        // The active pill is an elevation layer owned by the record, not a typed shadow; a file with a chip recipe
+        // gets the physical plate, a file without one stays flat but token-clean (no `shadow_unbound`).
+        if (!o.dark && segPlate && storage.EL && storage.EL.has && storage.EL.has('chip')) storage.EL.apply(segPlate, 'chip');
       } else if (S === 'hover' || S === 'pressed') {
         ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
       }
-      if (o.iconOnly) ctx.glyph(o.glyphs ? o.glyphs[i] : 'grid', seg, { color: on ? (o.dark ? C('surface') : C('ink')) : C('muted'), opacity: stateAlpha(S) });
-      else ctx.text(String(t), seg, { size: L.fs, color: on ? (o.dark ? C('surface') : C('ink')) : C('muted'), weight: on ? 600 : 400,
+      if (o.iconOnly) ctx.glyph(o.glyphs ? o.glyphs[i] : 'grid', seg, { color: on ? (o.dark ? C('surface') : C('ink')) : ((S === 'hover' || S === 'pressed') ? C('ink') : C('muted')), opacity: stateAlpha(S) });
+      else ctx.text(String(t), seg, { size: L.fs, color: on ? (o.dark ? C('surface') : C('ink')) : ((S === 'hover' || S === 'pressed') ? C('ink') : C('muted')), weight: on ? 600 : 400,
         opacity: (S === 'disabled' || i === o.disabled) ? CF.STATE.disabledContent : 1 });
     });
     await ctx.settle(); ctx.place();
@@ -1721,7 +1729,11 @@ return (function () {
     });
     if (o.freeSolo !== false) rows.push({ label: 'Create “' + (o.value || 'new') + '”', lead: 'plus' });
     if (o.async) rows.push({ skeleton: true });
-    return CF.select(Object.assign({ open: true, options: rows, trail: 'caretDown' }, o, { }));
+    var comb = await CF.select(Object.assign({ open: true, options: rows, trail: 'caretDown' }, o, { }));
+    // A family composite owns its host NAME: without this the Combobox spec drew a raw `Select·…` host, which the
+    // library already holds as a master, so the catalog could not register it (spec_unregistered on every state).
+    try { if (comb) comb.name = CF.name('Combobox', { size: o.size, state: o.state || 'default', slot: 'Open' }); } catch (e) {}
+    return comb;
   };
 
   /** Multi-select with chips inside the field; chips wrap so the field grows, +N overflow chip, per-chip ✕. */
@@ -1819,7 +1831,9 @@ return (function () {
     o = o || {};
     var rows = [];
     for (var h = 0; h < (o.hourly ? 24 : 6); h++) rows.push({ label: (o.hourly ? (h < 10 ? '0' + h : h) : (h + 8)) + ':00', selected: h === (o.selected || 0), active: h === (o.hover || 1) });
-    return CF.select(Object.assign({ open: true, options: rows, panelW: o.panelW || 160, trail: 'clock', w: o.w || 160 }, o));
+    var tp = await CF.select(Object.assign({ open: true, options: rows, panelW: o.panelW || 160, trail: 'clock', w: o.w || 160 }, o));
+    try { if (tp) tp.name = CF.name('TimePicker', { size: o.size, state: o.state || 'default', slot: 'Open' }); } catch (e) {}
+    return tp;
   };
 
   /** Form-field wrapper: label above (or beside at 240-280), 6-8 gap, control, helper/error 4 below — uses LY.slots.field. */
@@ -2147,7 +2161,7 @@ return (function () {
       var dim = stateAlpha(US === 'disabled' ? 'disabled' : null);
       ctx.glyph('upload', B(box.x + box.w / 2 - 20, box.y + 32, 40, 40), { color: o.dragging ? C('primary') : C('muted'), opacity: dim });
       ctx.text(o.dragging ? 'Drop to upload' : 'Drag files here or browse', B(box.x + 16, box.y + 88, box.w - 32, 22), { size: 14, weight: 500, color: C('ink'), opacity: dim });
-      ctx.text('PNG, JPG or PDF up to 20 MB', B(box.x + 16, box.y + 112, box.w - 32, 18), { size: 12, color: C('muted'), opacity: dim });
+      ctx.text('PNG, JPG or PDF up to 20 MB', B(box.x + 16, box.y + 112, box.w - 32, 18), { size: 12, color: (US === 'hover' || o.dragging) ? C('ink') : C('muted'), opacity: dim });
       await ctx.settle(); ctx.place();
       if (o.state === 'focus') ctx.ring(box, { radius: 'sm' });
       return ctx.host;
@@ -2293,22 +2307,36 @@ return (function () {
   /** Badge — dot 6 / label pill h16, count min-w 16 pad-X 4 (10-11/700), overflow 99+, offset -4…-8 [spec M3]. */
   CF.badge = async function (o) {
     o = o || {};
-    var dot = o.dot || o.value === undefined && !o.text;
+    // SOURCE PROFILE: a marketing overline is a badge with a dot AND a label, a height, padding and its own plate.
+    // The generic badge is a 20px count pill, so a recreation must be able to read the measured anatomy instead.
+    var prof = CF.profile('data', 'badge'), pp = (prof && prof.size) || {};
+    var hasText = o.text !== undefined || o.value !== undefined;
+    var dot = o.dot || (!hasText && o.text === undefined && o.value === undefined);
+    var dotOnly = !hasText;
     var tone = o.tone || 'danger';
     var soft = TONEMAP[tone] ? TONEMAP[tone][0] : 'errorSoft';
-    // §4: a tone may carry copy only at its ink step — as text on the wash, or as the solid surface under white.
     var deep = TONEMAP[tone] ? C(TONEMAP[tone][2]) : C(tone);
-    var bg = o.soft ? C(soft) : deep;
-    var ink = o.soft ? deep : C('onPrimary');
-    var h = dot ? 6 : 20, w = dot ? 6 : max(20, CF.estW(String(o.text === undefined ? (o.value === undefined ? '' : String(o.value)) : o.text), 12) + 12);
-    var txt = dot ? null : (o.text === undefined ? (o.value === undefined ? '' : (Number(o.value) > (o.max || 99) ? (o.max || 99) + '+' : String(o.value))) : String(o.text));
+    var bg = o.bg ? C(o.bg) : (prof && prof.fill ? C(prof.fill) : (o.soft ? C(soft) : deep));
+    var ink = o.ink ? C(o.ink) : (prof && prof.ink ? C(prof.ink) : (o.soft ? deep : C('onPrimary')));
+    var fs = o.fs || pp.fs || 12;
+    var dotD = o.dotSize || pp.dot || 6;
+    var h = o.h || pp.h || (dotOnly ? dotD : 20);
+    var padX = o.padX !== undefined ? o.padX : (pp.padX !== undefined ? pp.padX : (dotOnly ? 0 : 6));
+    var txt = dotOnly ? null : (o.text === undefined ? (o.value === undefined ? '' : (Number(o.value) > (o.max || 99) ? (o.max || 99) + '+' : String(o.value))) : String(o.text));
+    var leadW = dot ? dotD + 6 : 0;
+    var w = o.w || (dotOnly ? dotD : max(20, padX * 2 + leadW + CF.estW(txt || '', fs)));
+    var rad = o.radius !== undefined ? o.radius : (pp.radius !== undefined ? pp.radius : ((prof && prof.radius) !== undefined ? prof.radius : (dotOnly ? 'full' : 'control')));
     var box = B(o.x || 0, o.y || 0, w, h);
-    var ctx = CF.build(CF.name('Badge', { type: dot ? 'Dot' : (o.status ? 'Status' : 'Count'), tone: tone, state: o.state }), box, { parent: o.parent });
+    var ctx = CF.build(CF.name('Badge', { type: dotOnly ? 'Dot' : (o.status ? 'Status' : (dot ? 'Overline' : 'Count')), tone: tone, state: o.state }), box, { parent: o.parent, radius: rad });
     ctx.host.fills = [{ fillColor: bg, fillOpacity: 1 }];
-    ctx.host.borderRadius = CF.radius('control');
+    if (dot) ctx.ellipse(B(box.x + padX, box.y + (h - dotD) / 2, dotD, dotD), { name: 'dot', fill: ink });
+    if (txt) ctx.text(txt, B(box.x + padX + leadW, box.y, box.w - padX * 2 - leadW, h), { size: fs, color: ink, weight: o.weight || 600, align: 'left', valign: 'middle' });
     if (o.standalone || o.ring) ctx.host.strokes = [{ strokeColor: C('surface'), strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner', strokeStyle: 'solid' }];
-    if (txt) ctx.text(txt, box, { size: 12, color: ink, weight: 700 });
     await ctx.settle(); ctx.place();
+    var elRole = o.elevation || (prof && prof.elevation);
+    if (elRole && storage.EL && storage.EL.has && storage.EL.has(elRole)) storage.EL.apply(ctx.host, elRole);
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { h: h, fs: fs, radius: CF.radius(rad) },
+      { family: 'badge', size: String(o.size || 'md').toLowerCase(), state: o.state || 'default', elevation: elRole || null });
     return ctx.host;
   };
 
@@ -2328,41 +2356,47 @@ return (function () {
   CF.chip = async function (o) {
     o = o || {};
     var L = CF.ladder(o.size || 'sm'), kind = o.kind || 'chip', S = o.state || 'default';
+    var prof = CF.profile('data', 'chip'), pp = (prof && prof.size) || {};
     var tone = o.tone || 'neutral', on = kind === 'filter' ? (o.selected !== false) : true;
-    var h = o.h || (o.size === 'md' ? 32 : 24), padX = o.padX || (kind === 'tag' ? 8 : 12), ic = h >= 28 ? 18 : 14;
+    var h = o.h || pp.h || (o.size === 'md' ? 32 : 24), padX = o.padX !== undefined ? o.padX : (pp.padX !== undefined ? pp.padX : (kind === 'tag' ? 8 : 12)), ic = h >= 28 ? 18 : 14;
+    var fs = o.fs || pp.fs || L.fs;
+    var cRad = o.radius !== undefined ? o.radius : (pp.radius !== undefined ? pp.radius : ((prof && prof.radius) !== undefined ? prof.radius : (kind === 'tag' ? 'sm' : 'control')));
     var label = String(o.label === undefined ? 'Chip' : o.label);
     var leadW = (o.dot ? 8 : 0) + (o.lead ? ic + 6 : 0) + (o.avatar ? h - 8 + 6 : 0);
     var trailW = (o.removable ? ic + 4 : 0) + (o.trail ? ic + 4 : 0) + (o.count ? CF.estW(String(o.count), CF.countFs(L)) + 6 : 0);
-    var box = B(o.x || 0, o.y || 0, o.w || (padX * 2 + leadW + CF.estW(label, L.fs) + trailW), h);
+    var box = B(o.x || 0, o.y || 0, o.w || (padX * 2 + leadW + CF.estW(label, fs) + trailW), h);
     var ctx = CF.build(CF.name('Chip', { type: kind, size: o.size, state: S, slot: slotName(o), tone: tone }), box,
-      { parent: o.parent, radius: kind === 'tag' ? 'sm' : 'control' });
+      { parent: o.parent, radius: cRad });
     var soft = TONEMAP[tone] || TONEMAP.neutral;
     // A link chip is CF.link with a pill outline, not a filled pill: its hue lives in the copy + underline, so the
     // host stays empty at rest. Giving it the base fill too made the copy primary-on-primary — invisible whenever the
     // brand hue is dark (a primary such as #161616), and §3.3 fails on the drawing, not on paper.
-    var bgc = kind === 'link' ? null
+    var bgc = prof && prof.fill ? C(prof.fill) : (kind === 'link' ? null
       : kind === 'actionable' ? (on ? C('primary') : C('surface'))
-      : (on ? C(soft[0]) : C('surface'));
+      : (on ? C(soft[0]) : C('surface')));
     ctx.host.fills = CF.fills(bgc, S === 'default' ? null : (S === 'disabled' ? 'disabled' : S), { onDark: kind !== 'link' && on && tone === 'accent' });
-    if (kind !== 'chip' && kind !== 'link') ctx._stroke(ctx.host, on ? C(soft[1]) : C('border'), tone === 'neutral' ? 1 : 1, S === 'disabled' ? 0.4 : (on ? 0.5 : 1));
+    if (kind !== 'chip' && kind !== 'link' && !(prof && prof.fill)) ctx._stroke(ctx.host, on ? C(soft[1]) : C('border'), tone === 'neutral' ? 1 : 1, S === 'disabled' ? 0.4 : (on ? 0.5 : 1));
     else if (kind === 'chip' && !on) ctx._stroke(ctx.host, C('borderStrong'), 1);
     var solidBrand = (kind === 'actionable') && on;                 // a filled brand chip: white copy on the base hue (5.17:1)
     var ink = kind === 'link' ? C('primary') : (solidBrand ? C('onPrimary')
       : (tone === 'neutral' ? C('ink') : C(soft[2])));               // §4 ink step on a wash
+    if (prof && prof.ink) ink = C(prof.ink);
     ink = S === 'disabled' ? C('muted') : ink;
     var x = box.x + padX;
     if (o.dot) { ctx.ellipse(B(x, box.y + (h - 8) / 2, 8, 8), { name: 'dot', fill: ink }); x += 8 + 6; }
     if (o.avatar) { ctx.ellipse(B(x, box.y + 4, h - 8, h - 8), { name: 'avatar', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1 }); x += h - 8 + 6; }
     if (o.lead) { ctx.glyph(iconOf(o.lead, 'check'), B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, anchor: 'left' }); x += ic + 6; }
-    ctx.text(label, B(x, box.y, box.w - (x - box.x) - padX - trailW + 4, h), { size: L.fs, color: ink, weight: kind === 'tag' ? 500 : 400,
+    ctx.text(label, B(x, box.y, box.w - (x - box.x) - padX - trailW + 4, h), { size: fs, color: ink, weight: kind === 'tag' ? (prof && prof.weight ? prof.weight : 500) : 400,
       opacity: stateAlpha(S), align: 'left', underline: kind === 'link' ? ink : false });
     x = box.x + box.w - padX;
     if (o.count) { x -= CF.estW(String(o.count), CF.countFs(L)) + 6; ctx.text(String(o.count), B(x, box.y, CF.estW(String(o.count), CF.countFs(L)), h), { size: CF.countFs(L), color: ink, align: 'left' }); }
     if (o.trail) { x -= ic + 4; ctx.glyph(iconOf(o.trail, 'chevronDown'), B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, anchor: 'right' }); }
     if (o.removable) { x -= ic + 4; ctx.glyph('close', B(x, box.y + (h - ic) / 2, ic, ic), { color: ink, strokeW: 1.6, anchor: 'right' }); }
     await ctx.settle(); ctx.place(); ctx.refit(padX);
-    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: 'control' });
+    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: cRad });
     if (o.hit) ctx.hitPad(B(ctx.host.x, ctx.host.y, ctx.host.width, h), o.hit);
+    if (prof && prof._family) CF.profStamp(ctx.host, prof, { h: h, fs: fs, radius: CF.radius(cRad) },
+      { family: 'chip', kind: kind, size: String(o.size || 'md').toLowerCase(), state: S });
     return ctx.host;
   };
 
@@ -2403,10 +2437,13 @@ return (function () {
   /** Avatar/group stack — ≤5 visible then +N overflow, 8px overlap (M3 16dp), z-order right→left. */
   CF.avatarGroup = async function (o) {
     o = o || {};
-    var s = o.size || 32, n = (o.members || 5).length, over = max(0, (o.total || n) - n), ov = s * 0.3;
+    var s = o.size || 32, n = o.members ? o.members.length : 5, over = max(0, (o.total || n) - n), ov = s * 0.3;
     var box = B(o.x || 0, o.y || 0, s + (n - 1) * (s - ov) + (over ? s - ov + 6 : 0), s);
-    var ctx = CF.build(CF.name('Avatar', { slot: 'Group' }), box, { parent: o.parent });
+    // Its own family name and a FIXED box: appending absolute avatar children to a hug frame collapsed the group to
+    // 1×1 inside a grid slot, so every catalog AvatarGroup rendered as a dot.
+    var ctx = CF.build(CF.name('AvatarGroup', { size: o.size }), box, { parent: o.parent });
     for (var i = 0; i < n; i++) await CF.avatar({ parent: ctx.host, x: box.x + i * (s - ov), y: box.y, size: s, initials: (o.members[i] || '').slice(0, 2), name: o.members[i] });
+    try { ctx.host.clipContent = false; ctx.host.horizontalSizing = 'fix'; ctx.host.verticalSizing = 'fix'; ctx.host.resize(box.w, box.h); } catch (e) {}
     if (over) {
       var xb = B(box.x + n * (s - ov), box.y, s, s);
       ctx.ellipse(xb, { name: 'overflow·bg', fill: C('surfaceAlt'), stroke: C('surface'), strokeW: 2 });
@@ -2655,7 +2692,7 @@ return (function () {
     ctx.host.fills = CF.fills(C((prof && prof.headerFill) || 'surfaceAlt'), o.state === 'hover' ? 'hover' : null);
     var right = o.align === 'right';
     ctx.text(label, B(box.x + padX, box.y, box.w - padX * 2 - sortW - filtW - resW, box.h),
-      { size: 12, color: o.sort || o.filter ? C('primary') : C('muted'), weight: 600, align: right ? 'right' : 'left', refit: false });
+      { size: 12, color: o.sort || o.filter ? C('primary') : (o.state === 'hover' ? C('ink') : C('muted')), weight: 600, align: right ? 'right' : 'left', refit: false });
     var x = box.x + box.w - padX - resW;
     if (o.filter) { x -= filtW; ctx.glyph('filter', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: C('primary'), strokeW: 1.6 }); }
     if (o.sort) { x -= sortW; ctx.glyph(o.sort === 'asc' ? 'caretUp' : 'caretDown', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: C('primary'), fill: C('primary') }); }
@@ -2887,7 +2924,9 @@ return (function () {
       ctx.text(String(it.title), B(tx, cy - 2, box.w - (tx - box.x) - 8, 20), { size: pp.fs || 14, color: C(tlInk), weight: 500, align: 'left', valign: 'top', refit: false });
       if (it.body) ctx.text(String(it.body), B(tx, cy + 18, box.w - (tx - box.x) - 8, 18), { size: 13, color: C('muted'), align: 'left', valign: 'top', refit: false });
       if (o.labelLeft) ctx.text(String(it.time || ''), B(box.x, cy, 80, 20), { size: 12, color: C('muted'), align: 'right', valign: 'top', refit: false });
-      else if (it.time) ctx.text(String(it.time), B(tx, cy + (it.body ? 38 : 20), 120, 16), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+      // Time sits on the TITLE line (right-aligned), not as a second vertical line: a below-title time creates two
+      // different gaps (title→time, time→next title) and `list_gap_split` rightly reads the uneven pitch as a defect.
+      else if (it.time) ctx.text(String(it.time), B(box.x + box.w - 60, cy - 2, 52, 20), { size: 12, color: C('muted'), align: 'right', valign: 'top', refit: false });
     });
     if (o.pending) {
       var py = box.y + items.length * rowH + 12, cxp = nx + nodeW / 2;
@@ -3189,7 +3228,8 @@ return (function () {
     }
     await ctx.settle(); ctx.place();
     if (!rail && !group) ctx.refit(padX);
-    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: rad });
+    try { ctx.host.clipContent = false; } catch (e) {}
+    if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: rad, offset: 0 });
     if (rail) ctx.hitPad(B(box.x, box.y, w, h), 44);
     CF.profStamp(ctx.host, prof, { h: h, padX: padX, radius: rad, fs: L.fs },
       { family: 'navitem', size: L.key, selected: sel, indicator: indicator, state: S, ink: sel ? selInkTok : (np.ink || 'ink') });
@@ -3260,7 +3300,7 @@ return (function () {
       var it = typeof items[i] === 'string' ? { label: items[i] } : items[i];
       var sr = slot && slot.items[i];
       await CF.tabs({ parent: ctx.host, x: sr ? sr.x : x, y: box.y + (box.h - (o.h2 || 40)) / 2,
-        w: o.equal && sr ? sr.w : it.w, h: o.h2 || box.h, label: it.label, icon: it.icon, count: it.count,
+        w: o.equal && sr ? sr.w : it.w, h: o.h2 || 40, label: it.label, icon: it.icon, count: it.count,
         closable: it.closable || o.closable, type: o.type, size: o.size, state: it.disabled ? 'disabled' : (i === act ? 'default' : 'default'),
         selected: i === act, direction: o.direction });
       if (!o.equal) x += (it.w || max(88, 32 + CF.estW(String(it.label), 14))) + (o.gap === undefined ? 4 : o.gap);
@@ -3288,7 +3328,7 @@ return (function () {
     });
     var total = backW;
     cells.forEach(function (c, i) { total += CF.estW(c.menu ? '…' : c.label, fs) + (c.glyph ? 18 : 0) + (c.menu ? 16 : 0) + (i < cells.length - 1 ? sepW : 0); });
-    var box = B(o.x || 0, o.y || 0, o.w || max(64, total), h);
+    var box = B(o.x || 0, o.y || 0, o.w || max(64, total + 8), h);
     var ctx = CF.build(CF.name('Breadcrumb', { type: o.back ? 'Back' : null, size: o.size, state: o.state, slot: o.truncated ? 'Truncated' : null }), box, { parent: o.parent });
     var x = box.x, focusB = null;
     if (o.back) { ctx.glyph('arrowLeft', B(x, box.y + (h - 16) / 2, 16, 16), { color: C('ink'), strokeW: 1.8 }); x += 24 + 8; }
@@ -3611,7 +3651,7 @@ return (function () {
     ctx.plate(B(sb.x + sb.w - 52, sb.y + (searchH - 22) / 2, 44, 22), { name: 'kbd·hint', fill: C('surface'), radius: 'xs', stroke: C('border'), strokeW: 1 });
     ctx.text('Ctrl K', B(sb.x + sb.w - 52, sb.y, 44, searchH), { size: 11, role: 'kbd', color: C('muted'), weight: 600, refit: false });
     var y = sb.y + searchH + 9;
-    ctx.plate(B(box.x + 1, y - 5, box.w - 2, 1), { name: 'hairline', fill: C('border') });
+    ctx.plate(B(box.x + 1, y - 5, box.w - 2, 1), { name: 'boundary·search', fill: C('border') });
     y += 8;
     var flat = [], gi = 0;
     groups.forEach(function (g) { if (g.label) flat.push({ kind: 'group', label: g.label }); g.items.forEach(function (it) { flat.push({ kind: 'row', it: it, g: gi }); }); gi++; });
@@ -3653,7 +3693,7 @@ return (function () {
     }
     if (footH) {
       var fy = box.y + box.h - pad - footH + 6;
-      ctx.plate(B(box.x + 1, fy - 6, box.w - 2, 1), { name: 'hairline·footer', fill: C('border') });
+      ctx.plate(B(box.x + 1, fy - 6, box.w - 2, 1), { name: 'boundary·footer', fill: C('border') });
       ctx.text('up/down to navigate · enter to select · esc to close', B(box.x + pad + 8, fy, box.w - pad * 2 - 16, footH - 6),
         { size: 12, color: C('muted'), align: 'left', valign: 'middle', refit: false });
       ctx.glyph('command', B(box.x + box.w - pad - 24, fy + (footH - 18) / 2, 16, 16), { color: C('borderStrong') });
@@ -3684,8 +3724,8 @@ return (function () {
       if (o.dots) { var dd = on ? 10 : 8; ctx.ellipse(B(railX + railW / 2 - dd / 2, ly + rowH / 2 - dd / 2, dd, dd), { name: 'dot·' + i, fill: on ? C('primary') : C('borderStrong') }); }
       var tx = railX + railW + 12 + (it.level || 0) * indent;
       ctx.text(String(it.label), B(tx, ly, box.w - (tx - box.x) - (o.counters ? 30 : 8), rowH),
-        { size: fs, color: on ? C('primary') : (it.disabled ? C('muted') : C('muted')), weight: on ? 500 : 400,
-          opacity: it.disabled ? CF.STATE.disabledContent : (on ? 1 : 0.92), align: 'left', valign: 'middle', refit: false });
+        { size: fs, color: on ? C('primary') : (it.disabled ? C('muted') : ((ST === 'hover' || ST === 'pressed') ? C('ink') : '#52525B')), weight: on ? 500 : 400,
+          opacity: it.disabled ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle', refit: false });
       if (o.counters) ctx.text(String(it.count === undefined ? (i + 1) * 3 : it.count), B(box.x + box.w - 30, ly, 22, rowH),
         { size: 12, color: C('muted'), align: 'right', valign: 'middle', refit: false });
     });
@@ -3747,7 +3787,7 @@ return (function () {
     ctx.host.fills = [{ fillColor: bgc, fillOpacity: 1 }];
     if (o.leftBar === true && A.bar !== false) ctx.plate(B(box.x, box.y, 3, box.h), { name: 'accent·bar', fill: filled ? C('surface') : fg });
     var x = box.x + padX;
-    if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'info', B(x, box.y + padY + 1, 20, 20), { color: iconInk, strokeW: 1.8 }); x += 20 + 12; }
+    if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'info', B(x, box.y + padY - 1, 20, 20), { color: iconInk, strokeW: 1.8 }); x += 20 + 12; }
     ctx.text(title, B(x, box.y + padY - 1, contentW, fs + 6), { size: fs, color: ink, weight: 600, align: 'left', valign: 'top', refit: false });
     var yy = box.y + padY + fs + 5;
     if (desc) { ctx.text(desc, B(x, yy, contentW, dfs + 6), { size: dfs, color: filled ? C('onPrimary') : C('muted'), opacity: filled ? 0.92 : 1, align: 'left', valign: 'top', refit: false }); yy += dfs + 6; }
@@ -4162,7 +4202,7 @@ return (function () {
       var it = typeof opts[i] === 'string' ? { label: opts[i] } : opts[i];
       var on = i === o.active;
       if (on) ctx.plate(B(box.x + 8, y, box.w - 16, rowH), { name: 'row·' + i, fills: CF.fills(C('surfaceAlt'), null), radius: CF.radius('md') });
-      if (i) ctx.plate(B(box.x + pad, y, box.w - pad * 2, 1), { name: 'divider·' + i, fill: C('border') });
+      if (i) ctx.plate(B(box.x + pad, y, box.w - pad * 2, 1), { name: 'boundary·row' + i, fill: C('border') });
       var x = box.x + pad, ink = it.danger ? C('error') : C('ink');
       if (it.glyph) { ctx.glyph(iconOf(it.glyph, 'edit'), B(x, y + (rowH - 20) / 2, 20, 20), { color: ink, strokeW: 1.8 }); x += 20 + 14; }
       ctx.text(String(it.label), B(x, y, box.w - (x - box.x) - pad - (it.trailing ? 20 : 0), rowH),
@@ -4492,6 +4532,10 @@ return (function () {
    */
   CF.matrix = async function (o) {
     o = o || {};
+    // The matrix skeleton is a native-flow composition; the engine is seeded after this file, so bind it here instead
+    // of reading a global that a fetched `new Function` scope does not have.
+    var NL = storage.NL;
+    if (!NL) return { err: 'CF.matrix needs storage.NL — seed native_layout.js first' };
     var rows = o.rows || [];
     var axes = o.axes || ['default'];
     // SPACING IS TOKEN-SOURCED (design-guide §1.5; gates `free_layout` + `space_off_scale`): the sheet arranges its
@@ -4592,7 +4636,7 @@ return (function () {
       NL.add(ctx.host, headRow, 'fill', 'auto');
       flowKids.push(headRow);
       var ht = pendTs.slice(ti, ti + (o.subtitle ? 2 : 1)); ti += ht.length;
-      ht.forEach(function (t) { try { headRow.appendChild(t); NL.sizing(t, 'auto', 'auto'); } catch (e) {} });
+      ht.forEach(function (t) { try { headRow.appendChild(t); t.layoutChild.absolute = false; NL.sizing(t, 'auto', 'auto'); } catch (e) {} });
     }
     var axisTs = stateRowH ? pendTs.slice(ti, ti + axes.length) : []; ti += axisTs.length;
     var useGrid = axes.length > 1 && needW <= (o.maxW || Infinity);
@@ -4609,8 +4653,8 @@ return (function () {
         var lab = pendTs[ti], note = rows[r2].note ? pendTs[ti + 1] : null; ti += rows[r2].note ? 2 : 1;
         if (lab || note) {
           var labBox = NL.col('label·' + fam + '·' + r2, { rowGap: br('inline'), sizing: 'auto' });
-          if (lab) { labBox.appendChild(lab); NL.sizing(lab, 'auto', 'auto'); }
-          if (note) { labBox.appendChild(note); NL.sizing(note, 'auto', 'auto'); }
+          if (lab) { labBox.appendChild(lab); lab.layoutChild.absolute = false; NL.sizing(lab, 'auto', 'auto'); }
+          if (note) { labBox.appendChild(note); note.layoutChild.absolute = false; NL.sizing(note, 'auto', 'auto'); }
           NL.cell(grid, labBox, gr + r2, 1);
         }
         var cellsR = drawn[r2] || [];
@@ -4640,8 +4684,8 @@ return (function () {
         var lab3 = pendTs[ti], note3 = rows[r3].note ? pendTs[ti + 1] : null; ti += rows[r3].note ? 2 : 1;
         if (lab3 || note3) {
           var labBox3 = NL.col('label·' + fam + '·' + r3, { rowGap: br('inline'), sizing: 'auto' });
-          if (lab3) { labBox3.appendChild(lab3); NL.sizing(lab3, 'auto', 'auto'); }
-          if (note3) { labBox3.appendChild(note3); NL.sizing(note3, 'auto', 'auto'); }
+          if (lab3) { labBox3.appendChild(lab3); lab3.layoutChild.absolute = false; NL.sizing(lab3, 'auto', 'auto'); }
+          if (note3) { labBox3.appendChild(note3); note3.layoutChild.absolute = false; NL.sizing(note3, 'auto', 'auto'); }
           NL.add(rl, labBox3, 'fix', 'auto');
         }
         var cells3 = drawn[r3] || [];
@@ -4745,7 +4789,7 @@ return (function () {
   CF.autoRegister = function (o) {
     o = o || {};
     var map = CF.map(), known = {};
-    Object.keys(map).forEach(function (g) { if (g !== 'composer') map[g].forEach(function (k) { known[k] = 1; }); });
+    Object.keys(map).forEach(function (g) { if (g !== 'composer') map[g].forEach(function (k) { known[String(k).toLowerCase()] = 1; }); });
     var STATE = /·(Hover|Focus|Pressed|Selected|Disabled|Loading|Error)/;
     var roots = o.roots;
     if (!roots) {
@@ -4755,21 +4799,34 @@ return (function () {
     var limit = o.limit || 40;
     var out = { scanned: 0, registered: [], already: [], skipped: [], dry: !!o.dry, truncated: false };
     var seen = {};
-    var famKey = function (nm) { var s = String(nm || '').split('·')[0] || ''; return s.charAt(0).toLowerCase() + s.slice(1); };
+    var famKey = function (nm) { return String(String(nm || '').split('·')[0] || '').toLowerCase(); };
     function visit(n, depth) {
       if (!n || depth > 28 || out.truncated) return;
       var nm = ''; try { nm = String(n.name || ''); } catch (e) {}
       var t = ''; try { t = n.type; } catch (e) {}
-      if (t === 'board' && /^([A-Za-z]+)·/.test(nm) && known[famKey(nm)] === 1 && !/·Spec(·|$)/.test(nm)) {
+      var famHead = famKey(nm);
+      var famHit = !!known[famHead] || Object.keys(known).some(function (k) {
+        return (k.length > famHead.length && k.indexOf(famHead) === 0) || (famHead.length > k.length && famHead.indexOf(k) === 0);
+      });
+      if (t === 'board' && /^([A-Za-z]+)(?:·|$)/.test(nm) && famHit && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nm)) {
         out.scanned++;
-        if (seen[nm]) return;
-        seen[nm] = 1;
-        if (CF.get(nm)) { out.already.push(nm); return; }
+        // Deduplicate by SHAPE ID, not by name: two state cells can share a name (TableHeader·Default three
+        // times) and each must still become a component — the second gets a unique `·AltN` alias below.
+        if (seen[n.id]) return;
+        seen[n.id] = 1;
+        var isInst = false;
+        try { isInst = !!(n.isComponentCopyInstance && n.isComponentCopyInstance()) || !!(n.isMainComponent && n.isMainComponent()); } catch (e) {}
+        if (CF.get(nm) && isInst) { out.already.push(nm); return; }
         if (STATE.test(nm) && !o.states) { out.skipped.push(nm); return; }
         if (out.registered.length >= limit) { out.truncated = true; return; }
         if (o.dry) { out.registered.push(nm); return; }
-        var res = CF.component(n, nm);
-        if (res && res.ok) out.registered.push(nm); else out.skipped.push(nm + ' → ' + (res && res.err || 'failed'));
+        // A second RAW host with the same name (two table headers, two descriptions states) cannot share the master's
+        // name: register it under a stable unique alias so it is a component too. Leaving it raw is what made
+        // spec_unregistered report the duplicate cells while the first cell of the same family read CLEAN.
+        var regName = nm;
+        if (CF.get(nm)) { var k = 2; while (CF.get(regName)) { regName = nm + '·Alt' + k; k++; } }
+        var res = CF.component(n, regName);
+        if (res && res.ok) out.registered.push(regName); else out.skipped.push(nm + ' → ' + (res && res.err || 'failed'));
         return;                                   // a host's internals belong to the master, never to the library
       }
       var kids = [];
@@ -4971,15 +5028,28 @@ return (function () {
   };
   /** The REFERENCE inventory: what the source site actually shows, measured, not what this factory can draw.
       On a recreation the agent MUST call this before building a component chapter, and the audit's `reference_drift`
-      rule (spec pages 03–09, one profile group per page) enforces it. The profile is stamped `nl:ref` on every PageRoot, so it survives a plugin reload.
+      rule (spec pages 03–09, one profile group per page) enforces the measured half. The profile is stamped `nl:ref`
+      on every PageRoot, so it survives a plugin reload.
         CF.setReference({ source:'https://…', actions:{ families:['Button','IconButton','Link'],
           shapes:{ Button:['full'], IconButton:['tile','full'], Link:['none'] } } });
-      Families absent from the source are NOT drawn or registered — a factory existing is not a reason to invent UI. */
+      The measured `families` are SOURCE-backed, not the catalog: pages 03–09 must still build every CF.map() family.
+      A family the source never shows is `derived` (CF.ensureCatalog) and takes the source material — it is built,
+      registered and gated like any other, never omitted. */
   CF.setReference = function (o, root) {
     // A recreation has several source profiles (actions on 03, feedback/forms on 04–09). MERGE instead of replacing,
     // so seeding feedback on page 09 does not wipe the measured action profile; the profile is one durable object
     // stamped on the page that owns it.
-    storage.REF = Object.assign({}, storage.REF || {}, o || {});
+    // Merge one level deeper for profile GROUPS: re-seeding a measured group must not erase the derived family
+    // entries `CF.ensureCatalog` added to the same group (a shallow Object.assign replaced `actions` wholesale and
+    // silently shrank the catalog back to the source-only families).
+    var mergedRef = Object.assign({}, storage.REF || {});
+    Object.keys(o || {}).forEach(function (k) {
+      var cur = mergedRef[k], nxt = o[k];
+      if (cur && nxt && typeof cur === 'object' && typeof nxt === 'object' && !Array.isArray(cur) && !Array.isArray(nxt)) {
+        mergedRef[k] = Object.assign({}, cur, nxt);
+      } else mergedRef[k] = nxt;
+    });
+    storage.REF = mergedRef;
     // The measured source SHAPES are also the design's radius ROLES: if the reference draws Button as a pill, then
     // `control` is `full` at birth (not the generic kit's 3px step), and an IconButton explicitly pinned to `tile`
     // keeps the tile step. Without this, every factory build went back to the fallback ladder on a fresh session and
@@ -5026,16 +5096,45 @@ return (function () {
     var r = (storage.REF && Object.keys(storage.REF).length) ? storage.REF : CF.hydrate();
     return r && r[group] ? r[group] : null;
   };
-  CF.referenceFamilies = function (group) {
+  /** The MEASURED source families (the inventory that has expect blocks). */
+  CF.sourceFamilies = function (group) {
     var r = CF.reference(group);
     return r && r.families ? r.families : (CF.map()[group] || []);
+  };
+  /** The COMPLETE factory catalog for a group. A recreation builds all of it: measured families take their profile,
+      absent families are derived from the source material and still get a ·Spec board and masters. */
+  CF.referenceFamilies = function (group) { return CF.map()[group] || []; };
+  /** Add one derived profile entry (source material, no `expect`): enough for the factory to stamp `nl:prof` and for
+      the completeness gate to tell a deliberate derived family from an accidentally generic one. */
+  CF.derivedProfile = function (group, family, opts) {
+    opts = opts || {};
+    // The `selection` profile group has no matching CF.map() group: its controls live in the forms factory group.
+    var mapGroup = group === 'selection' ? 'forms' : group;
+    var map = CF.map()[mapGroup] || [], key = String(family);
+    var hit = map.filter(function (f) { return String(f).toLowerCase() === key.toLowerCase(); })[0];
+    if (!hit) return { err: 'family ' + family + ' is not in CF.map().' + group, families: map };
+    var g = storage.REF = storage.REF || {};
+    g[group] = g[group] || {};
+    if (CF.profile(group, hit)) return { kept: true, group: group, family: hit };
+    g[group][hit] = Object.assign({ source: 'derived', derived: true, family: hit, material: opts.material || 'source' }, opts.entry || {});
+    return { added: true, group: group, family: hit, entry: g[group][hit] };
+  };
+  /** Fill every missing family of a group with a derived entry (idempotent). Returns what was added. */
+  CF.ensureCatalog = function (group, opts) {
+    var out = { group: group, added: [], kept: [] };
+    (CF.map()[group === 'selection' ? 'forms' : group] || []).forEach(function (f) {
+      var r = CF.derivedProfile(group, f, opts);
+      if (r.added) out.added.push(f); else out.kept.push(f);
+    });
+    if (out.added.length) CF.stampRef();
+    return out;
   };
   /** One measured family entry from a profile group: `profiles.forms.input`, `profiles.selection.switch`, … .
       Aliases let one source measurement back several draws of the same control (Textarea/Search are Input fields).
       The actions inventory keeps `families` as an array; that is not a family entry and is ignored here. */
   CF.PROFILE_ALIAS = {
-    input: ['input', 'field'], textarea: ['textarea', 'input'], search: ['search', 'searchfield', 'input'],
-    field: ['field', 'input'], switch: ['switch'], checkbox: ['checkbox'], radio: ['radio'], slider: ['slider'],
+    input: ['input'], textarea: ['textarea'], search: ['search'],
+    field: ['field'], switch: ['switch'], checkbox: ['checkbox'], radio: ['radio'], slider: ['slider'],
     card: ['card'], kpi: ['kpi'], navitem: ['navitem', 'nav'], tabs: ['tabs'], accordion: ['accordion'],
     breadcrumb: ['breadcrumb'], pagination: ['pagination'], menu: ['menu'],
     button: ['button'], iconbutton: ['iconbutton', 'icon'], icontile: ['icontile'],

@@ -97,6 +97,7 @@ return (function () {
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
     shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
+    shadow_clipped: '§5 + gate G18 · a shadowed shape whose painted shadow box is cut by a clipping ancestor — Penpot boards default to clipContent=true, so a slot/grid/Spec/row container slices the drop+inset stack at the cell edge. Layout containers must be authored with clipContent=false; only `clip·` media masks crop. Repair: storage.unclip() on the page, or rebuild the container with the fixed NL.frame/mkAbsBoard default',
     elevation_flat: '§5 + gate G18 · a shape stamped `nl:el=<recipe>` whose `shadows` has fewer layers than that recipe (a multi-layer stack collapsed to one, or a rebuild that dropped the insets), OR whose stamp names a different recipe than its NAME resolves to (a `Button·Secondary` still carrying `control` while its role is `chip`). The stamp is the durable contract; this rule compares it to the render and to the role. Repair with `EL.apply(shape, recipe)` / `EL.sweepPage`',
     edge_missing: '§5 + gate G18 · a stamped recipe declares INNER layers (the dark bottom lip / white top highlight that make a card read as a physical object) but the shape paints only drop shadows. A drop shadow alone is the flat "everything is a card" look this rule exists to stop',
     sheen_missing: '§5 + gate G18 · a stamped recipe declares a radial sheen but the host carries no `sheen·*` plate — the top-light that sells the material is absent. Repair with `EL.sheenFor(host, recipe)`',
@@ -104,7 +105,7 @@ return (function () {
     surface_missing: '§5 + gate G18 · a screen record declares `surface`/`elevation` for a section but the board has no `surface·<region>` plate — the section was assembled as bare text/frames with nothing to cast a shadow (measured 2026-10-23: 143 shapes, 0 shadows on `15 · Screens · content`). Mount it with `SC.surface` / `EL.surfacePass`',
     spec_unregistered: 'gate G10s · a control-shaped board on a spec page (`03`–`09`) that is not a Penpot component (neither a master nor an instance); repair with CF.autoRegister({states:true}).',
     label_off_axis: '§2.3 · a control\'s label is not on the control\'s own vertical axis: its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
-    free_layout: '§1.5 + native-layout §9 · on pages 01–09 a content board positions its elements ONLY as flow or grid children — rowGap/columnGap/padding (values judged by space_off_scale) or a grid cell: an absolutely-positioned child that is not a name-declared overlay (scrim/overlay/veil/wash·/ring·/hitpad·/connector/tail·/rail·/boundary·/underline·) is free layout. A control host\'s own anatomy is exempt, but the host itself must still be a flow/grid child; page chrome (-Header/-Footer/-PageRoot) and page-level shelf placement are outside the rule. The measured platform fact behind it (api-pitfalls §coordinates): a board\'s absolute children hold WORLD coordinates and do not follow the shell, so free layout cannot re-flow after a token change and cannot be repaired in place. Producers: CF.matrix (grid/flow rows) and the FN row builders; the repair is a rebuild from the record, never a nudge',
+    free_layout: '§1.5 + native-layout §9 · on pages 01–09 a content board positions its elements ONLY as flow or grid children — rowGap/columnGap/padding (values judged by space_off_scale) or a grid cell: an absolutely-positioned child that is not a name-declared overlay (scrim/overlay/veil/wash·/sheen·/ring·/hitpad·/connector/tail·/rail·/boundary·/underline·) is free layout. A control host\'s own anatomy is exempt, but the host itself must still be a flow/grid child; page chrome (-Header/-Footer/-PageRoot) and page-level shelf placement are outside the rule. The measured platform fact behind it (api-pitfalls §coordinates): a board\'s absolute children hold WORLD coordinates and do not follow the shell, so free layout cannot re-flow after a token change and cannot be repaired in place. Producers: CF.matrix (grid/flow rows) and the FN row builders; the repair is a rebuild from the record, never a nudge',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
     'align_missing', 'crash_100x100', 'degenerate_size', 'root_stray', 'text_centre_residue', 'loose_assembly', 'spec'];
@@ -941,6 +942,28 @@ return (function () {
       try {
         const shs = arr(s, 'shadows');
         let tokMap = {}; try { tokMap = s.tokens || {}; } catch (e) {}
+        // A layout board must not clip a child's shadow. Penpot defaults clipContent=true; the engine now authors it
+        // false, and this rule is the backstop for anything built before that fix (and for hand-drawn containers).
+        if (shs.length) {
+          let eL = 0, eT = 0, eR = 0, eB = 0;
+          shs.forEach(function (sh) {
+            const ox = Number(sh.offsetX || 0), oy = Number(sh.offsetY || 0);
+            const bl = Number(sh.blur || 0), sp = Number(sh.spread || 0);
+            eL = Math.max(eL, bl + sp - ox); eT = Math.max(eT, bl + sp - oy);
+            eR = Math.max(eR, bl + sp + ox); eB = Math.max(eB, bl + sp + oy);
+          });
+          let p2 = s.parent, dep = 0, cut = null;
+          while (p2 && dep++ < 16) {
+            let cc = false, cw = 0, ch = 0;
+            try { cc = !!p2.clipContent; cw = p2.width; ch = p2.height; } catch (e) {}
+            if (cc && cw > 1 && ch > 1 && !/^clip·/.test(nameOf(p2))) {
+              if (s.x - eL < p2.x - 1 || s.y - eT < p2.y - 1 ||
+                  s.x + s.width + eR > p2.x + cw + 1 || s.y + s.height + eB > p2.y + ch + 1) { cut = p2; break; }
+            }
+            p2 = p2.parent;
+          }
+          if (cut) add('shadow_clipped', s, st.top, '"' + nm.slice(0, 40) + '" paints a shadow that is cut by the clipping ancestor "' + nameOf(cut).slice(0, 34) + '" (clipContent=true, ' + Math.round(cut.width) + '×' + Math.round(cut.height) + ') — a layout container must not crop a child shadow; repair: storage.unclip() or rebuild the container with clipContent=false');
+        }
         if (SHADOW_TOKENS > 0 && shs.length && !tokMap.shadow) {
           add('shadow_unbound', s, st.top, '"' + nm.slice(0, 30) + '" paints ' + shs.length + ' shadow layer(s) with no `tokens.shadow` binding — the stack was typed, not taken from the elevation record. Repair: EL.sweepPage({ page, apply: true })');
         }
@@ -1700,7 +1723,15 @@ return (function () {
         if (!ref || !ref.families || !ref.families.length) {
           add('reference_drift', null, top, 'no reference action profile on page 03 — seed CF.setReference({actions:{families,shapes}}) from DESIGN.md before building the Actions chapter; a factory list is not a reference inventory');
         } else {
-          const want = ref.families.map((f) => String(f).toLowerCase());
+          // COMPLETE CATALOG. The source inventory is the measured half, not a licence to delete the other
+          // action families: pages 03–09 are the library. Every CF.map() family gets a ·Spec board; the source's
+          // families are judged against their measured `expect`, the rest are derived and registered like any other.
+          const NAMEMAP = { fab: 'FAB', kpi: 'KPI', otpInput: 'OTP', searchField: 'Search', passwordField: 'Password' };
+          const capFam = (f) => NAMEMAP[f] || (String(f).charAt(0).toUpperCase() + String(f).slice(1));
+          let catalog = ['Button', 'IconButton', 'ButtonGroup', 'SplitButton', 'FAB', 'Link', 'Segmented'];
+          try { const m = storage.CF && storage.CF.map ? storage.CF.map().actions : []; if (m && m.length) catalog = m.map(capFam); } catch (e) {}
+          const want = catalog.map((f) => String(f).toLowerCase());
+          const source = ref.families.map((f) => String(f).toLowerCase());
           const shapes = {};
           Object.keys(ref.shapes || {}).forEach((k) => { shapes[String(k).toLowerCase()] = ref.shapes[k]; });
           const specs = (kidsOf(top) || []).filter((c) => typeOf(c) === 'board' && /^[A-Za-z][A-Za-z0-9]*·Spec(?:·|$)/.test(nameOf(c)));
@@ -1708,7 +1739,7 @@ return (function () {
           specs.forEach((b) => {
             const fam = String(nameOf(b)).split('·')[0], key = fam.toLowerCase();
             seen[key] = 1;
-            if (want.indexOf(key) < 0) add('reference_drift', b, top, 'Actions spec "' + nameOf(b) + '" belongs to ' + fam + ', which the reference inventory does not contain (' + ref.families.join(', ') + ') — do not invent a family the source never shows');
+            if (want.indexOf(key) < 0) add('reference_drift', b, top, 'Actions spec "' + nameOf(b) + '" names family ' + fam + ', which is not in CF.map().actions — the library has no factory to back it');
             const allowed = shapes[key];
             if (allowed && allowed.length) {
               const vals = allowed.map((role) => { try { return (storage.CF && storage.CF.radius) ? storage.CF.radius(role) : ({ none: 0, tile: 12, full: 9999 }[role]); } catch (e) { return null; } });
@@ -1722,7 +1753,7 @@ return (function () {
               })(b);
             }
           });
-          ref.families.forEach((f) => { if (!seen[String(f).toLowerCase()]) add('reference_drift', null, top, 'reference action family ' + f + ' has no ·Spec board on page 03'); });
+          catalog.forEach((f) => { if (!seen[String(f).toLowerCase()]) add('reference_drift', null, top, 'complete action catalog: ' + f + ' has no ·Spec board on page 03' + (source.indexOf(String(f).toLowerCase()) >= 0 ? ' (source-measured family)' : ' (derived family — build it from the source material, do not omit it)')); });
           // ANATOMY — the family list is only the first half of the source contract. A family that IS in the inventory
           // can still be drawn with the wrong material: the a reference secondary action may be a borderless light chip, but the
           // generic "secondary" tone gave it a 1px border, a `control` stack and a detached halo. These facts live in the
@@ -1763,13 +1794,12 @@ return (function () {
                 const key = storage.CF.profKeyFor(nm);
                 if (key && key.group === 'actions') {
                   const st = readProf(k);
-                  if (!st) add('reference_drift', k, top, nm.slice(0, 44) + ' carries no nl:prof stamp — it was not drawn from the actions profile; run CF.stampPass (measures the render) or rebuild it with the profile-aware factory');
-                  else {
-                    const prof = storage.CF.profile(key.group, key.family, key.variant);
-                    if (prof) storage.CF.profDiff(prof, st).forEach(function (b) {
-                      add('reference_drift', k, top, nm.slice(0, 44) + ' draws ' + b.k + '=' + (b.got === undefined || b.got === null ? '—' : b.got) + '; the actions profile measures ' + b.k + '=' + b.want);
-                    });
-                  }
+                  const prof = storage.CF.profile(key.group, key.family, key.variant);
+                  const derived = !!(prof && prof.derived);
+                  if (!st && !derived) add('reference_drift', k, top, nm.slice(0, 44) + ' carries no nl:prof stamp — it was not drawn from the actions profile; run CF.stampPass (measures the render) or rebuild it with the profile-aware factory');
+                  else if (st && prof && !derived) storage.CF.profDiff(prof, st).forEach(function (b) {
+                    add('reference_drift', k, top, nm.slice(0, 44) + ' draws ' + b.k + '=' + (b.got === undefined || b.got === null ? '—' : b.got) + '; the actions profile measures ' + b.k + '=' + b.want);
+                  });
                 }
               }
               (kidsOf(k) || []).forEach(walkStamp);
@@ -1783,6 +1813,14 @@ return (function () {
         let fb = null;
         try { fb = (storage.CF && storage.CF.reference) ? storage.CF.reference('feedback') : null; } catch (e) {}
         if (!fb) { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; if (raw) { const d = JSON.parse(raw); fb = d && d.feedback; } } catch (e) {} }
+        // The complete feedback catalog is the page contract; measured tooltip/modal are checked below, the rest are
+        // derived and must still be built and registered (never omitted).
+        try {
+          const m = storage.CF && storage.CF.map ? storage.CF.map().feedback : [];
+          const specHead = {};
+          (kidsOf(top) || []).forEach((c) => { if (typeOf(c) === 'board' && /·Spec(?:·|$)/.test(nameOf(c))) specHead[String(nameOf(c)).split('·')[0].toLowerCase()] = 1; });
+          m.forEach((f) => { const cap = String(f).charAt(0).toUpperCase() + String(f).slice(1); if (!specHead[String(cap).toLowerCase()]) add('reference_drift', null, top, 'complete feedback catalog: ' + cap + ' has no ·Spec board on page 09 — measured families use their profile, the rest are derived from the source material and must still be built'); });
+        } catch (e) {}
         if (!fb) {
           add('reference_drift', null, top, 'no feedback source profile on page 09 — seed CF.setReference({feedback:{tooltip,modal,alert,toast}}) from the reference CSS before building Overlays; generic factory defaults are not the source');
         } else {
@@ -1834,13 +1872,33 @@ return (function () {
         // recreation, every host of a profiled family must carry the `nl:prof` birth stamp, and the stamp's measured
         // geometry must equal the profile's declared `expect` block. A factory default therefore cannot read CLEAN.
         const GROUPS = [
-          { re: /^04/, g: 'forms', fams: ['Input', 'Textarea', 'Search'] },
-          { re: /^05/, g: 'selection', fams: ['Switch', 'Checkbox', 'Radio', 'Slider'] },
-          { re: /^0[67]/, g: 'data', fams: ['Card', 'KPI', 'Table', 'List', 'Progress', 'Timeline', 'Calendar'] },
-          { re: /^08/, g: 'navigation', fams: ['NavItem', 'Tabs', 'Breadcrumb', 'Pagination', 'Menu', 'Accordion'] }
+          { re: /^04/, g: 'forms', fams: [] },
+          { re: /^05/, g: 'selection', fams: [] },
+          { re: /^06/, g: 'data', fams: [] },
+          { re: /^07/, g: 'data', fams: [] },
+          { re: /^08/, g: 'navigation', fams: [] }
         ];
         const G = GROUPS.filter((x) => x.re.test(pname))[0];
         if (G) {
+          // The complete catalog, split by page contract (not a hand-list that lets families disappear):
+          // 04 = fields, 05 = selection/pickers, 06 = data lists, 07 = display/metrics, 08 = navigation.
+          try {
+            const m = storage.CF && storage.CF.map ? storage.CF.map() : null;
+            const NAMEMAP2 = { fab: 'FAB', kpi: 'KPI', otpInput: 'OTP', searchField: 'Search', passwordField: 'Password' };
+            const cap = (f) => NAMEMAP2[f] || (String(f).charAt(0).toUpperCase() + String(f).slice(1));
+            const PICK = new Set(['select', 'combobox', 'multiSelect', 'datePicker', 'timePicker', 'switch', 'checkbox', 'radio', 'slider', 'rating', 'colorPicker']);
+            const DISPLAY = new Set(['badge', 'statusText', 'chip', 'avatar', 'avatarGroup', 'card', 'kpi', 'progress', 'skeleton', 'emptyState']);
+            if (m) {
+              if (/^04/.test(pname)) G.fams = m.forms.filter((f) => f !== 'fieldBox' && !PICK.has(f)).map(cap);
+              else if (/^05/.test(pname)) G.fams = m.forms.filter((f) => PICK.has(f)).map(cap);
+              else if (/^06/.test(pname)) G.fams = m.data.filter((f) => !DISPLAY.has(f)).map(cap);
+              else if (/^07/.test(pname)) G.fams = m.data.filter((f) => DISPLAY.has(f)).map(cap);
+              else if (/^08/.test(pname)) G.fams = m.navigation.map(cap);
+            }
+          } catch (e) {}
+          const specHead = {};
+          (kidsOf(top) || []).forEach((c) => { if (typeOf(c) === 'board' && /·Spec(?:·|$)/.test(nameOf(c))) specHead[String(nameOf(c)).split('·')[0].toLowerCase()] = 1; });
+          G.fams.forEach((f) => { if (!specHead[String(f).toLowerCase()]) add('reference_drift', null, top, 'complete ' + G.g + ' catalog: ' + f + ' has no ·Spec board on page ' + pname.slice(0, 2) + ' — build the whole family set; a source recreation does not delete the families the site does not show'); });
           const rootRef = () => { try { const raw = top.getPluginData ? top.getPluginData('nl:ref') : null; return raw ? JSON.parse(raw) : null; } catch (e) { return null; } };
           let groupRef = null;
           try { groupRef = (storage.CF && storage.CF.reference) ? storage.CF.reference(G.g) : null; } catch (e) {}
@@ -1853,7 +1911,7 @@ return (function () {
           if (isRecreation && !groupRef) {
             add('reference_drift', null, top, 'no ' + G.g + ' source profile on page ' + pname.slice(0, 2) + ' — seed CF.setReference({' + G.g + ': {…}}) from the reference CSS before building this chapter; a factory default is legal for a blank file, not for a source-backed page');
           } else if (groupRef) {
-            const ALIAS = { textarea: ['textarea', 'input'], search: ['search', 'searchfield', 'input'], field: ['field', 'input'], navitem: ['navitem', 'nav'],
+            const ALIAS = { textarea: ['textarea'], search: ['search'], field: ['field'], navitem: ['navitem', 'nav'],
               list: ['list', 'listitem'], table: ['table', 'tablerow', 'tableheader'], calendar: ['calendar', 'minicalendar'] };
             // A family is identified by its HOST-NAME prefix, and one family can own several prefixes (List draws
             // `ListItem·`, Table draws `TableHeader·`/`TableRow·`). Matching on the bare prefix alone left every
@@ -1876,10 +1934,12 @@ return (function () {
                 const famKey = fam ? keyFor(fam) : null;
                 if (fam && famKey) {
                   const st = readProf(k);
-                  if (!st) {
+                  const entry0 = (storage.CF && storage.CF.profile && storage.CF.profile(G.g, famKey)) || groupRef[famKey];
+                  const derived0 = !!(entry0 && entry0.derived);
+                  if (!st && !derived0) {
                     const draw = ({ List: 'listItem', Table: 'tableRow', Calendar: 'miniCalendar' })[fam] || fam.toLowerCase();
                     add('reference_drift', k, top, nm.slice(0, 44) + ' carries no nl:prof stamp — it was drawn from the generic kit, not from the ' + G.g + ' profile; run CF.stampPass (measures the render) or rebuild it with the profile-aware factory (CF.' + draw + ')');
-                  } else {
+                  } else if (st && derived0) { /* derived family: coverage is the contract, no measured expect */ } else {
                     if (st.g && st.g !== G.g) add('reference_drift', k, top, nm.slice(0, 44) + ' is stamped from the "' + st.g + '" profile on a ' + G.g + ' page');
                     // Judge against the entry MERGED with the variant the HOST NAME declares (`Card·…·Selectable` — a
                     // factory stamp may record a different axis, and the name is the one both stamp paths agree on),
@@ -1909,7 +1969,7 @@ return (function () {
     try {
       const pF = String(out.page || '');
       if (/^0[1-9](?:\.| ·)/.test(pF) && /-PageRoot$/.test(nameOf(top))) {
-        const OVL_RE = /^(scrim|overlay|veil|wash·|ring·|hitpad·|connector|tail·|rail·|boundary·|underline·)/;
+        const OVL_RE = /^(scrim|overlay|veil|wash·|sheen·|ring·|hitpad·|slot·|connector|tail·|rail·|boundary·|underline·)/;
         let flN = 0;
         const walkFL = (b, depth) => {
           (kidsOf(b) || []).forEach((c) => {

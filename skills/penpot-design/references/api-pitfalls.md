@@ -91,7 +91,7 @@ c.strokes = c.strokes.map(st => Object.assign({}, st, { strokeAlignment: want })
 
 - The property name is the board's **`clipContent`** (not clipsContent — if you read undefined, suspect the property name first). Default `true`.
 - Mechanism: drop-shadow radiates outside the shape (blur+spread). When a shape touches the parent board edge (e.g. button cap same size as its instance board), the glow is entirely clipped → glow invisible in the editor, only shows when you drag the element out of the container.
-- Fix: all boards hosting glow elements `clipContent = false`. Safety: glow radius (blur 20 + spread 1 ≈ 21px) must be smaller than the component gap (38-40px), otherwise adjacent glows pollute each other.
+- Fix: **every layout container is `clipContent = false`** — not only glow hosts. A slot/grid/Spec/row that clips crops a child's drop/inset shadow and its stroke at the cell edge; with grid/gap layout this is the default failure because Penpot boards default to `true`. The engines now author it false (`mkAbsBoard`, `NL.frame`, `NL.gridFrame`); only `clip·` media masks set it true. Gate `shadow_clipped` (rule 60) catches a clipped shadow, and `storage.unclip()` is the page repair (it keeps `clip·`). Safety: glow radius (blur 20 + spread 1 ≈ 21px) must be smaller than the component gap (38-40px), otherwise adjacent glows pollute each other.
 - Whole-file batch fix: walk all `type==='board' && clipContent===true` → false.
 
 ## 5. Text

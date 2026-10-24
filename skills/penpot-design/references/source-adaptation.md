@@ -7,8 +7,10 @@ the project's `DESIGN.md` and in its `CF.setReference` profile, never in this sk
 ## 1. The rule
 
 **A factory default is legal for a blank file; a source recreation must read a measured profile for every family it
-draws.** When the reference has CSS for a family, those values are the profile. When it has none, the family is
-`derived` from the nearest source material and that fact is recorded in DESIGN.md.
+draws from the source — and must still build every family in the factory catalog.** Pages 03–09 are the complete
+library, not a trimmed screenshot: measured families take their source profile, families the source never shows are
+`derived` from the nearest source material (recorded in DESIGN.md), built on a `·Spec` board, registered and gated.
+Omission is not a design decision; it is a missing component.
 
 ## 2. Profile groups and schema
 
@@ -74,13 +76,13 @@ substitute for the source values.
 
 ## 4. Derived families (source has none)
 
-A family absent from the source can still be delivered for the application shell, but it must be:
+A family absent from the source is still delivered — pages 03–09 are the complete library, not just the screenshot. It must be:
 
 1. marked `derived: true` in the profile and in DESIGN.md;
 2. built from the source's **material language** — its card/ink/control/chip recipes, radii, and type — never an
    unrelated M3 pastel or a generic app-dialog look;
-3. gated like any other family: `nl:prof` must carry the derived material, and `reference_drift` reports a missing or
-   mismatched stamp.
+3. built on its group page with a `·Spec` board (the completeness half of `reference_drift`), registered like every
+   other family, and gated: `nl:prof` carries the derived material — a missing spec board or a missing stamp is a finding.
 
 The skill must not hardcode which families are derived for a particular site. The project profile declares them.
 

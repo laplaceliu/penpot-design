@@ -108,7 +108,7 @@ return (async function () {
     o = o || {};
     const m = SC.master(req);
     if (m.err) { SC.log.push({ ch: 'ctl', err: m.err, tried: m.tried }); return { err: m.err, tried: m.tried }; }
-    const r = CF.instance(m.name, Object.assign({ parent }, req.place || {}, o));
+    const r = CF.instance(m.name, Object.assign({ parent }, req.place ? { absolute: { x: req.place.x, y: req.place.y } } : {}, o, req.text !== undefined ? { text: req.text } : {}, req.resize ? { resize: req.resize } : {}));
     if (!r || !r.ok) return { err: 'instance: ' + String((r && r.err) || 'no result'), master: m.name };
     if (req.stamp !== false) { try { NL.stamp(r.inst, { ctl: m.name }); } catch (e) {} }
     return { ok: true, master: m.name, via: 'instance', shape: r.inst, name: String(r.inst.name || '') };
@@ -125,6 +125,9 @@ return (async function () {
     if (parent) parent.appendChild(t);
     let style = null;
     if (TP && TP.apply) { const a = TP.apply(t); style = a && (a.step || a.err); }
+    // A measured paragraph has a MEASURE: without it a Penpot text grows to its one-line width and ignores the
+    // source's column. Resize first, then restore auto-height so the block wraps instead of clipping.
+    if (req.w) { try { t.resize(req.w, Math.max(8, t.height)); t.growType = 'auto-height'; } catch (e) {} }
     if (req.box && storage.absMount) storage.absMount(parent, t, req.box.x, req.box.y);
     else if (req.x !== undefined && req.y !== undefined) { try { t.x = req.x; t.y = req.y; } catch (e) {} }
     await sleep(120);   // text metrics settle; a centering done before this bakes the stale-center fingerprint

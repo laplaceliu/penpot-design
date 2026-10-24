@@ -407,7 +407,7 @@ return (function () {
 
   FN.typeRamp = function (o) {
     o = o || {}; const d = FN.source(); if (d.err) return d;
-    const st = FN.lanes(o.page) || { full: 1760, half: 864 }; const W = o.w || st.half;
+    const st = FN.lanes(o.page) || { full: 1760, half: 864 }; const W = o.w || st.full;
     const fam = o.family || null;
     const rows = d.types.filter((t) => (!fam || t.family === String(fam).toLowerCase()) && (o.min === undefined || t.size >= o.min) && (o.max === undefined || t.size <= o.max));
     if (!rows.length) return { err: 'no declared ramp step matches ' + JSON.stringify({ family: fam, min: o.min, max: o.max }) };
@@ -463,19 +463,40 @@ return (function () {
 
   FN.elevation = function (o) {
     o = o || {}; const d = FN.source(); if (d.err) return d;
-    const st = FN.lanes(o.page) || { half: 864 }; const W = o.w || st.half;
+    const st = FN.lanes(o.page) || { full: 1760 }; const W = o.w || st.full;
     const b = FN.board(o.name || 'Elevation', W);
     FN.head(b, 'Elevation · declared shadows', d.shadows.length + ' shadow tokens · stacking uses shadow, adjacency uses a border (§5)');
-    const r = FN.row(b, { name: 'row·strip·elevation', align: 'start', gap: FN.layout.gap });
+    const PER = 9;
     let drawn = 0;
-    d.shadows.forEach(function (x) {
+    for (let ri = 0; ri < d.shadows.length; ri += PER) {
+    const r = FN.row(b, { name: 'row·strip·elevation·' + Math.floor(ri / PER), align: 'start', gap: FN.layout.gap });
+    d.shadows.slice(ri, ri + PER).forEach(function (x) {
       const c = FN.cell(r, 160, { name: 'cell·elev·' + x.name.replace(/^shadow\./, ''), align: 'center' });
-      const pl = FN.plate(c, 128, 88, { name: 'plate·' + x.name.replace(/^shadow\./, ''), fill: FN.surface(), radius: CF.radius('sm'), stroke: FN.hexOf['color.border'] || '' });
-      const s = Array.isArray(x.value) ? x.value : [x.value];
-      try { pl.shadows = s.map((v) => ({ offsetX: Number(v.offsetX || 0), offsetY: Number(v.offsetY || 0), blur: Number(v.blur || 0), spread: Number(v.spread || 0), color: v.color || '#00000026', opacity: 1, style: 'drop-shadow', show: true })); drawn++; } catch (e) {}
+      // A shadow sample must be a BOARD, not a rectangle: the material's sheen is a child plate, and the auditor
+      // resolves `sheen·*` on the stamped host. `TK.declared().shadows` exposes only the first layer, so the stack
+      // itself is read from the EL recipe (the record), not from that scalar.
+      const recName = x.name.replace(/^shadow\./, '');
+      const rec = storage.EL && storage.EL.recipe ? storage.EL.recipe(recName) : null;
+      const pl = NL.frame('plate·' + recName, { w: 128, h: 88, fill: FN.surface(), radius: CF.radius('sm') });
+      NL.add(c, pl, 'fix', 'fix');
+      pl.strokes = [{ strokeColor: FN.hexOf['color.border'] || '#E4E4E7', strokeOpacity: 1, strokeWidth: 1, strokeAlignment: 'inner' }];
+      let drawnLayers = 0;
+      if (rec) {
+        const ap = storage.EL.apply(pl, recName);
+        if (ap && ap.ok) {
+          drawnLayers = (pl.shadows || []).length;
+          if (storage.EL.sheen(recName) && !pl.clipContent) { try { pl.clipContent = true; } catch (e) {} }
+          if (storage.EL.sheen(recName)) storage.EL.sheenFor(pl, recName, { parent: pl, box: { x: pl.x, y: pl.y, w: pl.width, h: pl.height }, radius: pl.borderRadius });
+          drawn++;
+        }
+      } else {
+        const s = Array.isArray(x.value) ? x.value : [x.value];
+        try { pl.shadows = s.map((v) => ({ offsetX: Number(v.offsetX || 0), offsetY: Number(v.offsetY || 0), blur: Number(v.blur || 0), spread: Number(v.spread || 0), color: v.color || '#00000026', opacity: 1, style: 'drop-shadow', show: true })); drawn++; drawnLayers = s.length; } catch (e) {}
+      }
       FN.text(c, x.name.replace(/^shadow\./, ''), 'type.axis', { size: 11, color: FN.muted(), axis: true, name: 'axis · ' + x.name });
-      FN.text(c, 'y' + Number((s[0] || {}).offsetY || 0) + ' blur ' + Number((s[0] || {}).blur || 0), 'type.axis', { size: 11, color: FN.muted(), axis: true, name: 'axis · geom ' + x.name });
+      FN.text(c, (rec ? rec.layers.length : drawnLayers) + ' layers', 'type.axis', { size: 11, color: FN.muted(), axis: true, name: 'axis · geom ' + x.name });
     });
+    }
     return { board: b, info: { shadows: d.shadows.length, applied: drawn } };
   };
 

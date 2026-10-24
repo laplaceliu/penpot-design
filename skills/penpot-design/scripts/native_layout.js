@@ -180,6 +180,8 @@ return (function () {
     b.name = name;
     b.x = o.x || 0; b.y = o.y || 0;
     try { b.resize(o.w || 100, o.h || 100); } catch (e) {}
+    // A layout frame is not a crop: default clipContent OFF so a card's shadow / ring / stroke can bleed into the gap.
+    b.clipContent = false;
     if (o.fill) b.fills = [{ fillColor: o.fill, fillOpacity: o.fillOpacity === undefined ? 1 : o.fillOpacity }];
     else b.fills = [];
     if (o.radius) b.borderRadius = storage.CF.radius(o.radius);
@@ -273,6 +275,7 @@ return (function () {
     const b = penpot.createBoard();
     b.name = name; b.x = o.x || 0; b.y = o.y || 0;
     try { b.resize(o.w || 100, o.h || 100); } catch (e) {}
+    b.clipContent = false;
     if (o.fill) b.fills = [{ fillColor: o.fill, fillOpacity: 1 }]; else b.fills = [];
     if (o.radius) b.borderRadius = storage.CF.radius(o.radius);
     b.addGridLayout();
