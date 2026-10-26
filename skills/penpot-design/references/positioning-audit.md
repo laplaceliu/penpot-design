@@ -97,6 +97,14 @@ Eyeballing the export can only find "looks crooked". Below are four machine-deci
 
 ### S5 `root_stray` — top-level stray primitives outside PageRoot
 
+**Cause class added 2026-10-26:** `board.remove()` re-parents the board's ungrouped children to the page root. A rebuild
+that removes a container (a partial matrix, a spec board, a stale demo) therefore scatters its nested glyphs, plates
+and checkmarks OUTSIDE the PageRoot — page 04 collected 102 `glyph·check`/`dash` strays this way. The repair is
+**subtree-safe deletion**: `storage.removeTree(shape)` (captures descendant ids, removes the shell, then deletes the
+survivors now parented to the page root), followed by `cleanOrphans({dry})` / `cleanOrphans()` which now removes every
+non-PageRoot root shape (the old version only removed root-level text and missed paths/rects). The gate signature is S5
+`root_stray`; do not hide it by grouping strays into the PageRoot.
+
 - **Meaning**: among `page.root`'s direct children, shapes other than `NN-PageRoot`.
 - **Cause**: **bound-instance residue** produced during library-component registration / variant-container building (here: page 01's `Badge·New`,
   page 03's `Button`, each a 0-child stray instance). `createVariantContainer` also places the container at the **page root** rather than inside PageRoot.

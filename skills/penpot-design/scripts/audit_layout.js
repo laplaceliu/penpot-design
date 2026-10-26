@@ -44,15 +44,20 @@ return (function () {
     opts = opts || {};
     const headBand = opts.headBand == null ? 96 : opts.headBand;
     const titleMin = opts.titleMin == null ? 20 : opts.titleMin;   // font-size floor for spec-board titles
-    const out = { page: penpot.currentPage.name, boards: 0, shapes: 0, counts: {}, findings: [], errors: [], headerSizes: [], fonts: {} };
+    const out = { page: penpot.currentPage.name, boards: 0, shapes: 0, counts: {}, findings: [], infos: [], errors: [], headerSizes: [], fonts: {} };
     const root = penpot.currentPage.root || penpot.root;
     const head = headOf(root);
     if (!head) return Object.assign(out, { err: 'no head board on this page' });
     const add = (k, s, p, d) => {
       out.counts[k] = (out.counts[k] || 0) + 1;
+      const row = { kind: k, board: p && p.name, shape: s.name, type: s.type, text: s.type === 'text' ? String(s.characters).slice(0, 16) : undefined, x: Math.round(s.x), y: Math.round(s.y), w: Math.round(s.width), h: Math.round(s.height), detail: d };
+      // INFORMATIONAL findings never consume the defect budget. Measured 2026-10-26 on page 04: 213 deliberate-inset
+      // `text_centre_info` rows filled the 70-slot cap, so six real `stroke_covered` defects were counted but absent
+      // from `findings` — the report looked clean while the verdict was NEEDS_REPAIR. Keep info in its own capped list.
+      if (k === 'text_centre_info') { if (out.infos.length < (opts.maxInfos == null ? 40 : opts.maxInfos)) out.infos.push(row); return; }
       // The cap keeps a reply readable, but it must not hide a class: 73 loose_assembly entries used to bury the one
       // text_overlap that mattered (counts is exhaustive, findings were not — so a page could never be closed honestly).
-      if (out.findings.length < (opts.maxFindings == null ? 70 : opts.maxFindings)) out.findings.push({ kind: k, board: p && p.name, shape: s.name, type: s.type, text: s.type === 'text' ? String(s.characters).slice(0, 16) : undefined, x: Math.round(s.x), y: Math.round(s.y), w: Math.round(s.width), h: Math.round(s.height), detail: d });
+      if (out.findings.length < (opts.maxFindings == null ? 70 : opts.maxFindings)) out.findings.push(row);
     };
     const ovr = (a, b) => { const w = Math.min(a.r, b.r) - Math.max(a.x, b.x); const h = Math.min(a.b, b.b) - Math.max(a.y, b.y); if (w <= 0 || h <= 0) return 0; const s = Math.min(a.w * a.h, b.w * b.h); return s > 0 ? (w * h) / s : 0; };
 

@@ -83,7 +83,7 @@ return (function () {
     text_cramped: '§2 + §3.2 · running copy whose `lineHeight` is below the leading its own ramp step declares (multi-line, or under 1.0), or two prose siblings closer than one line of the upper block — vertical rhythm is typography, not just layout',
     radius_off_ladder: '§5.1 + design-tokens §8 · a corner radius that is not one of the declared `borderRadius` token values (a checkbox box above the 4px `radius.xxs` step is included): the token ladder is the ONLY source of a corner, so an orphan number cannot be retuned, themed or found again (measured 2026-10-21: a radius token writes all four corner props at once)',
     radius_unbound: '§5.1 + design-tokens §8 · a radius equal to a declared `borderRadius` token but with no `tokens.borderRadius*` binding — the corner was typed instead of taken from the set; run TK.bindBoard',
-    ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not the corner of the unit it outlines, or whose two margins disagree around a circular owner (an oval ring around an ellipse), or a checkbox/radio/switch ring that is OUTSET around its visible box (the ring is flush; an outset halo leaves a corner gap): a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places, and a 24×28 ring around a 20×20 radio is an oval that does not say what it focuses. Rules 35/36 cannot see the corner case — **both** values are on the ladder and bound — and the corner test cannot see an ellipse (no borderRadius). Repair with `TK.roleSweep` for corners, `TK.ringSweep` for ovals.',
+    ring_off_host: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` outline whose corner is not the corner of the unit it outlines — a control BOARD or a NESTED plate (field, OTP digit, slider handle) — or whose two margins disagree around a circular owner (an oval ring around an ellipse), or a RECTANGULAR outline around a circular owner (a circle gets a circle: a 24×24 r0 ring around a 20px radio has 2/2 margins and passes the old ellipse test, but it is the wrong SHAPE), or a checkbox/radio/switch ring that is OUTSET around its visible box (the ring is flush; an outset halo leaves a corner gap): a ring is a derived outline, so `r0` body under an `r9999` ring (or a `r10` ring around a `r0` field) is one defect seen from two places. The owner is resolved by `TK.ringHost`, which ranks the TIGHTEST UNIFORM hug — not the smallest concentric plate: on `Radio·Focus·Checked` the 10px inner dot is concentric at 7px while the visible 20px disc owns the 2px ring. Rules 35/36 cannot see the corner case — **both** values are on the ladder and bound — and an ellipse has no borderRadius to compare. Repair with `TK.ringSweep` (corner + oval/rect refit).',
     ring_detached: '§5.1 + CF.ROLE.ring = "host" · a `ring·*` plate that is not mounted inside the control it outlines: it sits on the container (`Family·Spec` / PageRoot) board instead, or sits inside a control it neither traces nor fits. `ctx.ring` can only produce this when the ring was drawn before a refit moved its host, so the outline keeps the old box while the control moves away (measured 2026-10-22: 7 of the file\'s 231 rings, drifted 10-72px). Rule 37 cannot see it — there is no pair to compare — and the old host lookup handed rule 37 the shelf itself (corners 0), so a floating plate read CLEAN. The margin is NOT judged (measured 2/5/6/7/10/0 across families); the relation is. Repair with `TK.ringSweep`',
     plate_rounded: '§5.1 · a `·Spec` / background plate with a non-zero corner: the plate holds a GROUP, so a large corner (a source ladder\'s `lg` can be a 100px pill step) clips the group at the plate\'s own corners. Background plates default to square (`radius.none`); rounding belongs to controls and cards',
     divider_separator: '§2.1 · a content separator drawn as a `divider`/`hairline` plate: content blocks separate with a spacing-token gap (`space.md` 12 / `space.base` 16, bound as rowGap/columnGap), never with a 1px line whose absolute position drifts when the host refits. Functional boundaries and state indicators must be named `boundary·*` or `underline·*`, which this rule does not judge',
@@ -106,8 +106,12 @@ return (function () {
     hover_flat: '§5.2 + gate G18 · a component state board named `·Hover`/`·Pressed` whose family declares a hover/press recipe but carries ZERO shadows — hover was modelled as an 8% fill tint, not as the source\'s elevation lift (measured 2026-10-23: every Button/Card hover state in the file read 0 shadows while the source adds 4–6 drop layers). Repair with `EL.sweepPage`',
     surface_missing: '§5 + gate G18 · a screen record declares `surface`/`elevation` for a section but the board has no `surface·<region>` plate — the section was assembled as bare text/frames with nothing to cast a shadow (measured 2026-10-23: 143 shapes, 0 shadows on `15 · Screens · content`). Mount it with `SC.surface` / `EL.surfacePass`',
     spec_unregistered: 'gate G10s · a control-shaped board on a spec page (`03`–`09`) that is not a Penpot component (neither a master nor an instance); repair with CF.autoRegister({states:true}).',
-    label_off_axis: '§2.3 · a control\'s label is not on the control\'s own vertical axis: its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
+    label_off_axis: '§2.3 · a control\'s label is not on the control\'s own axis (vertical AND horizontal): its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged; horizontal centring is exempt when the host carries a lead element — glyph, icon, avatar, dot, swatch, badge or any ellipse — because that element legitimately offsets the copy). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Measured 2026-10-26: five `Chip·Input·MD·Avatar` masters were falsely 15px off-axis because the exemption only recognised paths/glyph names, not the avatar ellipse. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
     free_layout: '§1.5 + native-layout §9 · on pages 01–09 a content board positions its elements ONLY as flow or grid children — rowGap/columnGap/padding (values judged by space_off_scale) or a grid cell: an absolutely-positioned child that is not a name-declared overlay (scrim/overlay/veil/wash·/sheen·/ring·/hitpad·/connector/tail·/rail·/boundary·/underline·) is free layout. A control host\'s own anatomy is exempt, but the host itself must still be a flow/grid child; page chrome (-Header/-Footer/-PageRoot) and page-level shelf placement are outside the rule. The measured platform fact behind it (api-pitfalls §coordinates): a board\'s absolute children hold WORLD coordinates and do not follow the shell, so free layout cannot re-flow after a token change and cannot be repaired in place. Producers: CF.matrix (grid/flow rows) and the FN row builders; the repair is a rebuild from the record, never a nudge',
+    control_corner_split: '§5.1 · ONE CONTROL, ONE CORNER: inside a field control (the host that owns a `field` plate), the field, its add-ons (`addon·*`), attached steppers, `disabled-overlay` and `ring·*` must all carry the SAME corner. A variant changes MATERIAL (fill/stroke), never geometry; a square borderless body under a rounded ring/overlay/stepper is one control drawn with two shapes and reads as an element that does not belong (measured 2026-10-26 on `05 · Forms II`: Borderless TimePicker field r0, ring + disabled-overlay + steppers r9999). Rules 35/36 pass it — both values are ladder values and both are token-bound — and rule 37 only compares a ring to a BOARD host, so the mixture had no gate. The corner is resolved once through `CF.fieldRadius()` (forms profile → `field` role, never the button pill). Popup surfaces (panel/row/option), chips, carets and divider lines are not frame parts. Repair with `storage.unifyCorners`',
+    axis_column_off: '§0 × §2.3 · a matrix sheet’s state row names its COLUMNS: one axis label per data column, each sitting on the column it names (flush-left on the slot or centred over it — either is legal, being off the column is not). Measured 2026-10-26: every `CF.matrix` grid had the whole state row one column left (axis cells 1..n while slots occupied 2..n+1), because the axis texts entered the grid as ABSOLUTE children — the platform ignored the explicit (row,col) and auto-placed them from the first free cell. The render read `default` over the row-label gutter and left the last state unnamed. Judge geometry, and report the grid cell when it disagrees with the column. Repair with `storage.repairAxisRow`',
+    nested_control_raw: 'component-library §5 / G10s · a composite COMPOSES the atom: a `chip`/`pill`/`tag` plate inside a registered control must be a real copy of the atom family, not a redrawn rectangle whose label and ✕ are loose siblings. Measured 2026-10-26 on the selected `MultiSelect·Outlined·MD` master: two raw `chip` rectangles, two loose Text runs and two loose close paths — the tags could not be themed, swapped or fixed from the Chip library. A copy answers `isComponentCopyInstance`; a raw child inside a master inherits the parent’s main-instance flags, so those cannot distinguish it. Repair with `storage.repairChips` (instances the registered `Chip·Input·SM·Clear·Neutral` atom and fits label/✕)',
+    chip_row_off_axis: '§2.3 + §3.3 · a field’s tag block is centred on the FIELD: the union of its chip pills (height + the gaps BETWEEN rows, never a trailing gap) shares the field’s vertical centre. Measured 2026-10-26 on `MultiSelect·Outlined·MD`: a 24px tag row in a 36px field sat at top 4 / bottom 8 because the factory centred `rowsN*(chipH+4)` — the trailing pitch counted as content. The old rule 57 is text-only, so the loose block had no gate. Repair with `storage.repairChips`',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
     'align_missing', 'crash_100x100', 'degenerate_size', 'root_stray', 'text_centre_residue', 'loose_assembly', 'spec'];
@@ -788,15 +792,38 @@ return (function () {
       // is clearly MEANT to be centred (inside the host band, within one line of its centre) is judged. This lives in
       // `auditText`, not the shape pass: text has its own pass, so the same test in the board pass never ran.
       if (par) {
+        // A label belongs to a control host under either its family prefix (`Button·…`) or a custom marketing name
+        // (`CtaButton`, `PurchaseButton`): naming a hero control by hand must not put it outside the axis contract.
+        const isCtlName = (nm) => {
+          const n = String(nm || '');
+          if (/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(n)) return false;
+          return /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(n) || /(?:Button|Cta|Toggle)$/.test(n.split('·').pop());
+        };
         let owner = par, steps = 0;
-        while (owner && owner !== st.top && steps < 3 && !(typeOf(owner) === 'board' && /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner)))) {
+        while (owner && owner !== st.top && steps < 3 && !(typeOf(owner) === 'board' && isCtlName(nameOf(owner)))) {
           owner = owner.parent || null; steps++;
         }
-        if (owner && owner !== st.top && typeOf(owner) === 'board' && /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(nameOf(owner)) && !/·Spec(·|$)/.test(nameOf(owner))) {
-          const ob = box(owner), dy = (r.y + r.h / 2) - (ob.y + ob.h / 2);
-          if (Math.abs(dy) > 2 && Math.abs(dy) <= Math.max(12, fs) && r.y >= ob.y - 1 && r.y + r.h <= ob.y + ob.h + 1) {
+        if (owner && owner !== st.top && typeOf(owner) === 'board' && isCtlName(nameOf(owner))) {
+          const ob = box(owner), dx = (r.x + r.w / 2) - (ob.x + ob.w / 2), dy = (r.y + r.h / 2) - (ob.y + ob.h / 2);
+          const inside = r.x >= ob.x - 1 && r.y >= ob.y - 1 && r.x + r.w <= ob.x + ob.w + 1 && r.y + r.h <= ob.y + ob.h + 1;
+          if (inside && Math.abs(dy) > 2 && Math.abs(dy) <= Math.max(12, fs)) {
             add('label_off_axis', t, st.top, 'label centre is ' + N(Math.abs(dy)) + 'px ' + (dy > 0 ? 'below' : 'above') +
-              ' the axis of "' + nameOf(owner).slice(0, 34) + '" — centre it on the final host box (resolved leading = ratio × fontSize)');
+              ' the axis of "' + nameOf(owner).slice(0, 34) + '" — centre it on the final host box (resolved leading = ratio × fontSize); repair: storage.centerLabels(page,{apply:true}) or CF.centerLabel(host)');
+          }
+          // Horizontal: only when the host has no lead element that legitimately offsets the label. A hero CTA whose
+          // font was enlarged after birth keeps the pre-edit box: it reads 25-30px off-axis while every style token
+          // and the vertical centre can still be correct (measured 2026-10-26 on CtaButton). Repaired by centerIn.
+          // A LEAD IS NOT ALWAYS A GLYPH: an input chip's avatar (ellipse), a radio's disc, a dot/swatch/badge all
+          // offset the label by design. The old path/`glyph·`/`icon·` test ignored ellipses and looked only at direct
+          // children, so it reported every `Chip·Input·…Avatar` master and the new chip atom (whose ✕ lives inside
+          // `row·content` → `icon·close`) as off-axis (measured 2026-10-26). Look two levels down.
+          const isLead = (k) => typeOf(k) === 'path' || typeOf(k) === 'ellipse' ||
+            /^(glyph|icon|avatar|dot|badge|swatch|indicator|lead|trail)(·|$)/.test(nameOf(k));
+          const leadIn = (h, depth) => (kidsOf(h) || []).some((k) => isLead(k) || (depth > 0 && leadIn(k, depth - 1)));
+          const iconSlot = /IconStart|IconEnd|Lead|Trail/.test(nameOf(owner)) || leadIn(owner, 2);
+          if (inside && !iconSlot && Math.abs(dx) > 2) {
+            add('label_off_axis', t, st.top, 'label centre is ' + N(Math.abs(dx)) + 'px ' + (dx > 0 ? 'right' : 'left') +
+              ' of the axis of "' + nameOf(owner).slice(0, 34) + '" — a label is centred on BOTH axes of its host; repair: storage.centerLabels(page,{apply:true}) or CF.centerLabel(host)');
           }
         }
       }
@@ -1228,20 +1255,126 @@ return (function () {
               add('ring_off_host', s, st.top, 'ring ' + N(sb.w) + '×' + N(sb.h) + ' is oval around the circular unit "' + nameOf(rh).slice(0, 30) +
                 '" (' + N(ob.w) + '×' + N(ob.h) + '), margins ' + N(mx) + '/' + N(my) + ' — repair: TK.ringSweep');
             }
-          }
-          // 37 binds a ring to its control BOARD's corner. A ring hugging a nested plate (an addon's `field`, one crumb
-          // text run, one OTP digit) is §5.1's open role question, not this rule's — judging it would rewrite 100+ outlines in one sweep.
-          if (typeOf(rh) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(nameOf(rh))) {
+            // A CIRCLE GETS A CIRCLE. Equal margins around a round owner are not enough when the outline itself is a
+            // rectangle with a small corner: measured 2026-10-26 on the selected `Radio·Focus·Checked` ring — 24×24
+            // r0 around a 20px disc, margins 2/2, so the old ellipse test passed and no rule compared the SHAPE.
+            const sc = typeOf(s) === 'ellipse' ? null : cornersOf(s);
+            const rmax = sc ? Math.max.apply(null, sc) : (typeOf(s) === 'ellipse' ? null : 0);
+            const need = Math.min(sb.w, sb.h) / 2 - 1;
+            if (rmax !== null && rmax < need) {
+              add('ring_off_host', s, st.top, 'ring ' + N(sb.w) + '×' + N(sb.h) + ' r' + N(rmax) +
+                ' is a rectangular outline around the circular unit "' + nameOf(rh).slice(0, 30) + '" (' + N(ob.w) + '×' + N(ob.h) +
+                ') — a circle gets a circle (repair: TK.ringSweep)');
+            }
+          } else {
+            // A ring takes its owner's corner whether the owner is a control BOARD or a nested plate (a field, an OTP
+            // digit, a Slider handle). Restricting the comparison to boards left every nested owner ungated.
             const rc = cornersOf(s), hc = cornersOf(rh);
             const rv = rc ? Math.max.apply(null, rc) : null, hv = hc ? Math.max.apply(null, hc) : null;
             if (rv !== null && hv !== null && rv !== hv) {
-              add('ring_off_host', s, st.top, 'ring r' + N(rv) + ' around host "' + nameOf(rh).slice(0, 30) + '" r' + N(hv) +
-                ' — a ring takes its host corner (repair: TK.roleSweep)');
+              add('ring_off_host', s, st.top, 'ring r' + N(rv) + ' around "' + nameOf(rh).slice(0, 30) + '" r' + N(hv) +
+                ' — a ring takes its host corner (repair: TK.ringSweep)');
             }
           }
         } else {
           add('ring_detached', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' off host "' + nameOf(rh).slice(0, 30) +
             '" by ' + N(host.dist) + 'px — a drifted plate, not a corner disagreement (repair: TK.ringSweep)');
+        }
+      }
+      // rule 63 · control_corner_split — §5.1 "one control, one corner". A field's variants change the MATERIAL
+      // (fill/stroke), never the geometry, and every layer derived from the field — focus ring, disabled overlay,
+      // add-ons, attached steppers — takes the field's corner. Measured 2026-10-26 on `05 · Forms II`: the Borderless
+      // TimePicker's `field` was r0 while its `ring·focus`, `disabled-overlay` and steppers were r9999; the eye reads
+      // that as two components wearing one element. Rules 35/36 pass it (both corners are ladder values and both are
+      // bound) and rule 37 only compares a ring to a BOARD host, so the mixture had no gate. The unit is the `field`
+      // plate's HOST: popup surfaces (panel/row/option), chips, carets, divider lines and glyphs have their own policy
+      // and are not frame parts. One finding per offending part, naming both values.
+      if (nm === 'field' && !isAnno(s) && par) {
+        const FRAME = /^(field|addon·|addon$|stepper$|disabled-overlay$|ring·)/;
+        const parts = (kidsOf(par) || []).filter((k) => FRAME.test(nameOf(k)) && !isAnno(k));
+        const vals = [];
+        parts.forEach((k) => { const c = cornersOf(k); if (c) vals.push({ k: k, v: Math.max.apply(null, c) }); });
+        const ref = vals.length ? Math.max.apply(null, vals.map((x) => x.v)) : 0;
+        if (ref > 0) {
+          vals.forEach((x) => {
+            if (x.v === ref) return;
+            add('control_corner_split', x.k, st.top, nameOf(x.k) + ' r' + N(x.v) + ' beside the control corner r' + N(ref) +
+              ' — field, ring, disabled overlay, add-ons and steppers share ONE corner (§5.1; repair: storage.unifyCorners)');
+          });
+        }
+      }
+      // rule 64 · axis_column_off — a matrix sheet's state row NAMES its columns, one axis per column, and each label
+      // must sit on the column whose cells it names. Measured 2026-10-26: every grid matrix built by `CF.matrix` had
+      // its whole state row one column left (axis cells 1..n while the slots held 2..n+1) because the axis texts
+      // entered the grid as ABSOLUTE children — the platform ignored (row,col) and auto-placed them from the first
+      // free cell. The eye reads "default" over the row-label gutter and the last state without a label. Geometry is
+      // the judge (flush-left or centred on the column); the grid cell is reported with it when they disagree.
+      // Repair: `storage.repairAxisRow`.
+      if (/^grid·/.test(nm) && !isAnno(s)) {
+        const ax = (kidsOf(s) || []).filter((k) => /^axis/.test(nameOf(k)) && typeOf(k) === 'text')
+          .sort((a, b) => box(a).x - box(b).x);
+        if (ax.length >= 2) {
+          const byRow = {};
+          (kidsOf(s) || []).forEach((k) => {
+            const m = /^slot·.+?·(\d+)\.(\d+)$/.exec(nameOf(k));
+            if (!m) return;
+            const r = Number(m[1]), c = Number(m[2]);
+            (byRow[r] || (byRow[r] = {}))[c] = k;
+          });
+          const rowKeys = Object.keys(byRow).map(Number).sort((a, b) => a - b);
+          const cols = rowKeys.length ? Object.keys(byRow[rowKeys[0]]).map(Number).sort((a, b) => a - b).map((c) => byRow[rowKeys[0]][c]) : [];
+          if (cols.length) {
+            if (ax.length !== cols.length) {
+              add('axis_column_off', s, st.top, ax.length + ' axis label(s) for ' + cols.length + ' data column(s) — the state row must name every column exactly once (repair: storage.repairAxisRow)');
+            }
+            ax.forEach((t, i) => {
+              const slot = cols[i];
+              if (!slot) return;
+              const tb = box(t), sb = box(slot);
+              const flush = Math.abs(tb.x - sb.x) <= 2;
+              const centred = Math.abs((tb.x + tb.w / 2) - (sb.x + sb.w / 2)) <= 2;
+              let cellOff = false;
+              try { cellOff = !!(t.layoutCell && slot.layoutCell && t.layoutCell.column && slot.layoutCell.column && t.layoutCell.column !== slot.layoutCell.column); } catch (e) {}
+              if (!flush && !centred) {
+                add('axis_column_off', t, st.top, 'axis "' + String(t.characters || '').slice(0, 18) + '" at x' + N(tb.x) + ' is ' + N(Math.abs(tb.x - sb.x)) +
+                  'px off its column "' + nameOf(slot).slice(0, 26) + '" (x' + N(sb.x) + ')' +
+                  (cellOff ? ' and sits in grid cell col ' + t.layoutCell.column + ' instead of ' + slot.layoutCell.column : '') +
+                  ' — a state label sits on the column it names (repair: storage.repairAxisRow)');
+              } else if (cellOff) {
+                add('axis_column_off', t, st.top, 'axis "' + String(t.characters || '').slice(0, 18) + '" is in grid cell col ' + t.layoutCell.column +
+                  ' but names the column at ' + slot.layoutCell.column + ' — cell and copy disagree (repair: storage.repairAxisRow)');
+              }
+            });
+          }
+        }
+      }
+      // rule 65 · nested_control_raw — a composite COMPOSES the atom. A `chip`/`pill`/`tag` plate inside a registered
+      // control must be a real copy of the atom family (Chip), not a redrawn rectangle whose label and ✕ are loose
+      // siblings: that construction cannot be themed, swapped or fixed from the library (measured 2026-10-26 on the
+      // selected `MultiSelect·Outlined·MD` master). A copy answers `isComponentCopyInstance`; a raw child inside a
+      // master does not (it answers the parent's main-instance flags, so those cannot be used here).
+      if (/^(chip|pill|tag)(?:·|$)/.test(nm) && par && !isAnno(s) && storage.CF && storage.CF.get) {
+        const pn = nameOf(par);
+        if (storage.CF.get(pn)) {
+          let isCopy = false; try { isCopy = !!(s.isComponentCopyInstance && s.isComponentCopyInstance()); } catch (e) {}
+          if (!isCopy && !storage.CF.get(nm)) {
+            add('nested_control_raw', s, st.top, '"' + nm + '" inside registered composite "' + pn.slice(0, 28) +
+              '" is a raw ' + typeOf(s) + ' plate — the inner pill must be a real Chip/Button component copy (repair: storage.repairChips)');
+          }
+        }
+      }
+      // rule 66 · chip_row_off_axis — the tag block is centred on the FIELD, not on a stale pitch. The old CF.multiSelect
+      // formula counted a trailing gap (`rowsN*(chipH+4)`), so a 24px tag row sat at top 4 / bottom 8 in a 36px field
+      // (the user's “上少下多”). Only the block's vertical centre is judged; the left inset is padding, not centring.
+      if (nm === 'field' && par && !isAnno(s)) {
+        const chips = (kidsOf(par) || []).filter((k) => /^chip(?:·|$)/.test(nameOf(k)) && typeOf(k) !== 'text' && typeOf(k) !== 'path');
+        if (chips.length) {
+          const minY = Math.min.apply(null, chips.map((k) => box(k).y));
+          const maxY = Math.max.apply(null, chips.map((k) => box(k).y + box(k).h));
+          const dy = (box(s).y + box(s).h / 2) - (minY + (maxY - minY) / 2);
+          if (Math.abs(dy) > 1) {
+            add('chip_row_off_axis', chips[0], st.top, 'chip block centre is ' + N(dy) + 'px off the field centre (top and bottom padding differ) — centre the block on the field (repair: storage.repairChips)');
+          }
         }
       }
       // rule 45 · row_axis_off — §2.3: one row has ONE axis. A horizontal connector must join the CENTRES of the nodes

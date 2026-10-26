@@ -1305,7 +1305,7 @@ return (function () {
         });
       };
       scan(pageRoot);
-      stale.forEach(function (c) { try { c.remove(); } catch (e) {} });
+      stale.forEach(function (c) { try { (storage.removeTree || function (x) { x.remove(); })(c); } catch (e) {} });
     } catch (e) {}
     var b = storage.mkAbsBoard('fold·' + t.w + '×' + vh, host.x, host.y, Math.min(t.w, host.width), vh, null, 0);
     b.strokes = [{ strokeColor: '#F97316', strokeOpacity: 1, strokeWidth: 2, strokeAlignment: 'inner' }];

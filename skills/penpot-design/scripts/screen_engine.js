@@ -258,7 +258,7 @@ return (async function () {
       if (penpot.currentPage.name !== o.page) return { err: 'page did not open (asked ' + o.page + ', got ' + penpot.currentPage.name + ')' };
     }
     const existing = SC.find(screen);
-    if (existing.length && o.rebuild) existing.forEach((b) => { try { b.remove(); } catch (e) {} });
+    if (existing.length && o.rebuild) existing.forEach((b) => { try { (storage.removeTree || ((x) => x.remove()))(b); } catch (e) {} });
     // S7/S8 as one rule: a screen board is found by its `nl:sc` stamp. First call creates it; later calls MOUNT into it,
     // so a build that hit the 30 s ceiling is continued by naming the next sections instead of being re-attempted blind.
     const resume = existing.length && !o.rebuild;

@@ -305,6 +305,12 @@ return (function () {
       out.err = 'cell ' + row + '/' + col + ' is outside a ' + nrows + '×' + ncols + ' grid (1-based) — the platform would clamp it to 1/1 silently';
       return out;
     }
+    // A GRID CHILD IS FLOW BY DEFINITION. An absolute layout child KEEPS the flag through `appendChild`, and the
+    // platform then ignores the explicit (row,col) and auto-places the shape in the next free cells. Measured
+    // 2026-10-26: every `CF.matrix` state row was one column left (axis cells 1..5 while the slots occupied 2..6),
+    // because the axes were absolute children of the spec host when they entered the grid. Clearing the flag AFTER
+    // the append is too late; it must happen here, before the platform sees the child.
+    try { if (child.layoutChild && child.layoutChild.absolute) child.layoutChild.absolute = false; } catch (e) {}
     try { g.appendChild(child, row, col); }
     catch (e) { try { gridBoard.appendChild(child); } catch (e2) {} out.placeErr = String(e).slice(0, 90); }
     if (!child.layoutCell) { out.cellErr = 'layoutCell null → child is not in a grid parent'; return out; }

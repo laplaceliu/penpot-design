@@ -76,6 +76,29 @@ New project workflow:
 3. Run `CAT.audit()`; `verdict` must be `CLEAN`.
 4. Run the normal `designGate`/`auditPage` acceptance. `catalog_drift` is rule **62**.
 
+### 3.1 Shelf repair — `CAT.reflowPage` (1.0.2)
+
+`CAT.reflowPage({ page })` re-packs every canonical `·Spec` board on the page from its **current measured size**, in
+canonical family order (80 / 208, gap 32, max row 1760), moving only boards that are off-shelf. It moves the **board only** — Penpot's layout-child coordinates are
+parent-relative, so the whole subtree follows; shifting descendants as well double-shifts them (measured 2026-10-26:
+a +500 shelf move put every host at +1000). It then re-fits the PageRoot/footer through `FN.fitRoot` when that engine
+is live. It is **idempotent**: a correctly packed page reports `moved: 0`.
+
+Why it exists — the stale-shelf class. `CF.matrix` returns an **auto-height** spec. `CAT.buildPage` used to measure the
+board and advance the shelf **before** `TK.bindBoard`, but binding rewrites the spec's fallback font/leading to the
+declared ramp and the board grows (measured: 100 → 277-2287). Every later board was then placed on the old 100px pitch
+(100 + 32 = 132), so the whole page read as a pile of overlapping boards even though each board was internally correct.
+
+The fix is two-sided and both halves are required:
+- build order is **bind first, then measure** (`CAT.buildPage` 1.0.2 calls `autoRegister` + `TK.bindBoard`, waits for
+  `NL.whenSettled`, then reads `b.width/height`), and
+- every `buildPage` ends with `CAT.reflowPage`, so any late growth is re-packed in the same call.
+
+`CF.matrix` (factory 1.0.2) also settles its flex layout before returning and stacks phase-1 hosts vertically, so an
+interrupted call leaves a readable column instead of overlapping controls. A partial matrix with no `grid·`/`row·`/
+`axis·` child is **reported** by `buildPage` (`partial: [...]`) and never shelved; rebuild that family (or split it with
+`CF.matrixPlan`) instead of continuing.
+
 ## 4. Gate — rule 62 `catalog_drift`
 
 - **01**: `TK.declared().counts` must equal `CAT.CAPACITY` (and the stroke/tone group counts); a missing/extra token is

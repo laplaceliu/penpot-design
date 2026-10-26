@@ -34,6 +34,10 @@ return (function () {
     border: T.border || '#E2E8F0', borderStrong: T.borderStrong || '#CBD5E1',
     // a raised dark panel (an inverse card, a dark toast): DESIGN.md declares it; with no declaration it IS the ink.
     darkRaised: T.darkRaised || T.onSurface || '#2A2A2A',
+    // A checkbox's mark, a selected row's glyph and a dark overlay all ask for `onDark`. It is a PALETTE key, not a
+    // tone: omitting it made C() return the literal string 'onDark', the fill write threw, and every Transfer/Tree
+    // cell was rolled back as an orphan (measured 2026-10-26: 15 cells → 0 hosts). White is the contract value.
+    onDark: T.onDark || '#FFFFFF',
     error: T.error || '#DC2626', success: T.success || '#16A34A',
     warning: T.warning || '#D97706', info: T.info || '#0284C7',
     // soft tint pairs (§4.1 triple): the wash is the background the matching `*Ink` copy sits on.
@@ -50,7 +54,44 @@ return (function () {
   };
   var CF = {};
   CF.P = P;
-  CF.theme = function (map) { Object.assign(P, map || {}); C._res = null; return Object.keys(P).length; };
+  CF.theme = function (map) { Object.assign(P, map || {}); C._res = null; CF._paletteOverride = true; return Object.keys(P).length; };
+  /** ADOPT THE LIVE COLOUR TOKENS. `P` is seeded from `storage.T`, a JS mirror that a fresh session/plugin reload does
+      not carry — the fallback is the generic kit (#2563EB slate palette), so a component rebuilt after a wipe came out
+      off-brand while the file's own tokens still declared the source palette (measured 2026-10-26: a Chip atom rebuilt
+      with #F8FAFC/#0F172A while every Chip master in the file used #F3EFEC/#161616). The token set is durable; the mirror
+      is not. This re-derives the semantic roles from `TK.declared()` and mirrors them back into `storage.T` for engines
+      that read it (`native_layout`, `icon_engine`). `CF.theme()` opts out (a deliberate custom palette). */
+  CF.adoptPalette = function () {
+    var d = null; try { d = storage.TK && storage.TK.declared ? storage.TK.declared(true) : null; } catch (e) {}
+    if (!d || !d.colors || !d.colors.length) return { applied: 0, err: 'no live colour tokens' };
+    var by = {}; d.colors.forEach(function (c) { by[String(c.name)] = c.hex || c.value; });
+    var map = {
+      primary: 'color.primary', primaryInk: 'color.primary-ink', primarySoft: 'color.primary-soft',
+      onPrimary: 'color.on-inverse', onDark: 'color.on-inverse',
+      ink: 'color.text-bright', muted: 'color.text-muted',
+      surface: 'color.surface', surfaceAlt: 'color.surfaceAlt', surfaceRaised: 'color.surfaceRaised',
+      border: 'color.border', borderStrong: 'color.borderStrong', line: 'color.text-bright',
+      darkRaised: 'color.inverseRaised',
+      error: 'color.error', errorInk: 'color.error-ink', errorSoft: 'color.error-soft',
+      success: 'color.success', successInk: 'color.success-ink', successSoft: 'color.success-soft',
+      warning: 'color.warning', warningInk: 'color.warning-ink', warningSoft: 'color.warning-soft',
+      info: 'color.info', infoInk: 'color.info-ink', infoSoft: 'color.info-soft'
+    };
+    var T2 = storage.T || (storage.T = {}), n = 0;
+    Object.keys(map).forEach(function (k) {
+      var h = by[map[k]];
+      if (!h) return;
+      P[k] = h; n++;
+      if (k === 'ink') { T2.onSurface = h; T2.ink = h; }
+      else if (k === 'surfaceAlt') { T2.neutral = h; T2.surfaceAlt = h; }
+      else if (k === 'muted') { T2.secondary = h; T2.muted = h; }
+      else if (k === 'onPrimary') { T2.onPrimary = h; T2.onDark = h; }
+      else T2[k] = h;
+    });
+    C._res = null;
+    CF._paletteSig = d.colors.length;
+    return { applied: n, primary: P.primary, surfaceAlt: P.surfaceAlt, ink: P.ink, border: P.border };
+  };
 
   // ---------------------------------------------------------------- brand copy for shell previews
   /** Product name the shell factories print when the caller passes no `name`. Set it once per design system
@@ -278,6 +319,20 @@ return (function () {
   /** The token name for the same question `CF.radius` answers with a number — the binder's input. */
   CF.radiusTokenFor = function (key) { return CF.radiusToken(CF.radius(key)); };
   CF.radiusSteps = function () { return Object.keys(RAD).map(function (k) { return { key: k, value: RAD[k], token: TOKEN_OF[k] }; }); };
+  /** The corner of a FORM control (§5.1 "one control, one corner"). A field is not a button: a source whose actions
+      are pills still draws its inputs on the form step (Rayo DESIGN.md: buttons `radius.full`, fields and modals
+      `radius.md` = 12). The measured `forms` profile wins; otherwise the `field` role — NEVER `control`, the button
+      pill. Every field family and every layer derived from a field (focus ring, state overlay, add-ons, steppers)
+      resolves through this one function, so a variant can never move the geometry on its own. */
+  CF.fieldRadius = function () {
+    var g = (CF.reference && CF.reference('forms')) || {};
+    var keys = ['input', 'textarea', 'search'];
+    for (var i = 0; i < keys.length; i++) {
+      var e = g[keys[i]];
+      if (e && e.radius !== undefined && e.radius !== null) return CF.radius(e.radius);
+    }
+    return CF.radius('field');
+  };
   /** The one way a shape's `borderRadius` gets written: undefined/null is the FLAT step (0), never an orphan number. */
   var RZ = function (v) { return (v === undefined || v === null) ? 0 : CF.radius(v); };
 
@@ -802,6 +857,11 @@ return (function () {
    */
   CF.build = function (name, box, o) {
     o = o || {};
+    // First build of a session adopts the durable live token colours if the JS mirror was not seeded (see adoptPalette).
+    if (!CF._paletteOverride && storage.TK && storage.TK.declared) {
+      var sig = 0; try { sig = (storage.TK.declared().colors || []).length; } catch (e) {}
+      if (sig && sig !== CF._paletteSig) { try { CF.adoptPalette(); } catch (e) {} }
+    }
     box = B(box.x, box.y, box.w, box.h);
     var ctx = Object.create(ctxProto);
     ctx.host = storage.mkAbsBoard(name, box.x, box.y, box.w, box.h, o.fill === undefined ? null : o.fill, RZ(o.radius));
@@ -1111,6 +1171,23 @@ return (function () {
   var iconOf = function (v, dflt) { return (v === undefined || v === null || v === false || v === true || v === 1) ? dflt : v; };
   var L2r = function (size) { return CF.ladder(size).radius; };
 
+  /** Centre a control's single label on BOTH axes of its host. Text inside a layout board is a layout child: its
+      `x/y` are parent-relative and a direct write is ignored — `storage.centerIn` writes `parentX/parentY`, which is
+      the only coordinate pair that sticks. Call this after any post-birth font change; the factory's own refit only
+      centres the size it was born with (measured 2026-10-26: a 16→30px label stayed ~29px right / 11px low). */
+  CF.centerLabel = function (host, o) {
+    o = o || {};
+    if (!host) return { err: 'no host' };
+    const texts = Array.from(host.children || []).filter((c) => c.type === 'text');
+    if (texts.length !== 1) return { skipped: true, reason: 'labels=' + texts.length };
+    const t = texts[0];
+    try { t.align = o.align || 'center'; t.verticalAlign = o.valign || 'middle'; } catch (e) {}
+    try { if (o.grow !== false) t.growType = 'auto-width'; } catch (e) {}
+    try { storage.centerIn(t, host); } catch (e) { return { err: String(e).slice(0, 90) }; }
+    return { ok: true, label: String(t.name), dx: Math.round((t.x + t.width / 2) - (host.x + host.width / 2)),
+             dy: Math.round((t.y + t.height / 2) - (host.y + host.height / 2)) };
+  };
+
   /**
    * CF.button — type(primary·default·dashed·text·link·ghost·danger) × size(xs…2xl) × slot(icon start/end/only,
    * loading, block) × state(§1.1 seven axes). Width comes from label + pad-X, never typed (except block / fixed spec).
@@ -1120,11 +1197,14 @@ return (function () {
     var L = CF.ladder(o.size), type = o.type || 'default', S = o.state || 'default';
     var tn = CF.tone(o.tone || type);
     var label = o.label === undefined ? (type === 'primary' ? 'Continue' : 'Button') : String(o.label);
+    // A hero/CTA size is a SIZE decision, not a post-birth font edit: the label's size participates in width
+    // estimation and in refit/centring. Editing `fontSize` after the factory returns leaves the old box behind.
+    var lfs = o.labelSize || L.fs, lwt = o.labelWeight || o.weight || 500;
     var iconOnly = o.iconOnly || (!label && !!o.lead);
     var lead = (o.lead && !iconOnly ? L.icon : 0) || (iconOnly ? L.icon : 0);
     var leadW = (o.lead || o.loading) && !iconOnly ? L.icon + L.gap : 0;
     var trailW = o.trail ? L.icon + L.gap : 0;
-    var lw = label && !iconOnly ? CF.estW(label, L.fs) : 0;
+    var lw = label && !iconOnly ? CF.estW(label, lfs) : 0;
     var w = o.block ? (o.w || 240) : (o.w || (iconOnly ? L.h : L.padX * 2 + leadW + trailW + lw));
     w = max(w, iconOnly ? L.h : L.h + 8);
     var round = o.shape === 'circle' || o.shape === 'round' || o.shape === 'pill';
@@ -1174,10 +1254,11 @@ return (function () {
       if (o.lead && !o.loading) ctx.glyph(o.glyph || 'download', B(box.x + L.padX, box.y + (box.h - L.icon) / 2, L.icon, L.icon), { color: ink, opacity: al, anchor: 'left' });
       if (o.loading) CF.spinner(ctx, B(box.x + L.padX, box.y + (box.h - L.icon) / 2, L.icon, L.icon), ink);
       if (label) ctx.text(label, B(box.x + L.padX + leadW, box.y, max(8, box.w - L.padX * 2 - leadW - trailW), box.h),
-        { size: L.fs, color: ink, weight: o.weight || 500, opacity: al, underline: (type === 'link' && (S === 'hover' || S === 'focus')) ? ink : false });
+        { size: lfs, color: ink, weight: lwt, opacity: al, underline: (type === 'link' && (S === 'hover' || S === 'focus')) ? ink : false });
       if (o.trail) ctx.glyph(o.glyphEnd || 'chevronDown', B(box.x + box.w - L.padX - L.icon, box.y + (box.h - L.icon) / 2, L.icon, L.icon), { color: ink, opacity: al, anchor: 'right' });
     }
     await ctx.settle(); ctx.place(); if (!o.noRefit) ctx.refit(L.padX);
+    if (!iconOnly && !o.lead && !o.trail) { try { CF.centerLabel(ctx.host); } catch (e) {} }
     CF.elevate(ctx.host, 'Button');
     var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
     // A focus ring is FLUSH to the control on every button type. An outer halo with a 2px offset reads as a detached
@@ -1431,7 +1512,9 @@ return (function () {
   }
   /**
    * Shared field shell. Host = outer bounds (addons + counter row included), the visible box is a plate, so
-   * outlined/filled/borderless/underlined are four draws of one geometry and `focus` is always a real ring layer.
+   * outlined/filled/borderless/underlined are four MATERIALS of one geometry — and one corner: `rad` is resolved once
+   * from the form step and used by the field plate, its focus ring, its disabled overlay, its add-ons and its
+   * steppers. A variant never changes geometry; `focus` is always a real ring layer.
    * o: {variant,size,state,status,lead,trail,clear,value,placeholder,addonBefore,addonAfter,count,readonly,disabled,hit}
    */
   CF.fieldBox = async function (family, o) {
@@ -1452,7 +1535,13 @@ return (function () {
     if (o.status === 'error' && S === 'default') S = 'error';
     var fv = (prof && prof.variants && prof.variants[variant]) || FIELD[variant] || FIELD.outlined;
     var fh = o.h || (sz.h !== undefined ? sz.h : pp.h) || L.h;
-    var rad = o.radius !== undefined ? CF.radius(o.radius) : CF.radius(pp.radius !== undefined ? pp.radius : L.radius);
+    // ONE CONTROL, ONE CORNER (§5.1). The variant is MATERIAL (fill/stroke); it must never move the geometry — a
+    // borderless body drawn `none` under a rounded focus ring / disabled overlay / stepper is one control wearing two
+    // shapes (measured 2026-10-26 on page 05: `TimePicker·LG·Borderless` field r0, its ring + disabled-overlay r9999).
+    // Fields also do not inherit the button pill: the source's `control` role is `full` for every button, while
+    // DESIGN.md pins fields at the form step (`radius.md`). `rad` is the control's corner, every derived layer uses it.
+    var rad = o.radius !== undefined ? CF.radius(o.radius)
+      : (prof && pp.radius !== undefined ? CF.radius(pp.radius) : CF.fieldRadius());
     var padX = o.padX === undefined ? max(12, L.padX) : o.padX;
     var bW = (prof && prof.border && prof.border.width !== undefined) ? Number(prof.border.width) : 1;
     var bTok = (prof && prof.border && prof.border.token) ? prof.border.token : null;
@@ -1478,20 +1567,21 @@ return (function () {
     if (S === 'disabled') lineAlpha = 0.4;
     ctx.plate(fb, { name: 'field', fill: C(fv.bg), fills: CF.fills(C(fv.bg), S === 'readonly' ? null : (S === 'error' || S === 'success' || S === 'warning' ? null : S)),
       stroke: (variant === 'underlined' || !lw) ? null : line, strokeW: lw, strokeOpacity: lineAlpha,
-      radius: variant === 'outlined' || variant === 'filled' ? rad : 'none' });
+      radius: rad });
     if (variant === 'underlined') ctx.plate(B(fb.x, fb.y + fb.h - (S === 'focus' ? max(2, lw) : lw), fb.w, S === 'focus' ? max(2, lw) : lw),
       { name: S === 'focus' ? 'underline·focus' : 'underline', fill: S === 'focus' ? C(focusTok) : line, opacity: lineAlpha });
     if (S === 'disabled') ctx.plate(fb, { name: 'disabled-overlay', fills: [{ fillColor: C('ink'), fillOpacity: CF.STATE.disabledContainer }], radius: rad });
     [o.addonBefore ? B(box.x, box.y, aB, fh) : null, o.addonAfter ? B(box.x + aB + fieldW, box.y, aA, fh) : null].forEach(function (ab, i) {
       if (!ab) return;
       ctx.plate(ab, { name: i ? 'addon·after' : 'addon·before', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1,
-        radius: i ? 'none' : rad });
+        radius: rad });
       ctx.text(String(i ? o.addonAfter : o.addonBefore), ab, { size: L.fs, color: C('muted') });
     });
     var txt = o.value === undefined ? (o.placeholder === undefined ? null : o.placeholder) : String(o.value);
+    var vt = null;
     if (txt !== null) {
       var isPh = o.value === undefined;
-      ctx.text(txt, g.text, { size: L.fs, color: isPh ? C(phTok) : (o.status === 'error' ? C('error') : C(inkTok)),
+      vt = ctx.text(txt, g.text, { size: L.fs, color: isPh ? C(phTok) : (o.status === 'error' ? C('error') : C(inkTok)),
         opacity: isPh ? (S === 'disabled' ? CF.STATE.disabledContent : 0.75) : stateAlpha(S === 'disabled' ? 'disabled' : null), align: o.align || 'left', valign: o.valign || 'middle' });
     }
     if (o.caret) ctx.plate(B(g.text.x + (o.value ? CF.estW(String(o.value), L.fs) : 0), fb.y + (fh - L.fs * 1.25) / 2, 1.5, N(L.fs * 1.25)), { name: 'caret', fill: C(focusTok) });
@@ -1504,13 +1594,29 @@ return (function () {
       ctx.text(o.count.v + ' / ' + o.count.max, B(box.x, box.y + fh + 4, box.w, 16), { size: 12, color: over ? C('error') : C('muted'), align: 'right', valign: 'top' });
     }
     await ctx.settle(); ctx.place();
+    // The control HOST carries the corner too. It is a transparent wrapper today, but an expanded state layer that
+    // traces the host (NumberField's focus ring) reads it, and a r0 host under a rounded ring is the same mixture one
+    // level up — `TK.roleSweep` resolves a ring to a BOARD host when it is concentric with it.
+    try { ctx.host.borderRadius = rad; } catch (e) {}
+    // MULTI-LINE VALUE: a textarea's copy is wrapped at the FIELD's content width, never left auto-width. An
+    // auto-width text grows to its one-line width and overflows the plate (measured 2026-10-26: a 43-char value was
+    // 259px wide in a 240px field, 31px outside; the same failure hits placeholders and long values). The host's
+    // height already reserves rows; the text re-flows inside it.
+    if (o.wrap && vt && vt.t) {
+      try {
+        vt.t.resize(g.text.w, Math.max(8, vt.t.height));
+        vt.t.growType = 'auto-height';
+        vt.t.verticalAlign = 'top';
+        penpotUtils.setParentXY(vt.t, g.text.x - ctx.host.x, g.text.y - ctx.host.y);
+      } catch (e) {}
+    }
     if (S === 'focus' && variant !== 'underlined') ctx.ring(fb, { radius: rad });
     if (o.hit) ctx.hitPad(fb, o.hit);
-    CF.profStamp(ctx.host, prof, { h: fh, padX: padX, fs: L.fs, radius: (variant === 'outlined' || variant === 'filled') ? rad : 0,
+    CF.profStamp(ctx.host, prof, { h: fh, padX: padX, fs: L.fs, radius: rad,
       stroke: variant === 'underlined' ? 0 : (bW || 0),
       fill: fv.bg || 'transparent', variant: variant }, { family: String(family).toLowerCase(), size: L.key, state: S, elevation: (prof && prof.elevation) || null });
     if (prof && prof.elevation && storage.EL && storage.EL.has && storage.EL.has(prof.elevation)) storage.EL.apply(ctx.host, prof.elevation);
-    return { ctx: ctx, host: ctx.host, geom: g, field: fb, box: box, L: L, state: S };
+    return { ctx: ctx, host: ctx.host, geom: g, field: fb, box: box, L: L, state: S, radius: rad };
   };
   CF.input = async function (o) { var r = await CF.fieldBox('Input', o); return r.host; };
 
@@ -1522,7 +1628,7 @@ return (function () {
     if (tp && tpp.fs) L = Object.assign({}, L, { fs: tpp.fs });
     var rows = o.rows || 3, lh = N(L.fs * 1.45), padY = tpp.padY !== undefined ? Number(tpp.padY) : 8;
     var h = o.h || tpp.h || (rows * lh + padY * 2);
-    var r = await CF.fieldBox('Textarea', Object.assign({}, o, { h: h, valign: 'top', align: 'left', trail: o.trail || false }));
+    var r = await CF.fieldBox('Textarea', Object.assign({}, o, { h: h, valign: 'top', align: 'left', trail: o.trail || false, wrap: true }));
     if (o.resize !== 'none' && !(tp && tp.resize === false)) {
       var f = r.field;
       r.ctx.path(' M ' + (f.x + f.w - 13) + ' ' + (f.y + f.h - 5) + ' L ' + (f.x + f.w - 5) + ' ' + (f.y + f.h - 5) + ' L ' + (f.x + f.w - 5) + ' ' + (f.y + f.h - 13) + ' Z',
@@ -1540,7 +1646,8 @@ return (function () {
       var r = await CF.fieldBox('Search', Object.assign({}, o, { clear: false, trail: false }));
       var f = r.field, host = r.host, ctx = r.ctx;
       var btn = B(f.x + f.w + 8, f.y, o.buttonW || 72, f.h);
-      ctx.plate(btn, { name: 'button·primary', fill: C('primary'), radius: CF.ladder(o.size).radius });
+      // An attached action is part of the FIELD composition, so it wears the field's corner, not the button pill.
+      ctx.plate(btn, { name: 'button·primary', fill: C('primary'), radius: r.radius });
       ctx.text(o.buttonLabel || 'Search', btn, { size: CF.ladder(o.size).fs, color: C('onPrimary'), weight: 500 });
       await ctx.settle(); ctx.place();
       ctx.host.resize(N(btn.x + btn.w - ctx.host.x + 1), ctx.host.height);
@@ -1656,9 +1763,13 @@ return (function () {
     }));
     var f = r.field, ctx = r.ctx;
     if (attached) {
+      // The expanded focus ring traces the HOST, so the host must carry the CONTROL corner — and the attached
+      // steppers are frame parts of the same control, so they take it too (the field's resolved `r.radius`, which is
+      // the form step; `L.radius` is the button pill and put r9999 steppers beside an r0 borderless field on page 05).
+      try { r.host.borderRadius = CF.radius(r.radius); } catch (e) {}
       var dn = B(f.x - btnW, f.y, btnW, f.h), up = B(f.x + f.w, f.y, btnW, f.h);
       [[dn, 'minus', v <= minv], [up, 'plus', v >= maxv]].forEach(function (t) {
-        ctx.plate(t[0], { name: 'stepper', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: L.radius });
+        ctx.plate(t[0], { name: 'stepper', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: r.radius });
         ctx.glyph(t[1], CF.iconBox(t[0], 20), { color: t[2] ? C('muted') : C('ink'), opacity: t[2] ? CF.STATE.disabledContent : 1, strokeW: 1.7 });
       });
     } else {
@@ -1667,12 +1778,25 @@ return (function () {
       ctx.glyph('chevronDown', B(gh.x, gh.y + 16, gh.w, gh.h), { color: v <= minv ? C('muted') : C('muted'), opacity: v <= minv ? CF.STATE.disabledContent : 1 });
     }
     await ctx.settle(); ctx.place();
+    // A focus ring traces the CONTROL the user sees, not just its input segment: attached steppers abut the field's
+    // edge and their 1px strokes cover an input-only ring's L/R border (measured 2026-10-26 on all three Focus
+    // hosts). Expand the ring to the whole host box so it encloses the steppers instead of colliding with them.
+    if (r.state === 'focus' && attached) {
+      var ring = (r.host.children || []).filter(function (c) { return /^ring·/.test(String(c.name)); })[0];
+      if (ring) {
+        try { penpotUtils.setParentXY(ring, r.box.x - 2 - r.host.x, r.box.y - 2 - r.host.y); ring.resize(r.box.w + 4, r.box.h + 4); } catch (e) {}
+      }
+    }
     return ctx.host;
   };
 
   // ---- dropdown panel shared by select / combobox / date / menu / multi-select
   function panelPlate(ctx, box, o) {
-    return ctx.plate(box, { name: o.name || 'panel', fill: C('surface'), radius: CF.radius('md'), shadow: o.shadow === undefined ? 3 : o.shadow, stroke: o.outline ? C('border') : null, strokeW: 1 });
+    var p = ctx.plate(box, { name: o.name || 'panel', fill: C('surface'), radius: CF.radius('md'), shadow: o.shadow === undefined ? 3 : o.shadow, stroke: o.outline ? C('border') : null, strokeW: 1 });
+    // A dropdown panel is an overlay material: use the declared elevation recipe (drop + inset, token-bound) instead of
+    // the factory's typed single-layer `shadow:3`, which G18 rejects as `shadow_unbound` (30 panels on page 05).
+    try { if (o.elevation !== false && storage.EL && storage.EL.seeded && storage.EL.apply) storage.EL.apply(p, o.elevation || 'panel'); } catch (e) {}
+    return p;
   }
   function optionRow(ctx, r, o) {
     var L = CF.ladder(o.size || 'md'), padX = 12, icon = L.icon;
@@ -1717,6 +1841,15 @@ return (function () {
     var ph = 16 + list * rowH + heads * 26 + (o.search ? 40 : 0);
     var base = await CF.fieldBox('Select', Object.assign({ trail: 'caretDown', state: 'focus', value: o.value, placeholder: o.placeholder }, o));
     var ctx = base.ctx, f = base.field, host = base.host;
+    // The field VALUE is not a list row: keep it off the option labels' x column by a 4px inset, otherwise the
+    // list_gap_split rule reads value→option as a 34px gap in an otherwise 16px list and fails the panel
+    // (measured 2026-10-26: 20 findings on Combobox/TimePicker). The inset is invisible at field scale.
+    if (o.open) {
+      try {
+        var vt = (host.children || []).filter(function (c) { return c.type === 'text'; })[0];
+        if (vt) penpotUtils.setParentXY(vt, Math.round(vt.parentX) - 4, Math.round(vt.parentY));
+      } catch (e) {}
+    }
     var pbox = B(f.x, f.y + f.h + 4, pw, ph);
     // Growth is a SIZE, not a world coordinate: `pbox.bottom - host.bottom` (the DatePicker form). Reading it as
     // `panelTop + panelHeight - hostHeight` inflates every open panel by however far down the page the cell sits.
@@ -1754,32 +1887,60 @@ return (function () {
   /** Multi-select with chips inside the field; chips wrap so the field grows, +N overflow chip, per-chip ✕. */
   CF.multiSelect = async function (o) {
     o = o || {};
-    var L = CF.ladder(o.size), vals = o.values || ['Design', 'Research'], maxTag = o.maxTagCount;
+    var L = CF.ladder(o.size), maxTag = o.maxTagCount;
+    // The chips ARE the value. `o.value` from CAT.PLAN ("Design, Product") is the chip source; it must not also be
+    // painted as a plain field value — the fieldBox merge (`Object.assign({value:undefined}, o)`) put it back and the
+    // value text ran through the chips (measured 2026-10-26: 15 text_overlap findings on page 05).
+    var vals = o.values || (o.value !== undefined ? String(o.value).split(/\s*,\s*/).filter(Boolean) : ['Design', 'Research']);
     var overflow = 0;
     if (maxTag !== undefined && vals.length > maxTag) { overflow = vals.length - maxTag; vals = vals.slice(0, maxTag); }
-    var chipH = min(28, L.h - 8), rowsN = 1;
+    // THE CHIPS ARE CHIP COMPONENTS. A composite control composes the atom; redrawing a pill + label + ✕ as three
+    // loose siblings is exactly what the selected MultiSelect master did (measured 2026-10-26). When the Chip atom
+    // master exists, every tag is a real copy; the raw path below is a reported fallback for a file whose Chip family
+    // has not been built yet (rule 65 `nested_control_raw` fails it on acceptance).
+    var chipH = min(24, L.h - 8), chipGap = 4, rowsN = 1;
+    var chipMaster = CF.get('Chip·Input·SM·Clear·Neutral');
+    if (!chipMaster) { try { console.warn('CF.multiSelect: no Chip·Input·SM·Clear·Neutral master — inner chips are raw; build the Chip atom before this composite'); } catch (e) {} }
+    var chipW = function (v) {
+      return chipMaster ? CF.chipWidth(v) : (CF.estW(v, L.fs - 1) + (v[0] === '+' ? 12 : (o.removable === false ? 16 : 16 + L.icon + 4)));
+    };
     var fieldW = o.w || 300, usable = fieldW - 24 - (L.icon + 8);
     var xs = [], x = 0;
     vals.concat(overflow ? ['+' + overflow] : []).forEach(function (v) {
-      var cw = CF.estW(v, L.fs - 1) + (v[0] === '+' ? 12 : (o.removable === false ? 16 : 16 + L.icon + 4));
+      var cw = chipW(v);
       if (x + cw > usable) { rowsN++; x = 0; }
-      xs.push({ v: v, x: x, w: cw, row: rowsN - 1 }); x += cw + 4;
+      xs.push({ v: v, x: x, w: cw, row: rowsN - 1 }); x += cw + chipGap;
     });
-    var fh = max(L.h, rowsN * (chipH + 4) + 8);
+    // The BLOCK is the chips + the gaps BETWEEN them. Counting a trailing gap (the old `rowsN*(chipH+4)`) centred the
+    // block two pixels high: MD field 36, chip 24 → top 4 / bottom 8 instead of 6/6 (the user's “上少下多”).
+    var blockH = rowsN * chipH + (rowsN - 1) * chipGap;
+    var fh = max(L.h, blockH + 12);
     // The placeholder is the empty-field affordance: with chips already inside, fieldBox's left-aligned placeholder
     // painted straight through them (audit_layout text_overlap).
-    var base = await CF.fieldBox('MultiSelect', Object.assign({ h: fh, value: undefined, placeholder: vals.length ? null : (o.placeholder || 'Add tags…'), trail: 'caretDown' }, o));
+    var baseOpts = Object.assign({ h: fh, value: undefined, placeholder: vals.length ? null : (o.placeholder || 'Add tags…'), trail: 'caretDown' }, o);
+    baseOpts.value = undefined;   // chips carry the content; the field shows no duplicate run
+    var base = await CF.fieldBox('MultiSelect', baseOpts);
     var ctx = base.ctx, f = base.field;
-    var yOff = (f.h - rowsN * (chipH + 4)) / 2;
+    var yOff = (f.h - blockH) / 2;
     xs.forEach(function (c) {
-      var cb = B(f.x + 12 + c.x, f.y + yOff + c.row * (chipH + 4), c.w, chipH);
+      var cb = B(f.x + 12 + c.x, f.y + yOff + c.row * (chipH + chipGap), c.w, chipH);
       var isMore = c.v[0] === '+';
-      ctx.plate(cb, { name: isMore ? 'chip·overflow' : 'chip', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 'control' });
-      // Only a removable chip reserves a right zone for the ✕; a read-only chip centers its label in the full pill
-      // (insetting it by the fixed 4px left pad leaves a 2.5px off-center residue against the plate).
-      var inset = !isMore && o.removable !== false;
-      ctx.text(c.v, B(inset ? cb.x + 4 : cb.x, cb.y, inset ? cb.w - 18 : cb.w, cb.h), { size: L.fs - 1, color: C('ink') });
-      if (!isMore && o.removable !== false) ctx.glyph('close', B(cb.x + cb.w - 16, cb.y + (cb.h - 12) / 2, 12, 12), { color: C('muted'), strokeW: 1.5 });
+      var inst = null;
+      if (chipMaster) {
+        var r = CF.instance(chipMaster.name, { parent: ctx.host, absolute: { x: cb.x, y: cb.y }, text: c.v });
+        if (r && r.ok) {
+          inst = r.inst;
+          try { inst.name = isMore ? 'chip·overflow' : 'chip'; } catch (e) {}
+          CF.chipFit(inst, c.v, { w: c.w, h: chipH });
+        }
+      }
+      if (!inst) {
+        // Reported fallback (see the head of this block): a file without a Chip atom still renders, and rule 65 fails it.
+        ctx.plate(cb, { name: isMore ? 'chip·overflow' : 'chip', fill: C('surfaceAlt'), stroke: C('border'), strokeW: 1, radius: 'control' });
+        var inset = !isMore && o.removable !== false;
+        ctx.text(c.v, B(inset ? cb.x + 4 : cb.x, cb.y, inset ? cb.w - 18 : cb.w, cb.h), { size: L.fs - 1, color: C('ink') });
+        if (!isMore && o.removable !== false) ctx.glyph('close', B(cb.x + cb.w - 16, cb.y + (cb.h - 12) / 2, 12, 12), { color: C('muted'), strokeW: 1.5 });
+      }
     });
     await ctx.settle(); ctx.place();
     return ctx.host;
@@ -1914,7 +2075,11 @@ return (function () {
     var ctx = CF.build(CF.name('Switch', { size: sm ? 'Sm' : 'Md', state: S, slot: swSlot }), box, { parent: o.parent });
     var tr = B(box.x, box.y + (box.h - th) / 2, tw, th);
     ctx.hitPad(tr, o.hit || (m3 ? 40 : 32));                    // bottom-most: the 40dp state layer / touch target
-    var rad = TR.radius !== undefined ? CF.radius(TR.radius) : CF.radius('control');
+    // A switch track is a pill by role; the profile may pin that step at the family level (`selection.switch.radius`)
+    // rather than inside `track` — reading only TR.radius left a re-seeded session with an r8 rounded rectangle and
+    // an r8 focus ring that could not wrap it (measured 2026-10-26).
+    var rad = TR.radius !== undefined ? CF.radius(TR.radius)
+      : ((prof && prof.radius !== undefined) ? CF.radius(prof.radius) : CF.radius('control'));
     var fillPr = (prof && prof.fill) || {};
     var tfill = on ? C(fillPr.on || 'primary') : C(fillPr.off || (m3 ? 'surface' : 'ink'));
     var grad = on && fillPr.onGradient && fillPr.onGradient.length >= 2 ? fillPr.onGradient : null;
@@ -2008,7 +2173,7 @@ return (function () {
     var rdoSlot = [on ? 'Checked' : null, o.label ? 'Label' : null].filter(Boolean).join('-') || null;
     var ctx = CF.build(CF.name('Radio', { state: S, slot: rdoSlot }), box, { parent: o.parent });
     var rb = B(box.x, box.y + (box.h - rs) / 2, rs, rs);
-    if (S === 'hover' || S === 'focus') ctx.plate(B(rb.x - (40 - rs) / 2, rb.y - (40 - rs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 'control' });
+    if (S === 'hover' || S === 'focus') ctx.plate(B(rb.x - (40 - rs) / 2, rb.y - (40 - rs) / 2, 40, 40), { name: 'state·layer', fills: CF.fills(null, S === 'hover' ? 'hover' : 'focus'), radius: 'full' });
     // The radio's ring weight and dot size are the profile's: the source draws a hairline ring with a solid dot,
     // the kit a 2px primary ring — a source without a radio rule keeps the generic one (derived material).
     var rLine = on ? C((prof && prof.ringInk) || 'primary') : (S === 'disabled' ? C('muted') : C((prof && prof.border) || 'borderStrong'));
@@ -2018,7 +2183,10 @@ return (function () {
     if (on) ctx.ellipse(B(rb.x + (rs - dotD) / 2, rb.y + (rs - dotD) / 2, dotD, dotD), { name: 'dot', fill: S === 'disabled' ? C('muted') : C((prof && prof.ringInk) || 'primary') });
     if (o.label) ctx.text(String(o.label), B(rb.x + rs + 8, box.y, labelW, box.h), { size: rfs, color: C((prof && prof.ink) || 'ink'), opacity: stateAlpha(S), align: 'left' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(rb, { radius: 'control' });
+    // A RADIO IS A CIRCLE: its focus ring must be a circle too. `'control'` is the button/pill role, and after a
+    // re-seed without the profile roles it became r8 — a rounded-square outline around the 20px disc (measured
+    // 2026-10-26 on `Radio·Focus·Checked`: ring 24×24 r0). The visible disc is an ellipse, so its outline is `full`.
+    if (S === 'focus') ctx.ring(rb, { radius: 'full' });
     ctx.hitPad(rb, o.hit || 32);
     if (prof && prof._family) CF.profStamp(ctx.host, prof, { ring: rs, dot: dotD, border: rLW },
       { family: 'radio', variant: on ? 'checked' : 'unchecked', state: S, checked: on });
@@ -2032,8 +2200,17 @@ return (function () {
     var vert = o.direction === 'vertical';
     var len = (vert ? o.h || 200 : o.w || 240), th = o.trackH || pp.track || 4, hs = o.handle || pp.handle || 20;
     var lo = o.min === undefined ? 0 : Number(o.min), hi = o.max === undefined ? 100 : Number(o.max);
-    var raw2 = o.value2 === undefined ? lo + (hi - lo) * 0.7 : Number(o.value2);
-    var raw = o.value === undefined ? lo + (hi - lo) * 0.4 : Number(o.value);
+    // A range slider's value is an ARRAY (`[20, 80]`); Number([20,80]) is NaN and every derived coordinate became
+    // NaN, so the whole row's cells were rolled back (measured 2026-10-26 on Slider·Spec row "Range"). A typed
+    // o.from/o.to pair stays supported; the array is the canonical shape from CAT.PLAN.
+    var vRaw = o.value, v2Raw = o.value2;
+    if (Array.isArray(vRaw) && o.range) { v2Raw = vRaw[1]; vRaw = vRaw[0]; }
+    if (o.from !== undefined) vRaw = o.from;
+    if (o.to !== undefined) v2Raw = o.to;
+    var raw2 = v2Raw === undefined ? lo + (hi - lo) * 0.7 : Number(v2Raw);
+    var raw = vRaw === undefined ? lo + (hi - lo) * 0.4 : Number(vRaw);
+    if (!isFinite(raw)) raw = lo + (hi - lo) * 0.4;
+    if (!isFinite(raw2)) raw2 = lo + (hi - lo) * 0.7;
     var norm = function (x) { return hi > lo ? max(0, min(1, (Number(x) - lo) / (hi - lo))) : 0; };
     var v = norm(raw), v2 = norm(raw2);
     var labels = !!(o.marks && o.labels);
@@ -2048,7 +2225,10 @@ return (function () {
     var trackBox = vert ? B(box.x + (box.w - bubW - th) / 2, box.y + hs / 2, th, len - hs)
       : B(box.x + hs / 2, railY - th / 2, len - hs, th);
     var trkInk = (prof && prof.trackInk) || 'ink', trkOp = prof && prof.trackOpacity !== undefined ? Number(prof.trackOpacity) : 0.12;
-    ctx.plate(trackBox, { name: 'track', fills: [{ fillColor: C(trkInk), fillOpacity: trkOp }], radius: 'control' });
+    // The rail is a pill by role; the profile may pin it at the family level (selection.slider.radius), which is what
+    // the source declares. Reading only `'control'` fell back to r8 whenever the session had not re-applied roles.
+    var railR = (prof && prof.radius !== undefined) ? CF.radius(prof.radius) : CF.radius('control');
+    ctx.plate(trackBox, { name: 'track', fills: [{ fillColor: C(trkInk), fillOpacity: trkOp }], radius: railR });
     var span = vert ? { a: trackBox.y, b: trackBox.y + trackBox.h, axis: 'y' } : { a: trackBox.x, b: trackBox.x + trackBox.w, axis: 'x' };
     var posOf = function (p) { return span.a + (span.b - span.a) * p; };
     var seg = function (pa, pb) {
@@ -2056,14 +2236,16 @@ return (function () {
       return vert ? B(trackBox.x, a0, trackBox.w, a1 - a0) : B(a0, trackBox.y, a1 - a0, trackBox.h);
     };
     var actInk = (prof && prof.activeInk) || 'primary';
-    ctx.plate(o.range ? seg(v, v2) : seg(0, v), { name: 'track·active', fill: o.state === 'disabled' ? C('muted') : C(actInk), radius: 'control' });
+    ctx.plate(o.range ? seg(v, v2) : seg(0, v), { name: 'track·active', fill: o.state === 'disabled' ? C('muted') : C(actInk), radius: railR });
     var handle = function (p) {
       var c = posOf(p);
       var b = vert ? B(trackBox.x + trackBox.w / 2 - hs / 2, c - hs / 2, hs, hs) : B(c - hs / 2, railY - hs / 2, hs, hs);
       if (o.state === 'hover' || o.state === 'dragged' || o.state === 'focus' || o.state === 'pressed')
         ctx.ellipse(B(b.x - 10, b.y - 10, hs + 20, hs + 20), { name: 'state·layer', fill: C('primary'), opacity: CF.STATE[o.state] });
-      if (o.state === 'focus') ctx.ring(B(b.x - 10, b.y - 10, hs + 20, hs + 20), { offset: 0, radius: 'control', color: C('primary') });
-      ctx.ellipse(b, { name: 'handle', fill: o.state === 'disabled' ? C('muted') : C('surface'), stroke: o.state === 'disabled' ? C('border') : C('primary'), strokeW: 2, shadow: 1 });
+      if (o.state === 'focus') ctx.ring(B(b.x - 10, b.y - 10, hs + 20, hs + 20), { offset: 0, radius: 'full', color: C('primary') });
+      var hb = ctx.ellipse(b, { name: 'handle', fill: o.state === 'disabled' ? C('muted') : C('surface'), stroke: o.state === 'disabled' ? C('border') : C('primary'), strokeW: 2 });
+      // A typed single-layer `shadow:1` is unbound and fails G18; the handle takes the declared `chip` recipe.
+      try { if (storage.EL && storage.EL.seeded && storage.EL.apply) storage.EL.apply(hb, 'chip'); } catch (e) {}
       return b;
     };
     var h1 = handle(v);
@@ -2413,6 +2595,64 @@ return (function () {
     if (prof && prof._family) CF.profStamp(ctx.host, prof, { h: h, fs: fs, radius: CF.radius(cRad) },
       { family: 'chip', kind: kind, size: String(o.size || 'md').toLowerCase(), state: S });
     return ctx.host;
+  };
+
+  /** Fit a placed Chip INSTANCE to a new label. The pill, its label and its ✕ are one component; a copy may not be
+      structurally edited, but text + child geometry are overrides — so the copy is resized, the text box is sized to
+      the new value, and the ✕ keeps the master's right inset. This is how a composite (MultiSelect) reuses a real
+      Chip instead of redrawing raw pill plates (measured 2026-10-26: two raw `chip` rectangles inside the selected
+      MultiSelect master, with text and ✕ as loose siblings). `o.w` fixes the box (in-place repair); otherwise the
+      box grows by the label's measured width difference. */
+  CF.chipFit = function (inst, label, o) {
+    o = o || {};
+    if (!inst) return null;
+    var kids = []; try { kids = Array.from(inst.children || []); } catch (e) {}
+    // FLEX anatomy: `row·content` owns the label↔✕ relation with a bound `columnGap` (space token). Only the copy's
+    // text and BOX are overridden; the row reflows, so the ✕ can never land on top of the label. Manual x positions are
+    // the legacy absolute path below (measured overlap 2026-10-26: a 78px copy kept the 85px master's right inset and
+    // pushed the 7px ✕ 3.5px into "Design").
+    var row = kids.filter(function (k) { return /^row·content$/.test(String(k.name || '')); })[0] || null;
+    var hit = kids.filter(function (k) { return /^hitpad·/.test(String(k.name || '')); })[0] || null;
+    if (row) {
+      var rk = []; try { rk = Array.from(row.children || []); } catch (e) {}
+      var ftxt = rk.filter(function (k) { return k.type === 'text'; })[0] || null;
+      var fs = 14; try { fs = parseFloat(ftxt.fontSize) || 14; } catch (e) {}
+      var tw = CF.estW(String(label), fs);
+      var w0 = Number(inst.width) || 85;
+      var w = o.w !== undefined ? Number(o.w) : w0;
+      if (ftxt) {
+        try { if (String(ftxt.characters) !== String(label)) ftxt.characters = String(label); } catch (e) {}
+        try { ftxt.resize(max(8, tw), ftxt.height); } catch (e) {}
+        try { ftxt.growType = 'auto-width'; } catch (e) {}
+      }
+      try { inst.resize(w, o.h !== undefined ? Number(o.h) : inst.height); } catch (e) {}
+      if (hit) { try { hit.resize(w, hit.height); } catch (e) {} }
+      return inst;
+    }
+    var txt = kids.filter(function (k) { return k.type === 'text'; })[0] || null;
+    var close = kids.filter(function (k) { return /^glyph·close/.test(String(k.name || '')); })[0] || null;
+    var fs2 = 14; try { fs2 = parseFloat(txt.fontSize) || 14; } catch (e) {}
+    var tw2 = CF.estW(String(label), fs2);
+    var baseW = Number(inst.width) || 85;
+    var baseTextW = txt ? Number(txt.width) : tw2;
+    var rightInset = close ? Math.max(0, baseW - (Number(close.x) - Number(inst.x)) - Number(close.width)) : 0;
+    var w2 = o.w !== undefined ? Number(o.w) : Math.round(baseW + (tw2 - baseTextW));
+    if (txt) {
+      try { if (String(txt.characters) !== String(label)) txt.characters = String(label); } catch (e) {}
+      try { txt.resize(max(8, tw2), txt.height); } catch (e) {}
+      try { txt.x = Number(inst.x) + 12; } catch (e) {}
+    }
+    try { inst.resize(w2, o.h !== undefined ? Number(o.h) : inst.height); } catch (e) {}
+    if (close) { try { close.x = Number(inst.x) + w2 - rightInset - Number(close.width); } catch (e) {} }
+    if (hit) { try { hit.resize(w2, hit.height); } catch (e) {} }
+    return inst;
+  };
+  /** The natural width of a Chip master for a label (the box a fresh instance needs). */
+  CF.chipWidth = function (label, masterName) {
+    var name = masterName || 'Chip·Input·SM·Clear·Neutral';
+    var w = 85;
+    try { var rec = CF.get(name); if (rec && rec.mainInstance && rec.mainInstance()) w = Number(rec.mainInstance().width) || w; } catch (e) {}
+    return Math.round(w + (CF.estW(String(label), 14) - CF.estW('Design', 14)));
   };
 
   /** Avatar — 24/32/40/48/64/96, circle·rounded·square, image·initials·icon, presence dot 8-10 with a 2px surface ring. */
@@ -4587,7 +4827,7 @@ return (function () {
       { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), stroke: C('border'), strokeW: 1 });
     var titleText = String(o.title === undefined ? fam + ' · variants' : o.title);
     // ---- phase 1: draw every cell host (absolute, provisional token slot) and measure it.
-    var drawn = [], maxCells = 0;
+    var drawn = [], maxCells = 0, stackI = 0;
     for (var r = 0; r < rows.length; r++) {
       var row = rows[r], cells = row.cells && row.cells.length ? row.cells : [{}];
       drawn[r] = []; maxCells = max(maxCells, cells.length);
@@ -4595,8 +4835,11 @@ return (function () {
         var opts = Object.assign({}, row.props || {}, cells[c] || {});
         if (!opts.size) opts.size = 'md';
         opts.parent = ctx.host;
-        opts.x = N(PADX + labelW + GAPC + c * (pitch + GAPC));
-        opts.y = N(PADY + headH + stateRowH + r * (rowH(row) + GAPR));
+        // Phase-1 anti-overlap: these hosts are transients (phase 3 attaches them to measured slots). A vertical stack
+        // means an interrupted call leaves a readable column instead of a pile of controls at a 112px pitch that are
+        // 2-5x wider than that pitch. The final geometry still comes from the measured grid below.
+        opts.x = N(PADX + labelW + GAPC);
+        opts.y = N(PADY + headH + stateRowH + (stackI++) * 440);
         var fn = CF[row.factory];
         if (!fn) { matrixWarn(row.factory); continue; }
         var host = null;
@@ -4632,7 +4875,12 @@ return (function () {
       if (row.note) ctx.text(String(row.note), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR) + rowH(row), labelW, 14),
         { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
     });
-    var innerW = max(1, N((o.maxW || o.w || 1000) - PADX * 2));
+    // The spec sheet is a page canvas artifact, not a 1000px card: widen it to the measured content (up to 1760)
+    // BEFORE wrapping. A 204px control × 5 states needs 1296px; clamping to 1000 wrapped each row into two lines,
+    // whose second line landed in the next row's label band (measured 2026-10-26 on NumberField·Spec). Wrapping is
+    // reserved for sheets whose measured content genuinely exceeds the canvas.
+    var CANVAS = o.canvasW === undefined ? 1760 : Number(o.canvasW);
+    var innerW = max(1, N((Math.min(o.maxW || 1000, CANVAS)) - PADX * 2));
     if (o.notes) CF.wrap(String(o.notes), innerW * 0.94, 12).slice(0, 3).forEach(function (ln) {
       ctx.text(ln, B(box.x + PADX, box.y + PADY, innerW, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
     });
@@ -4647,8 +4895,7 @@ return (function () {
       colW[ci] = N(mw);
     }
     var needW = PADX * 2 + labelW + (colN ? GAPC + colW.reduce(function (a, w) { return a + w + GAPC; }, -GAPC) : 0);
-    var fitW = N(max(160, needW));
-    if (o.maxW) fitW = min(fitW, N(o.maxW));
+    var fitW = min(N(max(160, needW)), CANVAS);
     try { ctx.host.resize(fitW, ctx.host.height); } catch (e) {}
     var attach = [], flowKids = [], ti = 0;
     if (headH) {
@@ -4656,10 +4903,10 @@ return (function () {
       NL.add(ctx.host, headRow, 'fill', 'auto');
       flowKids.push(headRow);
       var ht = pendTs.slice(ti, ti + (o.subtitle ? 2 : 1)); ti += ht.length;
-      ht.forEach(function (t) { try { headRow.appendChild(t); t.layoutChild.absolute = false; NL.sizing(t, 'auto', 'auto'); } catch (e) {} });
+      ht.forEach(function (t) { try { t.layoutChild.absolute = false; } catch (e) {} try { headRow.appendChild(t); NL.sizing(t, 'auto', 'auto'); } catch (e) {} });
     }
     var axisTs = stateRowH ? pendTs.slice(ti, ti + axes.length) : []; ti += axisTs.length;
-    var useGrid = axes.length > 1 && needW <= (o.maxW || Infinity);
+    var useGrid = axes.length > 1 && needW <= CANVAS;
     if (useGrid) {
       var gcols = [['fixed', labelW]].concat(colW.map(function (w) { return ['fixed', w]; }));
       var grows = [];
@@ -4668,13 +4915,18 @@ return (function () {
       NL.add(ctx.host, grid, 'fill', 'auto');
       flowKids.push(grid);
       var gr = 1;
-      if (stateRowH) { axisTs.forEach(function (t, i) { NL.cell(grid, t, 1, i + 2); NL.sizing(t, 'fix', 'auto'); }); gr = 2; }
+      // axis texts are created absolutely (world coords) before the grid exists. They MUST enter the cell as flow —
+      // and the flag must be cleared BEFORE `NL.cell`: an absolute child keeps the flag through appendChild, the
+      // platform ignores (row,col) and auto-places it in the next free cell, which put every state row one column
+      // left (measured 2026-10-26: axes at cells 1..n, slots at 2..n+1). `NL.cell` also pre-clears it; this is the
+      // readable half of the same contract.
+      if (stateRowH) { axisTs.forEach(function (t, i) { try { t.layoutChild.absolute = false; } catch (e) {} NL.cell(grid, t, 1, i + 2); NL.sizing(t, 'fix', 'auto'); }); gr = 2; }
       for (var r2 = 0; r2 < rows.length; r2++) {
         var lab = pendTs[ti], note = rows[r2].note ? pendTs[ti + 1] : null; ti += rows[r2].note ? 2 : 1;
         if (lab || note) {
           var labBox = NL.col('label·' + fam + '·' + r2, { rowGap: br('inline'), sizing: 'auto' });
-          if (lab) { labBox.appendChild(lab); lab.layoutChild.absolute = false; NL.sizing(lab, 'auto', 'auto'); }
-          if (note) { labBox.appendChild(note); note.layoutChild.absolute = false; NL.sizing(note, 'auto', 'auto'); }
+          if (lab) { try { lab.layoutChild.absolute = false; } catch (e) {} labBox.appendChild(lab); NL.sizing(lab, 'auto', 'auto'); }
+          if (note) { try { note.layoutChild.absolute = false; } catch (e) {} labBox.appendChild(note); NL.sizing(note, 'auto', 'auto'); }
           NL.cell(grid, labBox, gr + r2, 1);
         }
         var cellsR = drawn[r2] || [];
@@ -4695,17 +4947,17 @@ return (function () {
         var spacer = NL.frame('labelspace·' + fam, { w: labelW, h: stateRowH, sizing: 'fix' });
         spacer.fills = [];
         NL.add(axisRow2, spacer, 'fix', 'fix');
-        axisTs.forEach(function (t) { NL.add(axisRow2, t, 'fix', 'auto'); try { t.resize(pitch, t.height); } catch (e) {} NL.sizing(t, 'fix', 'auto'); });
+        axisTs.forEach(function (t, ai) { try { t.layoutChild.absolute = false; } catch (e) {} NL.add(axisRow2, t, 'fix', 'auto'); try { t.resize(colW[ai] || pitch, t.height); } catch (e) {} NL.sizing(t, 'fix', 'auto'); });
       }
       for (var r3 = 0; r3 < rows.length; r3++) {
-        var rl = NL.row('row·' + fam + '·' + r3, { rowGap: GAPC, columnGap: GAPC, align: 'center', wrap: o.maxW ? 'wrap' : undefined });
+        var rl = NL.row('row·' + fam + '·' + r3, { rowGap: GAPC, columnGap: GAPC, align: 'center', wrap: useGrid ? undefined : 'wrap' });
         NL.add(ctx.host, rl, 'fill', 'auto');
         flowKids.push(rl);
         var lab3 = pendTs[ti], note3 = rows[r3].note ? pendTs[ti + 1] : null; ti += rows[r3].note ? 2 : 1;
         if (lab3 || note3) {
           var labBox3 = NL.col('label·' + fam + '·' + r3, { rowGap: br('inline'), sizing: 'auto' });
-          if (lab3) { labBox3.appendChild(lab3); lab3.layoutChild.absolute = false; NL.sizing(lab3, 'auto', 'auto'); }
-          if (note3) { labBox3.appendChild(note3); note3.layoutChild.absolute = false; NL.sizing(note3, 'auto', 'auto'); }
+          if (lab3) { try { lab3.layoutChild.absolute = false; } catch (e) {} labBox3.appendChild(lab3); NL.sizing(lab3, 'auto', 'auto'); }
+          if (note3) { try { note3.layoutChild.absolute = false; } catch (e) {} labBox3.appendChild(note3); NL.sizing(note3, 'auto', 'auto'); }
           NL.add(rl, labBox3, 'fix', 'auto');
         }
         var cells3 = drawn[r3] || [];
@@ -4732,6 +4984,10 @@ return (function () {
     // anatomy — the same move the old matrix used for row centring (production-proven on nested hosts).
     attach.forEach(function (a) { try { CF.move(a.host, N(a.slot.x), N(a.slot.y)); } catch (e) {} });
     await ctx.settle();
+    // Return only after the flex layout has settled: the shelf step reads this height, and a transient hug height is
+    // exactly what produced stale ~100px pitches (boards later grew to 277-2287 and overlapped). Cheap; removes a race.
+    try { await NL.settle(); } catch (e) {}
+    await new Promise(function (r) { setTimeout(r, 120); });
     return ctx.host;
   };
 
@@ -5074,15 +5330,25 @@ return (function () {
     // `control` is `full` at birth (not the generic kit's 3px step), and an IconButton explicitly pinned to `tile`
     // keeps the tile step. Without this, every factory build went back to the fallback ladder on a fresh session and
     // the role sweep had to repair corners after the fact (measured 2026-10-23: a probe button was born r0).
+    CF.applyRoles(storage.REF || o);
+    CF.stampRef(root);
+    return storage.REF;
+  };
+  /** Re-apply the source's radius ROLES from a reference profile. This MUST run on hydrate too, not only when the
+      profile is first seeded: storage is volatile, so after every plugin reload the factories were re-seeded with
+      `ROLE.control = 'sm'` while the file's actions measured `full` — fresh radios/switches/sliders were then born
+      r8 and their focus rings could not wrap a pill/circle (measured 2026-10-26: the profile says
+      `selection.radio.radius = 9999`, the render said r8). The profile is the durable record; the roles are derived. */
+  CF.applyRoles = function (r) {
+    r = r || storage.REF || {};
     try {
-      var sh = (o && o.actions && o.actions.shapes) || {};
+      var sh = (r.actions && r.actions.shapes) || {};
       (sh.Button || []).forEach(function (role) {
         if (role === 'full' || role === 'none' || role === 'tile') CF.ROLE.control = role;
       });
       if (sh.IconButton && sh.IconButton.length === 1 && /^(tile|full|none)$/.test(String(sh.IconButton[0]))) CF.ROLE.tile = sh.IconButton[0];
     } catch (e) {}
-    CF.stampRef(root);
-    return storage.REF;
+    return { control: CF.ROLE.control, tile: CF.ROLE.tile };
   };
   /** Write the MERGED profile to every PageRoot, not the delta from the last call. A recreation owns one file-wide
       profile; stamping only the group seeded on the current page lost every earlier group after a plugin reload
@@ -5104,12 +5370,16 @@ return (function () {
   /** Restore the profile from the file after a storage wipe: the PageRoot stamp is the durable copy, `storage.REF`
       is only the session cache. Called at seed time and lazily by `CF.reference`. */
   CF.hydrate = function () {
-    if (storage.REF && Object.keys(storage.REF).length) return storage.REF;
-    try {
-      var pr = penpotUtils.findShape(function (s) { return /-?PageRoot$/.test(String(s.name || '')); }, penpot.currentPage.root);
-      var raw = pr && pr.getPluginData ? pr.getPluginData('nl:ref') : null;
-      if (raw) storage.REF = JSON.parse(raw);
-    } catch (e) {}
+    if (!(storage.REF && Object.keys(storage.REF).length)) {
+      try {
+        var pr = penpotUtils.findShape(function (s) { return /-?PageRoot$/.test(String(s.name || '')); }, penpot.currentPage.root);
+        var raw = pr && pr.getPluginData ? pr.getPluginData('nl:ref') : null;
+        if (raw) storage.REF = JSON.parse(raw);
+      } catch (e) {}
+    }
+    // The durable profile also owns the radius ROLES; only re-deriving them here keeps a re-seeded session from
+    // building pill controls as r8 rounded rectangles (see CF.applyRoles).
+    CF.applyRoles(storage.REF || {});
     return storage.REF || {};
   };
   CF.reference = function (group) {
@@ -5436,6 +5706,7 @@ return (function () {
   /*__CF_MORE__*/
 
   try { CF.hydrate(); } catch (e) {}
+  try { if (storage.TK && storage.TK.declared) CF.adoptPalette(); } catch (e) {}
   storage.CF = CF;
   CF._keys = Object.keys(CF).filter(function (k) { return typeof CF[k] === 'function' && /^[a-z]/.test(k); });
   return { seeded: 'CF', factories: CF._keys.length, glyphs: CF.glyphKinds.length,

@@ -46,10 +46,46 @@ return (function () {
   // without this, every absMount'd child of an engine frame was reported as absolute_child).
   storage.absMount = function (parent, child, worldX, worldY) {
     parent.appendChild(child);
-    child.layoutChild.absolute = true;
-    child.x = worldX; child.y = worldY;
+    // A parent WITHOUT a layout system has no `layoutChild`: writing `.absolute` on null threw and aborted every
+    // factory mounted into a plain board (probes, hand-made cards, a temp container). The coordinate write is still
+    // legal there, so guard the layout flag instead of trusting the parent to be a flex/grid frame.
+    try { if (child.layoutChild) child.layoutChild.absolute = true; } catch (e) {}
+    try { child.x = worldX; child.y = worldY; } catch (e) {}
     try { if (storage.NL && storage.NL._note) storage.NL._note(child, { declaredAbsolute: true }); } catch (e) {}
     return child;
+  };
+
+  // ---- subtree-safe delete (the ONLY legal delete of a container) ----
+  // Penpot re-parents a removed board's ungrouped children to the PAGE ROOT: a rebuild that calls board.remove()
+  // scatters every nested glyph/plate outside the PageRoot as root_stray shapes (measured 2026-10-26 on page 04:
+  // deleting the partial Transfer boards left 102 checkbox glyphs/dashes floating over the page). Capture the subtree
+  // ids, remove the shell, then delete the survivors that are now direct children of the page root.
+  storage.removeTree = function (shape) {
+    if (!shape) return 0;
+    const ids = [];
+    (function walk(s) {
+      let kids = [];
+      // A leaf (text / path / rect) has NO children collection: reading `.children` throws `getChildren` in this
+      // build, and the throw aborted the whole removal half-way (the probe left its shell behind). Stop at leaves.
+      try { kids = Array.from(s.children || []); } catch (e) { return; }
+      kids.forEach((c) => { ids.push(c.id); walk(c); });
+    })(shape);
+    const idset = new Set(ids);
+    let n = 0;
+    try { shape.remove(); n++; } catch (e) {}
+    const frame = penpot.currentPage && penpot.currentPage.root;
+    // The leak CASCADES: removing a leaked host can re-parent ITS loose children to the page root in turn. Sweep
+    // until no shape from the captured subtree remains as a direct root child (bounded; a healthy tree stops at 1).
+    if (frame) {
+      for (let pass = 0; pass < 8; pass++) {
+        let hit = 0;
+        Array.from(frame.children || []).forEach((c) => {
+          if (idset.has(c.id)) { try { c.remove(); n++; hit++; } catch (e) {} }
+        });
+        if (!hit) break;
+      }
+    }
+    return n;
   };
 
   // ---- text factory: CJK auto-selects Noto Sans SC (Penpot has no CSS font-stack fallback, applyToText applies to the whole paragraph) ----
@@ -140,7 +176,7 @@ return (function () {
   // ⚠️ Iron rule: t.width/t.height at the createText() creation instant are ~1px transient values (see mcp-automation "Text positioning").
   //    Using transient width/height to compute centering bakes the wrong offset into coordinates (text top-left landing exactly on host center = stale-center fingerprint).
   //    So ct() must center by **measuring after rendering** (async, internally sleeps 120ms). Callers always `await storage.ct(...)`.
-  storage.sleep = storage.sleep || function (ms) { return new Promise((r) => setTimeout(r, ms)); };
+  storage.sleep = function (ms) { return new Promise((r) => setTimeout(r, ms)); };
   storage.ct = async function (b, str, opts) {
     opts = opts || {};
     const t = storage.mkText(str, 0, 0, opts.size, opts.color, opts.weight);

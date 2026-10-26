@@ -244,7 +244,7 @@ return (function () {
     const existing = Array.from(parent.children || []).filter((c) => String(c.name || '') === name);
     if (existing.length) {
       if (!o.replace) return { skipped: true, board: existing[0] };
-      existing.forEach((c) => { try { c.remove(); } catch (e) {} });
+      existing.forEach((c) => { try { (storage.removeTree || ((x) => x.remove()))(c); } catch (e) {} });
     }
     const T = storage.T || {};
     const b = storage.NL.frame(name, { x: o.x === undefined ? 80 : o.x, y: o.y === undefined ? 208 : o.y,

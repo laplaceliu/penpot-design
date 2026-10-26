@@ -858,7 +858,7 @@ return (function () {
     const use = await FN.use(o.page);
     if (use.err) return { kind: k, err: use.err, want: use.want, wait: use.wait };
     const prose = FN.recoverProse(o.page);          // a fresh session must not silently drop what the board says
-    if (o.replace !== false) Array.from(root.children || []).filter((c) => nm(String(c.name)) === name).forEach((c) => { try { c.remove(); } catch (e) {} });
+    if (o.replace !== false) Array.from(root.children || []).filter((c) => nm(String(c.name)) === name).forEach((c) => { try { (storage.removeTree || ((x) => x.remove()))(c); } catch (e) {} });
     const built = FN[k](Object.assign({}, o, { name: name }));
     FN.setFilter = null;                                 // the set filter lives only for this projector call
     if (!built || built.err) return { kind: k, err: (built && built.err) || 'the projector returned nothing' };

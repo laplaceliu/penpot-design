@@ -1056,7 +1056,9 @@ return (function () {
   TK.RING_OFF = 2;
   TK.RING_MAX_MARGIN = 12;
   const RING_CONTAINER = /·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Root /;
-  const RING_DECOR = /^(ring·|hairline·|guide·|axis|Group$|sheen·|hitpad·|wash·|clip·|surface·|fold·|scrim·|overlay·|veil·|boundary·|underline·|state·layer)/;
+  // glyph·/icon· are ANATOMY drawings, not plates: a checkbox's 13×11 check mark was the innermost concentric shape,
+  // so the ring resolved to the glyph and read "outset around its 13×11 box" even though the 18×18 box was flush.
+  const RING_DECOR = /^(ring·|hairline·|guide·|axis|Group$|sheen·|hitpad·|wash·|clip·|surface·|fold·|scrim·|overlay·|veil·|boundary·|underline·|state·layer|glyph·|icon·)/;
   function ringName(sh) { try { return String(sh.name || ''); } catch (e) { return ''; } }
   function ringBox(sh) {
     try {
@@ -1078,12 +1080,12 @@ return (function () {
   }
   /** The corner a ring takes from its resolved owner. A control BOARD is always trusted; a NESTED plate is trusted
       only when its corner is on the live radius ladder (a wrapper's r0 is not the visible unit's shape). An ELLIPSE
-      owner is a circle, so its ring uses the control step. This is the half roleSweep/ringSweep used to skip — which
-      left a pill track's ring square after the tie-break returned the nested plate. */
+      owner is a CIRCLE, so its ring is `radius.full` — not the `control` role, which is a rounded rectangle in every
+      system whose buttons are not pills (returning `control` here left a square-ish ring around a round radio). */
   function ringCornerOf(host) {
     if (!host) return null;
     if (String(host.type) === 'ellipse') {
-      try { return storage.CF && storage.CF.radius ? storage.CF.radius('control') : 9999; } catch (e) { return 9999; }
+      try { return storage.CF && storage.CF.radius ? storage.CF.radius('full') : 9999; } catch (e) { return 9999; }
     }
     const cs = TK.cornersOf(host); if (!cs) return null;
     const hv = Math.max.apply(null, cs);
@@ -1166,11 +1168,17 @@ return (function () {
         let ks = []; try { ks = Array.from(k.children || []); } catch (e) {}
         ks.forEach((c) => scan(c, d + 1));
       })(control, 0);
-      // a composite's ring hugs the SMALLER thing it outlines, so the innermost concentric plate wins.
-      // A transparent control wrapper and its visible plate can share the SAME box (Switch: host 44×22 r0 around
-      // a track 44×22 r9999). v and area tie, so the wrapper used to win and every sweep copied its square corner
-      // onto the ring. The innermost plate is the one the eye sees; it wins the tie.
-      good.sort((p, q) => (p.v - q.v) || (p.sh.width * p.sh.height - q.sh.width * q.sh.height) || ((q.d || 0) - (p.d || 0)));
+      // RANK BY THE HUG, not by size. The plate a ring was drawn around is the one it hugs with the tightest,
+      // most uniform margin. Measured 2026-10-26 on `Radio·Focus·Checked`: the 24×24 focus ring hugs the 20px disc at
+      // 2px, but the 10px inner dot is also concentric at 7px — the old smallest-area tie-break picked the DOT, so the
+      // ring was judged against a detail instead of the unit the user sees (and a later sweep copied a square corner
+      // from somewhere up the tree). Order: centre → uniform margin → tightest margin → deepest plate (a visible track
+      // under a same-box wrapper) → smallest area as the last tie.
+      good.sort((p, q) => (p.v - q.v)
+        || (Math.abs(p.ox - p.oy) - Math.abs(q.ox - q.oy))
+        || (Math.max(p.ox, p.oy) - Math.max(q.ox, q.oy))
+        || ((q.d || 0) - (p.d || 0))
+        || (p.sh.width * p.sh.height - q.sh.width * q.sh.height));
       if (good.length) {
         const w = good[0];
         return { host: w.sh, control: control, concentric: w.v <= tol, offBy: N2(w.v), floating: false, contained: contained,

@@ -178,11 +178,213 @@ return (function () {
   };
 
   // ---- clean root-level orphan text (historical crash residue, pollutes traversal) ----
-  storage.cleanOrphans = () => {
-    const root = rootOf();
-    let n = 0;
-    for (const c of root.children.slice()) if (c.type === 'text') { c.remove(); n++; }
-    return n;
+  /** Delete root-level strays. A shape outside `NN-PageRoot` is a stray by contract (audit `root_stray`), and the
+      usual cause is `board.remove()` re-parenting a removed container's loose children to the page root. The old
+      version only deleted root-level TEXT, so leaked glyphs/plates (paths, rects) survived every cleanup pass
+      (measured 2026-10-26: 102 checkbox glyphs/dashes on page 04). It now removes every non-PageRoot root shape,
+      recursively, and still removes loose text that sits directly under the PageRoot board. */
+  storage.cleanOrphans = (opts) => {
+    opts = opts || {};
+    const frame = rootOf();
+    const keep = opts.keep || [];
+    const dry = !!opts.dry;
+    const names = [];
+    Array.from(frame.children || []).forEach((c) => {
+      const nm = String(c.name || '');
+      if (/-PageRoot$/.test(nm)) return;
+      if (keep.some((k) => nm === k || (k instanceof RegExp && k.test(nm)))) return;
+      names.push(nm || c.type);
+      if (!dry) { try { (storage.removeTree || function (x) { x.remove(); })(c); } catch (e) {} }
+    });
+    const pr = Array.from(frame.children || []).find((c) => /-PageRoot$/.test(String(c.name)));
+    if (pr) Array.from(pr.children || []).forEach((c) => {
+      if (c.type === 'text') { names.push('PageRoot/text:' + String(c.name || '')); if (!dry) { try { c.remove(); } catch (e) {} } }
+    });
+    return { dry: dry, removed: names.length, names: names.slice(0, 30) };
+  };
+
+  // ---- unifyCorners: §5.1 "one control, one corner" (rule 63 control_corner_split) ----
+  /**
+   * Every FRAME part of a field control (`field`, `addon·*`, `stepper`, `disabled-overlay`, `ring·*`) takes the
+   * control's resolved corner. The factory resolves it once (`CF.fieldRadius()`: forms profile → `field` role, never
+   * the button pill), but a host built by an older generation can carry a square borderless body beside a rounded
+   * ring/overlay/stepper (measured 2026-10-26 on `05 · Forms II`: field r0, ring + disabled-overlay + steppers r9999).
+   * One scalar corner per plate keeps every value token-bindable — `TK.bindBoard` writes the four corner props as one
+   * token, so a per-corner design would be flattened by the next bind. Popup surfaces (panel/row/option), chips,
+   * carets and divider lines are not frame parts and are left alone. `o.radius` overrides the resolved step; `o.dry`
+   * only reports. Bind afterwards (TK.bindPage / TK.radiusSweep) and re-audit.
+   */
+  storage.unifyCorners = (root, o) => {
+    o = o || {};
+    const CFx = storage.CF;
+    let R = o.radius;
+    if (R === undefined || R === null) R = (CFx && CFx.fieldRadius) ? CFx.fieldRadius() : 12;
+    R = Math.round(Number(R) || 0);
+    const FRAME = /^(field|addon·|addon$|stepper$|disabled-overlay$|ring·)/;
+    const maxCorner = (s) => {
+      let b = null; try { b = s.borderRadius; } catch (e) { return null; }
+      if (b === null || b === undefined) return null;
+      if (typeof b === 'number') return b;
+      if (typeof b === 'object') return Math.max(Number(b.borderRadiusTopLeft) || 0, Number(b.borderRadiusTopRight) || 0,
+        Number(b.borderRadiusBottomRight) || 0, Number(b.borderRadiusBottomLeft) || 0);
+      return null;
+    };
+    const out = { radius: R, hosts: 0, parts: 0, changed: 0, sample: [], dry: !!o.dry };
+    (function walk(s) {
+      let ks = []; try { ks = Array.from(s.children || []); } catch (e) { ks = []; }
+      if (ks.some((k) => String(k.name || '') === 'field')) {
+        out.hosts++;
+        const hc = maxCorner(s);
+        if (hc !== null && Math.round(hc) !== R) {
+          out.changed++;
+          if (!o.dry) { try { s.borderRadius = R; } catch (e) {} }
+          if (out.sample.length < 12) out.sample.push(String(s.name || '?').slice(0, 24) + ' host r' + Math.round(hc) + '→r' + R);
+        }
+        ks.forEach((k) => {
+          const n = String(k.name || '');
+          if (!FRAME.test(n)) return;
+          out.parts++;
+          const v = maxCorner(k);
+          if (v === null || Math.round(v) === R) return;
+          out.changed++;
+          if (!o.dry) { try { k.borderRadius = R; } catch (e) {} }
+          if (out.sample.length < 12) out.sample.push(String(s.name || '?').slice(0, 24) + ' / ' + n + ' r' + Math.round(v) + '→r' + R);
+        });
+      }
+      ks.forEach(walk);
+    })(root || rootOf());
+    return out;
+  };
+
+  // ---- repairAxisRow: rule 64 axis_column_off — the state row must sit on its columns ----
+  /**
+   * A matrix sheet names its columns with one `axis` text per column, and each label must sit on the column whose
+   * cells it names. `CF.matrix` used to let the axes enter the grid while still `absolute`, so the platform ignored
+   * the explicit (row,col) and auto-placed them from the first free cell: the whole state row read one column left
+   * and the last state had no label (measured 2026-10-26 on every grid on page 05). This pass re-cells each axis to
+   * its slot's column and lets the grid re-flow, then settles. Geometry is the trigger (flush-left or centred is
+   * legal); a cell that names a different column is also repaired. `o.dry` reports only.
+   */
+  storage.repairAxisRow = async (root, o) => {
+    o = o || {};
+    const NL = storage.NL;
+    const out = { grids: 0, axes: 0, fixed: 0, skipped: 0, moved: [], dry: !!o.dry };
+    (function walk(s) {
+      let ks = []; try { ks = Array.from(s.children || []); } catch (e) { ks = []; }
+      if (/^grid·/.test(String(s.name || ''))) {
+        const ax = ks.filter((k) => /^axis/.test(String(k.name || '')) && k.type === 'text').sort((a, b) => a.x - b.x);
+        if (ax.length >= 2) {
+          const byRow = {};
+          ks.forEach((k) => {
+            const m = /^slot·.+?·(\d+)\.(\d+)$/.exec(String(k.name || ''));
+            if (!m) return;
+            const r = Number(m[1]), c = Number(m[2]);
+            (byRow[r] || (byRow[r] = {}))[c] = k;
+          });
+          const rowKeys = Object.keys(byRow).map(Number).sort((a, b) => a - b);
+          const cols = rowKeys.length ? Object.keys(byRow[rowKeys[0]]).map(Number).sort((a, b) => a - b).map((c) => byRow[rowKeys[0]][c]) : [];
+          if (cols.length) {
+            out.grids++;
+            ax.forEach((t, i) => {
+              const slot = cols[i];
+              if (!slot) { out.skipped++; return; }
+              out.axes++;
+              let cellCol = null, slotCol = null, row = 1;
+              try { cellCol = t.layoutCell && t.layoutCell.column; row = (t.layoutCell && t.layoutCell.row) || 1; } catch (e) {}
+              try { slotCol = slot.layoutCell && slot.layoutCell.column; } catch (e) {}
+              const cellBad = !!(cellCol && slotCol && cellCol !== slotCol);
+              const flush = Math.abs(t.x - slot.x) <= 2;
+              const centred = Math.abs((t.x + t.width / 2) - (slot.x + slot.width / 2)) <= 2;
+              // CELL FIRST when the grid exposes one: after the first axis lands, the platform re-flows the remaining
+              // auto-placed siblings, so their pre-settle x is still stale even though their cell is already right.
+              // Geometry is the fallback for a shape without a cell (a wrapped/flex-row sheet).
+              const geoBad = (!cellCol || !slotCol) && (!flush && !centred);
+              if (!cellBad && !geoBad) return;
+              // A grid child is moved by its CELL. `NL.cell` clears `absolute` before the append (the platform ignores
+              // (row,col) otherwise). After the first axis lands, the platform re-flows the auto-placed siblings, so
+              // the loop re-reads each child rather than trusting the pre-pass cells.
+              if (slotCol && NL && NL.cell) {
+                out.fixed++;
+                if (!o.dry) { try { NL.cell(s, t, row, slotCol); } catch (e) { out.fixed--; out.skipped++; } }
+                if (out.moved.length < 12) out.moved.push({ grid: String(s.name), axis: String(t.characters || '').slice(0, 16), from: cellCol, to: slotCol });
+              } else {
+                // A flex-row axis (the wrapped fallback sheet): a layout child's x is derived, so report rather than nudge.
+                out.skipped++;
+              }
+            });
+          }
+        }
+      }
+      ks.forEach(walk);
+    })(root || rootOf());
+    if (!o.dry && out.fixed && NL && NL.settle) { try { await NL.settle(); } catch (e) {} }
+    return out;
+  };
+
+  // ---- repairChips: rules 65/66 — inner pills are Chip components and the row is centred on the field ----
+  /**
+   * A composite field's tags are a COMPOSITION of the Chip atom, not three loose shapes: a pill plate + a text + a ✕
+   * redrawn inside MultiSelect cannot be instanced, themed or fixed from one place (measured 2026-10-26 on the
+   * selected `MultiSelect·Outlined·MD` master). This pass replaces a raw tag cluster with a copy of the registered
+   * `Chip·Input·SM·Clear·Neutral` master, then centres the whole tag block on the field. The old centring formula
+   * counted a trailing gap (`rowsN*(chipH+4)`), which put the 24px row at top 4 / bottom 8 in a 36px field (the
+   * user's “上少下多”). `o.master` overrides the atom name; `o.dry` reports only. Run after building a composite
+   * family, or on any composite that predates the Chip atom.
+   */
+  storage.repairChips = async (root, o) => {
+    o = o || {};
+    const CFx = storage.CF;
+    const masterName = o.master || 'Chip·Input·SM·Clear·Neutral';
+    const master = CFx && CFx.get ? CFx.get(masterName) : null;
+    const out = { hosts: 0, raw: 0, converted: 0, centered: 0, skipped: 0, samples: [], dry: !!o.dry };
+    const isCopy = (k) => { try { return !!(k.isComponentCopyInstance && k.isComponentCopyInstance()); } catch (e) { return false; } };
+    const kidsOf = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    (function walk(s) {
+      const ks = kidsOf(s);
+      const field = ks.filter((k) => String(k.name || '') === 'field')[0] || null;
+      const chips = ks.filter((k) => /^chip(?:·|$)/.test(String(k.name || '')) && k.type !== 'text' && k.type !== 'path');
+      if (field && chips.length) {
+        out.hosts++;
+        chips.forEach((ch) => { if (!isCopy(ch)) out.raw++; });
+        if (!o.dry && master && CFx.instance) {
+          chips.forEach((ch) => {
+            if (isCopy(ch)) return;
+            const box = { x: Number(ch.x), y: Number(ch.y), w: Number(ch.width), h: Number(ch.height) };
+            const inside = (k) => {
+              const cx = Number(k.x) + Number(k.width) / 2, cy = Number(k.y) + Number(k.height) / 2;
+              return cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h;
+            };
+            const text = ks.filter((k) => k.type === 'text' && inside(k))[0] || null;
+            const close = ks.filter((k) => /^glyph·close/.test(String(k.name || '')) && inside(k))[0] || null;
+            const label = text ? String(text.characters || '') : 'Tag';
+            const keep = String(ch.name || 'chip');
+            [ch, text, close].forEach((k) => { if (k) { try { (storage.removeTree || function (x) { x.remove(); })(k); } catch (e) {} } });
+            const r = CFx.instance(masterName, { parent: s, absolute: { x: box.x, y: box.y }, text: label });
+            if (r && r.ok) {
+              try { r.inst.name = keep; } catch (e) {}
+              try { CFx.chipFit(r.inst, label, { w: box.w, h: box.h }); } catch (e) {}
+              out.converted++;
+              if (out.samples.length < 10) out.samples.push(String(s.name || '?').slice(0, 26) + ' / ' + label + ' ' + Math.round(box.w) + '×' + Math.round(box.h));
+            } else out.skipped++;
+          });
+        } else if (!master) out.skipped += chips.length;
+        // Centre the BLOCK (chips + inner gaps, never a trailing gap) on the field.
+        const now = kidsOf(s).filter((k) => /^chip(?:·|$)/.test(String(k.name || '')) && k.type !== 'text' && k.type !== 'path');
+        if (now.length && field) {
+          const minY = Math.min.apply(null, now.map((k) => Number(k.y)));
+          const maxY = Math.max.apply(null, now.map((k) => Number(k.y) + Number(k.height)));
+          const dy = (Number(field.y) + Number(field.height) / 2) - (minY + (maxY - minY) / 2);
+          if (Math.abs(dy) > 0.5) {
+            out.centered++;
+            if (!o.dry) now.forEach((k) => { try { k.y = Number(k.y) + dy; } catch (e) {} });
+            if (out.samples.length < 10) out.samples.push(String(s.name || '?').slice(0, 26) + ' chips centre ' + Math.round(dy * 10) / 10 + 'px');
+          }
+        }
+      }
+      ks.forEach(walk);
+    })(root || rootOf());
+    if (!o.dry && (out.converted || out.centered)) { try { await new Promise((r) => setTimeout(r, 300)); } catch (e) {} }
+    return out;
   };
 
   // ---- fixStaleCenter: stale-center fingerprint precise fix (only fixes centering offset baked by "stale transient width/height") ----
@@ -453,7 +655,7 @@ return (function () {
             try { inst.resize(box.w, box.h); } catch (e) {}
             try { okW = inst.width; okH = inst.height; } catch (e) {}
           }
-          try { h.remove(); out.replaced++; if (out.sample.length < 12) out.sample.push(nm + ' ' + Math.round(okW) + '×' + Math.round(okH)); }
+          try { (storage.removeTree || function (x) { x.remove(); })(h); out.replaced++; if (out.sample.length < 12) out.sample.push(nm + ' ' + Math.round(okW) + '×' + Math.round(okH)); }
           catch (e) { out.failed++; out.errors.push(nm + ' → host.remove(): ' + String(e).slice(0, 60)); try { inst.remove(); } catch (e2) {} }
         } catch (e) { out.failed++; out.errors.push(String((h && h.name) || '?') + ' → ' + String(e).slice(0, 60)); }
         walk(h);
@@ -541,5 +743,40 @@ return (function () {
     return out;
   };
 
-  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize', 'fitTexts'] };
+  /** Re-centre every control label on BOTH axes of its host. A label whose size was edited after birth keeps its
+      old box (the factory's refit only knows the size it was born with), so it reads 10-30px off-axis while every
+      style token still passes. `CF.centerLabel` uses `storage.centerIn` (`parentX/parentY`), the only coordinate pair
+      that writes on a layout child. Icon-slot hosts are skipped: their label is offset by design. Idempotent. */
+  storage.centerLabels = function (root, o) {
+    o = o || {};
+    const scope = root || (penpot.currentPage && penpot.currentPage.root);
+    const CFx = storage.CF;
+    if (!scope) return { err: 'no scope' };
+    if (!CFx || !CFx.centerLabel) return { err: 'CF.centerLabel missing — seed component_factory.js' };
+    const isCtl = (nm) => {
+      const n = String(nm || '');
+      if (/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Masters·/.test(n)) return false;
+      return /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(n) || /(?:Button|Cta|Toggle)$/.test(n.split('·').pop());
+    };
+    const out = { hosts: 0, fixed: 0, skipped: 0, rows: [] };
+    (function walk(s) {
+      Array.from(s.children || []).forEach((c) => {
+        if (c.type === 'board' && isCtl(c.name)) {
+          out.hosts++;
+          const iconSlot = /IconStart|IconEnd|Lead|Trail/.test(String(c.name)) ||
+            (Array.from(c.children || []).some((k) => k.type === 'path' || /^(glyph|icon)·/.test(String(k.name))));
+          if (iconSlot) { out.skipped++; }
+          else {
+            const r = CFx.centerLabel(c);
+            if (r && r.ok) { out.fixed++; if (out.rows.length < 40) out.rows.push({ host: String(c.name), dx: r.dx, dy: r.dy }); }
+            else out.skipped++;
+          }
+        }
+        walk(c);
+      });
+    })(scope);
+    return out;
+  };
+
+  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'unifyCorners', 'repairAxisRow', 'repairChips', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize', 'fitTexts', 'centerLabels'] };
 })();
