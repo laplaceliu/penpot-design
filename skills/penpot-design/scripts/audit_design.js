@@ -117,6 +117,7 @@ return (function () {
     popup_row_corner: '§5.1 nested surfaces · a popup row is inset inside its panel, so its corner is the LARGEST declared radius step ≤ panel radius − row inset — not the trigger’s corner and not an arbitrary smaller step. Measured 2026-10-26: TimePicker/Combobox rows sat 4px inside a r12 panel with r4 (`xs`), which read as a different component; the legal nested step is r8. Repair with `storage.repairPopupRows`',
     label_icon_overlap: '§2.3 + §3.3 · a registered control’s label and its leading/trailing icon are layout neighbours: their boxes must not intersect. Measured 2026-10-26 on `TableHeader·Sorted·asc`: an 88px host with 16px pads and a 16px caret slot gave the 43px label a 36px box; the auto-width text ran 2.3px into the caret (4.3px into the filter icon). The header factory now grows to its content minimum (label + space gap + icon slot); rule 67 covers chip label/✕. Repair with `storage.repairIconOverlap`',
     spec_label_overlap: '§1.5 + §2.3 spec matrix · a `·Spec` matrix is a GRID — including a default-only/single-axis family — with a measured label column and one data cell per row; the label text and its slot/component must not intersect. Measured 2026-10-26 on `TableHeader·Spec`: the single-axis fallback used wrap rows, the 100px label board held a 119px “Sorted descending”, and the text ran 7px into the TableHeader slot. `CF.matrix` now labels every fitting sheet as a grid, reads the rendered label/note widths and grows the label column (rounded to 4px); labels fill the row and centre vertically. Rebuild a legacy spec through `CF.matrix`',
+    overlay_clipped: '§5.1 overlay visibility · a host with `clipContent` must not contain its own overlay badge (`presence`/`presence·ring`, `badge·`, `status·`, `dot·`, `indicator`): the clip trims the badge against the rounded silhouette. Measured 2026-10-26 on `Avatar·LG·Status·online` — 48×48 r9999 with `clipContent: true`, a 17px `presence·ring` at the edge losing its outer quarter; every avatar carried the same clip because `CF.avatar` passed `clip: true` unconditionally. Repair: the host does not clip; a surface that genuinely needs cropping (an editable scrim, a photo) takes the corner itself or lives in its own `clip·` wrapper',
     flush_corner_split: '§5.1 "one control, one corner", composited · a plate that sits FLUSH in a rounded host (both an X edge and a Y edge within 1px) must carry the host corner on the sides that touch that edge, or the host must clip. A group of segments is the case that hid: `ButtonGroup·Primary·MD·Focus` was a r9999 pill with r0 `segment·` plates and clipContent false, so the two end segments painted square corners straight through the pill outline — and it passed every gate (rule 63 only names the field family, rule 37 only compares a ring to its host). Measured 2026-10-26: 3 hosts in the file (two ButtonGroup states, one Toast accent bar). Repair: give the end plate a per-corner radius (CF.buttonGroup does), never clip the host — clipping cuts the focus ring that is authored 1px outside it. A 1–6px INDICATOR (progress meter, accent line) is exempt: spanning the edge is what makes it read as the card’s own bottom edge (“矩形和圆角融为一体”), and the trim comes from the HOST’s `clipContent` — the `Avatar·LG·Status·online` pattern (r9999 host, clip=true, presence badge at the edge) — never from an inset bar, a rounded 3px corner, or a separate `clip·` board (each was tried on `Toast·Dark·Timed·Info` and each was worse: detached, no-op, and lost absolute children on the next shelf move). `clipContent` clips children only, so the card’s own shadow is untouched. The rule judges PLATES only',
     spec_not_grid: '§1.5 + §2.3 spec matrix shape · a `·Spec` sheet is laid out by ONE real grid container (`grid·<Family>`: a measured label column + one data column per state), not by an `axis·` row plus `row·<Family>·N` fallback boards, and a board named `grid·` must actually carry a grid layout. Rule 71 only fires once a label crosses its slot, so the fallback shape itself was ungated and 36 of 67 block pages kept it after the grid landed in `CF.matrix` (32 with a 100px label column under a 148px axis spacer — the two columns visibly disagree). There is no wrap-row shape any more: a sheet whose states do not fit side by side becomes a GROUPED grid (whole state groups wrap into extra grid rows, each group named by its own caption row). Repair: rebuild through `CF.matrix`',
   };
@@ -1292,6 +1293,21 @@ return (function () {
         } else {
           add('ring_detached', s, st.top, 'ring ' + N(box(s).w) + '×' + N(box(s).h) + ' off host "' + nameOf(rh).slice(0, 30) +
             '" by ' + N(host.dist) + 'px — a drifted plate, not a corner disagreement (repair: TK.ringSweep)');
+        }
+      }
+      // rule 74 · overlay_clipped — a badge is an overlay: it must read as a COMPLETE shape, so the host cannot clip it.
+      if (typeOf(s) === 'board' && !isAnno(s)) {
+        let clips = false;
+        try { clips = !!s.clipContent; } catch (e) { clips = false; }
+        if (clips) {
+          (kidsOf(s) || []).forEach((k) => {
+            if (!/^(presence|badge|status|dot·|indicator)/.test(nameOf(k))) return;
+            const kb = box(k), sb = box(s);
+            const out = kb.x < sb.x - 1 || kb.y < sb.y - 1 || kb.x + kb.w > sb.x + sb.w + 1 || kb.y + kb.h > sb.y + sb.h + 1;
+            add('overlay_clipped', k, st.top, '"' + nameOf(k).slice(0, 22) + '" is an overlay on a clipping host "' + nameOf(s).slice(0, 24) +
+              '" — the clip trims it against the rounded silhouette' + (out ? ' (and its box already reaches the host edge)' : '') +
+              '; the host must not clip its own badge (repair: clip a `clip·` content wrapper instead)');
+          });
         }
       }
       // rule 73 · flush_corner_split — a square plate that occupies a CORNER of a rounded, unclipped host cuts the

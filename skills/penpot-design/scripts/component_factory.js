@@ -2729,7 +2729,7 @@ return (function () {
     var fs = s >= 64 ? 20 : (s >= 48 ? 16 : (s >= 32 ? 13 : 12));   // §3.2 ramp: an avatar's initials are copy, not a glyph
     var box = B(o.x || 0, o.y || 0, s, s);
     var ctx = CF.build(CF.name('Avatar', { size: o.size || s, slot: o.status ? ('Status·' + o.status) : (o.content === 'initials' ? 'Initials' : (o.editable ? 'Editable' : null)) }), box,
-      { parent: o.parent, radius: o.shape === 'square' ? 'none' : (o.shape === 'rounded' ? 'sm' : 'control'), clip: s < 999 });
+      { parent: o.parent, radius: o.shape === 'square' ? 'none' : (o.shape === 'rounded' ? 'sm' : 'control'), clip: false });
     ctx.host.fills = [{ fillColor: C('surfaceAlt'), fillOpacity: 1 }];
     if (o.image) {
       ctx.host.fills = [{ fillColor: C('border'), fillOpacity: 1 }];
@@ -2747,7 +2747,17 @@ return (function () {
       ctx.ellipse(sb, { name: 'presence', fill: C(o.status === 'online' ? 'success' : (o.status === 'busy' ? 'error' : (o.status === 'away' ? 'warning' : 'muted'))) });
     }
     if (o.editable) {
-      ctx.plate(B(box.x, box.y + s - s * 0.4, s, s * 0.4), { name: 'editable·scrim', fill: C('ink'), opacity: 0.55 });
+      // THE HOST DOES NOT CLIP (a clip trims `presence`/`presence·ring`, which must read as a complete badge —
+      // measured 2026-10-26 on `Avatar·LG·Status·online`: a 17px badge at the edge lost its outer quarter). The scrim
+      // still has to follow the circle, so it takes the host's corner on the two sides that touch the edge — the same
+      // per-corner device `ButtonGroup` uses for its end segments.
+      var scrimR = o.shape === 'square' ? 0 : RZ(o.shape === 'rounded' ? 'sm' : 'control');
+      var scrim = ctx.plate(B(box.x, box.y + s - s * 0.4, s, s * 0.4), { name: 'editable·scrim', fill: C('ink'), opacity: 0.55 });
+      Array.from(ctx.host.children || []).forEach(function (k) {
+        if (String(k.name) !== 'editable·scrim') return;
+        ['BottomLeft', 'BottomRight'].forEach(function (c) { try { k['borderRadius' + c] = scrimR; } catch (e) {} });
+      });
+      void scrim;
       ctx.glyph('camera', B(box.x + s / 2 - s * 0.15, box.y + s - s * 0.32, s * 0.3, s * 0.3), { color: '#FFFFFF' });
     }
     if (o.ring) ctx.ring(box, { radius: 'control', offset: 2, width: 2 });
