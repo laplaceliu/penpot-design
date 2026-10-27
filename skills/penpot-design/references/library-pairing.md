@@ -55,8 +55,9 @@ See `libraries/codesign-ui.md`.
   Presence, ClientOnly, FocusTrap, Collection, Formatting) are documented on the page-13 index and need no master.
 - **parts** — the public anatomy. Parts are drawn in the spec board and may be registered as part masters at
   `granularity:'part'`; the default `namespace` granularity counts a part master as coverage for its namespace.
-- **pages/groups** — the fixed 18-page groups: 03 actions, 04 fields, 05 selection, 06 data lists, 07 display,
-  08 navigation, 09 feedback; 13 is the index (non-visual utilities).
+- **pages/groups** — the fixed chapter groups: 03 actions, 04 fields, 05 selection, 06 data lists, 07 display,
+  08 navigation, 09 feedback; each family becomes its own `NN.MM · Chapter · Family·Spec` block page; 13 is the index
+  (non-visual utilities).
 
 ## 3. Headless libraries: anatomy, not styled variants
 
@@ -81,8 +82,8 @@ LM.load(manifest);                       // or LM.hydrate() from a PageRoot's `n
 LM.validate(storage.CF);                 // { ok, missingFactories, custom, nonVisual }
 LM.ensureProfiles(storage.CF);           // derived profiles for mapped factory families
 LM.stamp(pr);                            // durable contract on the PageRoot (per page, while it is open)
-const plan = LM.pagePlan('09 · Overlays & feedback');
-const out = await LM.buildPage({ page:'09 · Overlays & feedback', parent: pr, x:80, y:208 });
+const plan = LM.pagePlan('09.01 · Overlays & feedback · Alert·Spec');   // one block page = one family
+const out = await LM.buildPage({ page:'09.01 · Overlays & feedback · Alert·Spec', parent: pr, x:80, y:208 });
 ```
 
 - `LM.buildPage` is section/page-scoped; call it once per page and continue with `nextY` when the 30 s ceiling cuts a

@@ -387,6 +387,138 @@ return (function () {
     return out;
   };
 
+  // ---- repairPopupRows: rules 68/69 — one selected row, neutral active, nested row corner ----
+  /**
+   * A single-select popup has ONE selected row; the hover/keyboard-active row is a neutral state. Existing specs
+   * painted both with the brand wash (row·selected and row·tint #2563eb @12%) and gave the row an arbitrary `xs`
+   * corner inside a r12 panel (measured 2026-10-26 on TimePicker/Combobox). This pass:
+   *   - keeps a TimePicker's active row only in the Hover variant (the source now does the same), otherwise removes it;
+   *   - neutralises any kept active/hover row to 6% ink, so it can never read as a second selection;
+   *   - rounds every row plate to the largest declared step ≤ panel radius − inset (r12 panel + 4px inset → r8).
+   * `o.dry` reports; `o.bind` (a page name) binds the radius tokens after the write. Multiple selected rows are
+   * reported, never guessed away.
+   */
+  storage.repairPopupRows = async (root, o) => {
+    o = o || {};
+    const CFx = storage.CF, P = CFx && CFx.P;
+    const hoverFills = (CFx && CFx.fills) ? CFx.fills(null, 'hover') : [{ fillColor: P && P.ink, fillOpacity: 0.08 }];
+    const out = { hosts: 0, rows: 0, activeNeutral: 0, activeRemoved: 0, selected: 0, corners: 0, samples: [], dry: !!o.dry };
+    const kidsOf = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    const bx = (k) => ({ x: Number(k.x), y: Number(k.y), w: Number(k.width), h: Number(k.height) });
+    const maxR = (k) => { let b = null; try { b = k.borderRadius; } catch (e) { return 0; } return typeof b === 'number' ? b : (b ? Math.max(Number(b.borderRadiusTopLeft) || 0, Number(b.borderRadiusTopRight) || 0, Number(b.borderRadiusBottomRight) || 0, Number(b.borderRadiusBottomLeft) || 0) : 0); };
+    (function walk(s) {
+      const ks = kidsOf(s);
+      const panel = ks.filter((k) => String(k.name || '') === 'panel')[0] || null;
+      if (panel) {
+        const rows = ks.filter((k) => /^(row·(selected|tint|hover|active)|option·(selected|active|hover))/i.test(String(k.name || '')));
+        if (rows.length) {
+          out.hosts++;
+          const pb = bx(panel), pR = maxR(panel);
+          const time = /^TimePicker/i.test(String(s.name || '')), hoverState = /Hover/i.test(String(s.name || ''));
+          rows.forEach((k) => {
+            const nm = String(k.name || '');
+            const active = /(tint|hover|active)/i.test(nm);
+            if (active) {
+              if (time && !hoverState) {
+                out.activeRemoved++;
+                if (!o.dry) { try { k.remove(); } catch (e) { out.activeRemoved--; } }
+                return;
+              }
+              out.activeNeutral++;
+              if (!o.dry) { try { k.fills = hoverFills; } catch (e) {} }
+            }
+            out.rows++;
+            if (/selected/i.test(nm)) out.selected++;
+            if (pR > 0) {
+              const rb = bx(k);
+              const inset = Math.min(rb.x - pb.x, rb.y - pb.y, (pb.x + pb.w) - (rb.x + rb.w), (pb.y + pb.h) - (rb.y + rb.h));
+              if (inset >= 1) {
+                const legal = (CFx && CFx.radiusDown) ? CFx.radiusDown(pR - inset) : 0;
+                if (Math.round(maxR(k)) !== Math.round(legal)) {
+                  out.corners++;
+                  if (!o.dry) { try { k.borderRadius = legal; } catch (e) { out.corners--; } }
+                  if (out.samples.length < 10) out.samples.push(String(s.name || '?').slice(0, 22) + ' / ' + nm + ' r' + Math.round(maxR(k)) + '→r' + legal);
+                }
+              }
+            }
+          });
+          if (out.samples.length < 10) out.samples.push(String(s.name || '?').slice(0, 22) + ' rows=' + rows.length + ' selected=' + rows.filter((k) => /selected/i.test(String(k.name || ''))).length);
+        }
+      }
+      ks.forEach(walk);
+    })(root || rootOf());
+    if (!o.dry && (out.activeNeutral || out.activeRemoved || out.corners)) {
+      try { await new Promise((r) => setTimeout(r, 300)); } catch (e) {}
+    }
+    return out;
+  };
+
+  // ---- repairIconOverlap: rule 70 — a label and its icon must not collide ----
+  /**
+   * TableHeader sized its label area as `host − pads − iconSlots` but let the text auto-grow past it: a 43px
+   * "Column" in an 88px header ran into the 16px caret slot (measured 2026-10-26, 2.3px; 4.3px into filter).
+   * Grow the header to its content minimum (label + 4px space-scale gap + icon slots), shift the right-hand icons
+   * by the delta, and widen the text box to the new gap. `o.dry` reports; non-TableHeader overlaps are reported,
+   * never guessed at.
+   */
+  storage.repairIconOverlap = async (root, o) => {
+    o = o || {};
+    const CFx = storage.CF;
+    const out = { fixed: 0, skipped: 0, samples: [], dry: !!o.dry };
+    const kidsOf = (s) => { try { return Array.from(s.children || []); } catch (e) { return []; } };
+    (function walk(s) {
+      const nm = String(s.name || ''), ks = kidsOf(s);
+      if (/^TableRow·/.test(nm) && s.type === 'board') {
+        const chev = ks.filter((k) => /^glyph·chevron/.test(String(k.name || '')))[0] || null;
+        const texts = ks.filter((k) => k.type === 'text').sort((a, b) => Number(a.x) - Number(b.x));
+        const label = texts[0] || null;
+        if (chev && label) {
+          const newX = Number(s.x) + 28; // 10 inset + 14 glyph + 4 gap, the same lead slot the factory writes
+          const d = Math.round(newX - Number(label.x));
+          if (d > 1) {
+            out.fixed++;
+            if (!o.dry) { try { label.x = newX; } catch (e) {} }
+            if (out.samples.length < 10) out.samples.push(nm.slice(0, 26) + ' label +' + d + 'px');
+          }
+        } else out.skipped++;
+      } else if (/^TableHeader·/.test(nm) && s.type === 'board') {
+        const text = ks.filter((k) => k.type === 'text')[0] || null;
+        const icons = ks.filter((k) => k.type === 'path' || /^(glyph|caret|chevron|sort|filter|arrow)(·|$)/.test(String(k.name || '')));
+        if (text && icons.length) {
+          const padX = Math.max(0, Number(text.x) - Number(s.x));
+          const fs = parseFloat(text.fontSize) || 12;
+          // Use the RENDERED width, not the estimate: `estW('Column',12)` is 35px while the real label is 43px, and
+          // the estimate-driven growth left the text box overflowing again (measured on the same three headers).
+          const tw = Math.max(Number(text.width) || 0, (CFx && CFx.estW) ? CFx.estW(String(text.characters || ''), fs) : 0);
+          const slots = icons.length * 20;
+          const minW = padX * 2 + tw + 4 + slots;
+          const need = Math.max(0, Math.round(minW - Number(s.width)));
+          const tb = { x: Number(text.x), y: Number(text.y), w: Number(text.width), h: Number(text.height) };
+          let overlap = 0;
+          icons.forEach((ic) => {
+            const ox = Math.min(tb.x + tb.w, Number(ic.x) + Number(ic.width)) - Math.max(tb.x, Number(ic.x));
+            const oy = Math.min(tb.y + tb.h, Number(ic.y) + Number(ic.height)) - Math.max(tb.y, Number(ic.y));
+            if (ox > 1 && oy > 1) overlap = Math.max(overlap, ox);
+          });
+          if (need > 0 || overlap > 1) {
+            out.fixed++;
+            if (!o.dry) {
+              try { s.resize(Number(s.width) + need, Number(s.height)); } catch (e) {}
+              icons.forEach((ic) => { try { ic.x = Number(ic.x) + need; } catch (e) {} });
+              // Keep the label auto-width. Resizing the text box to the WIDER gap inflated it (43→54), so the next
+              // audit read the label box touching the icon again; auto-width returns it to the measured 43px.
+              try { text.growType = 'auto-width'; } catch (e) {}
+            }
+            if (out.samples.length < 10) out.samples.push(nm.slice(0, 26) + ' overlap ' + Math.round(overlap) + 'px, +' + need + 'px');
+          }
+        } else out.skipped++;
+      }
+      ks.forEach(walk);
+    })(root || rootOf());
+    if (!o.dry && out.fixed) { try { await new Promise((r) => setTimeout(r, 300)); } catch (e) {} }
+    return out;
+  };
+
   // ---- fixStaleCenter: stale-center fingerprint precise fix (only fixes centering offset baked by "stale transient width/height") ----
   // Fingerprint: the text's **top-left corner** lands exactly on the host center (|t.x−hcx|≤2 or |t.y−hcy|≤2), but the text's real center
   //    deviates from the host center by >0.5 — the arithmetic consequence of "computing (w−1)/2 with the 1×1 transient width/height at creation";
@@ -778,5 +910,5 @@ return (function () {
     return out;
   };
 
-  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'unifyCorners', 'repairAxisRow', 'repairChips', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize', 'fitTexts', 'centerLabels'] };
+  return { seeded: true, fns: ['alignPage', 'vAlignPage', 'fixInner', 'unclip', 'cleanOrphans', 'unifyCorners', 'repairAxisRow', 'repairChips', 'repairPopupRows', 'repairIconOverlap', 'fixStaleCenter', 'groupAssemblies', 'fixZOrder', 'componentize', 'fitTexts', 'centerLabels'] };
 })();

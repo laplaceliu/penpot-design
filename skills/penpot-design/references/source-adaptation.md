@@ -95,12 +95,12 @@ The skill must not hardcode which families are derived for a particular site. Th
 `reference_drift` (rule 56) is the source-adaptation gate. It is **data-driven**: one branch per page range, no family
 names hardcoded per page.
 
-**The catalogue constrains the inventory; the profile constrains the form.** Pages 03–09 deliver exactly `CAT.PLAN`
+**The catalogue constrains the inventory; the profile constrains the form.** Pages 03–09 deliver exactly `CAT.PLAN` as one block page per family (`CAT.BLOCKS`)
 (67 families, one page each — rule 62). A profile entry may change a family's material, geometry and variants; it may
 not add a family to a standard page, remove one, or move it to another page. A source-only component is built on
 page `10` or later (or page `17 · Reference imitation`), never as an extra `·Spec` inside 03–09.
 
-- **03 · Actions** — the page is the seven canonical action families (`CAT.PLAN['03']`), each with a `·Spec`: a spec
+- **03 · Actions** — the chapter is the seven canonical action families (`CAT.PLAN['03']`), each on its own `03.MM · Actions · Family·Spec` page: a spec
   whose family is not in the profile, a profile family with no spec, or a host whose corner role the source does not pin.
 - **04–08 · Forms / Selection / Data / Navigation** — one table maps the page prefix to its group and its profiled
   families (and one family may own several host-name prefixes: `List` claims `ListItem·`, `Table` claims

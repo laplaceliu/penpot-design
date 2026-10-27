@@ -52,13 +52,20 @@ return (function () {
   LM.visual = function () { return LM.all().filter((c) => (c.kind || 'visual') === 'visual'); };
   LM.nonVisual = function () { return LM.all().filter((c) => (c.kind || 'visual') !== 'visual'); };
   LM.byPage = function (page) { const p = pageNum(page); return LM.all().filter((c) => String(c.page) === p); };
+  /** Block pages (`03.01 · …`) carry ONE canonical family; filter the chapter manifest to it. Chapter pages keep
+      the whole-page list for legacy manifests. */
+  const blockFor = (page) => (storage.CATALOG && storage.CATALOG.blockFor) ? storage.CATALOG.blockFor(page) : null;
+  const onBlock = (list, page) => {
+    const b = blockFor(page);
+    if (!b) return list;
+    return list.filter((c) => String(c.designFamily).toLowerCase() === String(b.family).toLowerCase());
+  };
   /** Design-family names assigned to a page (visual only); the audit requires exactly these spec boards. */
   LM.pageFams = function (page) {
-    const p = pageNum(page);
-    return names(LM.byPage(p).filter((c) => (c.kind || 'visual') === 'visual').map((c) => c.designFamily));
+    return names(onBlock(LM.byPage(page), page).filter((c) => (c.kind || 'visual') === 'visual').map((c) => c.designFamily));
   };
   LM.pagePlan = function (page) {
-    return LM.byPage(page).map((c) => ({ name: c.name, designFamily: c.designFamily, page: c.page,
+    return onBlock(LM.byPage(page), page).map((c) => ({ name: c.name, designFamily: c.designFamily, page: c.page,
       group: c.group, factory: c.factory || 'custom', kind: c.kind || 'visual', parts: c.parts || [], states: c.states || [] }));
   };
   LM.factoryIndex = function (CF) {

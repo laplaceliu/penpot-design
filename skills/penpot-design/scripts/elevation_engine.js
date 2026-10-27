@@ -60,7 +60,7 @@
    USAGE (after the G1 seed order; needs storage.TK + storage.CF)
    --------------------------------------------------------------
      EL.seed({ set:'Reference · Core', recipes:{card:{drop:[…],inner:[…]}}, roles:{…} })
-     await EL.sweepPage({ page:'03 · Actions', apply:true })
+     await EL.sweepPage({ page:'03.01 · Actions · Button·Spec', apply:true })   // one block page = one family
      EL.surface(parent, { name:'surface·nav', role:'nav', fill:'color.surface', radius:'full' })
      EL.audit()
    ========================================================================== */
@@ -197,6 +197,45 @@
       if (n !== EL.recipes[k].layers.length) errors.push('shadow.' + k + ': token has ' + n + ' layer(s), recipe wants ' + EL.recipes[k].layers.length);
     });
     return { seeded: EL.seeded, set: set, recipes: Object.keys(EL.recipes), roles: Object.keys(EL.roles), tokens: check, log: log, errors: errors };
+  };
+
+  /** THE ELEVATION RECORD IS DURABLE IN THE TOKEN SET: `EL.seed` writes one `shadow.<recipe>` token per recipe, and
+      those tokens survive in the file. After a storage wipe `EL.recipes` is empty, so `sweepPage` silently reports
+      `groups: 0`, `adopt` refuses (no recipe to apply) and every freshly built shadowed shape stays typed — gate
+      `shadow_unbound` then indicts the page and the repair the gate names does nothing. Hydrate reads the declared
+      tokens back into recipes, so the engine is never weaker than the file it is repairing. */
+  EL.hydrate = function () {
+    var tk = TK();
+    if (!tk || !tk.declared) return { err: 'TK is not seeded' };
+    var dec = null;
+    try { dec = tk.declared(true) || {}; } catch (e) { return { err: String(e.message || e) }; }
+    var unhex = function (c) {
+      var t = String(c || '#000000');
+      if (t.length === 9) return { hex: t.slice(0, 7), op: parseInt(t.slice(7, 9), 16) / 255 };
+      return { hex: t, op: 0.1 };
+    };
+    EL.recipes = {};
+    (dec.shadows || []).forEach(function (e) {
+      var nm = String((e && e.name) || '').replace(/^shadow\./, '');
+      if (!nm) return;
+      var tok = null;
+      try { tok = tk.find ? tk.find('shadow.' + nm) : null; } catch (x) { tok = null; }
+      var v = null;
+      try { v = tok ? tok.value : (e && e.value); } catch (x) { v = null; }
+      var arr = Array.isArray(v) ? v : (v && v.shadow) ? v.shadow : (v ? [v] : []);
+      var drop = [], inner = [];
+      arr.forEach(function (l) {
+        l = l || {};
+        var c = unhex(l.color);
+        var t = { offsetX: Number(l.offsetX) || 0, offsetY: Number(l.offsetY) || 0, blur: Number(l.blur) || 0,
+                  spread: Number(l.spread) || 0, color: c.hex, opacity: c.op };
+        (l.inset ? inner : drop).push(t);
+      });
+      var rec = normRecipe(nm, { drop: drop, inner: inner });
+      if (rec.layers.length) EL.recipes[nm] = rec;
+    });
+    EL.seeded = Object.keys(EL.recipes).length > 0;
+    return { seeded: EL.seeded, recipes: Object.keys(EL.recipes), tokens: (dec.shadows || []).length };
   };
 
   EL.recipe = function (name) { return EL.recipes[String(name)] || null; };

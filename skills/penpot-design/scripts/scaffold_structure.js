@@ -5,11 +5,13 @@
 // PageRoot is always 1920 — the spec-sheet canvas, not a screen. Screen widths come from the tier (LY.TIERS: web 1440 / pad 834 / mobile 375).
 //
 // TWO GRANULARITIES (penpot-structure.md §2a):
-//   · chapter pages (default) — the 18-row PAGES table below: one page per chapter, boards shelved side by side.
-//   · block pages — `storage.scaffoldPages(rows)` installs a per-block row list (`{n,d,t}` per board) and every phase
-//     iterates that instead. Page name grammar: `NN.MM · <Chapter> · <Block>`. Use it whenever a page will hold ONE
-//     board: a shape can never change pages in this API (appendChild AND remove both throw "Cannot modify a page that
-//     is not currently active" — measured 2026-10-21), so the page must be decided before the first shape is drawn.
+//   · block pages (DEFAULT for 03–09) — one canonical family per page, derived from `storage.CATALOG.BLOCKS`
+//     (`03.01 · Actions · Button·Spec`). The 18-row PAGES table stays the chapter contract for 00–02 and 10–17.
+//   · chapter pages / custom rows — `storage.scaffoldPages(rows)` installs a per-page row list (`{n,d,t}`) and every
+//     phase iterates that instead. A shape can never change pages in this API (appendChild AND remove both throw
+//     "Cannot modify a page that is not currently active"), so the page must be decided before the first shape is drawn.
+// ⚠️ catalog_engine.js MUST be loaded before this runner: if CAT.BLOCKS is absent this file REFUSES rather than
+// silently rebuilding the legacy 7-chapter shape (the exact failure mode where a pagination edit "did not take effect").
 
 var CANVAS_W = 1920, CONTENT_X = 80, CONTENT_R = 1840;
 var HEADER_H = 160, FOOTER_H = 80, CONTENT_Y = 208, MIN_H = 1000;
@@ -48,15 +50,34 @@ return (function () {
   };
   var rightX = function (s, size) { return G(Math.max(CONTENT_X, CONTENT_R - estW(s, size))); };
 
-  storage.scaffoldContract = function () { return PAGES.map(function (p) { return p.n; }); };
-  /** Install the block-page row list (`[{n,d,t}]`, one row per board) — every phase below iterates it instead of
-      PAGES. Passing null restores chapter granularity. */
+  // ---- 03–09 block pages: one canonical family per page, derived from CAT.BLOCKS (single inventory) --------------
+  var BLOCK_ROWS = (function () {
+    var CAT = storage.CATALOG;
+    if (!CAT || !CAT.BLOCKS || !CAT.BLOCKS.length) return null;
+    return CAT.BLOCKS.map(function (b) {
+      var ch = PAGES.filter(function (p) { return p.n === CAT.PAGE_NAMES[b.chapter]; })[0] || { d: '', t: '' };
+      var axes = (b.fam && b.fam.axes) || [], rows = (b.fam && b.fam.rows) || [];
+      return {
+        n: b.page, d: ch.d, t: 'CF.matrix · ' + axes.join(' / ') + ' · ' + rows.length + ' variants',
+        ch: b.chapter, family: b.family, spec: b.spec
+      };
+    });
+  })();
+  var DEFAULT_ROWS = (BLOCK_ROWS && BLOCK_ROWS.length)
+    ? PAGES.slice(0, 3).concat(BLOCK_ROWS, PAGES.slice(10))   // 00–02 · 67 block pages · 10–17
+    : PAGES.slice();                                           // only reachable for an explicitly installed row list
+  if (!storage._scafRows && !BLOCK_ROWS) {
+    return { err: 'the 03–09 standard is one block page per family, derived from storage.CATALOG.BLOCKS — load scripts/catalog_engine.js BEFORE scaffold_structure.js (or call storage.scaffoldPages(rows) before a re-run for a custom list). Refusing to build the legacy seven-chapter shape.' };
+  }
+
+  storage.scaffoldContract = function () { return DEFAULT_ROWS.map(function (p) { return p.n; }); };
+  /** Install a custom page row list (`[{n,d,t}]`, one row per board). Passing null restores the standard list. */
   storage.scaffoldPages = function (rows) {
     storage._scafRows = rows && rows.length ? rows : null;
     storage.scaffoldQueue = null;
-    return (storage._scafRows || PAGES).length;
+    return (storage._scafRows || DEFAULT_ROWS).length;
   };
-  var rowsOf = function () { return storage._scafRows || PAGES; };
+  var rowsOf = function () { return storage._scafRows || DEFAULT_ROWS; };
   // `NN.MM · Chapter · Block` pages name their chrome after the full code (04.07-PageRoot); chapter pages keep NN-.
   var prefixOf = function (pageName) { return String(pageName).split(' · ')[0]; };
 

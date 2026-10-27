@@ -1,9 +1,9 @@
-# Penpot file contract — the 18-page output structure
+# Penpot file contract — the standard block-page output structure
 
-> Every code-to-design task produces **the same file**: one Penpot file, 18 numbered pages in 4 layers, one root board
-> per page, one spec board per component family, one board per screen recipe. The page list is fixed; the *contents* of
-> the pages are derived from the engines, so adding a factory or a recipe automatically adds a board without changing
-> this contract.
+> Every code-to-design task produces **the same file**: one Penpot file, 18 chapter rows in 4 layers, with **03–09
+> built as 67 block pages** by default (`NN.MM · Chapter · Family·Spec`) → **78 pages**. One root board per page, one
+> spec board per component family, one board per screen recipe. The page list is fixed; the *contents* of the pages are
+> derived from the engines, so adding a factory or a recipe automatically adds a page without changing this contract.
 >
 > **DESIGN.md is the source of truth** for tokens and rationale; this file is its visual implementation. Token names,
 > colors, type scale, radius and spacing correspond 1:1. Where the two disagree, DESIGN.md wins for values and
@@ -46,13 +46,13 @@ Three consequences that make the contract checkable instead of aspirational:
 - **PageRoot is 1920 wide: it is the spec-sheet canvas, not a screen.** The screen width comes from the viewport tier
   (`LY.TIERS`: web 1440 / pad 834 / mobile 375) and only appears as the width of a board placed *inside* a page.
 
-## 2. Page master table (18 pages, fixed numbering and order)
+## 2. Page master table (18 chapter rows; 03–09 paginate by default)
 
 `Required boards` is the delivery contract. `Scope` is the argument passed to `storage.designGate()` for that page.
 
 | # | Page | Required boards | Scope |
 |---|---|---|---|
-| **L0** | `00 · Cover` | 1 identity board (name, version+date, style-keyword chips, the 6 tone ramps as wash/hue/ink triples, the 18-page table of contents) | default |
+| **L0** | `00 · Cover` | 1 identity board (name, version+date, style-keyword chips, the 6 tone ramps as wash/hue/ink triples, the chapter → block-page range table of contents) | default |
 | | `01 · Foundations` | 8 boards — **one `01.MM` page each, each projected by `storage.FN` and carrying the durable `nl:fn=<kind>` stamp (gate G16; `designCoverage()` judges the chapter across pages, engines.md §7)**: `Palette` (every declared colour token, dual polarity when a dark scheme exists) · `Type ramp` (one line per **`TK.declared().types`** step — `storage.T.fontRamp` only when the system overrides it, else design-guide §3.2 `[11,12,13,14,16,20,24,32,40,56,64]` — each with its role) · `Spacing` (`LY.SPACE` bars) · `Grid` (12/8/4 diagrams) · `Radius` · `Elevation` · `Icons` (`CF.glyphKinds` on `CF.iconSquare` pitches; the one **declared exemption** `FN.EXEMPT['01']`, it draws a catalog) · `Strokes & dividers`. **No board here takes a height argument**: the value comes from the hug sum. The token **capacity** is fixed by `CAT.CAPACITY` (57 colours · 12 type · 14 spaces · 9 radii · 13 shadows · 2 dims · 4 stroke roles · 10 tone triples); values are brand-configurable | default |
 | | `02 · Color in use` | 5 boards: `Semantic roles` (tone → wash / hue / **ink**, the triples derived from token *names*, design-guide §4) · `State layers` (the `CF.STATE` alphas drawn on one base) · `Contrast matrix` (every text/background pair the kit can produce, WCAG ratio + verdict **computed** from the palette) · `Light vs dark` (scheme boards only, §2.2) · `Data colors` (categorical ramp). All but `Light vs dark` are `FN` projections. Capacity is the same `CAT.CAPACITY` contract as page 01 | default |
 | **L1** | `03 · Actions` | **7 canonical** `Family·Spec` boards in `CAT.PLAN` order: Button, IconButton, ButtonGroup, SplitButton, FAB, Link, Segmented. On a recreation the profile adjusts material/geometry; it never adds or removes a family. | default |
@@ -114,27 +114,28 @@ Asked in the **same round-trip**, written into DESIGN.md `## Colors`. Definition
   - `14–16` add **one dark twin per demo page** (the recipe that best shows the scheme), not one per board.
   - `11 Grid & breakpoints` and `12 Screen recipes` are unaffected: layout is orthogonal to color.
 
-### 2.3 Block-per-page pagination (the fine-grained variant of the same contract)
+### 2.3 Block-per-page pagination — the default for 03–09
 
-The 18-page list is the **chapter** contract. A chapter may be paginated to **one board per page** without changing
-anything else in this file: page `07 · Display & metrics` becomes `07.01 · Display & metrics · Card·Spec`,
-`07.02 · … · Kpi·Spec`, … The grammar is fixed:
+The 18-row table is the **chapter** contract for `00–02` and `10–17`. Pages **03–09 are built as block pages by
+default**: `scripts/scaffold_structure.js` derives 67 `NN.MM · Chapter · Family·Spec` rows from
+`storage.CATALOG.BLOCKS` and refuses to build the legacy seven-chapter shape. The grammar is fixed:
 
 ```
-NN.MM · <chapter name> · <board name>        07.03 · Display & metrics · Card·Spec
+NN.MM · <chapter name> · <board name>        07.03 · Display & metrics · Chip·Spec
 ```
 
-`NN` is still the chapter of §2 (so layer, ordering and the footer nav are unchanged), `MM` is the 1-based index of the
-board inside that chapter, and the block suffix is **the board's own name verbatim** — the page is addressable by the
-thing it contains, which is the whole point: a defect report, a repair call and a human sentence all name the same
-unit, and no repair ever has to "find the card spec somewhere on page 07".
+`NN` is the chapter of §2, `MM` is the 1-based **canonical `CAT.PLAN` position** (not the board's current shelf
+position), and the block suffix is **the board's own name verbatim** — the page is addressable by the thing it
+contains, which is the whole point: a defect report, a repair call and a human sentence all name the same unit, and no
+repair ever has to "find the calendar spec somewhere on page 06".
 
-- **When to use it**: whenever a chapter carries more than a couple of boards and the task involves repair loops or
-  per-board delivery. One board per page makes `designPage`/`auditPage` scope trivially small, keeps each page's
-  PageRoot short (a 12-board chapter page is a 12 000px scroll), and makes the block addressable in a URL/selection.
+- **Default**: every family page holds exactly one canonical `Family·Spec` board. `CAT.pageIssues()` rejects a chapter
+  page that still carries family specs, a missing block page, or a family spec on a support page.
 - **When NOT to paginate**: pages **14/15/16** and **17**. Prototype links are page-local — a `navigate-to` whose
   destination lives on another page persists with a **null destination** (measured 2026-10-21: the interaction survives,
   reads back fine, and does nothing in the viewer). Screens must therefore stay on one page with their flow partners.
+- **Support pages** are allowed for non-family boards (this file carries `07.11 · Display & metrics · Masters·Chip`):
+  one board, no family spec. They sit after the chapter's family pages.
 - **Page anatomy per block page** is §3 verbatim: `<NN.MM>-PageRoot` (1920) + `-Header` + `-Footer` + exactly **one**
   content board at `x=80, y=208`. The header's description line is the chapter description; the token line is the
   board's own token reference.
@@ -153,10 +154,12 @@ unit, and no repair ever has to "find the card spec somewhere on page 07".
   `FN.stampOf(board)` the `nl:fn` proof; `FN.projected(page)` still recognises a board by its **`FN.KINDS` display name**,
   so the block suffix of the page name and the board name are the same string — which is exactly the §2.3 rule.
   Under pagination `FN.reflow`/`fitRoot` become no-ops on a one-board page, and `FN.check(page)` scopes to that board.
-- **Deleting a page is not a cosmetic act.** It destroys the component masters hosted on it (measured: 275 → 0) and it
-  wipes every flow and interaction in the file. After any page deletion: re-register masters (`CF.autoRegister` per
-  page), re-create the named flows **before** re-wiring links (otherwise Penpot invents `Flow N`), and re-author links
-  from a name-based spec, because ids do not survive a rebuild.
+- **Deleting a page is not a cosmetic act.** It destroys the component masters still hosted on it and wipes every
+  flow/interaction in the file. **Cut/paste is a lossless migration for component masters** (measured 2026-10-26: cutting
+  a board that hosts main instances took the library 692 → 689, and pasting it on another page restored 692 with the
+  **same component ids and mainInstance ids**; the board id changes). So: cut/paste every board first, verify the
+  component total and the mainInstance locations, then remove the empty chapter shells. A page deletion still wipes
+  flows; re-create named flows **before** re-wiring links, from a name-based spec, because ids do not survive a rebuild.
 
 ## 3. Page anatomy (per-page contract)
 
@@ -333,17 +336,18 @@ This is where amateur output is most visible, so the rules are explicit:
 
 ## 8. Delivery self-check
 
-- [ ] 18 pages present, named and ordered per §2 (17 optional, declared in DESIGN.md `omitted`).
-- [ ] **If §2.3 pagination is used**: every chapter page is replaced by `NN.MM · Chapter · Block` pages, one board each,
-      `MM` contiguous from 01 inside each chapter; 14/15/16/17 stay grouped; the cover TOC, the `13` index and the
-      prototype flows were regenerated **after** the last page add/delete; every flow is named (no `Flow N`); a
-      destination readback of `null` on any interaction is a defect, not a formatting quirk.
+- [ ] **78 pages present, named and ordered per §2/§2.3**: `00–02`, 67 block pages, `10–17` (17 optional, declared in
+      DESIGN.md `omitted`). A legacy `03 · …`–`09 · …` chapter page holding family specs is a defect, not an alternative.
+- [ ] **03–09 block-page inventory**: every `CAT.BLOCKS` page exists exactly once, one `Family·Spec` board each, `MM`
+      contiguous from 01 inside each chapter; a support page (`Masters·`) holds no family spec; 14/15/16/17 stay
+      grouped; the cover TOC, the `13` index and the prototype flows were regenerated **after** the last page
+      add/delete; every flow is named (no `Flow N`); a destination readback of `null` on any interaction is a defect.
 - [ ] One PageRoot per page with Header/Footer in place, `clipContent=false`, root height = used height (§3).
 - [ ] **No empty page**: enumerate `penpot.currentFile.pages` and assert each page's PageRoot has ≥ 1 child board.
-      A page-split leaves the old `NN · Chapter` shells behind with an empty root — both auditors pass them (they scope to
-      the PageRoot subtree), so the only thing that catches them is this enumeration. Remove them with
+      A migration leaves the old `NN · Chapter` shells behind with an empty root — both auditors pass them (they scope to
+      the PageRoot subtree), so `CAT.pageIssues()` and this enumeration are what catch them. Remove them with
       `storage.pg(name).remove()` (there is no `penpot.deletePage`), re-checking `root.children.length` per page inside the loop.
-- [ ] Pages 03–09: one `Family·Spec` per family of `CAT.PLAN` (`CAT.pageFams(page)`, 67 total), packed by `LY.pack`, names in
+- [ ] Pages 03–09: exactly one `Family·Spec` per `CAT.BLOCKS` page (67 total), names in
       `Family·Type·Size·State·Slot` form, no `/`.
 - [ ] Coverage per §4.1: `variant_sparse`, `state_coverage`, `focus_ring_missing`, `disabled_wrong` all **0**.
 - [ ] Assembly ownership per §4.3: `loose_assembly` = 0; screens never re-draw loose primitives.

@@ -318,6 +318,17 @@ return (function () {
   };
   /** The token name for the same question `CF.radius` answers with a number — the binder's input. */
   CF.radiusTokenFor = function (key) { return CF.radiusToken(CF.radius(key)); };
+  /** The largest DECLARED radius step at or below `v`. A nested surface must use this, not an arbitrary smaller
+      step: a r12 panel with a 4px inset admits at most r8, and a r4 row reads as a different control (measured
+      2026-10-26 on TimePicker/Combobox: panel r12, row r4). Falls back to the generic ladder before tokens exist. */
+  CF.radiusDown = function (v) {
+    var vals = [];
+    try { if (storage.TK && storage.TK.declared) vals = (storage.TK.declared().radii || []).map(function (r) { return Number(r.value); }); } catch (e) {}
+    if (!vals.length) vals = Object.keys(RAD).map(function (k) { return RAD[k]; });
+    var best = 0;
+    vals.forEach(function (x) { if (isFinite(x) && x <= Number(v) + 0.5 && x > best) best = x; });
+    return best;
+  };
   CF.radiusSteps = function () { return Object.keys(RAD).map(function (k) { return { key: k, value: RAD[k], token: TOKEN_OF[k] }; }); };
   /** The corner of a FORM control (§5.1 "one control, one corner"). A field is not a button: a source whose actions
       are pills still draws its inputs on the form step (Rayo DESIGN.md: buttons `radius.full`, fields and modals
@@ -698,7 +709,28 @@ return (function () {
         §1.3: for a `reserved` family the boundary is authored at alpha 0 and the unit gets the state wash. */
     ring: function (box, o) {
       o = o || {};
-      var off = o.offset === undefined ? 2 : o.offset, w = o.width || 2, r = RZ(o.radius === undefined ? 'sm' : o.radius);
+      var off = o.offset === undefined ? 2 : o.offset, w = o.width || 2;
+      // A RING TAKES ITS HOST'S CORNER, not a ladder role. The default used to be `RZ('sm')`, which agreed with a
+      // rounded control by coincidence (button 8 = sm 8) and disagreed with anything square: `CF.listItem` painted its
+      // own state background on an r0 row, asked for no corner, and got an r8 ring + r8 `wash·focus` around a square
+      // plate (rule 37 `ring_off_host` on every rebuilt ListItem·Focus). Resolve the same way the auditor does — the
+      // host, or a same-box non-decorative plate inside it (a Switch track outranks its r0 wrapper) — and only fall
+      // back to `sm` when nothing declares a corner at all.
+      var rHost = null;
+      if (this.host && storage.TK && storage.TK.cornersOf) {
+        var cs = storage.TK.cornersOf(this.host);
+        if (cs && cs.length) rHost = Math.max.apply(null, cs);
+        var hb0 = this.host;
+        var DECOR = /^(sheen·|hitpad·|wash·|clip·|surface·|hairline·|state·layer|ring·)/;
+        Array.from(hb0.children || []).forEach(function (k) {
+          if (DECOR.test(String(k.name))) return;
+          if (Math.abs(k.width - hb0.width) > 2 || Math.abs(k.height - hb0.height) > 2) return;
+          var kc = storage.TK.cornersOf(k); if (!kc || !kc.length) return;
+          var km = Math.max.apply(null, kc);
+          if (km > (rHost || 0)) rHost = km;
+        });
+      }
+      var r = o.radius === undefined ? (rHost === null ? RZ('sm') : rHost) : RZ(o.radius);
       var hb = this.host ? B(this.host.x, this.host.y, this.host.width, this.host.height) : null;
       var src = box ? B(box.x, box.y, box.w, box.h) : (hb ? B(hb.x, hb.y, hb.w, hb.h) : null);
       if (!src) return null;
@@ -1371,11 +1403,31 @@ return (function () {
       parent: o.parent, fill: C('surface'), stroke: C('border'), strokeW: 1, radius: L.radius, clip: true
     });
     var off = 0;
+    // THE GROUP'S SILHOUETTE BELONGS TO ITS END SEGMENTS. The host is a pill/rounded plate that does NOT clip (a clip
+    // would cut the focus ring, which is authored 1px outside), so a square `segment·` flush at either end painted its
+    // corners straight through the host's rounded outline — measured 2026-10-26 on `ButtonGroup·Primary·MD·Focus`
+    // (host r9999, segments r0, clipContent false, gate CLEAN). Per-corner radius: only the sides that touch the host
+    // edge take the group corner; interior segments stay square.
+    var grpR = RZ(L.radius);
     for (var i = 0; i < items.length; i++) {
       var it = items[i], tn = CF.tone(it.type || 'default');
       var seg = vert ? B(box.x + 1, box.y + 1 + off, box.w - 2, hs[i] - (i ? 1 : 0)) : B(box.x + 1 + off, box.y + 1, ws[i] - (i ? 1 : 0), box.h - 2);
-      if (tn.bg) ctx.plate(seg, { name: 'segment·' + (i + 1), fill: C(tn.bg), fills: CF.fills(C(tn.bg), S, { onDark: tn.onDark }) });
-      else if (i && (S === 'hover' || S === 'pressed')) ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
+      var fS = i === 0, lS = i === items.length - 1;
+      var segR = (fS || lS) ? (vert
+        ? { borderRadiusTopLeft: fS ? grpR : 0, borderRadiusTopRight: fS ? grpR : 0, borderRadiusBottomLeft: lS ? grpR : 0, borderRadiusBottomRight: lS ? grpR : 0 }
+        : { borderRadiusTopLeft: fS ? grpR : 0, borderRadiusBottomLeft: fS ? grpR : 0, borderRadiusTopRight: lS ? grpR : 0, borderRadiusBottomRight: lS ? grpR : 0 }) : 0;
+      // `RZ`/`CF.radius` resolve a NUMBER or a role name, so a per-corner map must be written onto the plate after it
+      // exists (passing it as `radius` came back r0 — measured on the first rebuild of this fix).
+      var segPlate = null;
+      if (tn.bg) segPlate = ctx.plate(seg, { name: 'segment·' + (i + 1), fill: C(tn.bg), fills: CF.fills(C(tn.bg), S, { onDark: tn.onDark }) });
+      else if (i && (S === 'hover' || S === 'pressed')) segPlate = ctx.plate(seg, { name: 'segment·' + (i + 1), fills: CF.fills(null, S) });
+      // a per-corner MAP cannot be assigned: `borderRadius = {...}` throws "Value not valid: [object Object]" in
+      // Penpot 2.17 (measured 2026-10-26); the four corner properties are the only writer.
+      if (segPlate && segR) {
+        ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(function (c) {
+          try { segPlate['borderRadius' + c] = Number(segR['borderRadius' + c]) || 0; } catch (e) {}
+        });
+      }
       if (i) ctx.plate(vert ? B(seg.x, seg.y, seg.w, 1) : B(seg.x, seg.y, 1, seg.h), { name: 'boundary·segment', fill: C('border'), opacity: 0.6 });
       if (it.label) ctx.text(it.label, seg, { size: L.fs, color: C(tn.ink, P.ink), weight: 500, opacity: stateAlpha(S) });
       else if (it.glyph) ctx.glyph(it.glyph, seg, { color: C(tn.ink, P.ink), opacity: stateAlpha(S) });
@@ -1801,11 +1853,15 @@ return (function () {
   function optionRow(ctx, r, o) {
     var L = CF.ladder(o.size || 'md'), padX = 12, icon = L.icon;
     if (o.group) { ctx.text(String(o.label).toUpperCase(), B(r.x + padX, r.y, r.w - padX * 2, r.h), { size: 11, role: 'overline', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false }); return; }
-    // The keyboard-active row is a wash of the brand, never solid brand: a system whose primary is a dark neutral
-    // (a dark neutral such as #161616) would paint an invisible plate under its own ink label and fail §3.3 at the factory.
-    if (o.active) ctx.plate(r, { name: 'row·tint', fills: CF.fills(C('primary'), 'focus', { tint: 1 }), radius: 'xs' });
-    if (o.selected) ctx.plate(r, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: 'xs' });
-    if (o.hover) ctx.plate(r, { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: 'xs' });
+    // ONE SELECTED ROW, ONE STYLE. A single-select list may have a selected row and a keyboard/pointer-active row
+    // at the same time, but they are different states: selected = brand wash + check; active/hover = NEUTRAL wash.
+    // Both were brand 12% before, so every TimePicker read as two selected items (measured 2026-10-26). The active
+    // plate is skipped when the same row is selected (selection wins). The row corner is the nested step passed by
+    // optionList (panel radius − 4px inset), not an arbitrary `xs`.
+    var rowR = o.radius === undefined ? 'xs' : o.radius;
+    if (o.active && !o.selected) ctx.plate(r, { name: 'row·tint', fills: CF.fills(null, 'hover'), radius: rowR });
+    if (o.selected) ctx.plate(r, { name: 'row·selected', fills: CF.fills(C('primary'), 'selected', { tint: 1 }), radius: rowR });
+    if (o.hover && !o.selected && !o.active) ctx.plate(r, { name: 'row·hover', fills: CF.fills(null, 'hover'), radius: rowR });
     if (o.lead) ctx.glyph(o.lead, B(r.x + padX, r.y + (r.h - icon) / 2, icon, icon), { color: o.selected ? C('primary') : C('muted') });
     ctx.text(String(o.label), B(r.x + padX + (o.lead ? icon + 8 : 0), r.y, r.w - padX * 2 - (o.lead ? icon + 8 : 0) - (o.selected ? icon + 4 : 0) - (o.right ? CF.estW(String(o.right), 12) + 12 : 0), r.h),
       { size: L.fs, color: o.selected ? C('primary') : C('ink'), weight: o.selected ? 600 : 400, opacity: o.disabled ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle' });
@@ -1818,10 +1874,14 @@ return (function () {
   CF.optionList = async function (ctx, box, rows, o) {
     o = o || {};
     var L = CF.ladder(o.size), rowH = o.rowH || max(32, L.h);
+    // Rows are inset 4 from the panel; the largest legal nested corner is the largest declared step ≤ panelR − 4.
+    // Using `xs` (4) inside a r12 panel made the selected/hover row read as a different component.
+    var panelR = o.radius === undefined ? CF.radius('md') : o.radius;
+    var rowR = CF.radiusDown(panelR - 4);
     var y = box.y + 4, n = 0;
     rows.forEach(function (r) {
       var h = r.group ? 24 : rowH;
-      optionRow(ctx, B(box.x + 4, y, box.w - 8, h), Object.assign({ size: o.size }, r));
+      optionRow(ctx, B(box.x + 4, y, box.w - 8, h), Object.assign({ size: o.size, radius: rowR }, r));
       y += h + (r.group ? 2 : 0);
       n++;
     });
@@ -1856,13 +1916,14 @@ return (function () {
     var nb = N(pbox.x + pbox.w - (host.x + host.width));
     var hb = N(pbox.y + pbox.h - (host.y + host.height));
     if (nb > 0 || hb > 0) { host.resize(N(host.width + max(0, nb)), N(host.height + max(0, hb))); base.box = B(host.x, host.y, host.width, host.height); }
+    var panelRadius = CF.radius('md'), listRadius = CF.radiusDown(panelRadius - 4);
     panelPlate(ctx, pbox, {});
-    if (o.search) ctx.plate(B(pbox.x + 4, pbox.y + 4, pbox.w - 8, 32), { name: 'panel·search', fill: C('surfaceAlt'), radius: 'xs' });
+    if (o.search) ctx.plate(B(pbox.x + 4, pbox.y + 4, pbox.w - 8, 32), { name: 'panel·search', fill: C('surfaceAlt'), radius: listRadius });
     var y0 = pbox.y + 4 + (o.search ? 40 : 4);
     var avail = pbox.h - (y0 - pbox.y) - 4;
     var rows = opts.map(function (r) { return typeof r === 'string' ? { label: r } : r; });
     if (o.maxRows && rows.length > o.maxRows) rows = rows.slice(0, o.maxRows);   // a capped panel scrolls; it never spills
-    var res = await CF.optionList(ctx, B(pbox.x, y0, pbox.w, avail), rows, { size: o.size, rowH: rowH });
+    var res = await CF.optionList(ctx, B(pbox.x, y0, pbox.w, avail), rows, { size: o.size, rowH: rowH, radius: panelRadius });
     if (o.empty) { ctx.text('No matches', B(pbox.x + 12, y0, pbox.w - 24, 40), { size: 13, color: C('muted') }); await ctx.settle(); ctx.place(); return host; }
     if (o.loading) CF.spinner(ctx, B(pbox.x + pbox.w - 28, y0, 16, 16), C('muted'));
     await ctx.settle(); ctx.place();
@@ -2006,7 +2067,12 @@ return (function () {
   CF.timePicker = async function (o) {
     o = o || {};
     var rows = [];
-    for (var h = 0; h < (o.hourly ? 24 : 6); h++) rows.push({ label: (o.hourly ? (h < 10 ? '0' + h : h) : (h + 8)) + ':00', selected: h === (o.selected || 0), active: h === (o.hover || 1) });
+    var sel = o.selected || 0, hov = o.hover === undefined ? 1 : o.hover;
+    // A single-select time list has ONE selected row. The hovered/active row is a separate, neutral state and is
+    // shown only in the Hover variant (or when a caller passes an explicit `active`); painting it brand made the
+    // Default/Focus/Disabled specs look like they had two selected items (measured 2026-10-26).
+    var active = o.active !== undefined ? o.active : (String(o.state || 'default') === 'hover' ? hov : null);
+    for (var h = 0; h < (o.hourly ? 24 : 6); h++) rows.push({ label: (o.hourly ? (h < 10 ? '0' + h : h) : (h + 8)) + ':00', selected: h === sel, active: active !== null && h === active && h !== sel });
     var tp = await CF.select(Object.assign({ open: true, options: rows, panelW: o.panelW || 160, trail: 'clock', w: o.w || 160 }, o));
     try { if (tp) tp.name = CF.name('TimePicker', { size: o.size, state: o.state || 'default', slot: 'Open' }); } catch (e) {}
     return tp;
@@ -2692,7 +2758,13 @@ return (function () {
   /** Avatar/group stack — ≤5 visible then +N overflow, 8px overlap (M3 16dp), z-order right→left. */
   CF.avatarGroup = async function (o) {
     o = o || {};
-    var s = o.size || 32, n = o.members ? o.members.length : 5, over = max(0, (o.total || n) - n), ov = s * 0.3;
+    // SIZE NAMES ARE PX. `o.size` arrives as a ladder key from CAT.PLAN ('md'/'lg'/'sm'); the old `var s = o.size || 32`
+    // kept the STRING, `s * 0.3` became NaN, the box width/height became 1×1 and every member avatar was laid out at
+    // NaN → (384,577) with all five stacked (measured 2026-10-26 on page 07: 3 degenerate slots, 16 escapes, 30 text
+    // overlaps). The Avatar factory resolves the same scale; the group must do it before any arithmetic.
+    var SCALE = { xs: 24, sm: 32, md: 40, lg: 48, xl: 64, '2xl': 96 };
+    var s = (o.size !== undefined && SCALE[o.size] !== undefined) ? SCALE[o.size] : (Number(o.size) || 32);
+    var n = o.members ? o.members.length : 5, over = max(0, (o.total || n) - n), ov = s * 0.3;
     var box = B(o.x || 0, o.y || 0, s + (n - 1) * (s - ov) + (over ? s - ov + 6 : 0), s);
     // Its own family name and a FIXED box: appending absolute avatar children to a hug frame collapsed the group to
     // 1×1 inside a grid slot, so every catalog AvatarGroup rendered as a dot.
@@ -2941,18 +3013,44 @@ return (function () {
     var h = o.h || pp.rowH || (o.density === 'dense' ? 32 : 40), padX = o.padX || pp.padX || (o.density === 'dense' ? 8 : 16);
     var label = String(o.label === undefined ? 'Column' : o.label);
     var sortW = o.sort ? 16 + 4 : 0, filtW = o.filter ? 16 + 4 : 0, resW = o.resizable ? 6 : 0;
-    var w = o.w || max(80, padX * 2 + CF.estW(label, 12) + sortW + filtW + resW);
+    // A TRAILING ICON NEEDS ITS OWN WIDTH + GAP. Sizing the label area as `w − pads − iconSlots` while allowing the
+    // text to auto-grow past that box let "Column" run 2.3px into the sort caret (and 4.3px into the filter icon) on a
+    // 88px header; the icons are at the right, so the label had nowhere to go (measured 2026-10-26). The host now grows
+    // to its content minimum (label + a space-token gap + icon slots) even when a caller passes a narrower `o.w`.
+    var iconGap = (o.sort || o.filter) ? 4 : 0;
+    var minW = padX * 2 + CF.estW(label, 12) + iconGap + sortW + filtW + resW;
+    var w = max(o.w || 0, max(80, minW));
     var box = B(o.x || 0, o.y || 0, w, h);
     var ctx = CF.build(CF.name('TableHeader', { state: o.sort ? 'Sorted·' + o.sort : (o.filter ? 'FilterActive' : 'Default'), slot: o.align === 'right' ? 'Numeric' : null }), box, { parent: o.parent });
     ctx.host.fills = CF.fills(C((prof && prof.headerFill) || 'surfaceAlt'), o.state === 'hover' ? 'hover' : null);
     var right = o.align === 'right';
-    ctx.text(label, B(box.x + padX, box.y, box.w - padX * 2 - sortW - filtW - resW, box.h),
-      { size: 12, color: o.sort || o.filter ? C('primary') : (o.state === 'hover' ? C('ink') : C('muted')), weight: 600, align: right ? 'right' : 'left', refit: false });
+    // ACTIVE HEADER COPY IS TEXT, NOT A FILL: `primary` is the brand plate colour (a light purple in this file) and
+    // measured 2.51:1 on surfaceAlt; a 12px sort label and its 1.6px caret/filter glyphs need 4.5:1 / 3:1. The filled
+    // primary button uses `primaryInk` for exactly this reason (CF.PALETTE button recipe), so the header's active
+    // affordance does too (measured 2026-10-26: 3 contrast findings on TableHeader·Spec).
+    var activeInk = C('primaryInk');
+    var labH = ctx.text(label, B(box.x + padX, box.y, box.w - padX * 2 - sortW - filtW - resW, box.h),
+      { size: 12, color: o.sort || o.filter ? activeInk : (o.state === 'hover' ? C('ink') : C('muted')), weight: 600, align: right ? 'right' : 'left', refit: false });
+    var iconsN = (o.sort ? 1 : 0) + (o.filter ? 1 : 0);
     var x = box.x + box.w - padX - resW;
-    if (o.filter) { x -= filtW; ctx.glyph('filter', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: C('primary'), strokeW: 1.6 }); }
-    if (o.sort) { x -= sortW; ctx.glyph(o.sort === 'asc' ? 'caretUp' : 'caretDown', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: C('primary'), fill: C('primary') }); }
+    if (o.filter) { x -= filtW; ctx.glyph('filter', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: activeInk, strokeW: 1.6 }); }
+    if (o.sort) { x -= sortW; ctx.glyph(o.sort === 'asc' ? 'caretUp' : 'caretDown', B(x, box.y + (box.h - 16) / 2, 16, 16), { color: activeInk, fill: activeInk }); }
     if (o.resizable) ctx.plate(B(box.x + box.w - 1, box.y + 8, 1, box.h - 16), { name: 'resize·handle', fill: C('borderStrong') });
     await ctx.settle(); ctx.place();
+    // MEASURE, THEN GROW — `CF.estW` under-reports the real rendered label (35 vs 43 for "Column" at 12px), so the
+    // box math above can still leave the auto-width text short of the icon slot. Grow the host by the measured
+    // overflow + one 4px space-scale gap and shift the right icons; the label then has its own run.
+    try {
+      var t = labH && labH.t;
+      var avail = box.w - padX * 2 - sortW - filtW - resW;
+      var need = (t && iconsN ? (Number(t.width) - avail) + 4 : 0);
+      if (need > 0.5) {
+        ctx.host.resize(N(ctx.host.width + need), ctx.host.height);
+        (ctx.host.children || []).forEach(function (k) {
+          if (/^glyph·(caret|filter)/.test(String(k.name || ''))) k.x = N(Number(k.x) + need);
+        });
+      }
+    } catch (e) {}
     if (prof && prof._family) CF.profStamp(ctx.host, prof, { padX: padX, rowH: h }, { family: 'table', part: 'header', state: o.state || 'default' });
     return ctx.host;
   };
@@ -2976,23 +3074,27 @@ return (function () {
     if (S === 'selected') ctx.plate(B(box.x, box.y, 2, box.h), { name: 'accent·bar', fill: C('primary') });
     var x = box.x + (o.selectable ? 44 : 0);
     var al = S === 'disabled' ? CF.STATE.disabledContent : 1;
-    if (o.expandable) { ctx.glyph(o.expanded ? 'chevronDown' : 'chevronRight', B(box.x + 10, box.y + (h - 14) / 2, 14, 14), { color: C('muted') }); x += 4; }
+    // The expand chevron is a LEADING slot inside the first cell: 10px inset + 14px glyph + 4px gap. The old
+    // `x += 4` gave the label only 4px, so "Row label" ran 2.9px under the chevron in every Expandable state
+    // (measured 2026-10-26). The first cell keeps its column width; its CONTENT starts after the slot.
+    if (o.expandable) ctx.glyph(o.expanded ? 'chevronDown' : 'chevronRight', B(box.x + 10, box.y + (h - 14) / 2, 14, 14), { color: C('muted') });
+    var leadInset = o.expandable ? 28 : 0;
     for (var ci = 0; ci < cells.length; ci++) {
-      var c = cells[ci], cw = widths[ci] || 120,
+      var c = cells[ci], cw = widths[ci] || 120, cellX = x + (ci === 0 ? leadInset : 0), cellW = cw - (ci === 0 ? leadInset : 0),
           algn = (o.aligns && o.aligns[ci]) || (typeof c === 'number' || /^[\d.,%$–—-]/.test(String(c)) ? 'right' : 'left');
       if (o.editing && ci === (o.editIndex === undefined ? 0 : o.editIndex)) {
-        await CF.input({ parent: ctx.host, x: x, y: box.y + (h - (dens === 'dense' ? 24 : 28)) / 2, w: cw - 8,
+        await CF.input({ parent: ctx.host, x: cellX, y: box.y + (h - (dens === 'dense' ? 24 : 28)) / 2, w: cellW - 8,
                          size: dens === 'dense' ? 'xs' : 'sm', value: String(c), state: 'focus' });
       } else if (c && typeof c === 'object') {
-        if (c.tone) await CF.chip({ parent: ctx.host, x: algn === 'right' ? x + cw - padX - (c.w || 76) : x,
+        if (c.tone) await CF.chip({ parent: ctx.host, x: algn === 'right' ? cellX + cellW - padX - (c.w || 76) : cellX,
                                     y: box.y + (h - 24) / 2, label: c.label || '', size: 'sm', kind: 'tag', tone: c.tone });
-        else if (c.progress !== undefined) await CF.progress({ parent: ctx.host, x: x, y: box.y + (h - 4) / 2, w: cw - padX, value: c.progress, hideLabel: true });
-        else if (c.avatar) await CF.avatar({ parent: ctx.host, x: x, y: box.y + (h - 32) / 2, size: 32, name: c.avatar });
-        else if (c.action) await CF.button({ parent: ctx.host, x: x, y: box.y + (h - 28) / 2, label: c.action, size: 'xs', type: c.type || 'link' });
-        else if (c.badge) await CF.badge({ parent: ctx.host, x: x + (algn === 'right' ? cw - padX - 24 : 0), y: box.y + (h - 20) / 2, value: c.badge, tone: c.tone });
-        else if (c.text !== undefined) ctx.text(String(c.text), B(x, box.y, cw - padX, h), { size: ci === 0 ? 14 : 13, color: C('ink'), opacity: al, align: algn, refit: false });
+        else if (c.progress !== undefined) await CF.progress({ parent: ctx.host, x: cellX, y: box.y + (h - 4) / 2, w: cellW - padX, value: c.progress, hideLabel: true });
+        else if (c.avatar) await CF.avatar({ parent: ctx.host, x: cellX, y: box.y + (h - 32) / 2, size: 32, name: c.avatar });
+        else if (c.action) await CF.button({ parent: ctx.host, x: cellX, y: box.y + (h - 28) / 2, label: c.action, size: 'xs', type: c.type || 'link' });
+        else if (c.badge) await CF.badge({ parent: ctx.host, x: cellX + (algn === 'right' ? cellW - padX - 24 : 0), y: box.y + (h - 20) / 2, value: c.badge, tone: c.tone });
+        else if (c.text !== undefined) ctx.text(String(c.text), B(cellX, box.y, cellW - padX, h), { size: ci === 0 ? 14 : 13, color: C('ink'), opacity: al, align: algn, refit: false });
       } else {
-        ctx.text(String(c), B(x, box.y, cw - padX, h), { size: ci === 0 ? 14 : 13, color: al < 1 ? C('muted') : C('ink'), weight: ci === 0 ? 500 : 400,
+        ctx.text(String(c), B(cellX, box.y, cellW - padX, h), { size: ci === 0 ? 14 : 13, color: al < 1 ? C('muted') : C('ink'), weight: ci === 0 ? 500 : 400,
           opacity: al, align: algn, valign: 'middle', refit: false });
       }
       x += cw;
@@ -3088,7 +3190,7 @@ return (function () {
     else if (o.trailing === 'switch') await CF.switch({ parent: ctx.host, x: box.x + box.w - padX - 44, y: box.y + (h - 22) / 2, size: 'sm', checked: o.on });
     else if (o.trailing === 'action') await CF.button({ parent: ctx.host, x: box.x + box.w - padX - 72, y: box.y + (h - 28) / 2, label: String(o.action || 'Open'), size: 'sm', type: 'default' });
     await ctx.settle(); ctx.place();
-    if (S === 'focus') ctx.ring(box, { radius: CF.radius('sm'), offset: 0 });
+    if (S === 'focus') ctx.ring(box, { offset: 0 });   // no radius: the row's own corner owns the ring and the wash
     if (prof && prof._family) CF.profStamp(ctx.host, prof, { padX: padX, radius: 0 },
       { family: 'list', lines: lines, state: S });
     return ctx.host;
@@ -3164,9 +3266,20 @@ return (function () {
     var ctx = CF.build(CF.name('Timeline', { slot: o.alternate ? 'Alternate' : (o.labelLeft ? 'LabelLeft' : null) }), box, { parent: o.parent });
     var nx = box.x + (o.labelLeft ? 92 : 0);
     var tlInk = (prof && prof.ink) || 'ink', tlNode = (prof && prof.nodeInk) || 'surface', tlLine = (prof && prof.connectorInk) || 'border';
+    // Pass A: every node's REAL box. A 10px dot and a 20px icon node do not share an edge, but the rail used a
+    // constant `cy + nodeW → + (rowH − nodeW + 6)` for both, so under a dot the line started 5px below the node and
+    // ran 1px into the next one (measured 2026-10-26 on `Timeline·Spec`: 3 disconnected rails per board).
+    var nodeBox = items.map(function (it2, i2) {
+      var cy2 = box.y + i2 * rowH + 12, cx2 = nx + nodeW / 2;
+      if (it2.dot === false || it2.icon || it2.avatar) return B(nx, cy2, nodeW, nodeW);
+      var d2 = o.dot || 10;
+      return B(cx2 - d2 / 2, cy2 + nodeW / 2 - d2 / 2, d2, d2);
+    });
+    var pendTop = o.pending ? (box.y + items.length * rowH + 12 + 5) : null;
     items.forEach(function (it, i) {
       var cy = box.y + i * rowH + 12, cx = nx + nodeW / 2;
-      if (i < items.length - 1 || o.pending) ctx.plate(B(cx - (o.width || 2) / 2, cy + nodeW, o.width || 2, rowH - nodeW + 6),
+      var nb = nodeBox[i], nTop = (i < items.length - 1) ? nodeBox[i + 1].y : pendTop;
+      if (nTop !== null && nTop !== undefined) ctx.plate(B(nb.x + nb.w / 2 - (o.width || 2) / 2, nb.y + nb.h, o.width || 2, Math.max(0, nTop - (nb.y + nb.h))),
         { name: 'connector' + (i === items.length - 1 ? '·pending' : ''), fill: C(tlLine), dashed: i === items.length - 1 });
       if (it.dot === false || it.icon || it.avatar) {
         ctx.ellipse(B(nx, cy, nodeW, nodeW), { name: 'node·' + i, fill: it.icon ? C(it.tone || 'primary') : C(tlNode), stroke: C(it.tone || tlLine), strokeW: 1 });
@@ -3391,13 +3504,16 @@ return (function () {
       // §1.3 the keyboard lands on ONE day cell, so that cell is the focus unit — not the 238×250 calendar.
       if (!fcell && (isSel || dnum === today)) fcell = r;
       if (inRange) ctx.plate(B(r.x, r.y + (cell - 24) / 2, cell, 24), { name: 'range·' + dnum, fills: CF.fills(C('primarySoft'), null), radius: 'none' });
-      if (isSel) ctx.plate(B(r.x, r.y, cell, cell), { name: 'sel·' + dnum, fill: C('primary'), radius: 'control' });
-      else if (dnum === today) ctx.plate(B(r.x + 1, r.y + 1, cell - 2, cell - 2), { name: 'today·' + dnum, fill: null, stroke: C('primary'), strokeW: 1.5, radius: 'control' });
+      // The selected day is a FILLED primary plate with onPrimary copy. `primary` is the light brand purple in this
+      // file; white on it measures 2.87:1 (24 contrast findings on MiniCalendar·Spec, measured 2026-10-26). The filled
+      // primary button already uses `primaryInk` for this reason, so the calendar's strongest state does too.
+      if (isSel) ctx.plate(B(r.x, r.y, cell, cell), { name: 'sel·' + dnum, fill: C('primaryInk'), radius: 'control' });
+      else if (dnum === today) ctx.plate(B(r.x + 1, r.y + 1, cell - 2, cell - 2), { name: 'today·' + dnum, fill: null, stroke: C('primaryInk'), strokeW: 1.5, radius: 'control' });
       if (!isSel && dnum === (o.hoverDay === undefined ? today : o.hoverDay) && (ST === 'hover' || ST === 'pressed'))
         ctx.plate(B(r.x, r.y, cell, cell), { name: 'day·' + (ST === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, ST), radius: 'control' });
       ctx.text(String(dnum), r, { size: 12, weight: isSel || dnum === today ? 600 : 400,
-        color: isSel ? C('onPrimary') : (dnum === today ? C('primary') : (muted ? C('muted') : C('ink'))), align: 'center', valign: 'middle', refit: false });
-      if (events.indexOf(dnum) >= 0 && !isSel) ctx.plate(B(r.x + cell / 2 - 2, r.y + cell - 6, 4, 4), { name: 'dot·' + dnum, fill: C('primary'), radius: 'xs' });
+        color: isSel ? C('onPrimary') : (dnum === today ? C('primaryInk') : (muted ? C('muted') : C('ink'))), align: 'center', valign: 'middle', refit: false });
+      if (events.indexOf(dnum) >= 0 && !isSel) ctx.plate(B(r.x + cell / 2 - 2, r.y + cell - 6, 4, 4), { name: 'dot·' + dnum, fill: C('primaryInk'), radius: 'xs' });
       if (o.hit) ctx.hitPad(r, o.hit);                          // 32 cells are a desktop sidebar affordance; touch tiers pass 44
       if (o.marks && o.marks[dnum]) ctx.text(String(o.marks[dnum]), B(r.x, r.y + 1, cell, 12), { size: 11, role: 'axis', color: C('muted'), align: 'center', valign: 'top', refit: false });
     }
@@ -4126,6 +4242,12 @@ return (function () {
     if (actW) ctx.text(String(o.action), B(box.x + box.w - padx - actW + 4, box.y + pady, actW - 4, fs + 6),
       { size: fs, color: dark ? C('onPrimary') : C('primary'), weight: 600, align: 'right', valign: 'top', refit: false, underline: true });
     if (meterH) {
+      // FULL-WIDTH, FUSED WITH THE CARD — and TRIMMED BY THE CARD ITSELF. The bar spans the edge exactly, and the host
+      // carries `clipContent = true` so the pill clips its ends: one silhouette, the same mechanism
+      // `Avatar·LG·Status·online` uses for its presence badge (measured 2026-10-26: that host is r9999 with clip=true
+      // and a 17px badge at its edge). `clipContent` clips CHILDREN only, so the card's own shadow is untouched. An
+      // inset bar read detached and a separate `clip·` wrapper lost its absolute children on the next shelf move.
+      try { ctx.host.clipContent = true; } catch (e) {}
       ctx.plate(B(box.x + 1, box.y + box.h - meterH, box.w - 2, meterH), { name: 'meter·track', fill: dark ? ink : C('ink'), opacity: 0.12 });
       ctx.plate(B(box.x + 1, box.y + box.h - meterH, max(4, (box.w - 2) * (o.remaining === undefined ? 0.62 : Number(o.remaining))), meterH),
         { name: 'meter', fill: dark ? ink : C('primary'), opacity: dark ? 0.85 : 1 });
@@ -4826,6 +4948,52 @@ return (function () {
     var ctx = CF.build(specName, box,
       { parent: o.parent, fill: C('surface'), radius: CF.radius('spec'), stroke: C('border'), strokeW: 1 });
     var titleText = String(o.title === undefined ? fam + ' · variants' : o.title);
+    // THE CANVAS IS KNOWN BEFORE ANY CELL IS DRAWN — a fluid specimen has to be fitted before it is measured.
+    var CANVAS = o.canvasW === undefined ? 1760 : Number(o.canvasW);
+    // FLUID SPECIMENS — a table row is a flow CONTAINER: its 735px is the width of the demo table, not the width its
+    // anatomy needs (`CF.tableRow` derives every column from `o.w`). Fragmenting the state ladder to fit five of them
+    // throws away the one thing a matrix is for — comparing states across the row. So when the natural copies cannot
+    // stand side by side, PROBE a fitted width first: the factory must honour `w` (a fixed-size control ignores it)
+    // and no copy may overrun the narrower host. Both are measured, nothing is declared. Only when the probe fails
+    // does the sheet fall back to the grouped grid.
+    var fluidW = 0;
+    var colN0 = Math.max(axes.length, rows.reduce(function (m, rr) { return max(m, (rr.cells && rr.cells.length) || 1); }, 0));
+    if (colN0 > 1 && rows.length && rows[0].factory && CF[rows[0].factory]) {
+      var probeAt = async function (wArg) {
+        var popts = Object.assign({}, rows[0].props || {}, (rows[0].cells && rows[0].cells[0]) || {},
+          { parent: ctx.host, x: N(PADX + labelW + GAPC), y: N(PADY + headH + stateRowH + 90000) });
+        if (!popts.size) popts.size = 'md';
+        if (wArg) popts.w = wArg;
+        var pfn = CF[rows[0].factory], ph = null;
+        try { ph = await pfn(popts); } catch (e) { return null; }
+        return ph;
+      };
+      var nat = await probeAt(null);
+      if (nat) {
+        var natW = N(nat.width);
+        try { nat.remove(); } catch (e) {}
+        if (PADX * 2 + labelW + colN0 * natW + (colN0 - 1) * GAPC > CANVAS) {
+          // snap DOWN to the 4px grid: an unfitted 303px column is off-grid copy (gate `off_grid`)
+          var fit = Math.floor((CANVAS - PADX * 2 - labelW - (colN0 - 1) * GAPC) / colN0 / 4) * 4;
+          if (fit >= 120) {
+            var ok = await probeAt(fit);
+            if (ok) {
+              var honored = Math.abs(N(ok.width) - fit) <= 2;
+              var overrun = false;
+              (function walk(k) {
+                Array.from(k.children || []).forEach(function (c) {
+                  if (c.type === 'text' && N(c.x) + N(c.width) > N(ok.x) + N(ok.width) + 1) overrun = true;
+                  walk(c);
+                });
+              })(ok);
+              try { ok.remove(); } catch (e) {}
+              if (honored && !overrun) fluidW = fit;
+            }
+          }
+        }
+      }
+      await ctx.settle();
+    }
     // ---- phase 1: draw every cell host (absolute, provisional token slot) and measure it.
     var drawn = [], maxCells = 0, stackI = 0;
     for (var r = 0; r < rows.length; r++) {
@@ -4834,6 +5002,9 @@ return (function () {
       for (var c = 0; c < cells.length; c++) {
         var opts = Object.assign({}, row.props || {}, cells[c] || {});
         if (!opts.size) opts.size = 'md';
+        // a fitted fluid specimen: every cell is RE-INSTANTIATED at the column width (never scaled), so the factory
+        // re-lays out its own columns and the state ladder stays readable across one row
+        if (fluidW && opts.w === undefined) opts.w = fluidW;
         opts.parent = ctx.host;
         // Phase-1 anti-overlap: these hosts are transients (phase 3 attaches them to measured slots). A vertical stack
         // means an interrupted call leaves a readable column instead of a pile of controls at a 112px pitch that are
@@ -4869,23 +5040,36 @@ return (function () {
       ctx.text(String(a), B(box.x + PADX + labelW, box.y + PADY + headH, pitch, stateRowH - 6),
         { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
     });
+    var rowLabelTs = [];
     rows.forEach(function (row, i) {
-      ctx.text(String(row.label === undefined ? row.factory : row.label), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR), labelW, rowH(row)),
+      var lh = ctx.text(String(row.label === undefined ? row.factory : row.label), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR), labelW, rowH(row)),
         { size: 13, color: C('ink'), weight: 500, align: 'left', valign: 'middle', refit: false });
-      if (row.note) ctx.text(String(row.note), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR) + rowH(row), labelW, 14),
-        { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+      if (lh && lh.t) rowLabelTs.push(lh.t);
+      if (row.note) {
+        var nh = ctx.text(String(row.note), B(box.x + PADX, box.y + PADY + headH + stateRowH + i * (rowH(row) + GAPR) + rowH(row), labelW, 14),
+          { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
+        if (nh && nh.t) rowLabelTs.push(nh.t);
+      }
     });
     // The spec sheet is a page canvas artifact, not a 1000px card: widen it to the measured content (up to 1760)
     // BEFORE wrapping. A 204px control × 5 states needs 1296px; clamping to 1000 wrapped each row into two lines,
     // whose second line landed in the next row's label band (measured 2026-10-26 on NumberField·Spec). Wrapping is
-    // reserved for sheets whose measured content genuinely exceeds the canvas.
-    var CANVAS = o.canvasW === undefined ? 1760 : Number(o.canvasW);
+    // reserved for sheets whose measured content genuinely exceeds the canvas. `CANVAS` is resolved above, before
+    // phase 1, because a fluid specimen has to be fitted before it is measured.
     var innerW = max(1, N((Math.min(o.maxW || 1000, CANVAS)) - PADX * 2));
     if (o.notes) CF.wrap(String(o.notes), innerW * 0.94, 12).slice(0, 3).forEach(function (ln) {
       ctx.text(ln, B(box.x + PADX, box.y + PADY, innerW, 14), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
     });
     var pendTs = (ctx.pend || []).map(function (h) { return h.t; });   // creation order
     await ctx.settle(); ctx.place();
+    // THE LABEL COLUMN IS MEASURED, NOT ASSUMED. A fixed 100px label column let "Sorted descending" (119px) run 7px
+    // into the TableHeader slot — and the single-axis fallback used wrap rows instead of a grid, so the text and the
+    // control never shared a cell contract. The rendered label widths are read after place; the column grows to the
+    // longest label/note + 8px, rounded to the 4px grid. Every matrix whose content fits is now a GRID (even one
+    // data column), exactly like MultiSelect; the wrap fallback is only for a sheet wider than the canvas.
+    var labelWEff = labelW;
+    rowLabelTs.forEach(function (t) { var w = Number(t.width) || 0; if (w + 8 > labelWEff) labelWEff = w + 8; });
+    labelWEff = Math.ceil(labelWEff / 4) * 4;
     // ---- phase 3: flow skeleton. Frames (slots) are the flow children — they own no world-pinned interior, so the
     // engine may position them freely; the drawn hosts are attached into their settled slot afterwards.
     var colN = Math.max(axes.length, maxCells), colW = [];
@@ -4894,7 +5078,7 @@ return (function () {
       for (var ri = 0; ri < rows.length; ri++) if (drawn[ri] && drawn[ri][ci]) mw = max(mw, N(drawn[ri][ci].width));
       colW[ci] = N(mw);
     }
-    var needW = PADX * 2 + labelW + (colN ? GAPC + colW.reduce(function (a, w) { return a + w + GAPC; }, -GAPC) : 0);
+    var needW = PADX * 2 + labelWEff + (colN ? GAPC + colW.reduce(function (a, w) { return a + w + GAPC; }, -GAPC) : 0);
     var fitW = min(N(max(160, needW)), CANVAS);
     try { ctx.host.resize(fitW, ctx.host.height); } catch (e) {}
     var attach = [], flowKids = [], ti = 0;
@@ -4906,9 +5090,18 @@ return (function () {
       ht.forEach(function (t) { try { t.layoutChild.absolute = false; } catch (e) {} try { headRow.appendChild(t); NL.sizing(t, 'auto', 'auto'); } catch (e) {} });
     }
     var axisTs = stateRowH ? pendTs.slice(ti, ti + axes.length) : []; ti += axisTs.length;
-    var useGrid = axes.length > 1 && needW <= CANVAS;
+    // ONE measure decides both shapes: can every state column stand in the same row? `groupNeed(colN)` is the same
+    // sum the classic grid would use, so the two branches can never disagree about whether the sheet fits — the old
+    // pair of formulas put a fitted TableRow sheet into the grouped branch with one group, printing the state names
+    // once per variant instead of once on the axis.
+    var groupNeed = function (kk) {
+      var w = 0;
+      for (var j = 0; j < kk; j++) { var mw = pitch; for (var s = j; s < colN; s += kk) mw = max(mw, N(colW[s] || pitch)); w += mw; }
+      return PADX * 2 + labelWEff + w + (kk - 1) * GAPC;
+    };
+    var useGrid = groupNeed(colN) <= CANVAS;
     if (useGrid) {
-      var gcols = [['fixed', labelW]].concat(colW.map(function (w) { return ['fixed', w]; }));
+      var gcols = [['fixed', labelWEff]].concat(colW.map(function (w) { return ['fixed', w]; }));
       var grows = [];
       for (var gi = 0; gi < rows.length + (stateRowH ? 1 : 0); gi++) grows.push(['auto', 1]);
       var grid = NL.gridFrame('grid·' + fam, { cols: gcols, rows: grows, rowGap: GAPR, columnGap: GAPC });
@@ -4924,7 +5117,9 @@ return (function () {
       for (var r2 = 0; r2 < rows.length; r2++) {
         var lab = pendTs[ti], note = rows[r2].note ? pendTs[ti + 1] : null; ti += rows[r2].note ? 2 : 1;
         if (lab || note) {
-          var labBox = NL.col('label·' + fam + '·' + r2, { rowGap: br('inline'), sizing: 'auto' });
+          // Fill the row height and centre the label copy: a grid cell is taller than the 20px line, and an auto-height
+          // label box sticks to the cell top (fresh TableHeader matrix measured label 10px above the slot centre).
+          var labBox = NL.col('label·' + fam + '·' + r2, { rowGap: br('inline'), sizing: { h: 'auto', v: 'fill' }, justify: 'center' });
           if (lab) { try { lab.layoutChild.absolute = false; } catch (e) {} labBox.appendChild(lab); NL.sizing(lab, 'auto', 'auto'); }
           if (note) { try { note.layoutChild.absolute = false; } catch (e) {} labBox.appendChild(note); NL.sizing(note, 'auto', 'auto'); }
           NL.cell(grid, labBox, gr + r2, 1);
@@ -4939,34 +5134,45 @@ return (function () {
         }
       }
     } else {
-      // Single-axis sheets and overflow sheets: rows with wrap — folding is the engine's, not a cursor's.
-      if (stateRowH) {
-        var axisRow2 = NL.row('axis·' + fam, { rowGap: GAPC, columnGap: GAPC });
-        NL.add(ctx.host, axisRow2, 'fill', 'auto');
-        flowKids.push(axisRow2);
-        var spacer = NL.frame('labelspace·' + fam, { w: labelW, h: stateRowH, sizing: 'fix' });
-        spacer.fills = [];
-        NL.add(axisRow2, spacer, 'fix', 'fix');
-        axisTs.forEach(function (t, ai) { try { t.layoutChild.absolute = false; } catch (e) {} NL.add(axisRow2, t, 'fix', 'auto'); try { t.resize(colW[ai] || pitch, t.height); } catch (e) {} NL.sizing(t, 'fix', 'auto'); });
-      }
-      for (var r3 = 0; r3 < rows.length; r3++) {
-        var rl = NL.row('row·' + fam + '·' + r3, { rowGap: GAPC, columnGap: GAPC, align: 'center', wrap: useGrid ? undefined : 'wrap' });
-        NL.add(ctx.host, rl, 'fill', 'auto');
-        flowKids.push(rl);
-        var lab3 = pendTs[ti], note3 = rows[r3].note ? pendTs[ti + 1] : null; ti += rows[r3].note ? 2 : 1;
-        if (lab3 || note3) {
-          var labBox3 = NL.col('label·' + fam + '·' + r3, { rowGap: br('inline'), sizing: 'auto' });
-          if (lab3) { try { lab3.layoutChild.absolute = false; } catch (e) {} labBox3.appendChild(lab3); NL.sizing(lab3, 'auto', 'auto'); }
-          if (note3) { try { note3.layoutChild.absolute = false; } catch (e) {} labBox3.appendChild(note3); NL.sizing(note3, 'auto', 'auto'); }
-          NL.add(rl, labBox3, 'fix', 'auto');
+      // GROUPED GRID — the states do not fit side by side on the canvas (measured 2026-10-26: `Accordion·Spec` is
+      // 5 × 360px = 2060 > the 1760 content canvas). The old answer was a wrap row: a 112px axis pitch sat over
+      // 360px cells so nothing lined up, and each row became 660px of two stacked cells. The sheet stays ONE grid;
+      // whole state GROUPS wrap into extra grid rows and every group is named by its own caption row directly above
+      // the cells it labels, so a caption can never disagree with its column.
+      var k = colN - 1;
+      while (k > 1 && groupNeed(k) > CANVAS) k--;   // useGrid already proved colN does not fit
+      var gw = [];
+      for (var j2 = 0; j2 < k; j2++) { var mw2 = pitch; for (var s2 = j2; s2 < colN; s2 += k) mw2 = max(mw2, N(colW[s2] || pitch)); gw.push(N(mw2)); }
+      var groups = Math.ceil(colN / k);
+      var gcols2 = [['fixed', labelWEff]].concat(gw.map(function (w) { return ['fixed', w]; }));
+      var grows2 = [];
+      for (var gr2 = 0; gr2 < rows.length * groups * 2; gr2++) grows2.push(['auto', 1]);
+      var grid2 = NL.gridFrame('grid·' + fam, { cols: gcols2, rows: grows2, rowGap: GAPR, columnGap: GAPC });
+      NL.add(ctx.host, grid2, 'fill', 'auto');
+      flowKids.push(grid2);
+      // one phase-1 axis row cannot name k-wide groups — the per-cell captions replace it
+      axisTs.forEach(function (t) { try { t.remove(); } catch (e) {} });
+      for (var r4 = 0; r4 < rows.length; r4++) {
+        var base = r4 * groups * 2 + 1;
+        var lab4 = pendTs[ti], note4 = rows[r4].note ? pendTs[ti + 1] : null; ti += rows[r4].note ? 2 : 1;
+        if (lab4 || note4) {
+          var labBox4 = NL.col('label·' + fam + '·' + r4, { rowGap: br('inline'), sizing: { h: 'auto', v: 'fill' }, justify: 'center' });
+          if (lab4) { try { lab4.layoutChild.absolute = false; } catch (e) {} labBox4.appendChild(lab4); NL.sizing(lab4, 'auto', 'auto'); }
+          if (note4) { try { note4.layoutChild.absolute = false; } catch (e) {} labBox4.appendChild(note4); NL.sizing(note4, 'auto', 'auto'); }
+          NL.cell(grid2, labBox4, base, 1, { row: groups * 2 });
         }
-        var cells3 = drawn[r3] || [];
-        for (var c3 = 0; c3 < cells3.length; c3++) {
-          if (!cells3[c3]) continue;
-          var slot3 = NL.frame('slot·' + fam + '·' + r3 + '.' + c3, { w: colW[c3], h: N(cells3[c3].height), sizing: 'fix' });
-          slot3.fills = [];
-          NL.add(rl, slot3, 'fix', 'fix');
-          attach.push({ slot: slot3, host: cells3[c3] });
+        var cells4 = drawn[r4] || [];
+        for (var c4 = 0; c4 < cells4.length; c4++) {
+          if (!cells4[c4]) continue;
+          var gj = Math.floor(c4 / k), j4 = c4 % k, crow = base + gj * 2;
+          var cap = ctx.text(String(axes[c4] === undefined ? c4 : axes[c4]),
+            B(box.x + PADX + labelWEff + GAPC, box.y + PADY + headH + stateRowH + (r4 * 40) + 400, gw[j4], 17),
+            { size: 11, role: 'axis', color: C('muted'), weight: 600, align: 'left', valign: 'middle', refit: false });
+          if (cap && cap.t) { try { cap.t.layoutChild.absolute = false; } catch (e) {} NL.cell(grid2, cap.t, crow, j4 + 2); NL.sizing(cap.t, 'fix', 'auto'); }
+          var slot4 = NL.frame('slot·' + fam + '·' + r4 + '.' + c4, { w: gw[j4], h: N(cells4[c4].height), sizing: 'fix' });
+          slot4.fills = [];
+          NL.cell(grid2, slot4, crow + 1, j4 + 2);
+          attach.push({ slot: slot4, host: cells4[c4] });
         }
       }
     }
@@ -5532,6 +5738,17 @@ return (function () {
     if (!n || /·spec(·|$)|-pageroot$|-header$|-footer$|^masters·/.test(n)) return null;
     var seg = n.split('·'), tok = seg[0], v2 = seg[1] || null;
     var groups = ['actions', 'forms', 'selection', 'data', 'navigation', 'feedback'];
+    // A COMPOSITE is not its atom. `ButtonGroup·Primary` and `SplitButton·Primary` used to resolve to the `button`
+    // profile (via the declared variant `primary` / the `button` prefix), so the audit demanded a Button birth stamp
+    // on a composite that is not a Button (measured 2026-10-26: 15 false reference_drift on ButtonGroup·Spec and 10
+    // on SplitButton·Spec). The canonical block-page families are the file's own family vocabulary; a non-key match
+    // may only cross into one of the structural containers (Table/List/Calendar), never into a different atom.
+    var CANON = {};
+    try { if (storage.CATALOG && storage.CATALOG.BLOCKS) storage.CATALOG.BLOCKS.forEach(function (b) { CANON[String(b.family).toLowerCase()] = 1; }); } catch (e) {}
+    var CONTAINER = { list: 1, table: 1, calendar: 1 };
+    var related = function (hit) {
+      return tok.indexOf(hit) === 0 || hit.indexOf(tok) === 0 || tok.slice(0, 4) === hit.slice(0, 4);
+    };
     // A family is measured per SIZE (an xl button is 48/16, an lg one 40/14), so the name's size axis is resolved
     // against the entry's `sizes` block and returned with it — one `expect` per family plus one merge per size.
     var sizeOf = function (ent) {
@@ -5559,6 +5776,12 @@ return (function () {
         return tok.indexOf(k) === 0;                              // prefix: listitem → list, tablerow → table
       })[0];
       if (!hit) return null;
+      var hitLower = String(hit).toLowerCase();
+      var aliasOk = !!(CF.PROFILE_ALIAS[hit] && CF.PROFILE_ALIAS[hit].indexOf(tok) >= 0);
+      if (want !== 'key' && !aliasOk) {
+        if (CANON[tok] && hitLower !== tok && !CONTAINER[hitLower]) return null;
+        if (!related(hitLower)) return null;
+      }
       // A VARIANT is any name segment the entry declares as one (first wins): `Card·Outlined·Selectable·Alt2` names a
       // state slot AND a selectable axis, and only `Selectable` is a declared variant — while `Switch·Md·On` names no
       // variant at all, so nothing is recorded. Size segments stay in `size`, never here.

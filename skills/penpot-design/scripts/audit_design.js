@@ -98,7 +98,7 @@ return (function () {
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
     shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
     library_drift: 'library-pairing contract (references/library-pairing.md) · when a host component library manifest is active (`storage.LM`, durable `nl:lib` on PageRoots), pages 03–09 must contain EXACTLY the manifest design families assigned to that page — a missing family or an extra family fails, and page 13 audits the live library masters against the manifest (missing visual components / masters that belong to no manifest component). A paired headless library draws anatomy + states, not invented styled variants',
-    catalog_drift: 'standard design-system contract (references/catalog-standard.md) · pages 01–09 are the SAME system across projects: 01/02 must carry the standard token CAPACITY (57 colours / 12 type steps / 14 space steps / 9 radii / 13 shadow recipes / 2 dimensions / 4 border roles / 10 semantic tone triples) so the Foundations and Color boards keep one layout, and each of 03–09 must contain EXACTLY the canonical page → family inventory, in the canonical order, from `storage.CATALOG` (`scripts/catalog_engine.js`). Brand values remain project-specific and a source profile may still change geometry inside a family (the project chose to keep profile behaviour), but the family/page inventory and token capacity are not project-authored. Load catalog_engine.js and call `CAT.seed()` before auditing; a file without the durable `nl:cat` stamp is REPORTED, not passed',
+    catalog_drift: 'standard design-system contract (references/catalog-standard.md) · pages 01–09 are the SAME system across projects: 01/02 must carry the standard token CAPACITY (57 colours / 12 type steps / 14 space steps / 9 radii / 13 shadow recipes / 2 dimensions / 4 border roles / 10 semantic tone triples) so the Foundations and Color boards keep one layout, and 03–09 must be the canonical 67 BLOCK PAGES from `storage.CATALOG.BLOCKS` — `NN.MM · Chapter · Family·Spec`, exactly one family spec per page, no legacy chapter page carrying family specs, no family spec on a support page, and the contract pages must sit in canonical sequence (`CAT.orderIssues`: 00–02 → 67 block pages in `CAT.BLOCKS` order → 10–17; extra support pages may sit anywhere). The file-level half is `CAT.pageIssues()` (missing block pages, chapter shells, order drift), merged into `storage.designCoverage().catalog`. Brand values remain project-specific and a source profile may still change geometry inside a family (the project chose to keep profile behaviour), but the block-page/family inventory, page order and token capacity are not project-authored. Load catalog_engine.js and call `CAT.seed()` before auditing; a file without the durable `nl:cat` stamp is REPORTED, not passed',
     shadow_clipped: '§5 + gate G18 · a shadowed shape whose painted shadow box is cut by a clipping ancestor — Penpot boards default to clipContent=true, so a slot/grid/Spec/row container slices the drop+inset stack at the cell edge. Layout containers must be authored with clipContent=false; only `clip·` media masks crop. Repair: storage.unclip() on the page, or rebuild the container with the fixed NL.frame/mkAbsBoard default',
     elevation_flat: '§5 + gate G18 · a shape stamped `nl:el=<recipe>` whose `shadows` has fewer layers than that recipe (a multi-layer stack collapsed to one, or a rebuild that dropped the insets), OR whose stamp names a different recipe than its NAME resolves to (a `Button·Secondary` still carrying `control` while its role is `chip`). The stamp is the durable contract; this rule compares it to the render and to the role. Repair with `EL.apply(shape, recipe)` / `EL.sweepPage`',
     edge_missing: '§5 + gate G18 · a stamped recipe declares INNER layers (the dark bottom lip / white top highlight that make a card read as a physical object) but the shape paints only drop shadows. A drop shadow alone is the flat "everything is a card" look this rule exists to stop',
@@ -109,9 +109,16 @@ return (function () {
     label_off_axis: '§2.3 · a control\'s label is not on the control\'s own axis (vertical AND horizontal): its text-box centre sits >2px off the host centre while still within one line of it (a deliberate top/bottom-aligned caption is not judged; horizontal centring is exempt when the host carries a lead element — glyph, icon, avatar, dot, swatch, badge or any ellipse — because that element legitimately offsets the copy). Measured 2026-10-23 on all 21 Button masters: a unitless `lineHeight` (1.25) was read as 1.25px, so every label was centred on a 1.25px-tall box and landed 9px low. Measured 2026-10-26: five `Chip·Input·MD·Avatar` masters were falsely 15px off-axis because the exemption only recognised paths/glyph names, not the avatar ellipse. Repair: re-place from the resolved leading (ratio × fontSize) and re-centre on the final host box',
     free_layout: '§1.5 + native-layout §9 · on pages 01–09 a content board positions its elements ONLY as flow or grid children — rowGap/columnGap/padding (values judged by space_off_scale) or a grid cell: an absolutely-positioned child that is not a name-declared overlay (scrim/overlay/veil/wash·/sheen·/ring·/hitpad·/connector/tail·/rail·/boundary·/underline·) is free layout. A control host\'s own anatomy is exempt, but the host itself must still be a flow/grid child; page chrome (-Header/-Footer/-PageRoot) and page-level shelf placement are outside the rule. The measured platform fact behind it (api-pitfalls §coordinates): a board\'s absolute children hold WORLD coordinates and do not follow the shell, so free layout cannot re-flow after a token change and cannot be repaired in place. Producers: CF.matrix (grid/flow rows) and the FN row builders; the repair is a rebuild from the record, never a nudge',
     control_corner_split: '§5.1 · ONE CONTROL, ONE CORNER: inside a field control (the host that owns a `field` plate), the field, its add-ons (`addon·*`), attached steppers, `disabled-overlay` and `ring·*` must all carry the SAME corner. A variant changes MATERIAL (fill/stroke), never geometry; a square borderless body under a rounded ring/overlay/stepper is one control drawn with two shapes and reads as an element that does not belong (measured 2026-10-26 on `05 · Forms II`: Borderless TimePicker field r0, ring + disabled-overlay + steppers r9999). Rules 35/36 pass it — both values are ladder values and both are token-bound — and rule 37 only compares a ring to a BOARD host, so the mixture had no gate. The corner is resolved once through `CF.fieldRadius()` (forms profile → `field` role, never the button pill). Popup surfaces (panel/row/option), chips, carets and divider lines are not frame parts. Repair with `storage.unifyCorners`',
-    axis_column_off: '§0 × §2.3 · a matrix sheet’s state row names its COLUMNS: one axis label per data column, each sitting on the column it names (flush-left on the slot or centred over it — either is legal, being off the column is not). Measured 2026-10-26: every `CF.matrix` grid had the whole state row one column left (axis cells 1..n while slots occupied 2..n+1), because the axis texts entered the grid as ABSOLUTE children — the platform ignored the explicit (row,col) and auto-placed them from the first free cell. The render read `default` over the row-label gutter and left the last state unnamed. Judge geometry, and report the grid cell when it disagrees with the column. Repair with `storage.repairAxisRow`',
+    axis_column_off: '§0 × §2.3 · a matrix sheet’s state row names its COLUMNS: one axis label per data column, each sitting on the column it names (flush-left on the slot or centred over it — either is legal, being off the column is not). Measured 2026-10-26: every `CF.matrix` grid had the whole state row one column left (axis cells 1..n while slots occupied 2..n+1), because the axis texts entered the grid as ABSOLUTE children — the platform ignored the explicit (row,col) and auto-placed them from the first free cell. The render read `default` over the row-label gutter and left the last state unnamed. Judge geometry, and report the grid cell when it disagrees with the column. Judged BY CELL (a caption in the grid row directly above each slot), so a grouped sheet — one caption row per state group, used when the states do not fit side by side — is held to the same pairing as a single axis row. Repair with `storage.repairAxisRow`',
     nested_control_raw: 'component-library §5 / G10s · a composite COMPOSES the atom: a `chip`/`pill`/`tag` plate inside a registered control must be a real copy of the atom family, not a redrawn rectangle whose label and ✕ are loose siblings. Measured 2026-10-26 on the selected `MultiSelect·Outlined·MD` master: two raw `chip` rectangles, two loose Text runs and two loose close paths — the tags could not be themed, swapped or fixed from the Chip library. A copy answers `isComponentCopyInstance`; a raw child inside a master inherits the parent’s main-instance flags, so those cannot distinguish it. Repair with `storage.repairChips` (instances the registered `Chip·Input·SM·Clear·Neutral` atom and fits label/✕)',
     chip_row_off_axis: '§2.3 + §3.3 · a field’s tag block is centred on the FIELD: the union of its chip pills (height + the gaps BETWEEN rows, never a trailing gap) shares the field’s vertical centre. Measured 2026-10-26 on `MultiSelect·Outlined·MD`: a 24px tag row in a 36px field sat at top 4 / bottom 8 because the factory centred `rowsN*(chipH+4)` — the trailing pitch counted as content. The old rule 57 is text-only, so the loose block had no gate. Repair with `storage.repairChips`',
+    chip_icon_overlap: '§2.3 + native-layout §2 · a chip’s label and its ✕ are layout siblings, not two coordinates: their boxes must not intersect. Measured 2026-10-26 on a 78px `chip` copy that inherited its 85px master’s right inset — the text ended at x331 and the ✕ started at x327.5, a 3.5px collision the user reported as “✕ 与文字重叠”. A flex atom (`row·content` with a bound `space.xxs` `columnGap`) cannot produce it; a legacy absolute chip can. The rule accepts both a board chip (label/✕ inside) and a raw plate (label/✕ as siblings). Repair: rebuild the Chip atom with the flex row / `storage.repairChips` for raw chips',
+    popup_state_collision: '§3.3 + §4 single-select semantics · a popup list has ONE selected row; hover/keyboard-active is a SEPARATE neutral state and a single-select panel must never show two selected rows or a brand-washed active row. Measured 2026-10-26: every TimePicker `row·selected` and `row·tint` was #2563eb @12%, so all variants read as two selected items (the user asked whether that was semantically correct — it is not). Repair with `storage.repairPopupRows`',
+    popup_row_corner: '§5.1 nested surfaces · a popup row is inset inside its panel, so its corner is the LARGEST declared radius step ≤ panel radius − row inset — not the trigger’s corner and not an arbitrary smaller step. Measured 2026-10-26: TimePicker/Combobox rows sat 4px inside a r12 panel with r4 (`xs`), which read as a different component; the legal nested step is r8. Repair with `storage.repairPopupRows`',
+    label_icon_overlap: '§2.3 + §3.3 · a registered control’s label and its leading/trailing icon are layout neighbours: their boxes must not intersect. Measured 2026-10-26 on `TableHeader·Sorted·asc`: an 88px host with 16px pads and a 16px caret slot gave the 43px label a 36px box; the auto-width text ran 2.3px into the caret (4.3px into the filter icon). The header factory now grows to its content minimum (label + space gap + icon slot); rule 67 covers chip label/✕. Repair with `storage.repairIconOverlap`',
+    spec_label_overlap: '§1.5 + §2.3 spec matrix · a `·Spec` matrix is a GRID — including a default-only/single-axis family — with a measured label column and one data cell per row; the label text and its slot/component must not intersect. Measured 2026-10-26 on `TableHeader·Spec`: the single-axis fallback used wrap rows, the 100px label board held a 119px “Sorted descending”, and the text ran 7px into the TableHeader slot. `CF.matrix` now labels every fitting sheet as a grid, reads the rendered label/note widths and grows the label column (rounded to 4px); labels fill the row and centre vertically. Rebuild a legacy spec through `CF.matrix`',
+    flush_corner_split: '§5.1 "one control, one corner", composited · a plate that sits FLUSH in a rounded host (both an X edge and a Y edge within 1px) must carry the host corner on the sides that touch that edge, or the host must clip. A group of segments is the case that hid: `ButtonGroup·Primary·MD·Focus` was a r9999 pill with r0 `segment·` plates and clipContent false, so the two end segments painted square corners straight through the pill outline — and it passed every gate (rule 63 only names the field family, rule 37 only compares a ring to its host). Measured 2026-10-26: 3 hosts in the file (two ButtonGroup states, one Toast accent bar). Repair: give the end plate a per-corner radius (CF.buttonGroup does), never clip the host — clipping cuts the focus ring that is authored 1px outside it. A 1–6px INDICATOR (progress meter, accent line) is exempt: spanning the edge is what makes it read as the card’s own bottom edge (“矩形和圆角融为一体”), and the trim comes from the HOST’s `clipContent` — the `Avatar·LG·Status·online` pattern (r9999 host, clip=true, presence badge at the edge) — never from an inset bar, a rounded 3px corner, or a separate `clip·` board (each was tried on `Toast·Dark·Timed·Info` and each was worse: detached, no-op, and lost absolute children on the next shelf move). `clipContent` clips children only, so the card’s own shadow is untouched. The rule judges PLATES only',
+    spec_not_grid: '§1.5 + §2.3 spec matrix shape · a `·Spec` sheet is laid out by ONE real grid container (`grid·<Family>`: a measured label column + one data column per state), not by an `axis·` row plus `row·<Family>·N` fallback boards, and a board named `grid·` must actually carry a grid layout. Rule 71 only fires once a label crosses its slot, so the fallback shape itself was ungated and 36 of 67 block pages kept it after the grid landed in `CF.matrix` (32 with a 100px label column under a 148px axis spacer — the two columns visibly disagree). There is no wrap-row shape any more: a sheet whose states do not fit side by side becomes a GROUPED grid (whole state groups wrap into extra grid rows, each group named by its own caption row). Repair: rebuild through `CF.matrix`',
   };
   const DELEGATED = ['out_of_bounds', 'board_overlap', 'text_overlap', 'header_collision', 'malformed_text',
     'align_missing', 'crash_100x100', 'degenerate_size', 'root_stray', 'text_centre_residue', 'loose_assembly', 'spec'];
@@ -797,7 +804,13 @@ return (function () {
         const isCtlName = (nm) => {
           const n = String(nm || '');
           if (/·Spec(·|$)|-PageRoot$|-Header$|-Footer$/.test(n)) return false;
-          return /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(n) || /(?:Button|Cta|Toggle)$/.test(n.split('·').pop());
+          // Matrix chrome (`head·Button`, `grid·IconButton`, `axis·Tabs`, `row·…`, `label·…`) is NOT a control:
+          // the suffix test below reads its trailing family name and used to treat the sheet's title/axis copy as a
+          // control label (measured 2026-10-26 after the block-page split: 11 false `label_off_axis` on Button·Spec,
+          // 2 on IconButton·Spec, all on `head·`/`axis·`/`grid·` text). Chrome names are declared here, once.
+          if (/^(head|grid|axis|row|label|slot|meta|foot|footer|cap|note|title|desc|tokens|stamp)(?:[·-]|$)/.test(n)) return false;
+          if (n.indexOf('·') < 0 && /(?:Button|Cta|Toggle)$/.test(n)) return true;   // hand-named hero control
+          return /^(Button|Tab|Chip|Checkbox|Radio|Switch)·/.test(n);
         };
         let owner = par, steps = 0;
         while (owner && owner !== st.top && steps < 3 && !(typeOf(owner) === 'board' && isCtlName(nameOf(owner)))) {
@@ -1281,6 +1294,43 @@ return (function () {
             '" by ' + N(host.dist) + 'px — a drifted plate, not a corner disagreement (repair: TK.ringSweep)');
         }
       }
+      // rule 73 · flush_corner_split — a square plate that occupies a CORNER of a rounded, unclipped host cuts the
+      // host's silhouette. The judge is geometry (flush on one X edge AND one Y edge), not a family list, so it covers
+      // any composite: segments, accent bars, tabs. Rule 63 covers the field family only and rule 37 only compares a
+      // ring, which is why a pill ButtonGroup full of square segments read CLEAN.
+      if (typeOf(s) === 'board' && !isAnno(s)) {
+        let hr = 0, clipped = false;
+        try { hr = Number(typeof s.borderRadius === 'number' ? s.borderRadius : 0) || 0; } catch (e) { hr = 0; }
+        try { clipped = !!s.clipContent; } catch (e) { clipped = false; }
+        if (hr > 0 && !clipped) {
+          const hb = box(s);
+          const DECOR_PLATE = /^(ring·|hitpad·|wash·|sheen·|clip·|boundary·|hairline·|state·layer|surface·|scrim|glow)/;
+          (kidsOf(s) || []).forEach((k) => {
+            if (typeOf(k) !== 'rectangle' || DECOR_PLATE.test(nameOf(k))) return;
+            // read the FOUR corners: with per-corner radii the scalar `borderRadius` readback is 0 (Penpot only
+            // reports the shorthand when every corner agrees), so a correctly rounded end segment looked square.
+            let kr = 0;
+            try {
+              kr = Math.max(Number(k.borderRadiusTopLeft) || 0, Number(k.borderRadiusTopRight) || 0,
+                            Number(k.borderRadiusBottomRight) || 0, Number(k.borderRadiusBottomLeft) || 0);
+              if (!kr) kr = Number(typeof k.borderRadius === 'number' ? k.borderRadius : 0) || 0;
+            } catch (e) { kr = 0; }
+            if (kr > 0) return;
+            const kb = box(k);
+            const fl = Math.abs(kb.x - hb.x) <= 1, fr = Math.abs(hb.x + hb.w - (kb.x + kb.w)) <= 1;
+            const ft = Math.abs(kb.y - hb.y) <= 1, fb = Math.abs(hb.y + hb.h - (kb.y + kb.h)) <= 1;
+            if (!((fl || fr) && (ft || fb))) return;
+            const sides = [(fl ? 'left' : 'right'), (ft ? 'top' : 'bottom')].join('+');
+            // A 1–6px INDICATOR (progress meter, accent line) IS EXEMPT. It reads as the card's OWN EDGE when it spans
+            // the edge — that is the "fused with the rounded corner" look the user asked for — and every alternative
+            // breaks it: inset reads detached, rounding a 3px bar is a no-op, and a clip wrapper detached the plates
+            // from their absolute coordinates on the next shelf move (all measured 2026-10-26 on `Toast·Dark·Timed·Info`).
+            if (Math.min(kb.w, kb.h) <= 6) return;
+            add('flush_corner_split', k, st.top, '"' + nameOf(k).slice(0, 24) + '" is square (r0) but sits in the ' + sides +
+              ' corner of the r' + N(hr) + ' "' + nameOf(s).slice(0, 26) + '" and the host does not clip — the plate\'s square corners cut the rounded silhouette; give it the host corner on the touching sides (per-corner radius), or stop authoring the host as a clip-free rounded plate');
+          });
+        }
+      }
       // rule 63 · control_corner_split — §5.1 "one control, one corner". A field's variants change the MATERIAL
       // (fill/stroke), never the geometry, and every layer derived from the field — focus ring, disabled overlay,
       // add-ons, attached steppers — takes the field's corner. Measured 2026-10-26 on `05 · Forms II`: the Borderless
@@ -1311,41 +1361,46 @@ return (function () {
       // the judge (flush-left or centred on the column); the grid cell is reported with it when they disagree.
       // Repair: `storage.repairAxisRow`.
       if (/^grid·/.test(nm) && !isAnno(s)) {
-        const ax = (kidsOf(s) || []).filter((k) => /^axis/.test(nameOf(k)) && typeOf(k) === 'text')
-          .sort((a, b) => box(a).x - box(b).x);
-        if (ax.length >= 2) {
-          const byRow = {};
-          (kidsOf(s) || []).forEach((k) => {
-            const m = /^slot·.+?·(\d+)\.(\d+)$/.exec(nameOf(k));
-            if (!m) return;
-            const r = Number(m[1]), c = Number(m[2]);
-            (byRow[r] || (byRow[r] = {}))[c] = k;
+        const kidsG = kidsOf(s) || [];
+        const ax = kidsG.filter((k) => /^axis/.test(nameOf(k)) && typeOf(k) === 'text');
+        const slotsG = kidsG.filter((k) => /^slot·/.test(nameOf(k)) && k.layoutCell);
+        if (ax.length >= 1 && slotsG.length) {
+          const cellKey = (r, c) => r + ':' + c;
+          const slotAt = {}, capAt = {};
+          slotsG.forEach((sl) => { slotAt[cellKey(sl.layoutCell.row, sl.layoutCell.column)] = sl; });
+          ax.forEach((t) => { if (t.layoutCell) capAt[cellKey(t.layoutCell.row, t.layoutCell.column)] = t; });
+          // A slot is named by the NEAREST caption above it in its own grid column: one axis row serves every variant
+          // row on a classic sheet, while a grouped sheet repeats the caption row per state group. Judged by cell, not
+          // by sorted index, so both shapes are held to the same pairing.
+          const capsInCol = {};
+          ax.forEach((t) => {
+            const c = t.layoutCell; if (!c) return;
+            (capsInCol[c.column] || (capsInCol[c.column] = [])).push(t);
           });
-          const rowKeys = Object.keys(byRow).map(Number).sort((a, b) => a - b);
-          const cols = rowKeys.length ? Object.keys(byRow[rowKeys[0]]).map(Number).sort((a, b) => a - b).map((c) => byRow[rowKeys[0]][c]) : [];
-          if (cols.length) {
-            if (ax.length !== cols.length) {
-              add('axis_column_off', s, st.top, ax.length + ' axis label(s) for ' + cols.length + ' data column(s) — the state row must name every column exactly once (repair: storage.repairAxisRow)');
+          slotsG.forEach((sl) => {
+            const c = sl.layoutCell;
+            const above = (capsInCol[c.column] || []).filter((t) => t.layoutCell.row < c.row)
+              .sort((a, b) => b.layoutCell.row - a.layoutCell.row)[0];
+            if (!above) {
+              add('axis_column_off', sl, st.top, 'slot "' + nameOf(sl).slice(0, 26) + '" in grid cell ' + c.row + '/' + c.column +
+                ' has no state caption above it in its own column — every data cell is named by the label over it');
+              return;
             }
-            ax.forEach((t, i) => {
-              const slot = cols[i];
-              if (!slot) return;
-              const tb = box(t), sb = box(slot);
-              const flush = Math.abs(tb.x - sb.x) <= 2;
-              const centred = Math.abs((tb.x + tb.w / 2) - (sb.x + sb.w / 2)) <= 2;
-              let cellOff = false;
-              try { cellOff = !!(t.layoutCell && slot.layoutCell && t.layoutCell.column && slot.layoutCell.column && t.layoutCell.column !== slot.layoutCell.column); } catch (e) {}
-              if (!flush && !centred) {
-                add('axis_column_off', t, st.top, 'axis "' + String(t.characters || '').slice(0, 18) + '" at x' + N(tb.x) + ' is ' + N(Math.abs(tb.x - sb.x)) +
-                  'px off its column "' + nameOf(slot).slice(0, 26) + '" (x' + N(sb.x) + ')' +
-                  (cellOff ? ' and sits in grid cell col ' + t.layoutCell.column + ' instead of ' + slot.layoutCell.column : '') +
-                  ' — a state label sits on the column it names (repair: storage.repairAxisRow)');
-              } else if (cellOff) {
-                add('axis_column_off', t, st.top, 'axis "' + String(t.characters || '').slice(0, 18) + '" is in grid cell col ' + t.layoutCell.column +
-                  ' but names the column at ' + slot.layoutCell.column + ' — cell and copy disagree (repair: storage.repairAxisRow)');
-              }
-            });
-          }
+            const tb = box(above), sb = box(sl);
+            const flush = Math.abs(tb.x - sb.x) <= 2;
+            const centred = Math.abs((tb.x + tb.w / 2) - (sb.x + sb.w / 2)) <= 2;
+            if (!flush && !centred) {
+              add('axis_column_off', above, st.top, 'axis "' + String(above.characters || '').slice(0, 18) + '" at x' + N(tb.x) + ' is ' + N(Math.abs(tb.x - sb.x)) +
+                'px off its column "' + nameOf(sl).slice(0, 26) + '" (x' + N(sb.x) + ') — a state label sits on the column it names (repair: storage.repairAxisRow)');
+            }
+          });
+          ax.forEach((t) => {
+            const c = t.layoutCell;
+            if (!c) { add('axis_column_off', t, st.top, 'axis "' + String(t.characters || '').slice(0, 18) + '" is not in a grid cell — it cannot name a column'); return; }
+            if (!slotAt[cellKey(c.row + 1, c.column)]) {
+              add('axis_column_off', t, st.top, 'axis "' + String(t.characters || '').slice(0, 18) + '" at cell ' + c.row + '/' + c.column + ' names no data cell below it (' + (c.row + 1) + '/' + c.column + ')');
+            }
+          });
         }
       }
       // rule 65 · nested_control_raw — a composite COMPOSES the atom. A `chip`/`pill`/`tag` plate inside a registered
@@ -1377,6 +1432,174 @@ return (function () {
           }
         }
       }
+      // rule 67 · chip_icon_overlap — the label and its ✕ are layout siblings, not two coordinates that happen to be
+      // close. Measured 2026-10-26: a 78px chip copy inherited the 85px master's right inset; the text box ended at 331
+      // and the ✕ started at 327.5 — a 3.5px collision the eye reads as a broken icon. The flex atom (row·content,
+      // bound `space.xxs` columnGap) cannot produce this; a legacy absolute chip can. The chip host may be a board with
+      // the label/✕ inside, or an old raw plate whose label/✕ are siblings — both are checked.
+      if (/^(chip|pill|tag)(?:·|$)/i.test(nm) && !isAnno(s)) {
+        const isIcon = (k) => /close|trail|chevron|caret|arrow/i.test(nameOf(k));
+        let text = null, icon = null;
+        if (typeOf(s) === 'board' || typeOf(s) === 'group') {
+          (function scan(k, d) {
+            (kidsOf(k) || []).forEach((c) => {
+              if (!text && typeOf(c) === 'text') text = c;
+              if (!icon && isIcon(c) && typeOf(c) !== 'text') icon = c;
+              if (d < 2) scan(c, d + 1);
+            });
+          })(s, 0);
+        } else if (par) {
+          const cb = box(s);
+          (kidsOf(par) || []).forEach((k) => {
+            if (k === s) return;
+            const kb = box(k), cx = kb.x + kb.w / 2, cy = kb.y + kb.h / 2;
+            if (cx < cb.x - 1 || cx > cb.x + cb.w + 1 || cy < cb.y - 1 || cy > cb.y + cb.h + 1) return;
+            if (!text && typeOf(k) === 'text') text = k;
+            if (!icon && isIcon(k) && typeOf(k) !== 'text') icon = k;
+          });
+        }
+        if (text && icon) {
+          const tb = box(text), ib = box(icon);
+          const ox = Math.min(tb.x + tb.w, ib.x + ib.w) - Math.max(tb.x, ib.x);
+          const oy = Math.min(tb.y + tb.h, ib.y + ib.h) - Math.max(tb.y, ib.y);
+          if (ox > 1 && oy > 1) {
+            add('chip_icon_overlap', icon, st.top, 'chip label and "' + nameOf(icon).slice(0, 18) + '" overlap by ' + N(ox) +
+              'px — lay the label/✕ out as a flex row with a bound space token; manual x is the defect (repair: rebuild the Chip atom / storage.repairChips)');
+          }
+        }
+      }
+      // rules 68/69 · popup state + nested corner. A single-select popup has ONE selected row; the hover/keyboard
+      // active row is a DIFFERENT, NEUTRAL state. Both were drawn with the brand wash (measured 2026-10-26: every
+      // TimePicker row·selected and row·tint were #2563eb @12%, so every variant read as two selected items). The row
+      // plate is a nested surface too: inside a r12 panel with a 4px inset, the largest legal corner is r8 — the old
+      // `xs` (4) made the highlight read as a different control. Both tests share the same panel/row inventory.
+      if (typeOf(s) === 'board' && !isAnno(s)) {
+        const panel = (kidsOf(s) || []).filter((k) => String(k.name || '') === 'panel')[0] || null;
+        if (panel) {
+          const rows = (kidsOf(s) || []).filter((k) => /^(row·(selected|tint|hover|active)|option·(selected|active|hover))/i.test(String(k.name || '')));
+          const sel = rows.filter((k) => /selected/i.test(nameOf(k)));
+          const act = rows.filter((k) => /(tint|hover|active)/i.test(nameOf(k)));
+          if (sel.length > 1) {
+            add('popup_state_collision', sel[1], st.top, sel.length + ' selected rows in one single-select panel — only one option may be selected (repair: storage.repairPopupRows)');
+          }
+          // Active/hover must be NEUTRAL. A brand wash on a row that is not selected reads as a second selection.
+          act.forEach((k) => {
+            const fl = arr(k, 'fills')[0];
+            if (!fl || num(fl, 'fillOpacity', 1) < 0.01) return;
+            const h = String(fl.fillColor || '').toLowerCase();
+            const e = TOK && TOK.ci && TOK.ci.byHex ? TOK.ci.byHex[h] : null;
+            const tname = e ? String(e.surface || (e.all && e.all[0]) || '') : '';
+            const neutral = /text-|border|surface|base|inverse|neutral|shade|backdrop/.test(tname);
+            if (!neutral) {
+              add('popup_state_collision', k, st.top, nameOf(k) + ' uses a non-neutral fill (' + h + (tname ? ' = ' + tname : ', no neutral colour token') +
+                ') — only the selected row may carry the brand wash; hover/active is a neutral state (repair: storage.repairPopupRows)');
+            }
+          });
+          // Nested corner: panel r12, rows inset 4 → r8 max. A rounded row must use the largest declared step ≤ that.
+          if (RI && RI.count) {
+            const pb = box(panel), pr = cornersOf(panel);
+            const pR = pr ? Math.max.apply(null, pr) : null;
+            if (pR && pR > 0) {
+              const steps = Object.keys(RI.byVal).map(Number).sort((a, b) => a - b);
+              rows.forEach((k) => {
+                const rb = box(k), rc = cornersOf(k);
+                if (!rc) return;
+                const rv = Math.max.apply(null, rc);
+                if (rv <= 0) return;
+                const inset = Math.min(rb.x - pb.x, rb.y - pb.y, (pb.x + pb.w) - (rb.x + rb.w), (pb.y + pb.h) - (rb.y + rb.h));
+                if (inset < 1) return;
+                let maxLegal = 0;
+                steps.forEach((v) => { if (v <= pR - inset + 0.5 && v > maxLegal) maxLegal = v; });
+                if (rv !== maxLegal) {
+                  add('popup_row_corner', k, st.top, nameOf(k) + ' r' + N(rv) + ' inside r' + N(pR) + ' panel at inset ' + N(inset) +
+                    ' — the nested corner is r' + N(maxLegal) + ' (largest ladder step ≤ panel−inset), not the trigger corner or an arbitrary smaller step (repair: storage.repairPopupRows)');
+                }
+              });
+            }
+          }
+        }
+      }
+      // rule 70 · label_icon_overlap — a control's copy and its trailing icon are layout neighbours, not two
+      // coordinates. Measured 2026-10-26 on `TableHeader·Sorted·asc`: an 88px host, 43px label, 16px caret slot and
+      // 16px pads left a 36px label area; the auto-width text ran 2.3px into the caret (4.3px into the filter icon).
+      // Chips are rule 67; all other registered controls are judged here.
+      if (typeOf(s) === 'board' && !isAnno(s) && !/^(chip|pill|tag)(?:·|$)/i.test(nm) && storage.CF && storage.CF.get && storage.CF.get(nm)) {
+        // AFFORDANCE icons only: a chart/arc/panel is content, not an icon slot beside copy. Treating every path
+        // as an icon flagged KPI sparklines (20px 'overlap' with the value) and Progress arcs (27px) — false positives.
+        const isIcon = (k) => /^glyph·(caret|chevron|close|arrow|sort|filter|ellipsis|more|plus|minus|search|calendar|clock|eye|info|help|check|copy|download|upload|settings|dots|menu)/i.test(nameOf(k)) ||
+          /^(icon|trail|lead)(·|$)/i.test(nameOf(k));
+        const kids = (kidsOf(s) || []);
+        const texts = kids.filter((k) => typeOf(k) === 'text');
+        const icons = kids.filter((k) => typeOf(k) !== 'text' && isIcon(k));
+        texts.forEach((t) => {
+          const tb = box(t);
+          icons.forEach((ic) => {
+            const ib = box(ic);
+            const ox = Math.min(tb.x + tb.w, ib.x + ib.w) - Math.max(tb.x, ib.x);
+            const oy = Math.min(tb.y + tb.h, ib.y + ib.h) - Math.max(tb.y, ib.y);
+            if (ox > 1 && oy > 1) {
+              add('label_icon_overlap', ic, st.top, 'label "' + String(t.characters || '').slice(0, 18) + '" and "' + nameOf(ic).slice(0, 20) +
+                '" overlap by ' + N(ox) + 'px in "' + nm.slice(0, 28) + '" — reserve the icon slot + a space-token gap and let the host grow, or truncate the label (repair: storage.repairIconOverlap)');
+            }
+          });
+        });
+      }
+      // rule 71 · spec_label_overlap — a spec matrix's row-label text and its data slot/component are separate cells.
+      // Measured 2026-10-26 on `TableHeader·Spec`: the single-axis fallback used wrap rows (no grid), the 100px label
+      // board held "Sorted descending" at 119px, and the text ran 7px into the TableHeader slot. Every `·Spec` is now
+      // a grid (even with one data column) with a measured label column; this gate judges the rendered label/slot pair.
+      if (/·Spec(?:·|$)/.test(nm) && typeOf(s) === 'board' && !isAnno(s)) {
+        const labels = [], slots = [];
+        (function scan(k) {
+          const n = nameOf(k);
+          if (/^label·/.test(n)) labels.push(k);
+          if (/^slot·/.test(n)) slots.push(k);
+          (kidsOf(k) || []).forEach(scan);
+        })(s);
+        labels.forEach((lab) => {
+          const lm = /·(\d+)(?:\.|$)/.exec(nameOf(lab));
+          const row = lm ? Number(lm[1]) : null;
+          let t = null;
+          (function findText(k) { if (t) return; if (typeOf(k) === 'text') { t = k; return; } (kidsOf(k) || []).forEach(findText); })(lab);
+          if (!t) return;
+          const tb = box(t);
+          slots.forEach((sl) => {
+            const sm = /·(\d+)(?:\.|$)/.exec(nameOf(sl));
+            if (!sm || (row !== null && Number(sm[1]) !== row)) return;
+            const sb = box(sl);
+            const ox = Math.min(tb.x + tb.w, sb.x + sb.w) - Math.max(tb.x, sb.x);
+            const oy = Math.min(tb.y + tb.h, sb.y + sb.h) - Math.max(tb.y, sb.y);
+            if (ox > 1 && oy > 1) {
+              add('spec_label_overlap', t, st.top, 'label "' + String(t.characters || '').slice(0, 20) + '" runs ' + N(ox) +
+                'px into "' + nameOf(sl).slice(0, 26) + '" — a spec matrix is a grid with a MEASURED label column (never wrap rows); repair: rebuild the board through CF.matrix (single-axis matrices are grids too)');
+            }
+          });
+        });
+      }
+      // rule 72 · spec_not_grid — §1.5/§2.3: a `·Spec` sheet's matrix body is ONE real grid container (`grid·<Family>`),
+      // never an `axis·` row plus `row·<Family>·N` boards. Rule 71 only catches a label that already crosses its slot, so
+      // a sheet that merely keeps the pre-grid fallback shape passed every gate while its label column drifted from the
+      // axis spacer (measured 2026-10-26: 36 of 67 block pages, 32 of them with 100px labels under a 148px spacer).
+      if (/·Spec(?:·|$)/.test(nm) && typeOf(s) === 'board' && !isAnno(s)) {
+        const body = kidsOf(s) || [];
+        const grids = body.filter((k) => /^grid·/.test(nameOf(k)));
+        const rowB = body.filter((k) => /^row·/.test(nameOf(k)));
+        const axisB = body.filter((k) => /^axis·/.test(nameOf(k)));
+        grids.forEach((g) => {
+          if (!g.grid) add('spec_not_grid', g, st.top, '"' + nameOf(g) + '" is named like a grid but carries no grid layout — the sheet is not laid out by a grid container');
+        });
+        if (!grids.length && (rowB.length || axisB.length)) {
+          const space = axisB.length ? (kidsOf(axisB[0]) || []).filter((k) => /^labelspace·/.test(nameOf(k)))[0] : null;
+          const lab = rowB.length ? (kidsOf(rowB[0]) || []).filter((k) => /^label·/.test(nameOf(k)))[0] : null;
+          const sw = space ? N(box(space).w) : null, lw = lab ? N(box(lab).w) : null;
+          add('spec_not_grid', s, st.top, 'matrix body is ' + axisB.length + ' `axis·` + ' + rowB.length + ' `row·` board(s), not one `grid·' +
+            String(nm).replace(/·Spec.*$/, '') + '` — a spec sheet is a grid with a MEASURED label column (one column per state, labels never cross their slot)' +
+            (sw !== null && lw !== null && Math.abs(sw - lw) > 1 ? ', and the label column has already drifted: axis spacer ' + sw + 'px vs row label ' + lw + 'px' : '') +
+            '. Repair: rebuild the board through CF.matrix (it grids any sheet up to the canvas) or split it with CF.matrixPlan');
+        } else if (grids.length && (rowB.length || axisB.length)) {
+          add('spec_not_grid', s, st.top, 'mixed matrix: ' + grids.length + ' `grid·` container(s) AND ' + rowB.length + ' `row·`/`axis·` fallback boards on the same sheet — the sheet must be one grid');
+        }
+      }
       // rule 45 · row_axis_off — §2.3: one row has ONE axis. A horizontal connector must join the CENTRES of the nodes
       // it runs between. A node drawn at the band's TOP slips out of its own line whenever the node is smaller than the
       // copy beside it (a 12px step dot under a 20px label = 4px), which is what the eye reads as "these are not aligned".
@@ -1390,6 +1613,27 @@ return (function () {
             const d = Math.abs((cb.y + cb.h / 2) - (nb.y + nb.h / 2));
             if (d > 1) add('row_axis_off', s, st.top, 'connector centre ' + N(cb.y + cb.h / 2) + ' is ' + N(d) +
               'px off the "' + nameOf(big).slice(0, 20) + '" centre ' + N(nb.y + nb.h / 2) + ' — a row has one axis (§2.3)');
+          }
+        } else if (cb.w > 0 && cb.w <= 6 && cb.h > cb.w) {
+          // A VERTICAL rail must join the node above to the node below EDGE to EDGE. Rule 45 used to read only
+          // horizontal bands (`w > h`), so a fixed-length rail detached in silence: `Timeline·Spec` carried 3
+          // disconnected rails per board because the rail assumed every node filled the 20px icon box.
+          const cxc = cb.x + cb.w / 2, cyc = cb.y + cb.h / 2;
+          const col = (kidsOf(par) || []).filter((k) => /^node·/.test(nameOf(k)) && Math.abs(box(k).x + box(k).w / 2 - cxc) <= 3);
+          // Pair by CENTRE proximity, then judge the EDGE gap: a rail that overlaps its node must report that node,
+          // not the next one down (filtering by "top below the rail end" skipped an overlapped node by 55px).
+          const near = (list, d) => list.slice().sort((a, b) => d(a) - d(b))[0];
+          const above = near(col.filter((k) => box(k).y + box(k).h / 2 < cyc), (k) => cyc - (box(k).y + box(k).h / 2));
+          const below = near(col.filter((k) => box(k).y + box(k).h / 2 > cyc), (k) => (box(k).y + box(k).h / 2) - cyc);
+          if (above) {
+            const g = cb.y - (box(above).y + box(above).h);
+            if (g > 1.5 || g < -1.5) add('row_axis_off', s, st.top, 'rail starts ' + N(g) + 'px from the bottom of "' + nameOf(above).slice(0, 16) +
+              '" (' + (g > 0 ? 'detached' : 'overlapping') + ') — a rail joins node edge to node edge; compute it from the drawn nodes, not from a fixed pitch');
+          }
+          if (below) {
+            const g2 = box(below).y - (cb.y + cb.h);
+            if (g2 > 1.5 || g2 < -1.5) add('row_axis_off', s, st.top, 'rail ends ' + N(g2) + 'px from the top of "' + nameOf(below).slice(0, 16) +
+              '" (' + (g2 > 0 ? 'detached' : 'overlapping') + ') — a rail joins node edge to node edge; compute it from the drawn nodes, not from a fixed pitch');
           }
         }
       }
@@ -1850,6 +2094,10 @@ return (function () {
     // source (for example Button=pill, IconButton=tile/circle, Link=none). The profile is durable on the PageRoot (`nl:ref`).
     try {
       const pname = String(out.page || '');
+      // 03–09 are BLOCK pages: one canonical family per page (CAT.BLOCKS). On a block page the family-presence
+      // checks below would demand the whole chapter on one page, so completeness is a file question there
+      // (CAT.pageIssues / designCoverage). The per-family material/stamp checks still run against the one spec.
+      const CATB = (storage.CATALOG && storage.CATALOG.blockFor) ? storage.CATALOG.blockFor(pname) : null;
       // Library pairing: an `nl:lib` stamp (or an in-session LM.load) replaces the generic CF.map() catalog with the
       // host library's exact component inventory. Generic mode has no stamp, so all existing rules are unchanged.
       const LIB = (storage.LM && storage.LM.ensure) ? (storage.LM.ensure() ? storage.LM : null) : null;
@@ -1899,7 +2147,7 @@ return (function () {
               })(b);
             }
           });
-          catalog.forEach((f) => { if (!seen[String(f).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired action catalog: ' : 'complete action catalog: ') + f + ' has no ·Spec board on page 03' + (LIB ? '' : (source.indexOf(String(f).toLowerCase()) >= 0 ? ' (source-measured family)' : ' (derived family — build it from the source material, do not omit it)'))); });
+          if (!CATB && /^0[3-9] · /.test(pname)) catalog.forEach((f) => { if (!seen[String(f).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired action catalog: ' : 'complete action catalog: ') + f + ' has no ·Spec board on page 03' + (LIB ? '' : (source.indexOf(String(f).toLowerCase()) >= 0 ? ' (source-measured family)' : ' (derived family — build it from the source material, do not omit it)'))); });
           // ANATOMY — the family list is only the first half of the source contract. A family that IS in the inventory
           // can still be drawn with the wrong material: the a reference secondary action may be a borderless light chip, but the
           // generic "secondary" tone gave it a 1px border, a `control` stack and a detached halo. These facts live in the
@@ -1965,7 +2213,7 @@ return (function () {
           const m = LIB ? LIB.pageFams('09') : (storage.CF && storage.CF.map ? storage.CF.map().feedback : []);
           const specHead = {};
           (kidsOf(top) || []).forEach((c) => { if (typeOf(c) === 'board' && /·Spec(?:·|$)/.test(nameOf(c))) specHead[String(nameOf(c)).split('·')[0].toLowerCase()] = 1; });
-          m.forEach((f) => { const cap = String(f).charAt(0).toUpperCase() + String(f).slice(1); if (!specHead[String(cap).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired feedback catalog: ' : 'complete feedback catalog: ') + cap + ' has no ·Spec board on page 09' + (LIB ? '' : ' — measured families use their profile, the rest are derived from the source material and must still be built')); });
+          if (!CATB && /^0[3-9] · /.test(pname)) m.forEach((f) => { const cap = String(f).charAt(0).toUpperCase() + String(f).slice(1); if (!specHead[String(cap).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired feedback catalog: ' : 'complete feedback catalog: ') + cap + ' has no ·Spec board on page 09' + (LIB ? '' : ' — measured families use their profile, the rest are derived from the source material and must still be built')); });
         } catch (e) {}
         if (!LIB && !fb) {
           add('reference_drift', null, top, 'no feedback source profile on page 09 — seed CF.setReference({feedback:{tooltip,modal,alert,toast}}) from the reference CSS before building Overlays; generic factory defaults are not the source');
@@ -2046,7 +2294,7 @@ return (function () {
           } catch (e) {}
           const specHead = {};
           (kidsOf(top) || []).forEach((c) => { if (typeOf(c) === 'board' && /·Spec(?:·|$)/.test(nameOf(c))) specHead[String(nameOf(c)).split('·')[0].toLowerCase()] = 1; });
-          G.fams.forEach((f) => { if (!specHead[String(f).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired ' : 'complete ') + G.g + ' catalog: ' + f + ' has no ·Spec board on page ' + pname.slice(0, 2) + (LIB ? ' — the paired library manifest assigns it to this page' : ' — build the whole family set; a source recreation does not delete the families the site does not show')); });
+          if (!CATB && /^0[3-9] · /.test(pname)) G.fams.forEach((f) => { if (!specHead[String(f).toLowerCase()]) add(LIB ? 'library_drift' : 'reference_drift', null, top, (LIB ? 'paired ' : 'complete ') + G.g + ' catalog: ' + f + ' has no ·Spec board on page ' + pname.slice(0, 2) + (LIB ? ' — the paired library manifest assigns it to this page' : ' — build the whole family set; a source recreation does not delete the families the site does not show')); });
           if (LIB) Object.keys(specHead).forEach((h) => {
             if (G.fams.map((x) => String(x).toLowerCase()).indexOf(h) < 0) {
               const capH = h.charAt(0).toUpperCase() + h.slice(1);
@@ -2083,6 +2331,10 @@ return (function () {
             if (!declared.length) add('reference_drift', null, top, 'the ' + G.g + ' profile declares no family entries — every family this page draws needs a measured or explicitly derived entry');
             (function walkP(k) {
               const nm = nameOf(k);
+              // A `Masters·` board is a supporting master sheet, not a family spec page: its children are the atom
+              // masters themselves. Judging them as page content produced 10 false reference_drift findings on the
+              // 07.11 Masters·Chip support page (measured 2026-10-26); skip the whole subtree.
+              if (typeOf(k) === 'board' && /^Masters·/.test(nm)) return;
               if (typeOf(k) === 'board' && !/·Spec(·|$)|-PageRoot$|-Header$|-Footer$|^Masters·/.test(nm)) {
                 const fam = G.fams.filter((f) => (FAMPAT[f] ? FAMPAT[f].test(nm) : new RegExp('^' + f + '(?:·|$)').test(nm)))[0];
                 const famKey = fam ? keyFor(fam) : null;
@@ -2093,7 +2345,9 @@ return (function () {
                   if (!st && !derived0) {
                     const draw = ({ List: 'listItem', Table: 'tableRow', Calendar: 'miniCalendar' })[fam] || fam.toLowerCase();
                     add('reference_drift', k, top, nm.slice(0, 44) + ' carries no nl:prof stamp — it was drawn from the generic kit, not from the ' + G.g + ' profile; run CF.stampPass (measures the render) or rebuild it with the profile-aware factory (CF.' + draw + ')');
-                  } else if (st && derived0) { /* derived family: coverage is the contract, no measured expect */ } else {
+                  } else if (derived0) { /* derived family: coverage is the contract, no measured expect — an UNSTAMPED
+                    derived host is legal too (st === null); the old `st && derived0` guard let that case fall through
+                    to `st.g` and crashed the page audit (measured 2026-10-26 on 08.03 TabBand·Spec) */ } else {
                     if (st.g && st.g !== G.g) add('reference_drift', k, top, nm.slice(0, 44) + ' is stamped from the "' + st.g + '" profile on a ' + G.g + ' page');
                     // Judge against the entry MERGED with the variant the HOST NAME declares (`Card·…·Selectable` — a
                     // factory stamp may record a different axis, and the name is the one both stamp paths agree on),
@@ -2101,8 +2355,8 @@ return (function () {
                     const nk = (storage.CF && storage.CF.profKeyFor) ? storage.CF.profKeyFor(nm) : null;
                     const vary = (nk && nk.variant) || st.variant || null;
                     const entry = (storage.CF && storage.CF.profile && storage.CF.profile(G.g, famKey, vary)) || groupRef[famKey];
-                    const diff = (storage.CF && storage.CF.profDiff) ? storage.CF.profDiff(entry, st)
-                      : Object.keys(entry.expect || {}).filter((ek) => entry.expect[ek] !== undefined && String((st.geo || {})[ek]) !== String(entry.expect[ek])).map((ek) => ({ k: ek, want: entry.expect[ek], got: (st.geo || {})[ek] }));
+                    const diff = !entry ? [] : ((storage.CF && storage.CF.profDiff) ? storage.CF.profDiff(entry, st)
+                      : (entry.expect ? Object.keys(entry.expect).filter((ek) => entry.expect[ek] !== undefined && String((st.geo || {})[ek]) !== String(entry.expect[ek])).map((ek) => ({ k: ek, want: entry.expect[ek], got: (st.geo || {})[ek] })) : []));
                     diff.forEach((b) => add('reference_drift', k, top, nm.slice(0, 44) + ' draws ' + b.k + '=' + (b.got === undefined || b.got === null ? '—' : b.got) + '; the ' + G.g + ' profile measures ' + b.k + '=' + b.want + (entry.derived ? ' (derived material)' : '')));
                   }
                 }
@@ -2224,9 +2478,16 @@ return (function () {
       over ~9 pages and coverage is only decidable across the file. Reads FN, so it costs one call and draws nothing. */
   storage.designCoverage = function () {
     const FN = storage.FN;
-    if (!FN || !FN.coverage) return { verdict: 'NEEDS_REPAIR', err: 'storage.FN is not seeded (G1 seeds foundations_engine.js last) — chapter coverage cannot be read' };
+    const CAT = storage.CATALOG;
+    const catFindings = (CAT && typeof CAT.pageIssues === 'function') ? CAT.pageIssues()
+      : [{ detail: 'storage.CATALOG is not seeded — the standard 67-page block inventory cannot be checked (load catalog_engine.js)' }];
+    const catVerdict = catFindings.length ? 'NEEDS_REPAIR' : 'CLEAN';
+    if (!FN || !FN.coverage) return { verdict: 'NEEDS_REPAIR', catalog: { verdict: catVerdict, findings: catFindings },
+      err: 'storage.FN is not seeded (G1 seeds foundations_engine.js last) — chapter coverage cannot be read' };
     const c = FN.coverage();
-    return { verdict: c.verdict, pages: c.pages, chapters: c.chapters.map((r) => ({ chapter: r.chapter, pages: r.pages,
+    return { verdict: c.verdict === 'CLEAN' && catVerdict === 'CLEAN' ? 'CLEAN' : 'NEEDS_REPAIR',
+      catalog: { verdict: catVerdict, findings: catFindings },
+      pages: c.pages, chapters: c.chapters.map((r) => ({ chapter: r.chapter, pages: r.pages,
       required: r.required.length, covered: r.covered, missing: r.missing, foreign: r.foreign, offChapter: r.offChapter })),
       missing: c.missing, foreign: c.foreign, offChapter: c.offChapter, contract: FN.CHAPTER, exempt: FN.EXEMPT };
   };

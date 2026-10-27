@@ -3,7 +3,7 @@
 Target artifacts (none dispensable):
 
 1. **DESIGN.md** — the compliant spec file (the skeleton from `references/design-md-spec.md` + passing lint).
-2. **Penpot design-system file** — the 18-page, 4-layer fixed structure (`references/penpot-structure.md` contract).
+2. **Penpot design-system file** — the 78-page block-page standard (18 chapter rows; `03–09` = 67 family pages; `references/penpot-structure.md` contract).
 3. **Component mapping table** (page `13 · Component index` + workspace `component-map.json`) — input for design-to-code.
 
 **The entry analysis only fills in numbers the engines already know how to draw.** Every value you extract lands either on a
@@ -80,8 +80,9 @@ register components → recipe screens. Where the library contradicts a `design-
    `scripts/layout_engine.js` (`storage.LY`) → `scripts/component_factory.js` (`storage.CF`, re-skin it with `CF.theme(map)` from the
    entry's measurements and set `CF.brandName` from DESIGN.md's name, so shell previews carry the product's name instead of `Brand`) → `scripts/token_engine.js` `TK.seed(spec)` to **actually record Penpot design tokens** (set split by color mode) →
    `TK.assert()` must PASS. See `references/design-tokens.md`.
-3. **Skeleton**: `scripts/scaffold_structure.js` builds the 18 pages + PageRoot/header/footer (PageRoot always 1920, it's the spec-sheet canvas);
-   run its phase-3 **fit** again at delivery time.
+3. **Skeleton**: load `scripts/catalog_engine.js` first, then `scripts/scaffold_structure.js` builds the standard pages
+   (00–02 + 67 block pages from `CAT.BLOCKS` + 10–17) + PageRoot/header/footer (PageRoot always 1920, it's the
+   spec-sheet canvas); run its phase-3 **fit** again at delivery time.
 4. **Fill page by page** (order = page number order; `export_shape` to accept after **each board**, earlier rebuild costs less):
    - `01 · Foundations` and `02 · Color in use` — **projected from the records; there is no composed alternative** (gate G16,
      enforced by rule 31 `not_projected` + `storage.designCoverage()`, `engines.md` §7.1):
