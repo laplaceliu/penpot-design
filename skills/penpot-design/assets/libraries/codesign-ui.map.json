@@ -1,64 +1,1869 @@
 {
- "accordion": {"page":"08","group":"navigation","factory":"accordion","kind":"visual","category":"Layout & Navigation","states":["closed","open","disabled"]},
- "angle-slider": {"page":"05","group":"selection","factory":"custom","kind":"visual","category":"Forms & Inputs","states":["default","focus","disabled"]},
- "avatar": {"page":"07","group":"data","factory":"avatar","kind":"visual","category":"Data Display","states":["default","disabled"]},
- "carousel": {"page":"06","group":"data","factory":"carousel","kind":"visual","category":"Data Display","states":["default","hover","focus","disabled"]},
- "checkbox": {"page":"05","group":"selection","factory":"checkbox","kind":"visual","category":"Forms & Inputs","states":["off","on","focus","disabled"]},
- "client-only": {"page":"13","group":"utility","factory":"custom","kind":"nonVisual","category":"Utilities","states":[]},
- "clipboard": {"page":"03","group":"actions","factory":"custom","kind":"visual","category":"Utilities","states":["default","hover","focus","disabled"]},
- "collapsible": {"page":"08","group":"navigation","factory":"custom","kind":"visual","category":"Utilities","states":["closed","open"]},
- "collection": {"page":"13","group":"utility","factory":"custom","kind":"nonVisual","category":"Utilities","states":[]},
- "color-picker": {"page":"05","group":"selection","factory":"colorPicker","kind":"visual","category":"Forms & Inputs","states":["closed","open","disabled"]},
- "combobox": {"page":"05","group":"selection","factory":"combobox","kind":"visual","category":"Forms & Inputs","states":["closed","open","disabled"]},
- "date-input": {"page":"04","group":"forms","factory":"custom","kind":"visual","category":"Forms & Inputs","states":["default","focus","invalid","disabled"]},
- "date-picker": {"page":"05","group":"selection","factory":"datePicker","kind":"visual","category":"Forms & Inputs","states":["closed","open","disabled"]},
- "dialog": {"page":"09","group":"feedback","factory":"modal","kind":"visual","category":"Overlays & Dialogs","states":["closed","open"]},
- "download-trigger": {"page":"03","group":"actions","factory":"custom","kind":"visual","category":"Utilities","states":["default","hover","focus","disabled"]},
- "drawer": {"page":"09","group":"feedback","factory":"drawer","kind":"visual","category":"Overlays & Dialogs","states":["closed","open"]},
- "editable": {"page":"04","group":"forms","factory":"custom","kind":"visual","category":"Forms & Inputs","states":["default","focus","disabled"]},
- "field": {"page":"04","group":"forms","factory":"field","kind":"visual","category":"Forms & Inputs","states":["default","focus","invalid","disabled"]},
- "fieldset": {"page":"04","group":"forms","factory":"custom","kind":"visual","category":"Forms & Inputs","states":["default","disabled"]},
- "file-upload": {"page":"04","group":"forms","factory":"upload","kind":"visual","category":"Forms & Inputs","states":["default","dragging","disabled"]},
- "floating-panel": {"page":"09","group":"feedback","factory":"custom","kind":"visual","category":"Overlays & Dialogs","states":["closed","open"]},
- "focus-trap": {"page":"13","group":"utility","factory":"custom","kind":"nonVisual","category":"Utilities","states":[]},
- "format": {"page":"13","group":"utility","factory":"custom","kind":"nonVisual","category":"Data Display","states":[]},
- "frame": {"page":"06","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default"]},
- "highlight": {"page":"07","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default"]},
- "hover-card": {"page":"09","group":"feedback","factory":"custom","kind":"visual","category":"Overlays & Dialogs","states":["closed","open"]},
- "image-cropper": {"page":"06","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default","dragging"]},
- "json-tree-view": {"page":"06","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["closed","open"]},
- "listbox": {"page":"05","group":"selection","factory":"select","kind":"visual","category":"Forms & Inputs","states":["closed","open","disabled"]},
- "marquee": {"page":"07","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default"]},
- "menu": {"page":"08","group":"navigation","factory":"menu","kind":"visual","category":"Utilities","states":["closed","open","disabled"]},
- "navigation-menu": {"page":"08","group":"navigation","factory":"custom","kind":"visual","category":"Layout & Navigation","states":["closed","open"]},
- "number-input": {"page":"04","group":"forms","factory":"numberField","kind":"visual","category":"Forms & Inputs","states":["default","focus","invalid","disabled"]},
- "pagination": {"page":"08","group":"navigation","factory":"pagination","kind":"visual","category":"Utilities","states":["default","hover","focus","disabled"]},
- "password-input": {"page":"04","group":"forms","factory":"passwordField","kind":"visual","category":"Forms & Inputs","states":["default","focus","invalid","disabled"]},
- "pin-input": {"page":"04","group":"forms","factory":"otpInput","kind":"visual","category":"Forms & Inputs","states":["default","focus","invalid","disabled"]},
- "popover": {"page":"09","group":"feedback","factory":"popover","kind":"visual","category":"Overlays & Dialogs","states":["closed","open"]},
- "portal": {"page":"13","group":"utility","factory":"custom","kind":"nonVisual","category":"Utilities","states":[]},
- "presence": {"page":"13","group":"utility","factory":"custom","kind":"nonVisual","category":"Utilities","states":[]},
- "progress": {"page":"07","group":"data","factory":"progress","kind":"visual","category":"Data Display","states":["default","indeterminate"]},
- "qr-code": {"page":"07","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default"]},
- "radio-group": {"page":"05","group":"selection","factory":"radio","kind":"visual","category":"Forms & Inputs","states":["off","on","focus","disabled"]},
- "rating-group": {"page":"05","group":"selection","factory":"rating","kind":"visual","category":"Forms & Inputs","states":["default","focus","disabled"]},
- "scroll-area": {"page":"06","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default"]},
- "segment-group": {"page":"05","group":"selection","factory":"segmented","kind":"visual","category":"Utilities","states":["off","on","focus","disabled"]},
- "select": {"page":"05","group":"selection","factory":"select","kind":"visual","category":"Forms & Inputs","states":["closed","open","disabled"]},
- "signature-pad": {"page":"04","group":"forms","factory":"custom","kind":"visual","category":"Forms & Inputs","states":["default","focus","disabled"]},
- "slider": {"page":"05","group":"selection","factory":"slider","kind":"visual","category":"Forms & Inputs","states":["default","focus","disabled"]},
- "splitter": {"page":"06","group":"data","factory":"custom","kind":"visual","category":"Layout & Navigation","states":["default","focus"]},
- "steps": {"page":"08","group":"navigation","factory":"steps","kind":"visual","category":"Layout & Navigation","states":["default","focus","disabled"]},
- "swap": {"page":"07","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["off","on"]},
- "switch": {"page":"05","group":"selection","factory":"switch","kind":"visual","category":"Forms & Inputs","states":["off","on","focus","disabled"]},
- "tabs": {"page":"08","group":"navigation","factory":"tabs","kind":"visual","category":"Layout & Navigation","states":["default","hover","focus","disabled","selected"]},
- "tags-input": {"page":"04","group":"forms","factory":"multiSelect","kind":"visual","category":"Forms & Inputs","states":["default","focus","invalid","disabled"]},
- "timer": {"page":"07","group":"data","factory":"custom","kind":"visual","category":"Data Display","states":["default","running","paused"]},
- "toast": {"page":"09","group":"feedback","factory":"toast","kind":"visual","category":"Utilities","states":["closed","open"]},
- "toc": {"page":"08","group":"navigation","factory":"anchor","kind":"visual","category":"Layout & Navigation","states":["default","hover","focus"]},
- "toggle": {"page":"05","group":"selection","factory":"button","kind":"visual","category":"Forms & Inputs","states":["off","on","focus","disabled"]},
- "toggle-group": {"page":"05","group":"selection","factory":"custom","kind":"visual","category":"Forms & Inputs","states":["off","on","focus","disabled"]},
- "tooltip": {"page":"09","group":"feedback","factory":"tooltip","kind":"visual","category":"Overlays & Dialogs","states":["closed","open"]},
- "tour": {"page":"09","group":"feedback","factory":"custom","kind":"visual","category":"Layout & Navigation","states":["closed","open"]},
- "tree-view": {"page":"06","group":"data","factory":"custom","kind":"visual","category":"Layout & Navigation","states":["closed","open","selected","disabled"]}
+ "accordion": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "accordion",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 5
+ },
+ "angle-slider": {
+  "page": "04",
+  "group": "forms",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 6
+ },
+ "avatar": {
+  "page": "07",
+  "group": "data",
+  "factory": "avatar",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "carousel": {
+  "page": "06",
+  "group": "data",
+  "factory": "carousel",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 8
+ },
+ "checkbox": {
+  "page": "05",
+  "group": "selection",
+  "factory": "checkbox",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "off",
+   "on",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 1
+ },
+ "client-only": {
+  "page": "13",
+  "group": "utility",
+  "factory": "custom",
+  "kind": "nonVisual",
+  "category": "Utilities",
+  "states": [],
+  "layer": "components",
+  "order": 99
+ },
+ "clipboard": {
+  "page": "03",
+  "group": "actions",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 7
+ },
+ "collapsible": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 6
+ },
+ "collection": {
+  "page": "13",
+  "group": "utility",
+  "factory": "custom",
+  "kind": "nonVisual",
+  "category": "Utilities",
+  "states": [],
+  "layer": "components",
+  "order": 99
+ },
+ "color-picker": {
+  "page": "05",
+  "group": "selection",
+  "factory": "colorPicker",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 2
+ },
+ "combobox": {
+  "page": "05",
+  "group": "selection",
+  "factory": "combobox",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 3
+ },
+ "date-input": {
+  "page": "04",
+  "group": "forms",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 7
+ },
+ "date-picker": {
+  "page": "05",
+  "group": "selection",
+  "factory": "datePicker",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 4
+ },
+ "dialog": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "modal",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 6
+ },
+ "download-trigger": {
+  "page": "03",
+  "group": "actions",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 8
+ },
+ "drawer": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "drawer",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 7
+ },
+ "editable": {
+  "page": "04",
+  "group": "forms",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 8
+ },
+ "field": {
+  "page": "04",
+  "group": "forms",
+  "factory": "field",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "fieldset": {
+  "page": "04",
+  "group": "forms",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "file-upload": {
+  "page": "04",
+  "group": "forms",
+  "factory": "upload",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "dragging",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 11
+ },
+ "floating-panel": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 8
+ },
+ "focus-trap": {
+  "page": "13",
+  "group": "utility",
+  "factory": "custom",
+  "kind": "nonVisual",
+  "category": "Utilities",
+  "states": [],
+  "layer": "components",
+  "order": 99
+ },
+ "format": {
+  "page": "13",
+  "group": "utility",
+  "factory": "custom",
+  "kind": "nonVisual",
+  "category": "Data Display",
+  "states": [],
+  "layer": "components",
+  "order": 99
+ },
+ "frame": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "highlight": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "layer": "components",
+  "order": 11
+ },
+ "hover-card": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "image-cropper": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "dragging"
+  ],
+  "layer": "components",
+  "order": 12
+ },
+ "json-tree-view": {
+  "page": "06",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "listbox": {
+  "page": "06",
+  "group": "data",
+  "factory": "select",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "marquee": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "layer": "components",
+  "order": 13
+ },
+ "menu": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "menu",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 7
+ },
+ "navigation-menu": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 8
+ },
+ "number-input": {
+  "page": "04",
+  "group": "forms",
+  "factory": "numberField",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 12
+ },
+ "pagination": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "pagination",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "password-input": {
+  "page": "04",
+  "group": "forms",
+  "factory": "passwordField",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 13
+ },
+ "pin-input": {
+  "page": "04",
+  "group": "forms",
+  "factory": "otpInput",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 14
+ },
+ "popover": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "popover",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "portal": {
+  "page": "13",
+  "group": "utility",
+  "factory": "custom",
+  "kind": "nonVisual",
+  "category": "Utilities",
+  "states": [],
+  "layer": "components",
+  "order": 99
+ },
+ "presence": {
+  "page": "13",
+  "group": "utility",
+  "factory": "custom",
+  "kind": "nonVisual",
+  "category": "Utilities",
+  "states": [],
+  "layer": "components",
+  "order": 99
+ },
+ "progress": {
+  "page": "07",
+  "group": "data",
+  "factory": "progress",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "indeterminate"
+  ],
+  "layer": "components",
+  "order": 14
+ },
+ "qr-code": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "layer": "components",
+  "order": 15
+ },
+ "radio-group": {
+  "page": "05",
+  "group": "selection",
+  "factory": "radio",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "off",
+   "on",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 6
+ },
+ "rating-group": {
+  "page": "05",
+  "group": "selection",
+  "factory": "rating",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 7
+ },
+ "scroll-area": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "layer": "components",
+  "order": 16
+ },
+ "segment-group": {
+  "page": "05",
+  "group": "selection",
+  "factory": "segmented",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "off",
+   "on",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 8
+ },
+ "select": {
+  "page": "05",
+  "group": "selection",
+  "factory": "select",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "signature-pad": {
+  "page": "04",
+  "group": "forms",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 15
+ },
+ "slider": {
+  "page": "05",
+  "group": "selection",
+  "factory": "slider",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "splitter": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default",
+   "focus"
+  ],
+  "layer": "components",
+  "order": 17
+ },
+ "steps": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "steps",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "swap": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "off",
+   "on"
+  ],
+  "layer": "components",
+  "order": 18
+ },
+ "switch": {
+  "page": "05",
+  "group": "selection",
+  "factory": "switch",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "off",
+   "on",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 11
+ },
+ "tabs": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "tabs",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "disabled",
+   "selected"
+  ],
+  "layer": "components",
+  "order": 11
+ },
+ "tags-input": {
+  "page": "04",
+  "group": "forms",
+  "factory": "multiSelect",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 16
+ },
+ "timer": {
+  "page": "07",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "running",
+   "paused"
+  ],
+  "layer": "components",
+  "order": 19
+ },
+ "toast": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "toast",
+  "kind": "visual",
+  "category": "Utilities",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 11
+ },
+ "toc": {
+  "page": "08",
+  "group": "navigation",
+  "factory": "anchor",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default",
+   "hover",
+   "focus"
+  ],
+  "layer": "components",
+  "order": 12
+ },
+ "toggle": {
+  "page": "03",
+  "group": "actions",
+  "factory": "button",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "off",
+   "on",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 9
+ },
+ "toggle-group": {
+  "page": "03",
+  "group": "actions",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "off",
+   "on",
+   "focus",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 10
+ },
+ "tooltip": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "tooltip",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 12
+ },
+ "tour": {
+  "page": "09",
+  "group": "feedback",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "layer": "components",
+  "order": 13
+ },
+ "tree-view": {
+  "page": "06",
+  "group": "data",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "closed",
+   "open",
+   "selected",
+   "disabled"
+  ],
+  "layer": "components",
+  "order": 11
+ },
+ "conversation": {
+  "name": "Conversation",
+  "designFamily": "Conversation",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 1,
+  "layer": "ai"
+ },
+ "message": {
+  "name": "Message",
+  "designFamily": "Message",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "hover"
+  ],
+  "order": 2,
+  "layer": "ai"
+ },
+ "prompt-input": {
+  "name": "PromptInput",
+  "designFamily": "PromptInput",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "focus",
+   "disabled"
+  ],
+  "order": 3,
+  "layer": "ai"
+ },
+ "model-selector": {
+  "name": "ModelSelector",
+  "designFamily": "ModelSelector",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "order": 4,
+  "layer": "ai"
+ },
+ "attachments": {
+  "name": "Attachments",
+  "designFamily": "Attachments",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "hover"
+  ],
+  "order": 5,
+  "layer": "ai"
+ },
+ "suggestion": {
+  "name": "Suggestion",
+  "designFamily": "Suggestion",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "hover"
+  ],
+  "order": 6,
+  "layer": "ai"
+ },
+ "sources": {
+  "name": "Sources",
+  "designFamily": "Sources",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "order": 7,
+  "layer": "ai"
+ },
+ "inline-citation": {
+  "name": "InlineCitation",
+  "designFamily": "InlineCitation",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "order": 8,
+  "layer": "ai"
+ },
+ "reasoning": {
+  "name": "Reasoning",
+  "designFamily": "Reasoning",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "collapsed",
+   "expanded"
+  ],
+  "order": 9,
+  "layer": "ai"
+ },
+ "chain-of-thought": {
+  "name": "ChainOfThought",
+  "designFamily": "ChainOfThought",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "collapsed",
+   "expanded"
+  ],
+  "order": 10,
+  "layer": "ai"
+ },
+ "plan": {
+  "name": "Plan",
+  "designFamily": "Plan",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 11,
+  "layer": "ai"
+ },
+ "tool": {
+  "name": "Tool",
+  "designFamily": "Tool",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "collapsed",
+   "expanded"
+  ],
+  "order": 12,
+  "layer": "ai"
+ },
+ "task": {
+  "name": "Task",
+  "designFamily": "Task",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "pending",
+   "running",
+   "done"
+  ],
+  "order": 13,
+  "layer": "ai"
+ },
+ "queue": {
+  "name": "Queue",
+  "designFamily": "Queue",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "hover"
+  ],
+  "order": 14,
+  "layer": "ai"
+ },
+ "confirmation": {
+  "name": "Confirmation",
+  "designFamily": "Confirmation",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "request",
+   "accepted",
+   "rejected"
+  ],
+  "order": 15,
+  "layer": "ai"
+ },
+ "question": {
+  "name": "Question",
+  "designFamily": "Question",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "answered"
+  ],
+  "order": 16,
+  "layer": "ai"
+ },
+ "agent": {
+  "name": "Agent",
+  "designFamily": "Agent",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "idle",
+   "running",
+   "done"
+  ],
+  "order": 17,
+  "layer": "ai"
+ },
+ "artifact": {
+  "name": "Artifact",
+  "designFamily": "Artifact",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 18,
+  "layer": "ai"
+ },
+ "code-block": {
+  "name": "CodeBlock",
+  "designFamily": "CodeBlock",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "copied"
+  ],
+  "order": 19,
+  "layer": "ai"
+ },
+ "snippet": {
+  "name": "Snippet",
+  "designFamily": "Snippet",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "copied"
+  ],
+  "order": 20,
+  "layer": "ai"
+ },
+ "terminal": {
+  "name": "Terminal",
+  "designFamily": "Terminal",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 21,
+  "layer": "ai"
+ },
+ "sandbox": {
+  "name": "Sandbox",
+  "designFamily": "Sandbox",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 22,
+  "layer": "ai"
+ },
+ "web-preview": {
+  "name": "WebPreview",
+  "designFamily": "WebPreview",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 23,
+  "layer": "ai"
+ },
+ "jsx-preview": {
+  "name": "JSXPreview",
+  "designFamily": "JSXPreview",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "error"
+  ],
+  "order": 24,
+  "layer": "ai"
+ },
+ "schema-display": {
+  "name": "SchemaDisplay",
+  "designFamily": "SchemaDisplay",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 25,
+  "layer": "ai"
+ },
+ "environment-variables": {
+  "name": "EnvironmentVariables",
+  "designFamily": "EnvironmentVariables",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "revealed"
+  ],
+  "order": 26,
+  "layer": "ai"
+ },
+ "package-info": {
+  "name": "PackageInfo",
+  "designFamily": "PackageInfo",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 27,
+  "layer": "ai"
+ },
+ "commit": {
+  "name": "Commit",
+  "designFamily": "Commit",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 28,
+  "layer": "ai"
+ },
+ "checkpoint": {
+  "name": "Checkpoint",
+  "designFamily": "Checkpoint",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 29,
+  "layer": "ai"
+ },
+ "context": {
+  "name": "Context",
+  "designFamily": "Context",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "order": 30,
+  "layer": "ai"
+ },
+ "stack-trace": {
+  "name": "StackTrace",
+  "designFamily": "StackTrace",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "collapsed",
+   "expanded"
+  ],
+  "order": 31,
+  "layer": "ai"
+ },
+ "test-results": {
+  "name": "TestResults",
+  "designFamily": "TestResults",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default",
+   "expanded"
+  ],
+  "order": 32,
+  "layer": "ai"
+ },
+ "shimmer": {
+  "name": "Shimmer",
+  "designFamily": "Shimmer",
+  "page": "18",
+  "group": "ai",
+  "factory": "custom",
+  "kind": "visual",
+  "category": "AI & Agents",
+  "states": [
+   "default"
+  ],
+  "order": 33,
+  "layer": "ai"
+ },
+ "button": {
+  "designFamily": "Button",
+  "page": "03",
+  "group": "actions",
+  "factory": "button",
+  "kind": "visual",
+  "category": "Actions",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 1,
+  "layer": "kit"
+ },
+ "icon-button": {
+  "designFamily": "IconButton",
+  "page": "03",
+  "group": "actions",
+  "factory": "iconButton",
+  "kind": "visual",
+  "category": "Actions",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 2,
+  "layer": "kit"
+ },
+ "button-group": {
+  "designFamily": "ButtonGroup",
+  "page": "03",
+  "group": "actions",
+  "factory": "buttonGroup",
+  "kind": "visual",
+  "category": "Actions",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 3,
+  "layer": "kit"
+ },
+ "split-button": {
+  "designFamily": "SplitButton",
+  "page": "03",
+  "group": "actions",
+  "factory": "splitButton",
+  "kind": "visual",
+  "category": "Actions",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 4,
+  "layer": "kit"
+ },
+ "fab": {
+  "designFamily": "FAB",
+  "page": "03",
+  "group": "actions",
+  "factory": "fab",
+  "kind": "visual",
+  "category": "Actions",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 5,
+  "layer": "kit"
+ },
+ "link": {
+  "designFamily": "Link",
+  "page": "03",
+  "group": "actions",
+  "factory": "link",
+  "kind": "visual",
+  "category": "Actions",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 6,
+  "layer": "kit"
+ },
+ "input": {
+  "designFamily": "Input",
+  "page": "04",
+  "group": "forms",
+  "factory": "input",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "order": 1,
+  "layer": "kit"
+ },
+ "textarea": {
+  "designFamily": "Textarea",
+  "page": "04",
+  "group": "forms",
+  "factory": "textarea",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "order": 2,
+  "layer": "kit"
+ },
+ "search": {
+  "designFamily": "Search",
+  "page": "04",
+  "group": "forms",
+  "factory": "searchField",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "order": 3,
+  "layer": "kit"
+ },
+ "masked-input": {
+  "designFamily": "MaskedInput",
+  "page": "04",
+  "group": "forms",
+  "factory": "maskedInput",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "invalid",
+   "disabled"
+  ],
+  "order": 4,
+  "layer": "kit"
+ },
+ "transfer": {
+  "designFamily": "Transfer",
+  "page": "04",
+  "group": "forms",
+  "factory": "transfer",
+  "kind": "visual",
+  "category": "Forms & Inputs",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 5,
+  "layer": "kit"
+ },
+ "time-picker": {
+  "designFamily": "TimePicker",
+  "page": "05",
+  "group": "selection",
+  "factory": "timePicker",
+  "kind": "visual",
+  "category": "Selection & Pickers",
+  "states": [
+   "closed",
+   "open",
+   "disabled"
+  ],
+  "order": 5,
+  "layer": "kit"
+ },
+ "table-header": {
+  "designFamily": "TableHeader",
+  "page": "06",
+  "group": "data",
+  "factory": "tableHeader",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 1,
+  "layer": "kit"
+ },
+ "table-row": {
+  "designFamily": "TableRow",
+  "page": "06",
+  "group": "data",
+  "factory": "tableRow",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "hover",
+   "selected",
+   "focus",
+   "disabled"
+  ],
+  "order": 2,
+  "layer": "kit"
+ },
+ "table-state": {
+  "designFamily": "TableState",
+  "page": "06",
+  "group": "data",
+  "factory": "tableState",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 3,
+  "layer": "kit"
+ },
+ "list-item": {
+  "designFamily": "ListItem",
+  "page": "06",
+  "group": "data",
+  "factory": "listItem",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "hover",
+   "selected",
+   "focus",
+   "disabled"
+  ],
+  "order": 4,
+  "layer": "kit"
+ },
+ "descriptions": {
+  "designFamily": "Descriptions",
+  "page": "06",
+  "group": "data",
+  "factory": "descriptions",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 5,
+  "layer": "kit"
+ },
+ "timeline": {
+  "designFamily": "Timeline",
+  "page": "06",
+  "group": "data",
+  "factory": "timeline",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 6,
+  "layer": "kit"
+ },
+ "mini-calendar": {
+  "designFamily": "MiniCalendar",
+  "page": "06",
+  "group": "data",
+  "factory": "miniCalendar",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 7,
+  "layer": "kit"
+ },
+ "badge": {
+  "designFamily": "Badge",
+  "page": "07",
+  "group": "data",
+  "factory": "badge",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 1,
+  "layer": "kit"
+ },
+ "status-text": {
+  "designFamily": "StatusText",
+  "page": "07",
+  "group": "data",
+  "factory": "statusText",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 2,
+  "layer": "kit"
+ },
+ "chip": {
+  "designFamily": "Chip",
+  "page": "07",
+  "group": "data",
+  "factory": "chip",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 3,
+  "layer": "kit"
+ },
+ "avatar-group": {
+  "designFamily": "AvatarGroup",
+  "page": "07",
+  "group": "data",
+  "factory": "avatarGroup",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 4,
+  "layer": "kit"
+ },
+ "card": {
+  "designFamily": "Card",
+  "page": "07",
+  "group": "data",
+  "factory": "card",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default",
+   "hover",
+   "selected",
+   "focus"
+  ],
+  "order": 5,
+  "layer": "kit"
+ },
+ "kpi": {
+  "designFamily": "KPI",
+  "page": "07",
+  "group": "data",
+  "factory": "kpi",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 6,
+  "layer": "kit"
+ },
+ "skeleton": {
+  "designFamily": "Skeleton",
+  "page": "07",
+  "group": "data",
+  "factory": "skeleton",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 7,
+  "layer": "kit"
+ },
+ "empty-state": {
+  "designFamily": "EmptyState",
+  "page": "07",
+  "group": "data",
+  "factory": "emptyState",
+  "kind": "visual",
+  "category": "Data Display",
+  "states": [
+   "default"
+  ],
+  "order": 8,
+  "layer": "kit"
+ },
+ "nav-item": {
+  "designFamily": "NavItem",
+  "page": "08",
+  "group": "navigation",
+  "factory": "navItem",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 1,
+  "layer": "kit"
+ },
+ "tab-band": {
+  "designFamily": "TabBand",
+  "page": "08",
+  "group": "navigation",
+  "factory": "tabBand",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default"
+  ],
+  "order": 2,
+  "layer": "kit"
+ },
+ "breadcrumb": {
+  "designFamily": "Breadcrumb",
+  "page": "08",
+  "group": "navigation",
+  "factory": "breadcrumb",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default",
+   "hover",
+   "focus",
+   "pressed",
+   "disabled"
+  ],
+  "order": 3,
+  "layer": "kit"
+ },
+ "command-palette": {
+  "designFamily": "CommandPalette",
+  "page": "08",
+  "group": "navigation",
+  "factory": "commandPalette",
+  "kind": "visual",
+  "category": "Layout & Navigation",
+  "states": [
+   "default"
+  ],
+  "order": 4,
+  "layer": "kit"
+ },
+ "alert": {
+  "designFamily": "Alert",
+  "page": "09",
+  "group": "feedback",
+  "factory": "alert",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "default"
+  ],
+  "order": 1,
+  "layer": "kit"
+ },
+ "notification": {
+  "designFamily": "Notification",
+  "page": "09",
+  "group": "feedback",
+  "factory": "notification",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "default"
+  ],
+  "order": 2,
+  "layer": "kit"
+ },
+ "popconfirm": {
+  "designFamily": "Popconfirm",
+  "page": "09",
+  "group": "feedback",
+  "factory": "popconfirm",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "order": 3,
+  "layer": "kit"
+ },
+ "spin": {
+  "designFamily": "Spin",
+  "page": "09",
+  "group": "feedback",
+  "factory": "spin",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "default"
+  ],
+  "order": 4,
+  "layer": "kit"
+ },
+ "sheet": {
+  "designFamily": "Sheet",
+  "page": "09",
+  "group": "feedback",
+  "factory": "sheet",
+  "kind": "visual",
+  "category": "Overlays & Dialogs",
+  "states": [
+   "closed",
+   "open"
+  ],
+  "order": 5,
+  "layer": "kit"
+ }
 }

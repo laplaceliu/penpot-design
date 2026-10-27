@@ -3,7 +3,7 @@
 Target artifacts (none dispensable):
 
 1. **DESIGN.md** — the compliant spec file (the skeleton from `references/design-md-spec.md` + passing lint).
-2. **Penpot design-system file** — the 78-page block-page standard (18 chapter rows; `03–09` = 67 family pages; `references/penpot-structure.md` contract).
+2. **Penpot design-system file** — the 136-page block-page standard (19 chapter rows; `03–09 + 18` = 125 codesign-ui component pages; `references/penpot-structure.md` contract).
 3. **Component mapping table** (page `13 · Component index` + workspace `component-map.json`) — input for design-to-code.
 
 **The entry analysis only fills in numbers the engines already know how to draw.** Every value you extract lands either on a
@@ -26,7 +26,7 @@ If a measured value cannot be expressed through a factory or a recipe, that is a
    - Shape: radius tiers, stroke weight, shadow/glow → `CF.radius` tiers and the elevation table (§5.1).
    - Spacing: page margins, card padding, list row height → snap to `LY.SPACE` / `LY.ROWS` (never "approximately 8px").
    - Component inventory: which families of `CF.map()` the page actually shows, and **which slots** (icon-leading input?
-     masked input? clear button? addon?) — this is the spec-board row list for pages 03–09.
+     masked input? clear button? addon?) — this is the spec-board row list for pages 03–09 + 18.
 2. **Style definition**: write Overview (brand personality / target users / emotional tone), determine style keywords (e.g. "deep-blue tech + glowing neon").
 3. **Produce DESIGN.md**: fill tokens and body per the skeleton; `npx @google/design.md lint DESIGN.md` until 0 errors.
 4. **Enter the unified build pipeline** (below).
@@ -58,7 +58,7 @@ If a measured value cannot be expressed through a factory or a recipe, that is a
 When the user gives an existing component library (`.tsx` + `.module.less` etc.) and asks to recreate it into a design system,
 use the **recreation pipeline** (`references/mcp-automation.md` §5): first read the full source (don't rely on doc impressions;
 lesson: a Title doc was one sentence, the source was five layers) → extract CSS variables into `CF.theme(map)` + `storage.T` +
-`TK.seed` → font probing + CJK split → `01 · Foundations` → `03–09` spec boards (the library's own props become the variant rows) →
+`TK.seed` → font probing + CJK split → `01 · Foundations` → `03–09 + 18` spec boards (the library's own props become the variant rows) →
 register components → recipe screens. Where the library contradicts a `design-guide` HARD rule (e.g. white copy on a 3.3:1 hue),
 **keep the library's shape and fix the tone**, and write the delta into DESIGN.md rather than forking the factory.
 
@@ -81,7 +81,7 @@ register components → recipe screens. Where the library contradicts a `design-
    entry's measurements and set `CF.brandName` from DESIGN.md's name, so shell previews carry the product's name instead of `Brand`) → `scripts/token_engine.js` `TK.seed(spec)` to **actually record Penpot design tokens** (set split by color mode) →
    `TK.assert()` must PASS. See `references/design-tokens.md`.
 3. **Skeleton**: load `scripts/catalog_engine.js` first, then `scripts/scaffold_structure.js` builds the standard pages
-   (00–02 + 67 block pages from `CAT.BLOCKS` + 10–17) + PageRoot/header/footer (PageRoot always 1920, it's the
+   (00–02 + 125 block pages from `CAT.BLOCKS` + 10–17) + PageRoot/header/footer (PageRoot always 1920, it's the
    spec-sheet canvas); run its phase-3 **fit** again at delivery time.
 4. **Fill page by page** (order = page number order; `export_shape` to accept after **each board**, earlier rebuild costs less):
    - `01 · Foundations` and `02 · Color in use` — **projected from the records; there is no composed alternative** (gate G16,
@@ -91,7 +91,7 @@ register components → recipe screens. Where the library contradicts a `design-
      the two **declared** exemptions are `Icons` — `IC.grid`/`CF.glyph` draws a catalog — and `Light vs dark`, a scheme
      comparison) → `FN.bindNext({page})` until `allBound`.
      Every later page references these.
-   - `03–09`: one `CF.matrix` spec board per family of `CF.map()`, shelves placed with `LY.pack`; `CF.missing()` must be `[]`.
+   - `03–09 + 18`: one spec board per `CAT.LIBRARY` component (LM representative or anatomy board), shelves placed with `LY.pack`; `LM.audit()` must be CLEAN.
    - `10 · App shell & chrome`: the `CF.map().shell` composites + one anatomy board per `LY.slots` key (audited with `{ families: […] }`).
    - `11 · Grid & breakpoints`: one diagram board **per tier** in `targetProfiles` (`LY.TIERS`), the container ladder, the collapse order, the touch floor.
    - `12 · Screen recipes`: one annotated skeleton per `LY.keys()` (`LY.drawStart`/`drawStep`) + the tier-gate table (which recipe refuses which tier, and its `use` pointer).

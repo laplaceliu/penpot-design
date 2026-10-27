@@ -4,7 +4,7 @@
  "granularity": "namespace",
  "source": "https://github.com/codesign-chat/codesign-ui",
  "package": "refs/codesign-ui/packages/react",
- "generated": "2026-10-24",
+ "generated": "2026-10-27",
  "components": [
   {
    "name": "Accordion",
@@ -17,6 +17,7 @@
     "AccordionRoot"
    ],
    "source": "packages/react/src/components/accordion",
+   "layer": "components",
    "designFamily": "Accordion",
    "category": "Layout & Navigation",
    "group": "navigation",
@@ -27,7 +28,8 @@
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 5
   },
   {
    "name": "AngleSlider",
@@ -43,17 +45,19 @@
     "AngleSliderValueText"
    ],
    "source": "packages/react/src/components/angle-slider",
+   "layer": "components",
    "designFamily": "AngleSlider",
    "category": "Forms & Inputs",
-   "group": "selection",
-   "page": "05",
+   "group": "forms",
+   "page": "04",
    "factory": "custom",
    "kind": "visual",
    "states": [
     "default",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 6
   },
   {
    "name": "Avatar",
@@ -64,6 +68,7 @@
     "AvatarRoot"
    ],
    "source": "packages/react/src/components/avatar",
+   "layer": "components",
    "designFamily": "Avatar",
    "category": "Data Display",
    "group": "data",
@@ -73,7 +78,8 @@
    "states": [
     "default",
     "disabled"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "Carousel",
@@ -92,6 +98,7 @@
     "CarouselRoot"
    ],
    "source": "packages/react/src/components/carousel",
+   "layer": "components",
    "designFamily": "Carousel",
    "category": "Data Display",
    "group": "data",
@@ -103,7 +110,8 @@
     "hover",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 8
   },
   {
    "name": "Checkbox",
@@ -117,6 +125,7 @@
     "CheckboxRoot"
    ],
    "source": "packages/react/src/components/checkbox",
+   "layer": "components",
    "designFamily": "Checkbox",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -128,7 +137,8 @@
     "on",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 1
   },
   {
    "name": "ClientOnly",
@@ -137,13 +147,15 @@
     "ClientOnly"
    ],
    "source": "packages/react/src/components/client-only",
+   "layer": "components",
    "designFamily": "ClientOnly",
    "category": "Utilities",
    "group": "utility",
    "page": "13",
    "factory": "custom",
    "kind": "nonVisual",
-   "states": []
+   "states": [],
+   "order": 99
   },
   {
    "name": "Clipboard",
@@ -158,6 +170,7 @@
     "ClipboardValueText"
    ],
    "source": "packages/react/src/components/clipboard",
+   "layer": "components",
    "designFamily": "Clipboard",
    "category": "Utilities",
    "group": "actions",
@@ -169,7 +182,8 @@
     "hover",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 7
   },
   {
    "name": "Collapsible",
@@ -181,6 +195,7 @@
     "CollapsibleTrigger"
    ],
    "source": "packages/react/src/components/collapsible",
+   "layer": "components",
    "designFamily": "Collapsible",
    "category": "Utilities",
    "group": "navigation",
@@ -190,20 +205,23 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 6
   },
   {
    "name": "Collection",
    "dir": "collection",
    "parts": [],
    "source": "packages/react/src/components/collection",
+   "layer": "components",
    "designFamily": "Collection",
    "category": "Utilities",
    "group": "utility",
    "page": "13",
    "factory": "custom",
    "kind": "nonVisual",
-   "states": []
+   "states": [],
+   "order": 99
   },
   {
    "name": "ColorPicker",
@@ -238,6 +256,7 @@
     "ColorPickerView"
    ],
    "source": "packages/react/src/components/color-picker",
+   "layer": "components",
    "designFamily": "ColorPicker",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -248,7 +267,8 @@
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 2
   },
   {
    "name": "Combobox",
@@ -271,6 +291,7 @@
     "ComboboxTrigger"
    ],
    "source": "packages/react/src/components/combobox",
+   "layer": "components",
    "designFamily": "Combobox",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -281,7 +302,8 @@
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 3
   },
   {
    "name": "DateInput",
@@ -295,6 +317,7 @@
     "DateInputSegmentGroup"
    ],
    "source": "packages/react/src/components/date-input",
+   "layer": "components",
    "designFamily": "DateInput",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -306,7 +329,8 @@
     "focus",
     "invalid",
     "disabled"
-   ]
+   ],
+   "order": 7
   },
   {
    "name": "DatePicker",
@@ -341,6 +365,7 @@
     "DatePickerYearSelect"
    ],
    "source": "packages/react/src/components/date-picker",
+   "layer": "components",
    "designFamily": "DatePicker",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -351,7 +376,8 @@
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 4
   },
   {
    "name": "Dialog",
@@ -367,6 +393,7 @@
     "DialogTrigger"
    ],
    "source": "packages/react/src/components/dialog",
+   "layer": "components",
    "designFamily": "Dialog",
    "category": "Overlays & Dialogs",
    "group": "feedback",
@@ -376,7 +403,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 6
   },
   {
    "name": "DownloadTrigger",
@@ -385,6 +413,7 @@
     "DownloadTrigger"
    ],
    "source": "packages/react/src/components/download-trigger",
+   "layer": "components",
    "designFamily": "DownloadTrigger",
    "category": "Utilities",
    "group": "actions",
@@ -396,7 +425,8 @@
     "hover",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 8
   },
   {
    "name": "Drawer",
@@ -418,6 +448,7 @@
     "DrawerTrigger"
    ],
    "source": "packages/react/src/components/drawer",
+   "layer": "components",
    "designFamily": "Drawer",
    "category": "Overlays & Dialogs",
    "group": "feedback",
@@ -427,7 +458,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 7
   },
   {
    "name": "Editable",
@@ -444,6 +476,7 @@
     "EditableSubmitTrigger"
    ],
    "source": "packages/react/src/components/editable",
+   "layer": "components",
    "designFamily": "Editable",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -454,7 +487,8 @@
     "default",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 8
   },
   {
    "name": "Field",
@@ -471,6 +505,7 @@
     "FieldTextarea"
    ],
    "source": "packages/react/src/components/field",
+   "layer": "components",
    "designFamily": "Field",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -482,7 +517,8 @@
     "focus",
     "invalid",
     "disabled"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "Fieldset",
@@ -494,6 +530,7 @@
     "FieldsetRoot"
    ],
    "source": "packages/react/src/components/fieldset",
+   "layer": "components",
    "designFamily": "Fieldset",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -503,7 +540,8 @@
    "states": [
     "default",
     "disabled"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "FileUpload",
@@ -524,6 +562,7 @@
     "FileUploadTrigger"
    ],
    "source": "packages/react/src/components/file-upload",
+   "layer": "components",
    "designFamily": "FileUpload",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -534,7 +573,8 @@
     "default",
     "dragging",
     "disabled"
-   ]
+   ],
+   "order": 11
   },
   {
    "name": "FloatingPanel",
@@ -554,6 +594,7 @@
     "FloatingPanelTrigger"
    ],
    "source": "packages/react/src/components/floating-panel",
+   "layer": "components",
    "designFamily": "FloatingPanel",
    "category": "Overlays & Dialogs",
    "group": "feedback",
@@ -563,7 +604,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 8
   },
   {
    "name": "FocusTrap",
@@ -572,13 +614,15 @@
     "FocusTrap"
    ],
    "source": "packages/react/src/components/focus-trap",
+   "layer": "components",
    "designFamily": "FocusTrap",
    "category": "Utilities",
    "group": "utility",
    "page": "13",
    "factory": "custom",
    "kind": "nonVisual",
-   "states": []
+   "states": [],
+   "order": 99
   },
   {
    "name": "Format",
@@ -590,13 +634,15 @@
     "FormatTime"
    ],
    "source": "packages/react/src/components/format",
+   "layer": "components",
    "designFamily": "Format",
    "category": "Data Display",
    "group": "utility",
    "page": "13",
    "factory": "custom",
    "kind": "nonVisual",
-   "states": []
+   "states": [],
+   "order": 99
   },
   {
    "name": "Frame",
@@ -605,15 +651,17 @@
     "Frame"
    ],
    "source": "packages/react/src/components/frame",
+   "layer": "components",
    "designFamily": "Frame",
    "category": "Data Display",
    "group": "data",
-   "page": "06",
+   "page": "07",
    "factory": "custom",
    "kind": "visual",
    "states": [
     "default"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "Highlight",
@@ -622,6 +670,7 @@
     "Highlight"
    ],
    "source": "packages/react/src/components/highlight",
+   "layer": "components",
    "designFamily": "Highlight",
    "category": "Data Display",
    "group": "data",
@@ -630,7 +679,8 @@
    "kind": "visual",
    "states": [
     "default"
-   ]
+   ],
+   "order": 11
   },
   {
    "name": "HoverCard",
@@ -644,6 +694,7 @@
     "HoverCardTrigger"
    ],
    "source": "packages/react/src/components/hover-card",
+   "layer": "components",
    "designFamily": "HoverCard",
    "category": "Overlays & Dialogs",
    "group": "feedback",
@@ -653,7 +704,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "ImageCropper",
@@ -667,16 +719,18 @@
     "ImageCropperViewport"
    ],
    "source": "packages/react/src/components/image-cropper",
+   "layer": "components",
    "designFamily": "ImageCropper",
    "category": "Data Display",
    "group": "data",
-   "page": "06",
+   "page": "07",
    "factory": "custom",
    "kind": "visual",
    "states": [
     "default",
     "dragging"
-   ]
+   ],
+   "order": 12
   },
   {
    "name": "JsonTreeView",
@@ -686,6 +740,7 @@
     "JsonTreeViewTree"
    ],
    "source": "packages/react/src/components/json-tree-view",
+   "layer": "components",
    "designFamily": "JsonTreeView",
    "category": "Data Display",
    "group": "data",
@@ -695,7 +750,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "Listbox",
@@ -714,17 +770,19 @@
     "ListboxValueText"
    ],
    "source": "packages/react/src/components/listbox",
+   "layer": "components",
    "designFamily": "Listbox",
    "category": "Forms & Inputs",
-   "group": "selection",
-   "page": "05",
+   "group": "data",
+   "page": "06",
    "factory": "select",
    "kind": "visual",
    "states": [
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "Marquee",
@@ -737,6 +795,7 @@
     "MarqueeViewport"
    ],
    "source": "packages/react/src/components/marquee",
+   "layer": "components",
    "designFamily": "Marquee",
    "category": "Data Display",
    "group": "data",
@@ -745,7 +804,8 @@
    "kind": "visual",
    "states": [
     "default"
-   ]
+   ],
+   "order": 13
   },
   {
    "name": "Menu",
@@ -771,6 +831,7 @@
     "MenuTriggerItem"
    ],
    "source": "packages/react/src/components/menu",
+   "layer": "components",
    "designFamily": "Menu",
    "category": "Utilities",
    "group": "navigation",
@@ -781,7 +842,8 @@
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 7
   },
   {
    "name": "NavigationMenu",
@@ -800,6 +862,7 @@
     "NavigationMenuViewportPositioner"
    ],
    "source": "packages/react/src/components/navigation-menu",
+   "layer": "components",
    "designFamily": "NavigationMenu",
    "category": "Layout & Navigation",
    "group": "navigation",
@@ -809,7 +872,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 8
   },
   {
    "name": "NumberInput",
@@ -825,6 +889,7 @@
     "NumberInputValueText"
    ],
    "source": "packages/react/src/components/number-input",
+   "layer": "components",
    "designFamily": "NumberInput",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -836,7 +901,8 @@
     "focus",
     "invalid",
     "disabled"
-   ]
+   ],
+   "order": 12
   },
   {
    "name": "Pagination",
@@ -851,6 +917,7 @@
     "PaginationRoot"
    ],
    "source": "packages/react/src/components/pagination",
+   "layer": "components",
    "designFamily": "Pagination",
    "category": "Utilities",
    "group": "navigation",
@@ -862,7 +929,8 @@
     "hover",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "PasswordInput",
@@ -876,6 +944,7 @@
     "PasswordInputVisibilityTrigger"
    ],
    "source": "packages/react/src/components/password-input",
+   "layer": "components",
    "designFamily": "PasswordInput",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -887,7 +956,8 @@
     "focus",
     "invalid",
     "disabled"
-   ]
+   ],
+   "order": 13
   },
   {
    "name": "PinInput",
@@ -900,6 +970,7 @@
     "PinInputRoot"
    ],
    "source": "packages/react/src/components/pin-input",
+   "layer": "components",
    "designFamily": "PinInput",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -911,7 +982,8 @@
     "focus",
     "invalid",
     "disabled"
-   ]
+   ],
+   "order": 14
   },
   {
    "name": "Popover",
@@ -930,6 +1002,7 @@
     "PopoverTrigger"
    ],
    "source": "packages/react/src/components/popover",
+   "layer": "components",
    "designFamily": "Popover",
    "category": "Overlays & Dialogs",
    "group": "feedback",
@@ -939,7 +1012,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "Portal",
@@ -948,26 +1022,30 @@
     "Portal"
    ],
    "source": "packages/react/src/components/portal",
+   "layer": "components",
    "designFamily": "Portal",
    "category": "Utilities",
    "group": "utility",
    "page": "13",
    "factory": "custom",
    "kind": "nonVisual",
-   "states": []
+   "states": [],
+   "order": 99
   },
   {
    "name": "Presence",
    "dir": "presence",
    "parts": [],
    "source": "packages/react/src/components/presence",
+   "layer": "components",
    "designFamily": "Presence",
    "category": "Utilities",
    "group": "utility",
    "page": "13",
    "factory": "custom",
    "kind": "nonVisual",
-   "states": []
+   "states": [],
+   "order": 99
   },
   {
    "name": "Progress",
@@ -984,6 +1062,7 @@
     "ProgressView"
    ],
    "source": "packages/react/src/components/progress",
+   "layer": "components",
    "designFamily": "Progress",
    "category": "Data Display",
    "group": "data",
@@ -993,7 +1072,8 @@
    "states": [
     "default",
     "indeterminate"
-   ]
+   ],
+   "order": 14
   },
   {
    "name": "QrCode",
@@ -1006,6 +1086,7 @@
     "QrCodeRoot"
    ],
    "source": "packages/react/src/components/qr-code",
+   "layer": "components",
    "designFamily": "QrCode",
    "category": "Data Display",
    "group": "data",
@@ -1014,7 +1095,8 @@
    "kind": "visual",
    "states": [
     "default"
-   ]
+   ],
+   "order": 15
   },
   {
    "name": "RadioGroup",
@@ -1029,6 +1111,7 @@
     "RadioGroupRoot"
    ],
    "source": "packages/react/src/components/radio-group",
+   "layer": "components",
    "designFamily": "RadioGroup",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -1040,7 +1123,8 @@
     "on",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 6
   },
   {
    "name": "RatingGroup",
@@ -1053,6 +1137,7 @@
     "RatingGroupRoot"
    ],
    "source": "packages/react/src/components/rating-group",
+   "layer": "components",
    "designFamily": "RatingGroup",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -1063,7 +1148,8 @@
     "default",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 7
   },
   {
    "name": "ScrollArea",
@@ -1077,15 +1163,17 @@
     "ScrollAreaViewport"
    ],
    "source": "packages/react/src/components/scroll-area",
+   "layer": "components",
    "designFamily": "ScrollArea",
    "category": "Data Display",
    "group": "data",
-   "page": "06",
+   "page": "07",
    "factory": "custom",
    "kind": "visual",
    "states": [
     "default"
-   ]
+   ],
+   "order": 16
   },
   {
    "name": "SegmentGroup",
@@ -1100,6 +1188,7 @@
     "SegmentGroupRoot"
    ],
    "source": "packages/react/src/components/segment-group",
+   "layer": "components",
    "designFamily": "SegmentGroup",
    "category": "Utilities",
    "group": "selection",
@@ -1111,7 +1200,8 @@
     "on",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 8
   },
   {
    "name": "Select",
@@ -1135,6 +1225,7 @@
     "SelectValueText"
    ],
    "source": "packages/react/src/components/select",
+   "layer": "components",
    "designFamily": "Select",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -1145,7 +1236,8 @@
     "closed",
     "open",
     "disabled"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "SignaturePad",
@@ -1160,6 +1252,7 @@
     "SignaturePadSegment"
    ],
    "source": "packages/react/src/components/signature-pad",
+   "layer": "components",
    "designFamily": "SignaturePad",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -1170,7 +1263,8 @@
     "default",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 15
   },
   {
    "name": "Slider",
@@ -1189,6 +1283,7 @@
     "SliderValueText"
    ],
    "source": "packages/react/src/components/slider",
+   "layer": "components",
    "designFamily": "Slider",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -1199,7 +1294,8 @@
     "default",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "Splitter",
@@ -1211,16 +1307,18 @@
     "SplitterRoot"
    ],
    "source": "packages/react/src/components/splitter",
+   "layer": "components",
    "designFamily": "Splitter",
    "category": "Layout & Navigation",
    "group": "data",
-   "page": "06",
+   "page": "07",
    "factory": "custom",
    "kind": "visual",
    "states": [
     "default",
     "focus"
-   ]
+   ],
+   "order": 17
   },
   {
    "name": "Steps",
@@ -1239,6 +1337,7 @@
     "StepsTrigger"
    ],
    "source": "packages/react/src/components/steps",
+   "layer": "components",
    "designFamily": "Steps",
    "category": "Layout & Navigation",
    "group": "navigation",
@@ -1249,7 +1348,8 @@
     "default",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "Swap",
@@ -1259,6 +1359,7 @@
     "SwapRoot"
    ],
    "source": "packages/react/src/components/swap",
+   "layer": "components",
    "designFamily": "Swap",
    "category": "Data Display",
    "group": "data",
@@ -1268,7 +1369,8 @@
    "states": [
     "off",
     "on"
-   ]
+   ],
+   "order": 18
   },
   {
    "name": "Switch",
@@ -1281,6 +1383,7 @@
     "SwitchThumb"
    ],
    "source": "packages/react/src/components/switch",
+   "layer": "components",
    "designFamily": "Switch",
    "category": "Forms & Inputs",
    "group": "selection",
@@ -1292,7 +1395,8 @@
     "on",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 11
   },
   {
    "name": "Tabs",
@@ -1301,6 +1405,7 @@
     "TabsRoot"
    ],
    "source": "packages/react/src/components/tabs",
+   "layer": "components",
    "designFamily": "Tabs",
    "category": "Layout & Navigation",
    "group": "navigation",
@@ -1313,7 +1418,8 @@
     "focus",
     "disabled",
     "selected"
-   ]
+   ],
+   "order": 11
   },
   {
    "name": "TagsInput",
@@ -1332,6 +1438,7 @@
     "TagsInputRoot"
    ],
    "source": "packages/react/src/components/tags-input",
+   "layer": "components",
    "designFamily": "TagsInput",
    "category": "Forms & Inputs",
    "group": "forms",
@@ -1343,7 +1450,8 @@
     "focus",
     "invalid",
     "disabled"
-   ]
+   ],
+   "order": 16
   },
   {
    "name": "Timer",
@@ -1357,6 +1465,7 @@
     "TimerSeparator"
    ],
    "source": "packages/react/src/components/timer",
+   "layer": "components",
    "designFamily": "Timer",
    "category": "Data Display",
    "group": "data",
@@ -1367,7 +1476,8 @@
     "default",
     "running",
     "paused"
-   ]
+   ],
+   "order": 19
   },
   {
    "name": "Toast",
@@ -1381,6 +1491,7 @@
     "Toaster"
    ],
    "source": "packages/react/src/components/toast",
+   "layer": "components",
    "designFamily": "Toast",
    "category": "Utilities",
    "group": "feedback",
@@ -1390,7 +1501,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 11
   },
   {
    "name": "Toc",
@@ -1406,6 +1518,7 @@
     "TocTitle"
    ],
    "source": "packages/react/src/components/toc",
+   "layer": "components",
    "designFamily": "Toc",
    "category": "Layout & Navigation",
    "group": "navigation",
@@ -1416,7 +1529,8 @@
     "default",
     "hover",
     "focus"
-   ]
+   ],
+   "order": 12
   },
   {
    "name": "Toggle",
@@ -1426,10 +1540,11 @@
     "ToggleRoot"
    ],
    "source": "packages/react/src/components/toggle",
+   "layer": "components",
    "designFamily": "Toggle",
    "category": "Forms & Inputs",
-   "group": "selection",
-   "page": "05",
+   "group": "actions",
+   "page": "03",
    "factory": "button",
    "kind": "visual",
    "states": [
@@ -1437,7 +1552,8 @@
     "on",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 9
   },
   {
    "name": "ToggleGroup",
@@ -1447,10 +1563,11 @@
     "ToggleGroupRoot"
    ],
    "source": "packages/react/src/components/toggle-group",
+   "layer": "components",
    "designFamily": "ToggleGroup",
    "category": "Forms & Inputs",
-   "group": "selection",
-   "page": "05",
+   "group": "actions",
+   "page": "03",
    "factory": "custom",
    "kind": "visual",
    "states": [
@@ -1458,7 +1575,8 @@
     "on",
     "focus",
     "disabled"
-   ]
+   ],
+   "order": 10
   },
   {
    "name": "Tooltip",
@@ -1472,6 +1590,7 @@
     "TooltipTrigger"
    ],
    "source": "packages/react/src/components/tooltip",
+   "layer": "components",
    "designFamily": "Tooltip",
    "category": "Overlays & Dialogs",
    "group": "feedback",
@@ -1481,7 +1600,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 12
   },
   {
    "name": "Tour",
@@ -1503,6 +1623,7 @@
     "TourTitle"
    ],
    "source": "packages/react/src/components/tour",
+   "layer": "components",
    "designFamily": "Tour",
    "category": "Layout & Navigation",
    "group": "feedback",
@@ -1512,7 +1633,8 @@
    "states": [
     "closed",
     "open"
-   ]
+   ],
+   "order": 13
   },
   {
    "name": "TreeView",
@@ -1536,6 +1658,7 @@
     "TreeViewTree"
    ],
    "source": "packages/react/src/components/tree-view",
+   "layer": "components",
    "designFamily": "TreeView",
    "category": "Layout & Navigation",
    "group": "data",
@@ -1547,13 +1670,1756 @@
     "open",
     "selected",
     "disabled"
-   ]
+   ],
+   "order": 11
+  },
+  {
+   "name": "Agent",
+   "dir": "agent",
+   "parts": [
+    "Agent",
+    "AgentContent",
+    "AgentHeader",
+    "AgentInstructions",
+    "AgentOutput",
+    "AgentTool",
+    "AgentTools"
+   ],
+   "source": "packages/react/src/ai/agent",
+   "layer": "ai",
+   "designFamily": "Agent",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "idle",
+    "running",
+    "done"
+   ],
+   "order": 17
+  },
+  {
+   "name": "Artifact",
+   "dir": "artifact",
+   "parts": [
+    "Artifact",
+    "ArtifactAction",
+    "ArtifactActions",
+    "ArtifactContent",
+    "ArtifactDescription",
+    "ArtifactHeader",
+    "ArtifactTitle"
+   ],
+   "source": "packages/react/src/ai/artifact",
+   "layer": "ai",
+   "designFamily": "Artifact",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 18
+  },
+  {
+   "name": "Attachments",
+   "dir": "attachments",
+   "parts": [
+    "Attachment",
+    "AttachmentEmpty",
+    "AttachmentInfo",
+    "AttachmentPreview",
+    "AttachmentRemove",
+    "Attachments"
+   ],
+   "source": "packages/react/src/ai/attachments",
+   "layer": "ai",
+   "designFamily": "Attachments",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover"
+   ],
+   "order": 5
+  },
+  {
+   "name": "ChainOfThought",
+   "dir": "chain-of-thought",
+   "parts": [
+    "ChainOfThought",
+    "ChainOfThoughtContent",
+    "ChainOfThoughtHeader",
+    "ChainOfThoughtImage",
+    "ChainOfThoughtSearchResult",
+    "ChainOfThoughtSearchResults",
+    "ChainOfThoughtStep"
+   ],
+   "source": "packages/react/src/ai/chain-of-thought",
+   "layer": "ai",
+   "designFamily": "ChainOfThought",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "collapsed",
+    "expanded"
+   ],
+   "order": 10
+  },
+  {
+   "name": "Checkpoint",
+   "dir": "checkpoint",
+   "parts": [
+    "Checkpoint",
+    "CheckpointIcon",
+    "CheckpointTrigger"
+   ],
+   "source": "packages/react/src/ai/checkpoint",
+   "layer": "ai",
+   "designFamily": "Checkpoint",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 29
+  },
+  {
+   "name": "CodeBlock",
+   "dir": "code-block",
+   "parts": [
+    "CodeBlock",
+    "CodeBlockActions",
+    "CodeBlockContainer",
+    "CodeBlockContent",
+    "CodeBlockCopyButton",
+    "CodeBlockFilename",
+    "CodeBlockHeader",
+    "CodeBlockTitle"
+   ],
+   "source": "packages/react/src/ai/code-block",
+   "layer": "ai",
+   "designFamily": "CodeBlock",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "copied"
+   ],
+   "order": 19
+  },
+  {
+   "name": "Commit",
+   "dir": "commit",
+   "parts": [
+    "Commit",
+    "CommitActions",
+    "CommitAuthor",
+    "CommitAuthorAvatar",
+    "CommitContent",
+    "CommitCopyButton",
+    "CommitFile",
+    "CommitFileAdditions",
+    "CommitFileChanges",
+    "CommitFileDeletions",
+    "CommitFileInfo",
+    "CommitFilePath",
+    "CommitFileStatus",
+    "CommitFiles",
+    "CommitHash",
+    "CommitHeader",
+    "CommitInfo",
+    "CommitMessage",
+    "CommitMetadata",
+    "CommitSeparator",
+    "CommitTimestamp"
+   ],
+   "source": "packages/react/src/ai/commit",
+   "layer": "ai",
+   "designFamily": "Commit",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 28
+  },
+  {
+   "name": "Confirmation",
+   "dir": "confirmation",
+   "parts": [
+    "Confirmation",
+    "ConfirmationAccepted",
+    "ConfirmationAction",
+    "ConfirmationActions",
+    "ConfirmationRejected",
+    "ConfirmationRequest",
+    "ConfirmationTitle"
+   ],
+   "source": "packages/react/src/ai/confirmation",
+   "layer": "ai",
+   "designFamily": "Confirmation",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "request",
+    "accepted",
+    "rejected"
+   ],
+   "order": 15
+  },
+  {
+   "name": "Context",
+   "dir": "context",
+   "parts": [
+    "Context",
+    "ContextCacheUsage",
+    "ContextContent",
+    "ContextContentBody",
+    "ContextContentFooter",
+    "ContextContentHeader",
+    "ContextInputUsage",
+    "ContextOutputUsage",
+    "ContextReasoningUsage",
+    "ContextTrigger"
+   ],
+   "source": "packages/react/src/ai/context",
+   "layer": "ai",
+   "designFamily": "Context",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ],
+   "order": 30
+  },
+  {
+   "name": "Conversation",
+   "dir": "conversation",
+   "parts": [
+    "Conversation",
+    "ConversationContent",
+    "ConversationEmptyState",
+    "ConversationScrollToBottom"
+   ],
+   "source": "packages/react/src/ai/conversation",
+   "layer": "ai",
+   "designFamily": "Conversation",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 1
+  },
+  {
+   "name": "EnvironmentVariables",
+   "dir": "environment-variables",
+   "parts": [
+    "EnvironmentVariable",
+    "EnvironmentVariableCopyButton",
+    "EnvironmentVariableGroup",
+    "EnvironmentVariableName",
+    "EnvironmentVariableRequired",
+    "EnvironmentVariableValue",
+    "EnvironmentVariables",
+    "EnvironmentVariablesContent",
+    "EnvironmentVariablesHeader",
+    "EnvironmentVariablesTitle",
+    "EnvironmentVariablesToggle"
+   ],
+   "source": "packages/react/src/ai/environment-variables",
+   "layer": "ai",
+   "designFamily": "EnvironmentVariables",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "revealed"
+   ],
+   "order": 26
+  },
+  {
+   "name": "InlineCitation",
+   "dir": "inline-citation",
+   "parts": [
+    "InlineCitation",
+    "InlineCitationCard",
+    "InlineCitationCardBody",
+    "InlineCitationCardTrigger",
+    "InlineCitationCarousel",
+    "InlineCitationCarouselContent",
+    "InlineCitationCarouselHeader",
+    "InlineCitationCarouselIndex",
+    "InlineCitationCarouselItem",
+    "InlineCitationCarouselNext",
+    "InlineCitationCarouselPrev",
+    "InlineCitationQuote",
+    "InlineCitationSource",
+    "InlineCitationText"
+   ],
+   "source": "packages/react/src/ai/inline-citation",
+   "layer": "ai",
+   "designFamily": "InlineCitation",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ],
+   "order": 8
+  },
+  {
+   "name": "JsxPreview",
+   "dir": "jsx-preview",
+   "parts": [
+    "JSXPreview",
+    "JSXPreviewContent",
+    "JSXPreviewError"
+   ],
+   "source": "packages/react/src/ai/jsx-preview",
+   "layer": "ai",
+   "designFamily": "JSXPreview",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "error"
+   ],
+   "order": 24
+  },
+  {
+   "name": "Message",
+   "dir": "message",
+   "parts": [
+    "Message",
+    "MessageAction",
+    "MessageActions",
+    "MessageBranch",
+    "MessageBranchContent",
+    "MessageBranchNext",
+    "MessageBranchPage",
+    "MessageBranchPrevious",
+    "MessageBranchSelector",
+    "MessageContent",
+    "MessageToolbar"
+   ],
+   "source": "packages/react/src/ai/message",
+   "layer": "ai",
+   "designFamily": "Message",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover"
+   ],
+   "order": 2
+  },
+  {
+   "name": "ModelSelector",
+   "dir": "model-selector",
+   "parts": [
+    "ModelSelector",
+    "ModelSelectorContent",
+    "ModelSelectorEmpty",
+    "ModelSelectorGroup",
+    "ModelSelectorInput",
+    "ModelSelectorItem",
+    "ModelSelectorList",
+    "ModelSelectorLogo",
+    "ModelSelectorLogoGroup",
+    "ModelSelectorName",
+    "ModelSelectorSeparator",
+    "ModelSelectorShortcut",
+    "ModelSelectorTrigger"
+   ],
+   "source": "packages/react/src/ai/model-selector",
+   "layer": "ai",
+   "designFamily": "ModelSelector",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ],
+   "order": 4
+  },
+  {
+   "name": "PackageInfo",
+   "dir": "package-info",
+   "parts": [
+    "PackageInfo",
+    "PackageInfoChangeType",
+    "PackageInfoContent",
+    "PackageInfoDependencies",
+    "PackageInfoDependency",
+    "PackageInfoDescription",
+    "PackageInfoHeader",
+    "PackageInfoName",
+    "PackageInfoVersion"
+   ],
+   "source": "packages/react/src/ai/package-info",
+   "layer": "ai",
+   "designFamily": "PackageInfo",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 27
+  },
+  {
+   "name": "Plan",
+   "dir": "plan",
+   "parts": [
+    "Plan",
+    "PlanAction",
+    "PlanBody",
+    "PlanContent",
+    "PlanDescription",
+    "PlanFooter",
+    "PlanHeader",
+    "PlanTitle",
+    "PlanTrigger"
+   ],
+   "source": "packages/react/src/ai/plan",
+   "layer": "ai",
+   "designFamily": "Plan",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 11
+  },
+  {
+   "name": "PromptInput",
+   "dir": "prompt-input",
+   "parts": [
+    "PromptInput",
+    "PromptInputActionAddAttachments",
+    "PromptInputActionAddScreenshot",
+    "PromptInputActionMenu",
+    "PromptInputActionMenuContent",
+    "PromptInputActionMenuItem",
+    "PromptInputActionMenuTrigger",
+    "PromptInputBody",
+    "PromptInputButton",
+    "PromptInputFooter",
+    "PromptInputHeader",
+    "PromptInputSubmit",
+    "PromptInputTextarea",
+    "PromptInputTools"
+   ],
+   "source": "packages/react/src/ai/prompt-input",
+   "layer": "ai",
+   "designFamily": "PromptInput",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "focus",
+    "disabled"
+   ],
+   "order": 3
+  },
+  {
+   "name": "Question",
+   "dir": "question",
+   "parts": [
+    "Question",
+    "QuestionActions",
+    "QuestionDescription",
+    "QuestionInput",
+    "QuestionOption",
+    "QuestionOptions",
+    "QuestionPrompt",
+    "QuestionSubmit"
+   ],
+   "source": "packages/react/src/ai/question",
+   "layer": "ai",
+   "designFamily": "Question",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "answered"
+   ],
+   "order": 16
+  },
+  {
+   "name": "Queue",
+   "dir": "queue",
+   "parts": [
+    "Queue",
+    "QueueItem",
+    "QueueItemAction",
+    "QueueItemActions",
+    "QueueItemAttachment",
+    "QueueItemContent",
+    "QueueItemDescription",
+    "QueueItemFile",
+    "QueueItemImage",
+    "QueueItemIndicator",
+    "QueueList",
+    "QueueSection",
+    "QueueSectionContent",
+    "QueueSectionLabel",
+    "QueueSectionTrigger"
+   ],
+   "source": "packages/react/src/ai/queue",
+   "layer": "ai",
+   "designFamily": "Queue",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover"
+   ],
+   "order": 14
+  },
+  {
+   "name": "Reasoning",
+   "dir": "reasoning",
+   "parts": [
+    "Reasoning",
+    "ReasoningContent",
+    "ReasoningTrigger"
+   ],
+   "source": "packages/react/src/ai/reasoning",
+   "layer": "ai",
+   "designFamily": "Reasoning",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "collapsed",
+    "expanded"
+   ],
+   "order": 9
+  },
+  {
+   "name": "Sandbox",
+   "dir": "sandbox",
+   "parts": [
+    "Sandbox",
+    "SandboxContent",
+    "SandboxHeader",
+    "SandboxTabContent",
+    "SandboxTabs",
+    "SandboxTabsBar",
+    "SandboxTabsList",
+    "SandboxTabsTrigger"
+   ],
+   "source": "packages/react/src/ai/sandbox",
+   "layer": "ai",
+   "designFamily": "Sandbox",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 22
+  },
+  {
+   "name": "SchemaDisplay",
+   "dir": "schema-display",
+   "parts": [
+    "SchemaDisplay",
+    "SchemaDisplayContent",
+    "SchemaDisplayDescription",
+    "SchemaDisplayExample",
+    "SchemaDisplayHeader",
+    "SchemaDisplayMethod",
+    "SchemaDisplayParameter",
+    "SchemaDisplayPath",
+    "SchemaDisplayProperty",
+    "SchemaDisplaySection"
+   ],
+   "source": "packages/react/src/ai/schema-display",
+   "layer": "ai",
+   "designFamily": "SchemaDisplay",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 25
+  },
+  {
+   "name": "Shimmer",
+   "dir": "shimmer",
+   "parts": [
+    "Shimmer"
+   ],
+   "source": "packages/react/src/ai/shimmer",
+   "layer": "ai",
+   "designFamily": "Shimmer",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 33
+  },
+  {
+   "name": "Snippet",
+   "dir": "snippet",
+   "parts": [
+    "Snippet",
+    "SnippetAddon",
+    "SnippetCopyButton",
+    "SnippetInput",
+    "SnippetText"
+   ],
+   "source": "packages/react/src/ai/snippet",
+   "layer": "ai",
+   "designFamily": "Snippet",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "copied"
+   ],
+   "order": 20
+  },
+  {
+   "name": "Sources",
+   "dir": "sources",
+   "parts": [
+    "Source",
+    "Sources",
+    "SourcesContent",
+    "SourcesTrigger"
+   ],
+   "source": "packages/react/src/ai/sources",
+   "layer": "ai",
+   "designFamily": "Sources",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ],
+   "order": 7
+  },
+  {
+   "name": "StackTrace",
+   "dir": "stack-trace",
+   "parts": [
+    "StackTrace",
+    "StackTraceActions",
+    "StackTraceContent",
+    "StackTraceCopyButton",
+    "StackTraceErrorMessage",
+    "StackTraceErrorType",
+    "StackTraceFrames",
+    "StackTraceHeader"
+   ],
+   "source": "packages/react/src/ai/stack-trace",
+   "layer": "ai",
+   "designFamily": "StackTrace",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "collapsed",
+    "expanded"
+   ],
+   "order": 31
+  },
+  {
+   "name": "Suggestion",
+   "dir": "suggestion",
+   "parts": [
+    "Suggestion",
+    "Suggestions"
+   ],
+   "source": "packages/react/src/ai/suggestion",
+   "layer": "ai",
+   "designFamily": "Suggestion",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover"
+   ],
+   "order": 6
+  },
+  {
+   "name": "Task",
+   "dir": "task",
+   "parts": [
+    "Task",
+    "TaskContent",
+    "TaskItem",
+    "TaskItemFile",
+    "TaskTrigger"
+   ],
+   "source": "packages/react/src/ai/task",
+   "layer": "ai",
+   "designFamily": "Task",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "pending",
+    "running",
+    "done"
+   ],
+   "order": 13
+  },
+  {
+   "name": "Terminal",
+   "dir": "terminal",
+   "parts": [
+    "Terminal",
+    "TerminalActions",
+    "TerminalClearButton",
+    "TerminalContent",
+    "TerminalCopyButton",
+    "TerminalHeader",
+    "TerminalStatus",
+    "TerminalTitle"
+   ],
+   "source": "packages/react/src/ai/terminal",
+   "layer": "ai",
+   "designFamily": "Terminal",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 21
+  },
+  {
+   "name": "TestResults",
+   "dir": "test-results",
+   "parts": [
+    "Test",
+    "TestDuration",
+    "TestError",
+    "TestErrorMessage",
+    "TestErrorStack",
+    "TestName",
+    "TestResults",
+    "TestResultsContent",
+    "TestResultsDuration",
+    "TestResultsHeader",
+    "TestResultsProgress",
+    "TestResultsSummary",
+    "TestStatus",
+    "TestSuite",
+    "TestSuiteContent",
+    "TestSuiteName",
+    "TestSuiteStats"
+   ],
+   "source": "packages/react/src/ai/test-results",
+   "layer": "ai",
+   "designFamily": "TestResults",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default",
+    "expanded"
+   ],
+   "order": 32
+  },
+  {
+   "name": "Tool",
+   "dir": "tool",
+   "parts": [
+    "Tool",
+    "ToolContent",
+    "ToolHeader",
+    "ToolInput",
+    "ToolOutput"
+   ],
+   "source": "packages/react/src/ai/tool",
+   "layer": "ai",
+   "designFamily": "Tool",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "collapsed",
+    "expanded"
+   ],
+   "order": 12
+  },
+  {
+   "name": "WebPreview",
+   "dir": "web-preview",
+   "parts": [
+    "WebPreview",
+    "WebPreviewBody",
+    "WebPreviewConsole",
+    "WebPreviewNavigation",
+    "WebPreviewNavigationButton",
+    "WebPreviewUrl"
+   ],
+   "source": "packages/react/src/ai/web-preview",
+   "layer": "ai",
+   "designFamily": "WebPreview",
+   "category": "AI & Agents",
+   "group": "ai",
+   "page": "18",
+   "factory": "custom",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 23
+  },
+  {
+   "name": "Alert",
+   "dir": "alert",
+   "parts": [
+    "Alert",
+    "AlertAction",
+    "AlertDescription",
+    "AlertIcon",
+    "AlertTitle"
+   ],
+   "source": "packages/react/src/kit/alert",
+   "layer": "kit",
+   "designFamily": "Alert",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "alert",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 1
+  },
+  {
+   "name": "AvatarGroup",
+   "dir": "avatar-group",
+   "parts": [
+    "AvatarGroup",
+    "AvatarGroupItem"
+   ],
+   "source": "packages/react/src/kit/avatar-group",
+   "layer": "kit",
+   "designFamily": "AvatarGroup",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "avatarGroup",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 4
+  },
+  {
+   "name": "Badge",
+   "dir": "badge",
+   "parts": [
+    "Badge"
+   ],
+   "source": "packages/react/src/kit/badge",
+   "layer": "kit",
+   "designFamily": "Badge",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "badge",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 1
+  },
+  {
+   "name": "Breadcrumb",
+   "dir": "breadcrumb",
+   "parts": [
+    "Breadcrumb",
+    "BreadcrumbCurrent",
+    "BreadcrumbItem",
+    "BreadcrumbLink",
+    "BreadcrumbList",
+    "BreadcrumbSeparator"
+   ],
+   "source": "packages/react/src/kit/breadcrumb",
+   "layer": "kit",
+   "designFamily": "Breadcrumb",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "breadcrumb",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 3
+  },
+  {
+   "name": "Button",
+   "dir": "button",
+   "parts": [
+    "Button",
+    "ButtonIcon",
+    "ButtonLabel"
+   ],
+   "source": "packages/react/src/kit/button",
+   "layer": "kit",
+   "designFamily": "Button",
+   "category": "Actions",
+   "group": "actions",
+   "page": "03",
+   "factory": "button",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 1
+  },
+  {
+   "name": "ButtonGroup",
+   "dir": "button-group",
+   "parts": [
+    "ButtonGroup",
+    "ButtonGroupItem"
+   ],
+   "source": "packages/react/src/kit/button-group",
+   "layer": "kit",
+   "designFamily": "ButtonGroup",
+   "category": "Actions",
+   "group": "actions",
+   "page": "03",
+   "factory": "buttonGroup",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 3
+  },
+  {
+   "name": "Card",
+   "dir": "card",
+   "parts": [
+    "Card",
+    "CardContent",
+    "CardDescription",
+    "CardFooter",
+    "CardHeader",
+    "CardTitle"
+   ],
+   "source": "packages/react/src/kit/card",
+   "layer": "kit",
+   "designFamily": "Card",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "card",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "selected",
+    "focus"
+   ],
+   "order": 5
+  },
+  {
+   "name": "Chip",
+   "dir": "chip",
+   "parts": [
+    "Chip",
+    "ChipLabel",
+    "ChipRemoveTrigger"
+   ],
+   "source": "packages/react/src/kit/chip",
+   "layer": "kit",
+   "designFamily": "Chip",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "chip",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 3
+  },
+  {
+   "name": "CommandPalette",
+   "dir": "command-palette",
+   "parts": [
+    "CommandPalette",
+    "CommandPaletteEmpty",
+    "CommandPaletteGroup",
+    "CommandPaletteInput",
+    "CommandPaletteItem",
+    "CommandPaletteList"
+   ],
+   "source": "packages/react/src/kit/command-palette",
+   "layer": "kit",
+   "designFamily": "CommandPalette",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "commandPalette",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 4
+  },
+  {
+   "name": "Descriptions",
+   "dir": "descriptions",
+   "parts": [
+    "Descriptions",
+    "DescriptionsItem",
+    "DescriptionsLabel",
+    "DescriptionsValue"
+   ],
+   "source": "packages/react/src/kit/descriptions",
+   "layer": "kit",
+   "designFamily": "Descriptions",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "descriptions",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 5
+  },
+  {
+   "name": "EmptyState",
+   "dir": "empty-state",
+   "parts": [
+    "EmptyState",
+    "EmptyStateAction",
+    "EmptyStateDescription",
+    "EmptyStateIcon",
+    "EmptyStateTitle"
+   ],
+   "source": "packages/react/src/kit/empty-state",
+   "layer": "kit",
+   "designFamily": "EmptyState",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "emptyState",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 8
+  },
+  {
+   "name": "Fab",
+   "dir": "fab",
+   "parts": [
+    "FabIcon",
+    "FabLabel",
+    "FabRoot"
+   ],
+   "source": "packages/react/src/kit/fab",
+   "layer": "kit",
+   "designFamily": "FAB",
+   "category": "Actions",
+   "group": "actions",
+   "page": "03",
+   "factory": "fab",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 5
+  },
+  {
+   "name": "IconButton",
+   "dir": "icon-button",
+   "parts": [
+    "IconButton",
+    "IconButtonIcon"
+   ],
+   "source": "packages/react/src/kit/icon-button",
+   "layer": "kit",
+   "designFamily": "IconButton",
+   "category": "Actions",
+   "group": "actions",
+   "page": "03",
+   "factory": "iconButton",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 2
+  },
+  {
+   "name": "Input",
+   "dir": "input",
+   "parts": [
+    "Input"
+   ],
+   "source": "packages/react/src/kit/input",
+   "layer": "kit",
+   "designFamily": "Input",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "input",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "invalid",
+    "disabled"
+   ],
+   "order": 1
+  },
+  {
+   "name": "Kpi",
+   "dir": "kpi",
+   "parts": [
+    "KpiDelta",
+    "KpiLabel",
+    "KpiRoot",
+    "KpiValue"
+   ],
+   "source": "packages/react/src/kit/kpi",
+   "layer": "kit",
+   "designFamily": "KPI",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "kpi",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 6
+  },
+  {
+   "name": "Link",
+   "dir": "link",
+   "parts": [
+    "Link"
+   ],
+   "source": "packages/react/src/kit/link",
+   "layer": "kit",
+   "designFamily": "Link",
+   "category": "Actions",
+   "group": "actions",
+   "page": "03",
+   "factory": "link",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 6
+  },
+  {
+   "name": "ListItem",
+   "dir": "list-item",
+   "parts": [
+    "ListItem",
+    "ListItemContent",
+    "ListItemDescription",
+    "ListItemTitle",
+    "ListItemTrailing"
+   ],
+   "source": "packages/react/src/kit/list-item",
+   "layer": "kit",
+   "designFamily": "ListItem",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "listItem",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "selected",
+    "focus",
+    "disabled"
+   ],
+   "order": 4
+  },
+  {
+   "name": "MaskedInput",
+   "dir": "masked-input",
+   "parts": [
+    "MaskedInput"
+   ],
+   "source": "packages/react/src/kit/masked-input",
+   "layer": "kit",
+   "designFamily": "MaskedInput",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "maskedInput",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "invalid",
+    "disabled"
+   ],
+   "order": 4
+  },
+  {
+   "name": "MiniCalendar",
+   "dir": "mini-calendar",
+   "parts": [
+    "MiniCalendar",
+    "MiniCalendarDay",
+    "MiniCalendarGrid"
+   ],
+   "source": "packages/react/src/kit/mini-calendar",
+   "layer": "kit",
+   "designFamily": "MiniCalendar",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "miniCalendar",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 7
+  },
+  {
+   "name": "NavItem",
+   "dir": "nav-item",
+   "parts": [
+    "NavItem",
+    "NavItemIcon",
+    "NavItemLabel",
+    "NavItemTrailing"
+   ],
+   "source": "packages/react/src/kit/nav-item",
+   "layer": "kit",
+   "designFamily": "NavItem",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "navItem",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 1
+  },
+  {
+   "name": "Notification",
+   "dir": "notification",
+   "parts": [
+    "Notification",
+    "NotificationAction",
+    "NotificationCloseTrigger",
+    "NotificationDescription",
+    "NotificationIcon",
+    "NotificationTitle"
+   ],
+   "source": "packages/react/src/kit/notification",
+   "layer": "kit",
+   "designFamily": "Notification",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "notification",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 2
+  },
+  {
+   "name": "Popconfirm",
+   "dir": "popconfirm",
+   "parts": [
+    "Popconfirm",
+    "PopconfirmActions",
+    "PopconfirmContent",
+    "PopconfirmDescription",
+    "PopconfirmTitle",
+    "PopconfirmTrigger"
+   ],
+   "source": "packages/react/src/kit/popconfirm",
+   "layer": "kit",
+   "designFamily": "Popconfirm",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "popconfirm",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ],
+   "order": 3
+  },
+  {
+   "name": "Search",
+   "dir": "search",
+   "parts": [
+    "Search",
+    "SearchClearTrigger",
+    "SearchIcon",
+    "SearchInput"
+   ],
+   "source": "packages/react/src/kit/search",
+   "layer": "kit",
+   "designFamily": "Search",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "searchField",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "invalid",
+    "disabled"
+   ],
+   "order": 3
+  },
+  {
+   "name": "Sheet",
+   "dir": "sheet",
+   "parts": [
+    "Sheet",
+    "SheetBody",
+    "SheetCloseTrigger",
+    "SheetContent",
+    "SheetFooter",
+    "SheetHeader",
+    "SheetTitle"
+   ],
+   "source": "packages/react/src/kit/sheet",
+   "layer": "kit",
+   "designFamily": "Sheet",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "sheet",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open"
+   ],
+   "order": 5
+  },
+  {
+   "name": "Skeleton",
+   "dir": "skeleton",
+   "parts": [
+    "Skeleton"
+   ],
+   "source": "packages/react/src/kit/skeleton",
+   "layer": "kit",
+   "designFamily": "Skeleton",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "skeleton",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 7
+  },
+  {
+   "name": "Spin",
+   "dir": "spin",
+   "parts": [
+    "Spin",
+    "SpinIndicator",
+    "SpinLabel"
+   ],
+   "source": "packages/react/src/kit/spin",
+   "layer": "kit",
+   "designFamily": "Spin",
+   "category": "Overlays & Dialogs",
+   "group": "feedback",
+   "page": "09",
+   "factory": "spin",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 4
+  },
+  {
+   "name": "SplitButton",
+   "dir": "split-button",
+   "parts": [
+    "SplitButton",
+    "SplitButtonAction",
+    "SplitButtonTrigger"
+   ],
+   "source": "packages/react/src/kit/split-button",
+   "layer": "kit",
+   "designFamily": "SplitButton",
+   "category": "Actions",
+   "group": "actions",
+   "page": "03",
+   "factory": "splitButton",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 4
+  },
+  {
+   "name": "StatusText",
+   "dir": "status-text",
+   "parts": [
+    "StatusText",
+    "StatusTextIndicator"
+   ],
+   "source": "packages/react/src/kit/status-text",
+   "layer": "kit",
+   "designFamily": "StatusText",
+   "category": "Data Display",
+   "group": "data",
+   "page": "07",
+   "factory": "statusText",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 2
+  },
+  {
+   "name": "TabBand",
+   "dir": "tab-band",
+   "parts": [
+    "TabBand",
+    "TabBandItem",
+    "TabBandList"
+   ],
+   "source": "packages/react/src/kit/tab-band",
+   "layer": "kit",
+   "designFamily": "TabBand",
+   "category": "Layout & Navigation",
+   "group": "navigation",
+   "page": "08",
+   "factory": "tabBand",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 2
+  },
+  {
+   "name": "TableHeader",
+   "dir": "table-header",
+   "parts": [
+    "TableHeader",
+    "TableHeaderCell",
+    "TableHeaderSortTrigger"
+   ],
+   "source": "packages/react/src/kit/table-header",
+   "layer": "kit",
+   "designFamily": "TableHeader",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "tableHeader",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 1
+  },
+  {
+   "name": "TableRow",
+   "dir": "table-row",
+   "parts": [
+    "TableRow",
+    "TableRowCell"
+   ],
+   "source": "packages/react/src/kit/table-row",
+   "layer": "kit",
+   "designFamily": "TableRow",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "tableRow",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "selected",
+    "focus",
+    "disabled"
+   ],
+   "order": 2
+  },
+  {
+   "name": "TableState",
+   "dir": "table-state",
+   "parts": [
+    "TableState",
+    "TableStateAction",
+    "TableStateDescription",
+    "TableStateIcon",
+    "TableStateTitle"
+   ],
+   "source": "packages/react/src/kit/table-state",
+   "layer": "kit",
+   "designFamily": "TableState",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "tableState",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 3
+  },
+  {
+   "name": "Textarea",
+   "dir": "textarea",
+   "parts": [
+    "Textarea"
+   ],
+   "source": "packages/react/src/kit/textarea",
+   "layer": "kit",
+   "designFamily": "Textarea",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "textarea",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "invalid",
+    "disabled"
+   ],
+   "order": 2
+  },
+  {
+   "name": "TimePicker",
+   "dir": "time-picker",
+   "parts": [
+    "TimePicker",
+    "TimePickerContent",
+    "TimePickerInput",
+    "TimePickerTrigger"
+   ],
+   "source": "packages/react/src/kit/time-picker",
+   "layer": "kit",
+   "designFamily": "TimePicker",
+   "category": "Selection & Pickers",
+   "group": "selection",
+   "page": "05",
+   "factory": "timePicker",
+   "kind": "visual",
+   "states": [
+    "closed",
+    "open",
+    "disabled"
+   ],
+   "order": 5
+  },
+  {
+   "name": "Timeline",
+   "dir": "timeline",
+   "parts": [
+    "Timeline",
+    "TimelineContent",
+    "TimelineIndicator",
+    "TimelineItem"
+   ],
+   "source": "packages/react/src/kit/timeline",
+   "layer": "kit",
+   "designFamily": "Timeline",
+   "category": "Data Display",
+   "group": "data",
+   "page": "06",
+   "factory": "timeline",
+   "kind": "visual",
+   "states": [
+    "default"
+   ],
+   "order": 6
+  },
+  {
+   "name": "Transfer",
+   "dir": "transfer",
+   "parts": [
+    "Transfer",
+    "TransferActions",
+    "TransferItem",
+    "TransferList",
+    "TransferPanel"
+   ],
+   "source": "packages/react/src/kit/transfer",
+   "layer": "kit",
+   "designFamily": "Transfer",
+   "category": "Forms & Inputs",
+   "group": "forms",
+   "page": "04",
+   "factory": "transfer",
+   "kind": "visual",
+   "states": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+   ],
+   "order": 5
   }
  ],
  "summary": {
-  "components": 62,
-  "parts": 461,
-  "visual": 56,
-  "nonVisual": 6
+  "components": 131,
+  "parts": 856,
+  "visual": 125,
+  "nonVisual": 6,
+  "primitives": 62,
+  "ai": 33,
+  "kit": 36,
+  "pages": 125
  }
 }

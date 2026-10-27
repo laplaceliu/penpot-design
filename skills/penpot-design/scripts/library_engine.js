@@ -80,7 +80,7 @@ return (function () {
     LM.visual().forEach((c) => {
       if (c.factory === 'custom') { custom.push(c.designFamily); return; }
       if (!fi[c.factory]) missingFactories.push({ component: c.name, factory: c.factory });
-      if (c.group && ['actions', 'forms', 'selection', 'data', 'navigation', 'feedback'].indexOf(c.group) < 0) unknownGroups.push(c.name + ':' + c.group);
+      if (c.group && ['actions', 'forms', 'selection', 'data', 'navigation', 'feedback', 'ai', 'utility'].indexOf(c.group) < 0) unknownGroups.push(c.name + ':' + c.group);
     });
     LM.nonVisual().forEach((c) => nonVisual.push(c.name));
     return { ok: missingFactories.length === 0 && LM.errors.length === 0, missingFactories, unknownGroups, custom, nonVisual,
@@ -149,6 +149,14 @@ return (function () {
     try { if (storage.NL && storage.NL.settle) await storage.NL.settle(450); } catch (e) {}
     try { if (storage.NL && storage.NL.settle) await storage.NL.settle(250); } catch (e) {}
     try { if (storage.TK && storage.TK.bindBoard) await storage.TK.bindBoard(b, { snapSpace: true }); } catch (e) {}
+    // Type styles are a separate library channel (a token set never fills `library.local.typographies`). Apply them to
+    // the spec copy so the paired page does not ship declared ramp steps with no `tokens.typography` binding.
+    try {
+      if (storage.TP && storage.TP.apply) {
+        const applyType = (k) => { if (k.type === 'text') { try { storage.TP.apply(k); } catch (e) {} } (k.children || []).forEach(applyType); };
+        applyType(b);
+      }
+    } catch (e) {}
     try {
       if (storage.EL) {
         if (storage.EL.adopt) storage.EL.adopt(b, 'card');
@@ -226,7 +234,7 @@ return (function () {
   LM.buildPage = async function (o) {
     o = o || {};
     const page = o.page;
-    const plan = LM.byPage(page);
+    const plan = LM.pagePlan(page);
     if (!plan.length) return { err: 'no manifest components on page ' + page };
     const parent = o.parent;
     if (!parent) return { err: 'parent PageRoot required' };
@@ -234,7 +242,7 @@ return (function () {
     const built = [], gaps = [];
     for (const c of plan) {
       if (o.only && o.only.indexOf(c.name) < 0 && o.only.indexOf(c.designFamily) < 0) continue;
-      const r = await LM.buildEntry(c, { parent: parent, x: o.x === undefined ? 80 : o.x, y: y });
+      const r = await LM.buildEntry(c, { parent: parent, x: o.x === undefined ? 80 : o.x, y: y, finish: o.finish, register: o.register });
       if (r.err) gaps.push({ component: c.name, err: r.err }); else { built.push({ component: c.name, mode: r.mode, master: r.master }); y += Math.round((r.board && r.board.height) || 240) + 40; }
       if (o.limit && built.length + gaps.length >= o.limit) break;
     }
@@ -266,9 +274,10 @@ return (function () {
       ' behaviour-only · ' + parts + ' anatomy parts', 0, 0, 14, T.secondary, 400);
     if (meta) { meta.name = 'axis · meta'; storage.NL.add(b, meta, 'fill', 'auto'); }
 
-    const order = { '03': 0, '04': 1, '05': 2, '06': 3, '07': 4, '08': 5, '09': 6, '13': 7 };
+    const order = { '03': 0, '04': 1, '05': 2, '06': 3, '07': 4, '08': 5, '09': 6, '13': 7, '18': 8 };
     const labels = { '03': 'Actions', '04': 'Text fields', '05': 'Selection & pickers', '06': 'Data & lists',
-      '07': 'Display & metrics', '08': 'Navigation', '09': 'Overlays & feedback', '13': 'Behaviour-only utilities' };
+      '07': 'Display & media', '08': 'Navigation', '09': 'Overlays & feedback', '13': 'Behaviour-only utilities',
+      '18': 'AI & agents' };
     const rows = LM.all().slice().sort((a, c) => {
       const pa = order[String(a.page)] === undefined ? 99 : order[String(a.page)];
       const pc = order[String(c.page)] === undefined ? 99 : order[String(c.page)];

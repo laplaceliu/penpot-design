@@ -1,7 +1,7 @@
 # Penpot file contract — the standard block-page output structure
 
-> Every code-to-design task produces **the same file**: one Penpot file, 18 chapter rows in 4 layers, with **03–09
-> built as 67 block pages** by default (`NN.MM · Chapter · Family·Spec`) → **78 pages**. One root board per page, one
+> Every code-to-design task produces **the same file**: one Penpot file, 19 chapter rows in 4 layers, with **03–09 + 18
+> built as 125 codesign-ui block pages** by default (`NN.MM · Chapter · Family·Spec`) → **136 pages**. One root board per page, one
 > spec board per component family, one board per screen recipe. The page list is fixed; the *contents* of the pages are
 > derived from the engines, so adding a factory or a recipe automatically adds a page without changing this contract.
 >
@@ -46,7 +46,7 @@ Three consequences that make the contract checkable instead of aspirational:
 - **PageRoot is 1920 wide: it is the spec-sheet canvas, not a screen.** The screen width comes from the viewport tier
   (`LY.TIERS`: web 1440 / pad 834 / mobile 375) and only appears as the width of a board placed *inside* a page.
 
-## 2. Page master table (18 chapter rows; 03–09 paginate by default)
+## 2. Page master table (19 chapter rows; 03–09 + 18 paginate by default)
 
 `Required boards` is the delivery contract. `Scope` is the argument passed to `storage.designGate()` for that page.
 
@@ -55,13 +55,13 @@ Three consequences that make the contract checkable instead of aspirational:
 | **L0** | `00 · Cover` | 1 identity board (name, version+date, style-keyword chips, the 6 tone ramps as wash/hue/ink triples, the chapter → block-page range table of contents) | default |
 | | `01 · Foundations` | 8 boards — **one `01.MM` page each, each projected by `storage.FN` and carrying the durable `nl:fn=<kind>` stamp (gate G16; `designCoverage()` judges the chapter across pages, engines.md §7)**: `Palette` (every declared colour token, dual polarity when a dark scheme exists) · `Type ramp` (one line per **`TK.declared().types`** step — `storage.T.fontRamp` only when the system overrides it, else design-guide §3.2 `[11,12,13,14,16,20,24,32,40,56,64]` — each with its role) · `Spacing` (`LY.SPACE` bars) · `Grid` (12/8/4 diagrams) · `Radius` · `Elevation` · `Icons` (`CF.glyphKinds` on `CF.iconSquare` pitches; the one **declared exemption** `FN.EXEMPT['01']`, it draws a catalog) · `Strokes & dividers`. **No board here takes a height argument**: the value comes from the hug sum. The token **capacity** is fixed by `CAT.CAPACITY` (57 colours · 12 type · 14 spaces · 9 radii · 13 shadows · 2 dims · 4 stroke roles · 10 tone triples); values are brand-configurable | default |
 | | `02 · Color in use` | 5 boards: `Semantic roles` (tone → wash / hue / **ink**, the triples derived from token *names*, design-guide §4) · `State layers` (the `CF.STATE` alphas drawn on one base) · `Contrast matrix` (every text/background pair the kit can produce, WCAG ratio + verdict **computed** from the palette) · `Light vs dark` (scheme boards only, §2.2) · `Data colors` (categorical ramp). All but `Light vs dark` are `FN` projections. Capacity is the same `CAT.CAPACITY` contract as page 01 | default |
-| **L1** | `03 · Actions` | **7 canonical** `Family·Spec` boards in `CAT.PLAN` order: Button, IconButton, ButtonGroup, SplitButton, FAB, Link, Segmented. On a recreation the profile adjusts material/geometry; it never adds or removes a family. | default |
-| | `04 · Text fields` | **11 canonical**: Field, Input, Textarea, Search, Password, MaskedInput, OTP, NumberField, Upload, Transfer, Tree | default |
-| | `05 · Selection & pickers` | **11 canonical**: Select, Combobox, MultiSelect, DatePicker, TimePicker, Switch, Checkbox, Radio, Slider, Rating, ColorPicker. A shared composite such as `OptionList` is judged inside its owner's board (§4.1), not as a page family | default |
-| | `06 · Data & lists` | **9 canonical**: TableHeader, TableRow, TableState, ListItem, Descriptions, Timeline, Accordion, Carousel, MiniCalendar | default |
-| | `07 · Display & metrics` | **10 canonical**: Badge, StatusText, Chip, Avatar, AvatarGroup, Card, KPI, Progress, Skeleton, EmptyState | default |
-| | `08 · Navigation` | **9 canonical**: NavItem, Tabs, TabBand, Breadcrumb, Pagination, Steps, Menu, CommandPalette, Anchor | default |
-| | `09 · Overlays & feedback` | **10 canonical**: Alert, Notification, Toast, Tooltip, Popover, Popconfirm, Modal, Drawer, Spin, Sheet — **each drawn over its real host** (a scrim, a dimmed screen, an anchor row), not floating on white | default |
+| **L1** | `03 · Actions` | **10 canonical** `Family·Spec` boards in `CAT.LIBRARY` order: Button, IconButton, ButtonGroup, SplitButton, FAB, Link, Clipboard, DownloadTrigger, Toggle, ToggleGroup. On a recreation the profile adjusts material/geometry; it never adds or removes a component. | default |
+| | `04 · Text fields` | **16 canonical**: Input, Textarea, Search, MaskedInput, Transfer, AngleSlider, DateInput, Editable, Field, Fieldset, FileUpload, NumberInput, PasswordInput, PinInput, SignaturePad, TagsInput | default |
+| | `05 · Selection & pickers` | **11 canonical**: Checkbox, ColorPicker, Combobox, DatePicker, TimePicker, RadioGroup, RatingGroup, SegmentGroup, Select, Slider, Switch | default |
+| | `06 · Data & lists` | **11 canonical**: TableHeader, TableRow, TableState, ListItem, Descriptions, Timeline, MiniCalendar, Carousel, JsonTreeView, Listbox, TreeView | default |
+| | `07 · Display & media` | **19 canonical**: Badge, StatusText, Chip, AvatarGroup, Card, KPI, Skeleton, EmptyState, Avatar, Frame, Highlight, ImageCropper, Marquee, Progress, QrCode, ScrollArea, Splitter, Swap, Timer | default |
+| | `08 · Navigation` | **12 canonical**: NavItem, TabBand, Breadcrumb, CommandPalette, Accordion, Collapsible, Menu, NavigationMenu, Pagination, Steps, Tabs, Toc | default |
+| | `09 · Overlays & feedback` | **13 canonical**: Alert, Notification, Popconfirm, Spin, Sheet, Dialog, Drawer, FloatingPanel, HoverCard, Popover, Toast, Tooltip, Tour — **each drawn over its real host** (a scrim, a dimmed screen, an anchor row), not floating on white | default |
 | **L2** | `10 · App shell & chrome` | one board per `CF.map().shell` (appBar, sideNav, toolbar, pageTitle, footer, mobileBar) + one anatomy board per `LY.slots` key (appBar, sideNav, toolbar, pageTitle, tabs, footer, modal, kpiCard, tableRow, card, field, messageRow) + the remaining chrome keys of `layout-library §2` that no factory owns (navRail, filterBar, breadcrumbBar, paginationBar, listPaneHeader, statusBar, emptyState, commandPalette) | `{ families: [ … the composite names … ] }` |
 | | `11 · Grid & breakpoints` | per selected tier: the column/gutter/margin diagram (`LY.TIERS[tier]`), the container ladder (1376 / 1152 / 720 / 640 / measure 760), the collapse order (`layout-library §4.2`), the touch-floor board (32 web / 44 touch, with the `hitpad·` escape), the fold anatomy | `{ tier: <tier of the board>` }` |
 | | `12 · Screen recipes` | **one annotated skeleton per `LY.keys()`** (`LY.drawStart` → `drawStep`, every region labelled with its `LY.rect` key) + the tier-gate table (which recipe refuses which tier, and the `use` pointer it returns) | default |
@@ -70,6 +70,7 @@ Three consequences that make the contract checkable instead of aspirational:
 | | `15 · Screens · content` | the 14 document-idiom recipes: landing, heroCenter, heroSplit, pricing, blogArticle, docsLayout, ecomListing, ecomPdp, cart, checkout, authCard, authSplit, otp, reportPrint (web 14/14, pad 12/14 refuses `authSplit` + `reportPrint`, mobile 5/14 = heroCenter, blogArticle, cart, authCard, otp) | `{ tier }` per board |
 | | `16 · Screens · mobile` | the mobile tier's own set: `mobileFeed`, `mobileListDetail`, plus every 14/15 recipe that survives at 375 (`settings`, `heroCenter`, `blogArticle`, `cart`, `authCard`, `otp`) drawn at 375 and labelled `@375`. `eventPopover` belongs to page 09 (it is an overlay over its host); `commandPalette` to page 10 | `{ tier: 'mobile' }` |
 | | `17 · Reference imitation` | *optional*: side-by-side of the recreation target and the produced screen + the delta list. Omit it and say so in DESIGN.md `omitted` | default |
+| **L1** | `18 · AI & agents` | **33 AI composite** `Family·Spec` boards in `CAT.LIBRARY` order: Conversation, Message, PromptInput, ModelSelector, Attachments, Suggestion, Sources, InlineCitation, Reasoning, ChainOfThought, Plan, Tool, Task, Queue, Confirmation, Question, Agent, Artifact, CodeBlock, Snippet, Terminal, Sandbox, WebPreview, JSXPreview, SchemaDisplay, EnvironmentVariables, PackageInfo, Commit, Checkpoint, Context, StackTrace, TestResults, Shimmer. Page 18 is appended after 17 so the 10–17 contract keeps its numbers. | default |
 
 All 30 `LY.keys()` recipes have a home above (11 + 14 + `mobileFeed` + `mobileListDetail` + `eventPopover` +
 `commandPalette`), which is what makes "the screen pages are complete" checkable: `LY.keys()` minus the board names on
@@ -114,17 +115,17 @@ Asked in the **same round-trip**, written into DESIGN.md `## Colors`. Definition
   - `14–16` add **one dark twin per demo page** (the recipe that best shows the scheme), not one per board.
   - `11 Grid & breakpoints` and `12 Screen recipes` are unaffected: layout is orthogonal to color.
 
-### 2.3 Block-per-page pagination — the default for 03–09
+### 2.3 Block-per-page pagination — the default for 03–09 + 18
 
 The 18-row table is the **chapter** contract for `00–02` and `10–17`. Pages **03–09 are built as block pages by
-default**: `scripts/scaffold_structure.js` derives 67 `NN.MM · Chapter · Family·Spec` rows from
+default**: `scripts/scaffold_structure.js` derives 125 `NN.MM · Chapter · Family·Spec` rows from
 `storage.CATALOG.BLOCKS` and refuses to build the legacy seven-chapter shape. The grammar is fixed:
 
 ```
-NN.MM · <chapter name> · <board name>        07.03 · Display & metrics · Chip·Spec
+NN.MM · <chapter name> · <board name>        07.05 · Display & media · Marquee·Spec
 ```
 
-`NN` is the chapter of §2, `MM` is the 1-based **canonical `CAT.PLAN` position** (not the board's current shelf
+`NN` is the chapter of §2, `MM` is the 1-based **canonical `CAT.LIBRARY` order** (not the board's current shelf
 position), and the block suffix is **the board's own name verbatim** — the page is addressable by the thing it
 contains, which is the whole point: a defect report, a repair call and a human sentence all name the same unit, and no
 repair ever has to "find the calendar spec somewhere on page 06".
@@ -336,9 +337,9 @@ This is where amateur output is most visible, so the rules are explicit:
 
 ## 8. Delivery self-check
 
-- [ ] **78 pages present, named and ordered per §2/§2.3**: `00–02`, 67 block pages, `10–17` (17 optional, declared in
+- [ ] **136 pages present, named and ordered per §2/§2.3**: `00–02`, 125 block pages, `10–17`, `18` AI chapter (17 optional, declared in
       DESIGN.md `omitted`). A legacy `03 · …`–`09 · …` chapter page holding family specs is a defect, not an alternative.
-- [ ] **03–09 block-page inventory**: every `CAT.BLOCKS` page exists exactly once, one `Family·Spec` board each, `MM`
+- [ ] **03–09 + 18 block-page inventory**: every `CAT.BLOCKS` page exists exactly once, one `Family·Spec` board each, `MM`
       contiguous from 01 inside each chapter; a support page (`Masters·`) holds no family spec; 14/15/16/17 stay
       grouped; the cover TOC, the `13` index and the prototype flows were regenerated **after** the last page
       add/delete; every flow is named (no `Flow N`); a destination readback of `null` on any interaction is a defect.
@@ -347,7 +348,7 @@ This is where amateur output is most visible, so the rules are explicit:
       A migration leaves the old `NN · Chapter` shells behind with an empty root — both auditors pass them (they scope to
       the PageRoot subtree), so `CAT.pageIssues()` and this enumeration are what catch them. Remove them with
       `storage.pg(name).remove()` (there is no `penpot.deletePage`), re-checking `root.children.length` per page inside the loop.
-- [ ] Pages 03–09: exactly one `Family·Spec` per `CAT.BLOCKS` page (67 total), names in
+- [ ] Pages 03–09 + 18: exactly one `Family·Spec` per `CAT.BLOCKS` page (125 total), names in
       `Family·Type·Size·State·Slot` form, no `/`.
 - [ ] Coverage per §4.1: `variant_sparse`, `state_coverage`, `focus_ring_missing`, `disabled_wrong` all **0**.
 - [ ] Assembly ownership per §4.3: `loose_assembly` = 0; screens never re-draw loose primitives.

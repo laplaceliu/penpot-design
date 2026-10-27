@@ -71,9 +71,21 @@ return (async function () {
     SC.families = out;
     return out;
   };
+  // The screen records speak the legacy factory vocabulary (`modal`, `otp`, `numberField`, …); the paired catalog
+  // names the masters after the codesign-ui convention (`Dialog`, `PinInput`, `NumberInput`, …). Resolve the alias
+  // BEFORE building a candidate name, otherwise a valid screen reports missing_master against a family that exists.
+  SC.FAMILY_ALIAS = {
+    modal: 'Dialog', otp: 'PinInput', otpinput: 'PinInput', numberfield: 'NumberInput', upload: 'FileUpload',
+    multiselect: 'TagsInput', radio: 'RadioGroup', rating: 'RatingGroup', segmented: 'SegmentGroup',
+    anchor: 'Toc', tree: 'TreeView', fab: 'FAB', kpi: 'KPI', searchfield: 'Search', passwordfield: 'PasswordInput', password: 'PasswordInput'
+  };
+  SC.resolveFamily = function (family) {
+    const alias = SC.FAMILY_ALIAS[String(family || '').toLowerCase()];
+    return alias || (String(family || '').charAt(0).toUpperCase() + String(family || '').slice(1));
+  };
   SC.isControlName = function (nm) {
     const head = String(nm || '').split('·')[0];
-    return !!SC.familyIndex()[head];
+    return !!SC.familyIndex()[head] || !!SC.FAMILY_ALIAS[head.toLowerCase()];
   };
 
   SC.libIndex = function (force) {
@@ -92,13 +104,18 @@ return (async function () {
     const tried = [];
     const hit = (n) => { if (!n) return null; const r = CF.get(n); if (r) return { name: n, rec: r }; if (tried.indexOf(n) < 0) tried.push(n); return null; };
     if (req.name) { const h = hit(req.name) || hit(SC.libIndex()[String(req.name).toLowerCase()]); if (h) return h; }
-    const fam = req.family ? (SC.familyIndex()[req.family] || (String(req.family).charAt(0).toUpperCase() + req.family.slice(1))) : null;
+    const fam = req.family ? SC.resolveFamily(req.family) : null;
     if (!fam) return { err: 'no family or name in the control request', tried };
     const parts = {};
     ['type', 'size', 'state', 'slot', 'variant', 'tone', 'extra'].forEach((k) => { if (req[k] !== undefined) parts[k] = req[k]; });
     const cands = [CF.name(fam, parts), CF.name(req.family, parts), CF.name(fam, Object.assign({}, parts, { state: undefined }))];
     for (const c of cands) { const h = hit(c); if (h) return h; }
     for (const c of cands) { const h = hit(SC.libIndex()[String(c).toLowerCase()]); if (h) return h; }
+    // Paired headless libraries register ONE representative per family (`Button`, `Dialog`, `Card`, …), not a styled
+    // variant matrix. A record that asks for `Button·Primary·MD` must still place the family master instead of
+    // reporting missing_master.
+    const bare = hit(fam) || hit(SC.libIndex()[String(fam).toLowerCase()]);
+    if (bare) return bare;
     return { err: 'missing_master', tried: tried, family: fam };
   };
 

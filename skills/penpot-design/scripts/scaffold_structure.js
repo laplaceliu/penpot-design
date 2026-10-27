@@ -5,8 +5,8 @@
 // PageRoot is always 1920 — the spec-sheet canvas, not a screen. Screen widths come from the tier (LY.TIERS: web 1440 / pad 834 / mobile 375).
 //
 // TWO GRANULARITIES (penpot-structure.md §2a):
-//   · block pages (DEFAULT for 03–09) — one canonical family per page, derived from `storage.CATALOG.BLOCKS`
-//     (`03.01 · Actions · Button·Spec`). The 18-row PAGES table stays the chapter contract for 00–02 and 10–17.
+//   · block pages (DEFAULT for 03–09 and 18) — one codesign-ui component per page, derived from `storage.CATALOG.BLOCKS`
+//     (`03.01 · Actions · Clipboard·Spec`). The 19-row PAGES table stays the chapter contract for 00–02 and 10–18.
 //   · chapter pages / custom rows — `storage.scaffoldPages(rows)` installs a per-page row list (`{n,d,t}`) and every
 //     phase iterates that instead. A shape can never change pages in this API (appendChild AND remove both throw
 //     "Cannot modify a page that is not currently active"), so the page must be decided before the first shape is drawn.
@@ -25,13 +25,13 @@ var PAGES = [
   { n: '00 · Cover', d: 'Identity: name, version, style keywords, the tone ramps, table of contents', t: 'Palette · Type ramp · Spacing · Radius · Elevation' },
   { n: '01 · Foundations', d: 'Palette, type ramp, spacing, grid, radius, elevation, icons, strokes', t: 'colors.* · §3.2 type ramp · LY.SPACE · LY.TIERS · CF.radius · CF.glyphKinds' },
   { n: '02 · Color in use', d: 'Semantic roles, state layers, contrast matrix, light vs dark, data colors', t: 'tone wash/hue/ink · CF.STATE · WCAG 4.5:1 · categorical ramp' },
-  { n: '03 · Actions', d: 'One Family·Spec per CF.map().actions family', t: 'CF.map().actions · control height ladder · CF.STATE' },
-  { n: '04 · Text fields', d: 'Field, input, textarea, search, password, masked, OTP, number, upload, color', t: 'CF.map().forms ∩ fields · label/input gap · ctx.ring focus' },
-  { n: '05 · Selection & pickers', d: 'Select, combobox, multi, date, time, switch, checkbox, radio, slider, rating, transfer, tree', t: 'CF.map().forms ∩ pickers · CF.STATE.toggle · touch floor' },
-  { n: '06 · Data & lists', d: 'Table header/row/state, list item, descriptions, timeline, accordion, carousel, calendar', t: 'LY.ROWS · quantized row heights · CF.map().data ∩ lists' },
-  { n: '07 · Display & metrics', d: 'Card, KPI, badge, status, chip, avatar, progress, skeleton, empty state', t: 'CF.map().data ∩ display · elevation · tone wash/ink' },
-  { n: '08 · Navigation', d: 'Nav item, tabs, tab band, breadcrumb, pagination, steps, menu, command palette, anchor', t: 'CF.map().navigation · tab heights · pagination cell' },
-  { n: '09 · Overlays & feedback', d: 'Modal, drawer, sheet, popover, popconfirm, tooltip, toast, notification, alert, spin — each over its real host', t: 'scrim alpha · CF.STATE · z-order (fixZOrder)' },
+  { n: '03 · Actions', d: 'One Family·Spec per codesign-ui action component: Button, IconButton, ButtonGroup, SplitButton, FAB, Link, Clipboard, DownloadTrigger, Toggle, ToggleGroup', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
+  { n: '04 · Text fields', d: 'One Family·Spec per codesign-ui form component: Input, Textarea, Search, MaskedInput, Transfer, AngleSlider, DateInput, Editable, Field, Fieldset, FileUpload, NumberInput, PasswordInput, PinInput, SignaturePad, TagsInput', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
+  { n: '05 · Selection & pickers', d: 'One Family·Spec per codesign-ui selection component: Checkbox, ColorPicker, Combobox, DatePicker, TimePicker, RadioGroup, RatingGroup, SegmentGroup, Select, Slider, Switch', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
+  { n: '06 · Data & lists', d: 'One Family·Spec per codesign-ui data component: TableHeader, TableRow, TableState, ListItem, Descriptions, Timeline, MiniCalendar, Carousel, JsonTreeView, Listbox, TreeView', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
+  { n: '07 · Display & media', d: 'One Family·Spec per codesign-ui display/media component: Badge, StatusText, Chip, AvatarGroup, Card, KPI, Skeleton, EmptyState, Avatar, Frame, Highlight, ImageCropper, Marquee, Progress, QrCode, ScrollArea, Splitter, Swap, Timer', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
+  { n: '08 · Navigation', d: 'One Family·Spec per codesign-ui navigation component: NavItem, TabBand, Breadcrumb, CommandPalette, Accordion, Collapsible, Menu, NavigationMenu, Pagination, Steps, Tabs, Toc', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
+  { n: '09 · Overlays & feedback', d: 'One Family·Spec per codesign-ui overlay component: Alert, Notification, Popconfirm, Spin, Sheet, Dialog, Drawer, FloatingPanel, HoverCard, Popover, Toast, Tooltip, Tour', t: 'CAT.BLOCKS · codesign-ui manifest · CF.matrix / anatomy board' },
   { n: '10 · App shell & chrome', d: 'App bar, side nav, toolbar, page title, footer, mobile bar + the LY.slots anatomies', t: 'CF.map().shell · LY.slots · layout-library §2' },
   { n: '11 · Grid & breakpoints', d: 'Columns, gutters, container ladder, collapse order, touch floor, fold anatomy', t: 'LY.TIERS · LY.container · CF.minHit · LY.fold' },
   { n: '12 · Screen recipes', d: 'One annotated skeleton per LY.keys() + the tier-gate table', t: 'LY.keys() · LY.recipe(key, {tier}) · LY.rect' },
@@ -39,7 +39,8 @@ var PAGES = [
   { n: '14 · Screens · app', d: 'App-idiom recipes per selected tier, height from LY bands, one fold marker per board', t: 'LY.recipe · CF.tier · storage.absMount' },
   { n: '15 · Screens · content', d: 'Document-idiom pages, 1600–4000 tall: hero, pricing, article, docs, commerce, report', t: 'LY.flow · totalH · fold·<tier>' },
   { n: '16 · Screens · mobile', d: 'Device frames at 375/390 with the mobile chrome stack', t: 'LY.TIERS.mobile · CF.tier = mobile · 44 targets' },
-  { n: '17 · Reference imitation', d: 'Optional: recreation target beside the produced screen + the delta list', t: 'delta list · DESIGN.md omitted' }
+  { n: '17 · Reference imitation', d: 'Optional: recreation target beside the produced screen + the delta list', t: 'delta list · DESIGN.md omitted' },
+  { n: '18 · AI & agents', d: 'One Family·Spec per codesign-ui AI composite: conversation, message, prompt input, tools, terminal, previews', t: 'CAT.BLOCKS · library manifest · LM.anatomyBoard' }
 ];
 
 return (function () {
@@ -50,21 +51,33 @@ return (function () {
   };
   var rightX = function (s, size) { return G(Math.max(CONTENT_X, CONTENT_R - estW(s, size))); };
 
-  // ---- 03–09 block pages: one canonical family per page, derived from CAT.BLOCKS (single inventory) --------------
+  // ---- 03–09 + 18 block pages: one catalog component per page, derived from CAT.BLOCKS (single inventory) --------
   var BLOCK_ROWS = (function () {
     var CAT = storage.CATALOG;
     if (!CAT || !CAT.BLOCKS || !CAT.BLOCKS.length) return null;
-    return CAT.BLOCKS.map(function (b) {
+    return CAT.BLOCKS.filter(function (b) { return b.chapter !== '18'; }).map(function (b) {
       var ch = PAGES.filter(function (p) { return p.n === CAT.PAGE_NAMES[b.chapter]; })[0] || { d: '', t: '' };
-      var axes = (b.fam && b.fam.axes) || [], rows = (b.fam && b.fam.rows) || [];
+      var axes = (b.fam && b.fam.axes) || [];
       return {
-        n: b.page, d: ch.d, t: 'CF.matrix · ' + axes.join(' / ') + ' · ' + rows.length + ' variants',
+        n: b.page, d: ch.d, t: (b.fam && b.fam.factory === 'custom' ? 'anatomy board' : 'factory · ' + ((b.fam && b.fam.factory) || 'custom')) + ' · states: ' + (axes.join(' / ') || '—'),
+        ch: b.chapter, family: b.family, spec: b.spec
+      };
+    });
+  })();
+  var AI_ROWS = (function () {
+    var CAT = storage.CATALOG;
+    if (!CAT || !CAT.BLOCKS) return [];
+    return CAT.BLOCKS.filter(function (b) { return b.chapter === '18'; }).map(function (b) {
+      var ch = PAGES.filter(function (p) { return p.n === CAT.PAGE_NAMES[b.chapter]; })[0] || { d: '', t: '' };
+      var axes = (b.fam && b.fam.axes) || [];
+      return {
+        n: b.page, d: ch.d, t: 'anatomy board · states: ' + (axes.join(' / ') || '—'),
         ch: b.chapter, family: b.family, spec: b.spec
       };
     });
   })();
   var DEFAULT_ROWS = (BLOCK_ROWS && BLOCK_ROWS.length)
-    ? PAGES.slice(0, 3).concat(BLOCK_ROWS, PAGES.slice(10))   // 00–02 · 67 block pages · 10–17
+    ? PAGES.slice(0, 3).concat(BLOCK_ROWS, PAGES.slice(10, 18), AI_ROWS)   // 00–02 · 03–09 · 10–17 · 18
     : PAGES.slice();                                           // only reachable for an explicitly installed row list
   if (!storage._scafRows && !BLOCK_ROWS) {
     return { err: 'the 03–09 standard is one block page per family, derived from storage.CATALOG.BLOCKS — load scripts/catalog_engine.js BEFORE scaffold_structure.js (or call storage.scaffoldPages(rows) before a re-run for a custom list). Refusing to build the legacy seven-chapter shape.' };

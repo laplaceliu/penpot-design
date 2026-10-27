@@ -23,7 +23,7 @@ The parser reads `src/components/<dir>/index.ts`, takes the namespace (`export *
 parts (`DialogRoot`, `DialogTrigger`, `DialogBackdrop`, …), and writes a manifest. A mapping file pins each namespace's
 design contract; without one every entry is `custom` on page 13.
 
-The committed example is **codesign-ui**: 62 namespaces, 461 anatomy parts, 56 visual and 6 behaviour-only components.
+The committed example is **codesign-ui**: 131 namespaces, 856 anatomy parts, 125 visual and 6 behaviour-only components — 56 visual Layer-1 primitives + 6 behaviour-only primitives (`src/components`), 36 screen-kit components (`src/kit`, with React/Solid/Vue/Svelte bindings), and 33 Layer-2 AI composites (`src/ai`). The manifest is generated from all three directories; the 125 visual components own 125 block pages (56 visual primitives + 36 kit in `03`–`09`, 33 AI composites in `18`), and the 6 behaviour-only primitives are indexed on page `13`.
 See `libraries/codesign-ui.md`.
 
 ## 2. Manifest schema
@@ -34,7 +34,7 @@ See `libraries/codesign-ui.md`.
   source: 'https://github.com/codesign-chat/codesign-ui',
   components: [{
     name: 'Dialog', designFamily: 'Dialog',          // 1:1 design-system family
-    page: '09', group: 'feedback',                   // skill page + profile group
+    page: '09', group: 'feedback',                   // chapter (03–09 primitives, 18 AI, 13 nonVisual)
     factory: 'modal',                                // CF factory, or 'custom'
     kind: 'visual',                                  // visual | nonVisual
     category: 'Overlays & Dialogs',
@@ -55,9 +55,9 @@ See `libraries/codesign-ui.md`.
   Presence, ClientOnly, FocusTrap, Collection, Formatting) are documented on the page-13 index and need no master.
 - **parts** — the public anatomy. Parts are drawn in the spec board and may be registered as part masters at
   `granularity:'part'`; the default `namespace` granularity counts a part master as coverage for its namespace.
-- **pages/groups** — the fixed chapter groups: 03 actions, 04 fields, 05 selection, 06 data lists, 07 display,
-  08 navigation, 09 feedback; each family becomes its own `NN.MM · Chapter · Family·Spec` block page; 13 is the index
-  (non-visual utilities).
+- **pages/groups** — the fixed chapters: 03 actions, 04 forms, 05 selection, 06 data lists, 07 display/media,
+  08 navigation, 09 feedback, 18 AI & agents; each visual component becomes its own `NN.MM · Chapter · Family·Spec`
+  block page. Page 13 is the index for the 6 behaviour-only primitives (no master).
 
 ## 3. Headless libraries: anatomy, not styled variants
 
@@ -82,13 +82,13 @@ LM.load(manifest);                       // or LM.hydrate() from a PageRoot's `n
 LM.validate(storage.CF);                 // { ok, missingFactories, custom, nonVisual }
 LM.ensureProfiles(storage.CF);           // derived profiles for mapped factory families
 LM.stamp(pr);                            // durable contract on the PageRoot (per page, while it is open)
-const plan = LM.pagePlan('09.01 · Overlays & feedback · Alert·Spec');   // one block page = one family
-const out = await LM.buildPage({ page:'09.01 · Overlays & feedback · Alert·Spec', parent: pr, x:80, y:208 });
+const plan = LM.pagePlan('09.01 · Overlays & feedback · Dialog·Spec');   // one block page = one component
+const out = await LM.buildPage({ page:'09.01 · Overlays & feedback · Dialog·Spec', parent: pr, x:80, y:208 });
 ```
 
-- `LM.buildPage` is section/page-scoped; call it once per page and continue with `nextY` when the 30 s ceiling cuts a
-  run. It draws mapped components with a single factory representative, `custom` components as anatomy boards, and
-  registers the representative/anatomy root as the `designFamily` master.
+- `LM.buildPage` is section/page-scoped; it reads `LM.pagePlan(page)` (the block page's ONE manifest component) and
+  draws mapped components with a single factory representative, `custom` components as anatomy boards, then registers
+  the representative/anatomy root as the `designFamily` master. Continue with `nextY` when the 30 s ceiling cuts a run.
 - Page 13 is generated from the manifest with `LM.indexPage({parent: pr})`: one row per namespace with its page/group,
   factory or `custom` mode, part count and first parts; `nonVisual` rows are marked `behaviour-only · no master`. It is
   idempotent by board name (`library·<name>·index`); pass `replace:true` to rebuild it.
@@ -103,7 +103,7 @@ const out = await LM.buildPage({ page:'09.01 · Overlays & feedback · Alert·Sp
 
 When `storage.LM` is active (or a PageRoot has `nl:lib`), the auditor:
 
-- replaces the generic 03–09 catalog with `LM.pageFams(page)`; a missing manifest family **or** an extra `·Spec` on the
+- replaces the generic 03–09/18 catalog with `LM.pageFams(page)`; a missing manifest component **or** an extra `·Spec` on the
   page fails `library_drift`;
 - skips the source-profile requirement of `reference_drift` (a paired headless library may have no CSS);
 - on page 13 runs `LM.audit()`: every **visual** manifest component must have a master whose head is its designFamily
@@ -115,7 +115,7 @@ simple: delete one component master → `missing` names it; register a `Foo·Spe
 ## 6. Acceptance
 
 - `LM.validate(CF).ok` with zero `missingFactories`.
-- `library_drift` CLEAN on pages 03–09 and 13.
+- `library_drift` CLEAN on pages 03–09, 18 and 13; `inventory_library.py --check --catalog scripts/catalog_engine.js` CLEAN on the source tree.
 - Page 13 lists every namespace, including `nonVisual` ones, with part counts.
 - The manifest is the codegen index too: `designFamily` ↔ repo namespace, `parts` ↔ the library's exported anatomy.
   A design→code pass must use the manifest rather than guessing a component from a visual match.

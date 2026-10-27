@@ -7,7 +7,7 @@ the project's `DESIGN.md` and in its `CF.setReference` profile, never in this sk
 ## 1. The rule
 
 **A factory default is legal for a blank file; a source recreation must read a measured profile for every family it
-draws from the source — and must still build every family in the factory catalog.** Pages 03–09 are the complete
+draws from the source — and must still build every family in the factory catalog.** Pages 03–09 + 18 are the complete
 library, not a trimmed screenshot: measured families take their source profile, families the source never shows are
 `derived` from the nearest source material (recorded in DESIGN.md), built on a `·Spec` board, registered and gated.
 Omission is not a design decision; it is a missing component.
@@ -80,7 +80,7 @@ substitute for the source values.
 
 ## 4. Derived families (source has none)
 
-A family absent from the source is still delivered — pages 03–09 are the complete library, not just the screenshot. It must be:
+A family absent from the source is still delivered — pages 03–09 + 18 are the complete library, not just the screenshot. It must be:
 
 1. marked `derived: true` in the profile and in DESIGN.md;
 2. built from the source's **material language** — its card/ink/control/chip recipes, radii, and type — never an
@@ -95,10 +95,10 @@ The skill must not hardcode which families are derived for a particular site. Th
 `reference_drift` (rule 56) is the source-adaptation gate. It is **data-driven**: one branch per page range, no family
 names hardcoded per page.
 
-**The catalogue constrains the inventory; the profile constrains the form.** Pages 03–09 deliver exactly `CAT.PLAN` as one block page per family (`CAT.BLOCKS`)
-(67 families, one page each — rule 62). A profile entry may change a family's material, geometry and variants; it may
+**The catalogue constrains the inventory; the profile constrains the form.** Pages 03–09 + 18 deliver exactly `CAT.LIBRARY` as one block page per component (`CAT.BLOCKS`)
+(125 codesign-ui components, one page each — rule 62). A profile entry may change a family's material, geometry and variants; it may
 not add a family to a standard page, remove one, or move it to another page. A source-only component is built on
-page `10` or later (or page `17 · Reference imitation`), never as an extra `·Spec` inside 03–09.
+page `10` or later (or page `17 · Reference imitation`), never as an extra `·Spec` inside 03–09/18.
 
 - **03 · Actions** — the chapter is the seven canonical action families (`CAT.PLAN['03']`), each on its own `03.MM · Actions · Family·Spec` page: a spec
   whose family is not in the profile, a profile family with no spec, or a host whose corner role the source does not pin.
