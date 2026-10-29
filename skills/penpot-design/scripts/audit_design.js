@@ -94,6 +94,7 @@ return (function () {
     media_stretched: 'M8 (media_engine) · a shape carrying a `fillImage` whose box ratio is more than 2% off the asset\'s own ratio — the photograph is being DISTORTED, not cropped. This build cannot ask for the crop: writing `fillFitMode: \'cover\'` succeeds and is silently dropped (the readback keeps only fillColor/fillOpacity/fillColorGradient/fillColorRefFile/fillColorRefId/fillImage), so Penpot falls back to `content` = stretch. Measured 2026-10-22 on `15 · Screens · content`: **30 of 30** images were stretched, worst 62% (a 1440×816 photo in a 468×700 gallery slot). The two legal forms are geometry: `MD.place({mode:\'fit\'})` sizes the shape to the asset ratio, `MD.place({mode:\'cover\'})` — the default when they disagree — builds a real MASK (`clip·` board with `clipContent`, the media inside at its own ratio scaled to cover and centred). Repair an existing file with `MD.refit`',
     frame_dead_band: '§3.3 + §2 · a control host whose border reserves a band its content never fills: one side\'s content inset is >= 32px AND >= 3x the opposite side (the frame is bigger than what it frames). Measured 2026-10-22 on `MiniCalendar·32cell`: the height formula used a hardcoded `rows: 6` while the drawn month (31 days starting on the first column) needs 5, and the loop `continue`d over every out-of-month slot, so the 6th row was empty and the grid\'s leading/trailing cells were never painted — inset bottom 49px vs top 7px. It is NOT a reservation for adjacent-month days: a reservation that is never filled is dead space. Repair: derive the frame from the content (`CF.miniCalendar` computes `need = ceil((firstWeekday + days) / 7)` and paints adjacent-month cells muted) or fill the band',
     not_assembled: 'gate G17 · a control-shaped board DRAWN on a screen or app-shell surface (`10`, `12`, `14–16`) whose name has no master in the local library. Rule 27 `not_component` only catches the redraw of a control that already has a master; a screen built from hand-drawn approximations has no master to compare against, so it read CLEAN while being nothing but disposable rectangles. A recreated screen is assembled from the system — extend the factory (G12), register it (`CF.autoRegister`), place it (`CF.instance` / `SC.ctl`)',
+    raw_assembly: 'gate G17b · component-first is measured: a `Screen·*` board on an app/screen surface (`10`, `12`, `14–16`) must be an ASSEMBLY of component copies, not a drawing. A band is a direct child of the screen that is at least 40% of the screen width and 56 high; a band that is not a component copy is a defect, and a screen with at least 4 structural children whose component-copy share is under 50% is a defect even when no single band is large. A placed master is not a copy. Build each band once as a master (page 10), then place it with CF.instance / SC.ctl — `raw_assembly` publishes `out.assembly` (structural / instances / bands / rawBands / share) so the page verdict shows the ratio',
     placeholder_media: 'gate G17 · a shape whose name claims a raster asset (the `CF.isMediaSlot` grammar: `img·`, `thumb·`, `media`, `photo`, `cover·`, `avatar·`…) on a screen page, with no `fillImage` in its fills — a gray plate standing in for the user\'s own photograph. Import the source file with `MD.place({ parent, slot, path })` (`media_engine.js`)',
     no_source_record: 'gate G17 · a screen page whose composition boards carry no durable `nl:sc` / `nl:rec` stamp, so there is no record of the source material the screen was assembled from and the gate cannot be read (or `storage.SC` is not seeded at all). Unprovable is REPORTED, not passed — same contract as G16',
     shadow_unbound: '§5 + gate G18 · a shape that paints a shadow while the token set declares `shadow.*` tokens but carries no `tokens.shadow` binding — the stack was typed instead of taken from the elevation record. Measured 2026-10-23: 49 shadowed shapes in the file, 0 bound, all single-layer. Repair with `storage.EL.sweepPage({page, apply:true})`',
@@ -228,6 +229,13 @@ return (function () {
   // consumer whose interior is not ours to judge; the main instance is the definition, and skipping it is what let a
   // whole spec chapter (79 button masters on `03.01`) pass the radius rules vacuously.
   const isCopy = (s) => { try { return typeof s.isComponentCopyInstance === 'function' && s.isComponentCopyInstance(); } catch (e) { return false; } };
+  const isMain = (s) => { try { return typeof s.isComponentMainInstance === 'function' && s.isComponentMainInstance(); } catch (e) { return false; } };
+  /** A screen board: the assembled surface the new band rule judges (SC screens carry `Screen·` and an `nl:sc` stamp). */
+  const isScreenBoard = (s) => {
+    if (typeOf(s) !== 'board') return false;
+    if (/^Screen·/.test(nameOf(s))) return true;
+    try { const raw = s.getPluginData && s.getPluginData('nl'); const o = raw ? JSON.parse(raw) : null; return !!(o && o.sc); } catch (e) { return false; }
+  };
   const rec = (s) => isBox(s) || isVC(s);
   const box = (s) => { const x = num(s, 'x', 0), y = num(s, 'y', 0), w = num(s, 'width', 0), h = num(s, 'height', 0); return { x: x, y: y, w: w, h: h, r: x + w, b: y + h }; };
   const radiusOf = (s) => { try { const b = s.borderRadius; if (typeof b === 'number') return b; if (b && typeof b === 'object') return Number(b.topLeft) || 0; } catch (e) {} return 0; };
@@ -325,6 +333,12 @@ return (function () {
   function controlFamily(nm) {
     const head = String(nm || '').split('·')[0];
     if (!head) return null;
+    // The paired catalog is live data: a designFamily may be drawn by another factory (ToggleGroup→Segmented) or be a
+    // custom anatomy (Swap). Check the manifest directly so a host is never mistaken for a page pane.
+    try {
+      const man = storage.LM && storage.LM.manifest;
+      if (man && (man.components || []).some((c) => c.kind !== 'nonVisual' && String(c.designFamily || '').toLowerCase() === head.toLowerCase())) return head;
+    } catch (e) {}
     if (!CFAMS) {
       CFAMS = {};
       Object.keys(CLASS).forEach((f) => { CFAMS[f] = 1; });
@@ -339,6 +353,19 @@ return (function () {
           CFAMS[k.charAt(0).toUpperCase() + k.slice(1)] = 1;
         }
       });
+      // The PAIRED catalog is the other half of the live family table: a codesign-ui family may be drawn by a
+      // differently-named factory (ToggleGroup is Segmented) or by a custom anatomy board, so CF.map() alone
+      // fails to recognise the host and its interior is judged as free layout / a raw control. Read the manifest
+      // (visual entries only) so every catalog family is a control family.
+      try {
+        const man = storage.LM && storage.LM.manifest;
+        ((man && man.components) || []).forEach((c) => {
+          if (!c || (c.kind && c.kind !== 'visual')) return;
+          const f = String(c.designFamily || c.name || '').split('·')[0];
+          if (!f) return;
+          CFAMS[f] = 1; CFAMS[f.toLowerCase()] = 1;
+        });
+      } catch (e) {}
       // `shell` composites (AppBar/SideNav/Toolbar/PageTitle/Footer/MobileBar) and the `composer` helpers are
       // DOCUMENTATION boards on page 10, not leaf controls a screen places. Including them made the strict
       // not_assembled rule indict all six shell specimens (measured 2026-10-23), which is the noise that would
@@ -422,6 +449,8 @@ return (function () {
     const pageBg = toRGB(hexOK(opts.pageBg) ? opts.pageBg : (hexOK(P.surface) ? P.surface : '#FFFFFF'));
     const out = { page: str(penpot.currentPage, 'name', 'single-board'), boards: 0, shapes: 0,
       counts: {}, findings: [], errors: [], sizes: {}, fonts: {}, tiers: {}, families: {}, skipped: {}, verdict: 'CLEAN' };
+    // component-first read: one row per Screen· board (gate G17b raw_assembly).
+    out.assembly = [];
     out.ramp = rampSrc + ' · ' + RAMP.join(',');   // say which ramp a `off_ramp_size` verdict was measured against
     // §5 elevation is measured against the LIVE record: the shadow tokens the set declares and the EL engine
     // that owns the recipes. A file with no shadow tokens is judged by the old rules only (no false positives).
@@ -831,8 +860,11 @@ return (function () {
           // offset the label by design. The old path/`glyph·`/`icon·` test ignored ellipses and looked only at direct
           // children, so it reported every `Chip·Input·…Avatar` master and the new chip atom (whose ✕ lives inside
           // `row·content` → `icon·close`) as off-axis (measured 2026-10-26). Look two levels down.
+          // The control's OWN UNIT is a lead too: a Checkbox's `box`, a Radio's disc, a Switch's `track`/`handle`
+          // sit left of the copy by design, so the label cannot share the host's centre (measured 2026-10-27:
+          // 5 false `label_off_axis` findings on Checkbox·LG/SM·Label, 11-15px because of the 18-24px box + 8 gap).
           const isLead = (k) => typeOf(k) === 'path' || typeOf(k) === 'ellipse' ||
-            /^(glyph|icon|avatar|dot|badge|swatch|indicator|lead|trail)(·|$)/.test(nameOf(k));
+            /^(glyph|icon|avatar|dot|badge|swatch|indicator|lead|trail|box|dash|track|handle|knob|thumb)(·|$)/.test(nameOf(k));
           const leadIn = (h, depth) => (kidsOf(h) || []).some((k) => isLead(k) || (depth > 0 && leadIn(k, depth - 1)));
           const iconSlot = /IconStart|IconEnd|Lead|Trail/.test(nameOf(owner)) || leadIn(owner, 2);
           if (inside && !iconSlot && Math.abs(dx) > 2) {
@@ -1749,6 +1781,36 @@ return (function () {
       if ((SCREEN || APP) && !isInstance(s) && typeOf(s) === 'board' && controlFamily(nm) && !/^Masters·/.test(nm) && !/·Spec(·|$)/.test(nm) && !(CF.get && CF.get(nm))) {
         add('not_assembled', s, st.top, '"' + nm + '" was drawn on an app/screen surface and no master of that name exists in the library — assemble from the system: extend the factory (G12), register it (CF.autoRegister / CF.component), then place it with CF.instance / SC.ctl');
       }
+      // rule 75 · raw_assembly (gate G17b) — component-first is MEASURED, not advised. A screen is an assembly of
+      // component copies; a band (a direct child >=40% of the screen width, >=56 high) that is a raw board/rect/ellipse
+      // means the system was redrawn, so the band cannot be swapped, themed or fixed from the library. A placed MASTER
+      // is not a copy (`isComponentCopyInstance`, never `isComponentInstance`). Small controls are rule 39's job; media
+      // masks, sheens, folds and icon vectors are annotations here. The ratio is published for every screen so a page
+      // cannot read CLEAN while mostly drawn (measured 2026-10-27: AppKit Screen·welcome had 3 copies among 9 structural
+      // children and passed the old gate).
+      if ((SCREEN || APP) && isScreenBoard(s)) {
+        const sb = box(s);
+        const annRx = /^(fold·|sheen·|boundary·|underline·|overlay·|scrim·|clip·|img·|icon·|annotation·|guide·|ruler·)/;
+        let structural = 0, copies = 0; const rawBands = [];
+        for (const c of (kidsOf(s) || [])) {
+          const cn = nameOf(c), cb = box(c);
+          let hasImg = false; try { hasImg = (c.fills || []).some((f) => !!f.fillImage); } catch (e) {}
+          if (isCopy(c)) copies++;
+          if (isText(c) || annRx.test(cn) || hasImg) continue;
+          const ct = typeOf(c);
+          if (!(isBox(c) || ct === 'rectangle' || ct === 'ellipse')) continue;
+          if (controlFamily(cn)) continue;                 // rule 39 owns control-shaped hosts
+          if (cb.w < 80 || cb.h < 40) continue;            // icons, chips, knobs are not bands
+          structural++;
+          if (cb.w >= sb.w * 0.4 && cb.h >= 56 && !isCopy(c)) rawBands.push(c);
+        }
+        const share = structural ? copies / structural : 1;
+        out.assembly.push({ screen: nm, structural: structural, instances: copies, rawBands: rawBands.length, share: +share.toFixed(2) });
+        rawBands.slice(0, 6).forEach((c) => add('raw_assembly', c, s,
+          '"' + nameOf(c) + '" is a raw band on ' + nm + ' — a screen section must be a component copy. Build it once as a master (page 10), then place it with CF.instance / SC.ctl; the screen is an assembly, not a drawing'));
+        if (!rawBands.length && structural >= 4 && share < 0.5) add('raw_assembly', s, s,
+          nm + ' has ' + structural + ' structural children but only ' + copies + ' component copies (' + Math.round(share * 100) + '%) — build the bands as masters and place instances; at least 50% of the structure must be placed components');
+      }
       // rule 58 · spec_unregistered (gate G10s) — a spec page is the component library's source of truth, so every
       // control host on 03–09 (including Hover/Focus/Pressed/Disabled state cells) must be a real master. Default cells
       // were registered in the original build; the state cells were not, and they were therefore unusable as instances.
@@ -1778,7 +1840,11 @@ return (function () {
       // A pane region that also carries **its own** copy, over a child region that carries copy, is the dashboard/
       // docsLayout defect: the paragraph drawn into the pane ran underneath (or across) the filled child band. A pane
       // is structure; a host pane may be filled only when its child regions are its own empty anatomy.
-      if (board && /^region·/.test(nm) && ownCopy(board) && holdsFilledRegion(board)) {
+      // SCOPE: this rule protects a SHIPPED screen from a pane that is both structure and copy owner. Page 12 is
+      // the contract's annotated-skeleton chapter (`LY.drawStart`/`drawStep`), where every region is a labelled tinted
+      // plate by design — judging it produced 17 false positives on diagrams that cannot be "filled" (measured 2026-10-27).
+      const SKELETON_DOC = /^12 · /.test(String(out.page || ''));
+      if (board && !SKELETON_DOC && /^region·/.test(nm) && ownCopy(board) && holdsFilledRegion(board)) {
         add('pane_filled', board, st.top, '"' + nm + '" contains a filled region and carries copy of its own — a pane is structure; fill its leaves only');
       }
       // A board named `Foo·…` where Foo is not a known family would silently escape the coverage audit, so say so
@@ -1878,8 +1944,10 @@ return (function () {
           }
         }
       }
-      // §8 two-column ratio (and the "three equal panes" tell: rails must be narrower than content)
-      const panes = blocks.filter((c) => { const k = box(c); return isBox(c) && k.h >= r.h * 0.8 && k.w >= r.w * 0.2 && Math.abs(k.y - r.y) <= 8; });
+      // §8 two-column ratio (and the "three equal panes" tell: rails must be narrower than content).
+      // A control host's interior is anatomy, not a page split: two chips inside a TagsInput are not two panes.
+      const inControl = (() => { let a = b.parent; while (a && a !== st.top) { if (typeOf(a) === 'board' && controlFamily(nameOf(a))) return true; a = a.parent || null; } return false; })();
+      const panes = inControl ? [] : blocks.filter((c) => { const k = box(c); return isBox(c) && k.h >= r.h * 0.8 && k.w >= r.w * 0.2 && Math.abs(k.y - r.y) <= 8; });
       const legName = nameOf(b) + ' ' + chainName(b, st.top);
       if (panes.length === 2 && !SPLITRX.test(legName) && !LEGRX.test(legName)) {
         const a = box(panes[0]), c2 = box(panes[1]);
@@ -1994,7 +2062,26 @@ return (function () {
       Object.keys(out.families).forEach((k) => {
         const F = out.families[k], cls = CLASS[k], need = SETS[cls];
         const where = { name: Object.keys(F.boards)[0] || k };
-        if (F.hosts < 2) return;                       // coverage is a property of a spec board, not of one instance
+        // Coverage is a property of a spec board. A single host used to be exempt outright, which is exactly how a
+        // paired catalog could regress to one cell per family and still read CLEAN (measured 2026-10-27: 69 factory
+        // pages, one representative each). A family with a factory must show its matrix; only a factory-less
+        // (anatomy/behaviour) family may legitimately draw one host.
+        if (F.hosts < 2) {
+          let declaredStates = 0, hasFactory = false;
+          try {
+            const man = storage.LM && storage.LM.manifest;
+            const c = man && (man.components || []).find((x) => String(x.designFamily || x.name || '').toLowerCase() === String(k).toLowerCase());
+            hasFactory = !!(c && c.factory && c.factory !== 'custom');
+            declaredStates = ((c && c.states) || []).length;
+          } catch (e) {}
+          if (hasFactory && declaredStates > 1) {
+            add('state_coverage', null, where, k + ': the spec page draws 1 host while the library declares ' + declaredStates +
+              ' states — the state ladder is missing (repair: CF.specPlan + LM.buildEntry matrix path)');
+          } else if (hasFactory) {
+            add('variant_sparse', null, where, k + ': the spec page draws 1 host — a family with a factory must show its variant sheet');
+          }
+          return;
+        }
         if (only && !only[k]) return;
         if (SPEC_SKIP[k]) { out.skipped[k] = F.hosts; return; }
         const missing = need.filter((s) => !F.states[s]);

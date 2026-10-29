@@ -66,7 +66,11 @@ return (function () {
   };
   LM.pagePlan = function (page) {
     return onBlock(LM.byPage(page), page).map((c) => ({ name: c.name, designFamily: c.designFamily, page: c.page,
-      group: c.group, factory: c.factory || 'custom', kind: c.kind || 'visual', parts: c.parts || [], states: c.states || [] }));
+      group: c.group, factory: c.factory || 'custom', kind: c.kind || 'visual', parts: c.parts || [], states: c.states || [],
+      // representative/variant/category are part of the mapping contract, not decoration: the representative is the
+      // variant the spec page shows (Button → primary), and dropping it here made the factory fall back to `default`.
+      representative: c.representative || null, variant: c.variant || null, category: c.category || null,
+      anatomy: c.anatomy || null }));
   };
   LM.factoryIndex = function (CF) {
     const map = CF.map ? CF.map() : {}, set = {};
@@ -138,9 +142,37 @@ return (function () {
     const familySet = {}; LM.visual().forEach((c) => familySet[c.designFamily] = 1);
     const missing = LM.visual().filter((c) => !(headSet[c.designFamily] || (c.parts || []).some((p) => headSet[p])))
       .map((c) => ({ name: c.name, designFamily: c.designFamily, page: c.page, factory: c.factory }));
-    const extras = heads.filter((h) => !familySet[h] && !partSet[h]);
+    // A master that is NOT a manifest component is drift — unless it lives on the shell chapter. The standard itself
+    // puts `CF.map().shell` composites and this system's own band masters on `10 · App shell & chrome`, so a project
+    // cannot have a page 10 AND an empty library; calling those "invented components" made an honest file un-CLEAnable.
+    const foreign = heads.filter((h) => !familySet[h] && !partSet[h]);
+    const onShell = (h) => {
+      try {
+        const pages = (penpot.currentFile && penpot.currentFile.pages) || [];
+        for (const pg of pages) {
+          if (!/^10( |$|\.)/.test(String(pg.name || ''))) continue;
+          let r = null; try { r = (penpotUtils.getPageById && penpotUtils.getPageById(pg.id)) || pg; } catch (e) { r = pg; }
+          let hit = false;
+          // Match the head, not only an exact name: the shell composites are registered as `AppBar·Mobile`,
+          // `PageTitle·88h`, so their head is `AppBar` / `PageTitle` while no board is named exactly that.
+          (function walk(sh, d) {
+            if (hit || d > 3) return;
+            (sh.children || []).forEach((k) => {
+              if (hit) return;
+              const kn = String(k.name || '');
+              if (kn === h || kn.indexOf(h + '·') === 0) { hit = true; return; }
+              walk(k, d + 1);
+            });
+          })(r && r.root || {}, 0);
+          if (hit) return true;
+        }
+      } catch (e) {}
+      return false;
+    };
+    const shellMasters = foreign.filter(onShell);
+    const extras = foreign.filter((h) => shellMasters.indexOf(h) < 0);
     return { name: LM.manifest.name, libraryMasters: comps.length, heads: heads.length,
-      visualFamilies: Object.keys(familySet).length, missing, extras,
+      visualFamilies: Object.keys(familySet).length, missing, extras, shellMasters,
       verdict: (missing.length || extras.length) ? 'NEEDS_REPAIR' : 'CLEAN' };
   };
 
@@ -176,7 +208,7 @@ return (function () {
       : storage.mkAbsBoard(entry.designFamily + '·Spec', o.x || 0, o.y || 0, w, 240, null, 0);
     if (o.parent) { try { o.parent.appendChild(b); b.layoutChild.absolute = true; b.x = o.x || 0; b.y = o.y || 0; } catch (e) {} }
     const T = storage.T;
-    const head = storage.mkText(entry.designFamily + ' · ' + (entry.category || ''), 0, 0, 20, T.onSurface, 600); head.name = 'title·' + entry.designFamily;
+    const head = storage.mkText(entry.designFamily + (entry.category ? ' · ' + entry.category : ''), 0, 0, 20, T.onSurface, 600); head.name = 'title·' + entry.designFamily;
     storage.NL.add(b, head, 'fill', 'auto');
     const meta = storage.mkText((entry.kind === 'nonVisual' ? 'behaviour-only · no master' : 'factory: ' + (entry.factory || 'custom')) +
       ' · states: ' + ((entry.states || []).join(' / ') || '—') + ' · ' + (entry.source || ''), 0, 0, 12, T.secondary, 400);
@@ -192,25 +224,39 @@ return (function () {
   LM.anatomyBoard = async function (entry, o) {
     o = o || {};
     const b = LM.specFrame(entry, o);
-    const root = storage.NL.frame(entry.designFamily, { w: o.w ? o.w - 48 : 672, h: 8, dir: 'column', breath: 'block', pad: 16, sizing: { h: 'fix', v: 'auto' }, clip: false });
-    storage.NL.add(b, root, 'fill', 'auto');
-    const T = storage.T;
-    (entry.parts || [entry.designFamily]).forEach((p) => {
-      const row = storage.NL.row('part·' + p, { dir: 'row', align: 'center', gap: 12 });
-      storage.NL.add(root, row, 'fill', 'auto');
-      const chip = penpot.createRectangle();
-      chip.name = 'chip·' + p; chip.resize(12, 12); chip.borderRadius = storage.CF.radius('xs');
-      chip.fills = [{ fillColor: T.borderStrong, fillOpacity: 1 }];
-      storage.NL.add(row, chip, 'fix', 'fix');
-      const t = storage.mkText(p, 0, 0, 13, T.onSurface, 500); t.name = 'part·' + p + '·label';
-      storage.NL.add(row, t, 'auto', 'auto');
-    });
+    // An anatomy board is a SECTION (its part rows are spaced at `group` 16); the frame gap must clear the 2x hierarchy
+    // rule. A factory representative is a control, so its frame keeps the 24 group gap.
+    try { if (b.flex) b.flex.rowGap = 32; } catch (e) {}
+    let root = null, mode = 'anatomy';
+    // SOURCE-DERIVED ANATOMY (AN): an example JSX tree + reference CSS laid out as a component wireframe. The old
+    // fallback below is a flat part-name list, so every custom page looked identical (measured 2026-10-27).
+    if (storage.AN && storage.AN.render) {
+      try {
+        const r = storage.AN.render(entry, b, o);
+        if (r && r.host) { root = r.host; mode = 'anatomy·source'; }
+      } catch (e) { /* fall through to the neutral part board */ }
+    }
+    if (!root) {
+      root = storage.NL.frame(entry.designFamily, { w: o.w ? o.w - 48 : 672, h: 8, dir: 'column', breath: 'block', pad: 16, sizing: { h: 'fix', v: 'auto' }, clip: false });
+      storage.NL.add(b, root, 'fill', 'auto');
+      const T = storage.T;
+      (entry.parts || [entry.designFamily]).forEach((p) => {
+        const row = storage.NL.row('part·' + p, { dir: 'row', align: 'center', gap: 12 });
+        storage.NL.add(root, row, 'fill', 'auto');
+        const chip = penpot.createRectangle();
+        chip.name = 'chip·' + p; chip.resize(12, 12); chip.borderRadius = storage.CF.radius('xs');
+        chip.fills = [{ fillColor: T.borderStrong, fillOpacity: 1 }];
+        storage.NL.add(row, chip, 'fix', 'fix');
+        const t = storage.mkText(p, 0, 0, 13, T.onSurface, 500); t.name = 'part·' + p + '·label';
+        storage.NL.add(row, t, 'auto', 'auto');
+      });
+    }
     if (o.finish !== false) await LM.finish(b);
     if (o.register !== false) { try { if (storage.CF && storage.CF.component) storage.CF.component(root, entry.designFamily); } catch (e) {} }
-    return { board: b, master: o.register === false ? null : entry.designFamily, mode: 'anatomy' };
-  };
+    return { board: b, master: o.register === false ? null : entry.designFamily, mode: mode };
+  };;
 
-  /** Build one manifest component on its page: mapped → one factory representative; custom → anatomy board. */
+  /** Build one manifest component on its page: mapped → its variant × state matrix (`CF.SPEC`); custom → source anatomy board. */
   LM.buildEntry = async function (entry, o) {
     o = o || {};
     if ((entry.kind || 'visual') !== 'visual') {
@@ -221,11 +267,73 @@ return (function () {
     const CF = storage.CF;
     const fn = CF[entry.factory];
     if (!fn) return { err: 'missing factory ' + entry.factory, entry: entry.name };
+    /** SPEC MATRIX (component-library §3): a family with a variant plan draws its full variant × state sheet, and the
+        manifest's `representative` is only the cell a screen places by default. Pairing a library fixes the page
+        INVENTORY (one component per block page); it never licensed shrinking the sheet to one cell — measured
+        2026-10-27, the paired build left 69 factory pages with a single host and the coverage gate could not see it. */
+    const plan = (CF.specPlan && CF.specPlan(entry.designFamily, entry)) || null;
+    if (plan && (plan.rows.length > 1 || plan.axes.length > 1)) {
+      // ONE BOARD PER BLOCK PAGE is the catalog contract (`CAT.pageIssues` rejects a second `·Spec` on the page), so the
+      // sheet is not split: the row set is trimmed to the cell budget one `execute_code` call can afford.
+      const budget = o.maxCells || 20;
+      const perRow = plan.axes.length || 1;
+      const rows = plan.rows.slice(0, Math.max(2, Math.floor(budget / perRow)));
+      let b = null;
+      try {
+        b = await CF.matrix({ family: entry.designFamily, rows: rows, axes: plan.axes,
+          specName: entry.designFamily + '·Spec', title: entry.designFamily + ' · variants × states',
+          subtitle: 'factory: ' + entry.factory + ' · states: ' + plan.axes.join('/'),
+          parent: o.parent, x: o.x || 0, y: o.y || 0 });
+      } catch (e) { return { err: 'CF.matrix ' + entry.factory + ': ' + String((e && e.message) || e) }; }
+      if (!b || b.err) return { err: 'CF.matrix returned nothing', board: null };
+      // A cell host carries the FACTORY's internal head (`Modal·Confirm·MD`, `OTP·6D`, `Segmented·MD`), but the
+      // paired inventory is the DESIGN family (`Dialog`, `PinInput`, `SegmentGroup`): a master whose head is not a
+      // manifest family shows up as an `extras` + `missing` pair in `LM.audit` (measured 2026-10-27: 12 of each).
+      // Normalize every cell head to the design family, then give the first cell the bare family name — a screen
+      // places `Dialog`, not `Dialog·Confirm·MD`.
+      try {
+        const cells = [];
+        // A CELL is a top-level sheet member: once a board matches, its own children belong to that control. Renaming
+        // into them turned a nested `Badge·Dot·Error` into an undersized `IconButton·Dot·Error` (measured 2026-10-27).
+        (function scan(k) {
+          (k.children || []).forEach((c) => {
+            const cn = String(c.name || '');
+            if (String(c.type) === 'board' && /^[A-Z][A-Za-z0-9]*(·|$)/.test(cn) && !/·Spec(·|$)/.test(cn)) { cells.push(c); return; }
+            scan(c);
+          });
+        })(b);
+        cells.forEach((c, i) => {
+          const nm = String(c.name || '');
+          if (i === 0) { try { c.name = entry.designFamily; } catch (e) {} return; }
+          const head = nm.split('·')[0];
+          if (head !== entry.designFamily) { try { c.name = entry.designFamily + nm.slice(head.length); } catch (e) {} }
+        });
+      } catch (e) {}
+      let reg = null;
+      try { reg = CF.autoRegister({ roots: [b], states: true, limit: 80 }); } catch (e) {}
+      if (o.finish !== false) await LM.finish(b);
+      return { board: b, mode: 'matrix', master: entry.designFamily, rows: rows.length,
+        cells: rows.length * perRow, registered: (reg && reg.registered && reg.registered.length) || 0,
+        truncated: !!(reg && reg.truncated) };
+    }
     const b = LM.specFrame(entry, o);
     let host = null;
-    try { host = await fn({ parent: b, x: (o.x || 0) + 24, y: (o.y || 0) + 120, size: 'md' }); }
+    var rep = (entry.representative && typeof entry.representative === 'object') ? entry.representative : {};
+    try { host = await fn(Object.assign({ parent: b, x: (o.x || 0) + 24, y: (o.y || 0) + 120, size: 'md' }, rep)); }
     catch (e) { return { err: 'factory ' + entry.factory + ': ' + String((e && e.message) || e), board: b }; }
     if (!host) return { err: 'factory ' + entry.factory + ' returned nothing', board: b };
+    // COMPONENT-FIRST SPEC LAYOUT (measured 2026-10-27): the representative is a FLOW child of the spec frame, after the
+    // header rows. The old absolute y = o.y + 120 put a 32px host on top of the `Parts ·` line and let a 76px Textarea
+    // overflow a 171px board; the frame now hugs the host and the spec reads header → control → states.
+    try {
+      if (host.parent && host.parent.id === b.id && host.layoutChild) {
+        host.layoutChild.absolute = false;
+        // A field host is born `auto`; inside the spec's auto-height column that hug recomputed a 44px Search back to its
+        // 32px ladder base while the `nl:prof` stamp still said 44. Pin the drawn size in the flow (R5: declare after resize).
+        try { host.layoutChild.horizontalSizing = 'fix'; host.layoutChild.verticalSizing = 'fix'; } catch (e3) {}
+        try { if (b.flex) b.flex.alignItems = 'start'; } catch (e2) {}
+      }
+    } catch (e) {}
     if (o.finish !== false) await LM.finish(b);
     if (o.register !== false) { try { if (CF.component) CF.component(host, entry.designFamily); } catch (e) {} }
     return { board: b, mode: 'factory', master: o.register === false ? null : entry.designFamily, shape: String(host.name || '') };

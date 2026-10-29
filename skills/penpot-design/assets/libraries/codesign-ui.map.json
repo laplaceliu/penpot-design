@@ -767,7 +767,7 @@
  "toggle": {
   "page": "03",
   "group": "actions",
-  "factory": "button",
+  "factory": "toggle",
   "kind": "visual",
   "category": "Forms & Inputs",
   "states": [
@@ -782,7 +782,7 @@
  "toggle-group": {
   "page": "03",
   "group": "actions",
-  "factory": "custom",
+  "factory": "segmented",
   "kind": "visual",
   "category": "Forms & Inputs",
   "states": [
@@ -1338,7 +1338,10 @@
    "disabled"
   ],
   "order": 1,
-  "layer": "kit"
+  "layer": "kit",
+  "representative": {
+   "type": "primary"
+  }
  },
  "icon-button": {
   "designFamily": "IconButton",
@@ -1474,7 +1477,10 @@
    "disabled"
   ],
   "order": 3,
-  "layer": "kit"
+  "layer": "kit",
+  "representative": {
+   "clear": false
+  }
  },
  "masked-input": {
   "designFamily": "MaskedInput",

@@ -77,9 +77,18 @@ return (function () {
       warning: 'color.warning', warningInk: 'color.warning-ink', warningSoft: 'color.warning-soft',
       info: 'color.info', infoInk: 'color.info-ink', infoSoft: 'color.info-soft'
     };
+    // The token set may spell the ink/wash steps `color.primary-ink` OR `color.primaryInk` (DESIGN.md emits the camel
+    // form the token engine and CF.P use). Without this fallback every *Ink/*Soft role silently kept the generic kit
+    // hex — measured 2026-10-27: AppKit's Button primary shipped #1E40AF (the default) while the set declared #3574C4.
+    var look = function (name) {
+      if (by[name]) return by[name];
+      var camel = String(name).replace(/-ink$/, 'Ink').replace(/-soft$/, 'Soft');
+      if (by[camel]) return by[camel];
+      return null;
+    };
     var T2 = storage.T || (storage.T = {}), n = 0;
     Object.keys(map).forEach(function (k) {
-      var h = by[map[k]];
+      var h = look(map[k]);
       if (!h) return;
       P[k] = h; n++;
       if (k === 'ink') { T2.onSurface = h; T2.ink = h; }
@@ -1246,6 +1255,24 @@ return (function () {
     // "secondary means borderless chip" locally is what made one file's Button·Secondary a bordered control wearing
     // another family's elevation stack (measured 2026-10-23). `outlined` remains the bordered form either way.
     var bp = CF.profile('actions', 'button', type) || {};
+    // PROFILE SIZE (§source-adaptation): a measured family size wins over the generic ladder. This factory used to read
+    // only material keys (chip/radius/hoverInk), so a source's 40px/12px/16px-pad button shipped at the kit's 32/14/12
+    // while its `nl:prof` stamp recorded the kit geometry and the gate compared it to a profile that said 40.
+    // `sizes[size]` (the drawn step) wins over `size`.
+    var bpSz = (bp && bp.size) || {}, bpZ = (bp && bp.sizes && bp.sizes[String(o.size || 'md').toLowerCase()]) || {};
+    if (bpSz.h !== undefined || bpZ.h !== undefined || bpSz.fs !== undefined || bpZ.fs !== undefined || bpSz.padX !== undefined || bpZ.padX !== undefined) {
+      L = Object.assign({}, L, {
+        h: o.h || bpZ.h || bpSz.h || L.h,
+        padX: bpZ.padX !== undefined ? bpZ.padX : (bpSz.padX !== undefined ? bpSz.padX : L.padX),
+        fs: bpZ.fs !== undefined ? bpZ.fs : (bpSz.fs !== undefined ? bpSz.fs : L.fs)
+      });
+      lfs = o.labelSize || L.fs;
+      leadW = (o.lead || o.loading) && !iconOnly ? L.icon + L.gap : 0;
+      trailW = o.trail ? L.icon + L.gap : 0;
+      lw = label && !iconOnly ? CF.estW(label, lfs) : 0;
+      w = o.block ? (o.w || 240) : (o.w || (iconOnly ? L.h : L.padX * 2 + leadW + trailW + lw));
+      w = max(w, iconOnly ? L.h : L.h + 8);
+    }
     var chip = o.chip !== undefined ? !!o.chip : (bp.chip === true && !o.outlined);
     // A PILL is `full` by definition. Drawing it at `control` (12) and letting TK.roleSweep repair it to 9999 left the
     // BIRTH STAMP saying 12 while the render said 9999 — the stamp must be what was drawn, so the corner is right at
@@ -1272,12 +1299,15 @@ return (function () {
     // shadow and sheen, not the background. Disabled keeps its container overlay (§1.2).
     var filled = type === 'primary' || type === 'ink' || !!tn.onDark;
     var fillState = ((chip || filled) && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ? 'default' : S;
-    ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : null, fillState, { onDark: tn.onDark });
+    // PROFILE MATERIAL: a variant's declared fill wins for a filled type — a source's primary is often its READABLE ink
+    // step, not the tone hue (white on #4A89DC is 3.56:1). `fill` is a palette key or hex, never a `color.*` token name.
+    var baseFill = (filled && bp && bp.fill) ? C(bp.fill) : (tn.bg ? C(tn.bg) : null);
+    ctx.host.fills = CF.fills(baseFill, fillState, { onDark: tn.onDark });
     if (tn.line && !chip) ctx._stroke(ctx.host, C(tn.line), 1, S === 'disabled' ? 0.4 : 1);
     if (tn.dashed && tn.line) ctx.host.strokes = [Object.assign({}, ctx.host.strokes[0], { strokeStyle: 'dashed' })];
     if (type === 'text' || type === 'link' || type === 'ghost') { /* no border, fill only carries the state tint */ }
     if (o.elevated) ctx.host.shadows = CF.shadow(1);
-    var ink = C(tn.ink, P.ink), al = stateAlpha(S);
+    var ink = C((filled && !tn.onDark) ? 'onPrimary' : tn.ink, P.ink), al = stateAlpha(S);
     // where the hover lives is a profile fact: some systems move the LABEL to the brand hue instead of washing the plate.
     var hoverInk = bp.hoverInk || (bp.states && bp.states.hover && bp.states.hover.ink) || (chip ? 'primary' : null);
     if (hoverInk && (S === 'hover' || S === 'focus' || S === 'pressed' || S === 'selected')) ink = C(hoverInk);
@@ -1305,6 +1335,43 @@ return (function () {
     return ctx.host;
   };
 
+  /**
+   * CF.toggle — the codesign-ui Toggle (a pressed/unpressed button with an indicator), NOT a plain Button.
+   * Anatomy `ToggleIndicator` + `ToggleRoot`; states off / on / focus / disabled. Geometry/material come from
+   * `actions.toggle` (a source that lacks a toggle derives it from the button material).
+   */
+  CF.toggle = async function (o) {
+    o = o || {};
+    var prof = CF.profile('actions', 'toggle') || CF.profile('actions', 'button') || {};
+    var sz = (prof && prof.size) || {}, szs = (prof && prof.sizes && prof.sizes[String(o.size || 'md').toLowerCase()]) || {};
+    var h = o.h || szs.h || sz.h || 40;
+    var padX = szs.padX !== undefined ? szs.padX : (sz.padX !== undefined ? sz.padX : 16);
+    var fs = szs.fs !== undefined ? szs.fs : (sz.fs !== undefined ? sz.fs : 12);
+    var rad = prof.radius !== undefined ? prof.radius : 8;
+    var S = o.state || (o.on ? 'on' : 'off');
+    var on = S === 'on' || S === 'selected' || o.on === true;
+    var label = o.label === undefined ? 'Toggle' : String(o.label);
+    var ind = o.indicator || 16;
+    var w = o.w || (padX * 2 + ind + 8 + CF.estW(label, fs));
+    var box = B(o.x || 0, o.y || 0, w, h);
+    var ctx = CF.build(CF.name('Toggle', { state: S, size: o.size }), box, { parent: o.parent, radius: rad });
+    ctx.host.fills = on ? CF.fills(C('primarySoft'), null) : CF.fills(C('surface'), null);
+    ctx._stroke(ctx.host, C(on ? 'primary' : 'border'), 1, S === 'disabled' ? 0.4 : 1);
+    var ib = B(box.x + padX, box.y + (h - ind) / 2, ind, ind);
+    ctx.plate(ib, { name: 'indicator', fill: on ? C('primary') : null, stroke: C(on ? 'primary' : 'borderStrong'), strokeW: 1, radius: 4 });
+    if (on) ctx.glyph('check', B(ib.x + 2, ib.y + 2, ind - 4, ind - 4), { color: C('onPrimary'), strokeW: 2 });
+    ctx.text(label, B(box.x + padX + ind + 8, box.y, max(8, w - padX * 2 - ind - 8), h),
+      { size: fs, color: C(on ? 'primaryInk' : 'ink'), weight: 600, valign: 'middle', align: 'left', refit: false });
+    if (S === 'focus') ctx.ring(B(box.x, box.y, w, h), { radius: rad, offset: 0, color: C('primary') });
+    if (S === 'disabled') ctx.host.opacity = 0.5;
+    await ctx.settle(); ctx.place(); ctx.refit(padX);
+    CF.elevate(ctx.host, 'Button');
+    var final = B(ctx.host.x, ctx.host.y, ctx.host.width, ctx.host.height);
+    if (prof._family) CF.profStamp(ctx.host, prof, { h: final.h, padX: padX, fs: fs, radius: CF.radius(rad) },
+      { family: 'toggle', size: String(o.size || 'md').toLowerCase(), state: S });
+    return ctx.host;
+  };
+
   /** Icon-only square button: 28 / 40 / 52 with icon 16 / 24 / 28 (§2 HARD), optional badge dot and toggle state. */
   CF.iconButton = async function (o) {
     o = o || {};
@@ -1319,11 +1386,23 @@ return (function () {
     // `actions.iconbutton.variants.<type>.gradient` (plus its own elevation recipe), and a file with no profile gets the
     // tone's flat token fill. Inventing a pair of gradient hexes here is what produced a tile that matched nothing.
     var iv = CF.profile('actions', 'iconbutton', toneKey || o.type) || CF.profile('actions', 'iconbutton') || {};
+    // PROFILE SIZE: the source's 38px tile wins over the kit's 40 (the factory read the radius/material but not the
+    // square, so the stamp said 40 against an expect of 38).
+    var ivSz = (iv && iv.size) || {}, ivZ = (iv && iv.sizes && iv.sizes[String(o.size || 'md').toLowerCase()]) || {};
+    if (ivSz.size !== undefined || ivZ.size !== undefined) sq = o.w || ivZ.size || ivSz.size || sq;
+    // `box` was built before the profile was resolved: rebuild it so the RENDER and the `nl:prof` stamp agree.
+    box = B(o.x || 0, o.y || 0, o.w || sq, o.h || sq);
+    // The glyph box is snapped to the 4px grid: an 18px mark inside a 40px tile centres at 11 (off-grid) and the
+    // auditor judges the mark's own box, not the tile's interior (measured 2026-10-27 on the shell title band).
+    ic = Math.max(8, Math.round(Math.round(sq * (CF.iconInSquare(o.size) / (CF.iconSquare(o.size) || 1))) / 4) * 4);
     // An icon button is a TILE by default (DESIGN.md §Shapes: small icon tiles take `sm`); an explicit circle is `full`
     // (a rounded rect at `control` is a 40px square with soft corners, not the source's disc — it only ever looked
     // circular because TK.roleSweep repaired it afterwards, which the birth stamp could not see).
     var icoR = o.shape === 'circle' ? 'full' : (iv.radius !== undefined ? iv.radius : 'tile');
     var ctx = CF.build(CF.name('IconButton', { type: o.type || 'ghost', size: o.size, state: S, slot: o.badge ? 'Badge' : (o.shape === 'circle' ? 'Circle' : null) }), box, { parent: o.parent, radius: icoR });
+    // The 44 hit pad is a child, but a flex parent could grow the 38 host to 41 before the spec pins its sizing. Pin the
+    // drawn square at birth so RENDER and the `nl:prof` stamp agree (measured 2026-10-27: 38 stamp, 41 board).
+    try { ctx.host.horizontalSizing = 'fix'; ctx.host.verticalSizing = 'fix'; } catch (e) {}
     // Filled brand/ink icons keep their base fill in every state; the old black focus overlay turned the red button
     // into a dark chip with a red-on-red halo. The state is carried by the ring and elevation.
     var icoFilled = toneKey === 'primary' || toneKey === 'ink' || !!tn.onDark;
@@ -1448,7 +1527,10 @@ return (function () {
     var ctx = CF.build(CF.name('SplitButton', { type: o.type, size: o.size, state: S }), box, { parent: o.parent, radius: L.radius });
     ctx.host.fills = CF.fills(tn.bg ? C(tn.bg) : C('surface'), S, { onDark: !!tn.bg && tn.onDark });
     if (!tn.bg) ctx._stroke(ctx.host, C('border'), 1);
-    ctx.plate(B(box.x + box.w - cw, box.y, cw, box.h), { name: 'chevron-zone', fill: tn.bg ? '#000000' : C('border'), opacity: tn.bg ? 0.12 : 0.001 });
+    var zone = ctx.plate(B(box.x + box.w - cw, box.y, cw, box.h), { name: 'chevron-zone', fill: tn.bg ? '#000000' : C('border'), opacity: tn.bg ? 0.12 : 0.001 });
+    // ONE CONTROL, ONE CORNER: the zone is flush with the host's right edge, so it must carry the host's right corners
+    // (a square zone inside an r8 pill paints square corners through the outline — rule 73 flush_corner_split).
+    try { var hostR = CF.radius(L.radius); zone.borderRadiusTopRight = hostR; zone.borderRadiusBottomRight = hostR; zone.borderRadiusTopLeft = 0; zone.borderRadiusBottomLeft = 0; } catch (e) {}
     ctx.plate(B(box.x + box.w - cw, box.y + 6, 1, box.h - 12), { name: 'boundary·zone', fill: C(tn.ink, P.ink), opacity: tn.bg ? 0.35 : 1 });
     ctx.text(o.label || 'Publish', B(box.x, box.y, box.w - cw, box.h), { size: L.fs, color: C(tn.ink, P.ink), weight: 500, opacity: stateAlpha(S) });
     ctx.glyph('chevronDown', B(box.x + box.w - cw, box.y, cw, box.h), { color: C(tn.ink, P.ink), opacity: stateAlpha(S) });
@@ -1461,7 +1543,8 @@ return (function () {
   CF.fab = async function (o) {
     o = o || {};
     var d = o.size === 'sm' ? 40 : (o.size === 'lg' ? 96 : 56);
-    var tn = o.tone === 'surface' ? TONE.filled : (o.tone === 'branded' ? { bg: 'primary', ink: 'onPrimary', onDark: 1 } : { bg: 'primary', ink: 'onPrimary', onDark: 1 });
+    // The extended FAB carries a white label, so its ground is the tone's INK step (§4.1: white on the hue is 3.56:1).
+    var tn = o.tone === 'surface' ? TONE.filled : (o.tone === 'branded' ? { bg: 'primary', ink: 'onPrimary', onDark: 1 } : { bg: 'primaryInk', ink: 'onPrimary', onDark: 1 });
     var S = o.state || 'default', label = o.extended ? String(o.label === undefined ? 'New note' : o.label) : null;
     var w = label ? max(d, 16 + (o.iconOnly ? 0 : 24) + 8 + CF.estW(label, 14) + 16 + 2) : d;
     var box = B(o.x || 0, o.y || 0, w, d);
@@ -1755,7 +1838,7 @@ return (function () {
   /** OTP: 6 boxes 44-48 × 56-64 gap 8-12 + a wider break after the 3rd; active box = 2px accent; error = all red. */
   CF.otpInput = async function (o) {
     o = o || {};
-    var n = o.length || 6, bw = o.boxW || 44, bh = o.boxH || 52, gap = o.gap || 10, groupAfter = o.grouped === false ? 0 : 3;
+    var n = o.length || 6, bw = o.boxW || 44, bh = o.boxH || 52, gap = o.gap || 12, groupAfter = o.grouped === false ? 0 : 3;
     // Error/resend lines are 13px type → a 20px rendered line; a 20px slot left the error's bottom 4px outside the
     // host (audit_layout out_of_bounds). Each slot is 24 = 4px gap + the real line.
     var extra = (o.error ? 24 : 0) + (o.resend ? 24 : 0);
@@ -1960,7 +2043,7 @@ return (function () {
     // master exists, every tag is a real copy; the raw path below is a reported fallback for a file whose Chip family
     // has not been built yet (rule 65 `nested_control_raw` fails it on acceptance).
     var chipH = min(24, L.h - 8), chipGap = 4, rowsN = 1;
-    var chipMaster = CF.get('Chip·Input·SM·Clear·Neutral');
+    var chipMaster = CF.get('Chip·Input·SM·Clear·Neutral') || CF.get('Chip');
     if (!chipMaster) { try { console.warn('CF.multiSelect: no Chip·Input·SM·Clear·Neutral master — inner chips are raw; build the Chip atom before this composite'); } catch (e) {} }
     var chipW = function (v) {
       return chipMaster ? CF.chipWidth(v) : (CF.estW(v, L.fs - 1) + (v[0] === '+' ? 12 : (o.removable === false ? 16 : 16 + L.icon + 4)));
@@ -1993,6 +2076,7 @@ return (function () {
           inst = r.inst;
           try { inst.name = isMore ? 'chip·overflow' : 'chip'; } catch (e) {}
           CF.chipFit(inst, c.v, { w: c.w, h: chipH });
+          try { inst.resize(N(c.w), N(chipH)); } catch (e) {}
         }
       }
       if (!inst) {
@@ -2045,7 +2129,8 @@ return (function () {
       var fy = gy + weeks * day;
       ctx.text('Clear', B(pbox.x + pad, fy, 60, 40), { size: 13, color: C('primary'), align: 'left' });
       var okb = B(pbox.x + pw - pad - 64, fy + 4, 64, 32);
-      ctx.plate(okb, { name: 'button·ok', fill: C('primary'), radius: L.radius });
+      // The OK plate carries white copy, so it takes the tone's INK step (white on the hue is 3.56:1).
+      ctx.plate(okb, { name: 'button·ok', fill: C('primaryInk'), radius: L.radius });
       ctx.text('OK', okb, { size: L.fs, color: C('onPrimary'), weight: 500 });
     } else if (o.presets) {
       var fy2 = gy + weeks * day;
@@ -2056,7 +2141,7 @@ return (function () {
       });
       ctx.text('Cancel', B(pbox.x + pad, fy2 + 38, 60, 30), { size: 13, color: C('muted'), align: 'left' });
       var ok2 = B(pbox.x + pw - pad - 64, fy2 + 38, 64, 30);
-      ctx.plate(ok2, { name: 'button·ok', fill: C('primary'), radius: L.radius });
+      ctx.plate(ok2, { name: 'button·ok', fill: C('primaryInk'), radius: L.radius });
       ctx.text('OK', ok2, { size: 13, color: C('onPrimary'), weight: 500 });
     }
     await ctx.settle(); ctx.place();
@@ -2126,15 +2211,21 @@ return (function () {
     // `profiles.selection.switch`, and a file with no profile keeps the AntD/M3 presets.
     var prof = CF.profile('selection', 'switch');
     var sm = o.size === 'sm';
+    // The profile's own size ladder wins: `selection.switch.sizes.sm` measured 46/26/24 while the factory read only
+    // the flat `size` block (58/32/30), so every SM cell drew the MD track (12 drift findings, 2026-10-27).
+    var PSZ = (prof && prof.sizes && prof.sizes[String(o.size || 'md').toLowerCase()]) || {};
     var TR = (prof && (sm ? (prof.trackSm || prof.track) : prof.track)) || {};
     var HS = (prof && prof.handle) || {};
+    // The source-adaptation profile measures the track in a flat `size` block (trackW/trackH/handle/inset): the factory
+    // used to read only `track:{w,h}` + `handle:{size}` and shipped the 44×22 kit against an expect of 58×32.
+    var PS = (prof && prof.size) || {};
     var m3 = !prof && o.system === 'm3';
-    var tw = o.trackW || TR.w || (m3 ? (sm ? 44 : 52) : (sm ? 28 : 44));
-    var th = o.trackH || TR.h || (m3 ? (sm ? 24 : 32) : (sm ? 16 : 22));
+    var tw = o.trackW || PSZ.trackW || TR.w || PS.trackW || (m3 ? (sm ? 44 : 52) : (sm ? 28 : 44));
+    var th = o.trackH || PSZ.trackH || TR.h || PS.trackH || (m3 ? (sm ? 24 : 32) : (sm ? 16 : 22));
     var on = !!o.checked, S = o.state || 'default';
     var pressed = S === 'pressed';
-    var hw = o.handleSize || HS.size || (m3 ? (on ? (pressed ? 28 : 24) : 16) : (pressed ? th - 2 : th - 4));
-    var inset = HS.inset !== undefined ? Number(HS.inset) : (m3 ? 4 : 2);
+    var hw = o.handleSize || PSZ.handle || HS.size || PS.handle || (m3 ? (on ? (pressed ? 28 : 24) : 16) : (pressed ? th - 2 : th - 4));
+    var inset = HS.inset !== undefined ? Number(HS.inset) : (PS.inset !== undefined ? Number(PS.inset) : (m3 ? 4 : 2));
     var labelFs = (prof && prof.label && prof.label.fs) || 14;
     var box = B(o.x || 0, o.y || 0, tw + (o.label ? CF.labelW(o.label, labelFs) : 0), max(th, 20));
     var swSlot = [on ? 'On' : 'Off', slotName({ lead: o.innerIcon ? true : null, loading: o.loading }), o.label ? 'Label' : null].filter(Boolean).join('-');
@@ -2774,12 +2865,13 @@ return (function () {
     // overlaps). The Avatar factory resolves the same scale; the group must do it before any arithmetic.
     var SCALE = { xs: 24, sm: 32, md: 40, lg: 48, xl: 64, '2xl': 96 };
     var s = (o.size !== undefined && SCALE[o.size] !== undefined) ? SCALE[o.size] : (Number(o.size) || 32);
-    var n = o.members ? o.members.length : 5, over = max(0, (o.total || n) - n), ov = s * 0.3;
+    var members = o.members || [];
+    var n = members.length || 5, over = max(0, (o.total || n) - n), ov = s * 0.3;
     var box = B(o.x || 0, o.y || 0, s + (n - 1) * (s - ov) + (over ? s - ov + 6 : 0), s);
     // Its own family name and a FIXED box: appending absolute avatar children to a hug frame collapsed the group to
     // 1×1 inside a grid slot, so every catalog AvatarGroup rendered as a dot.
     var ctx = CF.build(CF.name('AvatarGroup', { size: o.size }), box, { parent: o.parent });
-    for (var i = 0; i < n; i++) await CF.avatar({ parent: ctx.host, x: box.x + i * (s - ov), y: box.y, size: s, initials: (o.members[i] || '').slice(0, 2), name: o.members[i] });
+    for (var i = 0; i < n; i++) await CF.avatar({ parent: ctx.host, x: box.x + i * (s - ov), y: box.y, size: s, initials: (members[i] || '').slice(0, 2), name: members[i] });
     try { ctx.host.clipContent = false; ctx.host.horizontalSizing = 'fix'; ctx.host.verticalSizing = 'fix'; ctx.host.resize(box.w, box.h); } catch (e) {}
     if (over) {
       var xb = B(box.x + n * (s - ov), box.y, s, s);
@@ -2804,7 +2896,8 @@ return (function () {
     var footerH = (o.actions || o.footer) ? 56 : 0;
     var rad = CF.radius(o.radius !== undefined ? o.radius : (pp.radius !== undefined ? pp.radius : 'md'));
     var fillTok = o.fill || (prof && prof.fill) || (tone === 'outlined' ? 'surface' : (tone === 'filled' ? 'surfaceAlt' : 'surface'));
-    var bW = prof && prof.border ? Number(prof.border.width || 0) : (tone === 'outlined' ? 1 : 0);
+    var bW = (prof && prof.expect && prof.expect.stroke !== undefined) ? Number(prof.expect.stroke)
+      : (prof && prof.border ? Number(prof.border.width || 0) : (tone === 'outlined' ? 1 : 0));
     var bTok = (prof && prof.border && prof.border.token) ? prof.border.token : 'border';
     var box = B(o.x || 0, o.y || 0, w, coverH + headerH + bodyH + footerH + pad * (coverH ? 1 : 2));
     var ctx = CF.build(CF.name('Card', { type: tone, state: S, slot: o.cover ? 'Cover' : (o.selectable ? 'Selectable' : null) }), box,
@@ -2822,7 +2915,17 @@ return (function () {
       // plate erases the card's L/T/R border (stroke_covered). Inset it on the three bordered sides only — the cover's
       // bottom edge is interior, so it may run to the full height.
       var ci = bW ? bW : 0;
-      ctx.plate(B(box.x + ci, y + ci, box.w - ci * 2, coverH - ci), { name: 'cover', fill: C(o.coverTone || 'border'), stroke: null });
+      var cover = ctx.plate(B(box.x + ci, y + ci, box.w - ci * 2, coverH - ci), { name: 'cover', fill: C(o.coverTone || 'border'), stroke: null });
+      // A square plate flush in a r20 host cuts the host silhouette (`flush_corner_split`); the cover takes the host's
+      // two top corners and keeps its own bottom edge square.
+      if (cover && rad) {
+        // Penpot keeps four corner props; assigning an array to `borderRadius` is silently dropped, so the flush
+        // plate still painted square corners through the host's r20 silhouette (`flush_corner_split`).
+        try {
+          cover.borderRadiusTopLeft = rad; cover.borderRadiusTopRight = rad;
+          cover.borderRadiusBottomLeft = 0; cover.borderRadiusBottomRight = 0;
+        } catch (e) {}
+      }
       ctx.glyph('image', B(box.x + box.w / 2 - 24, y + coverH / 2 - 24, 48, 48), { color: C('muted') });
       if (o.coverLabel) ctx.text(String(o.coverLabel), B(box.x + 12, y + coverH - 32, box.w - 24, 24), { size: 12, color: CF.onTone(o.coverTone || 'border'), align: 'left' });
       y += coverH;
@@ -2896,8 +2999,11 @@ return (function () {
     var yy = box.y + pad + 16 + vs + 6;
     if (delta !== null) {
       var up = delta >= 0, good = o.inverse ? !up : up;
-      var dcol = C(good ? 'success' : 'error');
-      ctx.glyph(up ? 'arrowUp' : 'arrowDown', B(box.x + pad, yy + 2, 14, 14), { color: dcol, strokeW: 1.8 });
+      // §4.1: on a white plate the copy is ink and the COLOUR rides on the arrow glyph — the palette's own
+      // success/error ink steps are 3.28:1 and 4.0:1 on white, so tinted copy cannot clear AA. Sign + colour are
+      // both still present (arrow direction + hue), which is what the guide asks for.
+      var dcol = C('ink');
+      ctx.glyph(up ? 'arrowUp' : 'arrowDown', B(box.x + pad, yy + 2, 14, 14), { color: C(good ? 'success' : 'error'), strokeW: 1.8 });
       ctx.text((up ? '+' : '') + delta + (o.deltaUnit === undefined ? '%' : o.deltaUnit), B(box.x + pad + 18, yy, 70, 18),
         { size: 13, color: dcol, weight: 500, align: 'left', valign: 'top' });
       if (o.deltaNote) ctx.text(String(o.deltaNote), B(box.x + pad + 92, yy, w - pad - 92, 18), { size: 12, color: C('muted'), align: 'left', valign: 'top', refit: false });
@@ -3144,7 +3250,7 @@ return (function () {
       return CF.emptyState(Object.assign({ x: o.x, y: o.y, w: w, h: o.h || 220, kind: kind === 'noPermission' ? '403' : 'no-data' }, o));
     var box2 = B(o.x || 0, o.y || 0, w, n * rowH + 40);
     var c2 = CF.build(CF.name('Table', { slot: 'Loading' }), box2, { parent: o.parent, fill: C('surface'), radius: CF.radius('md'), stroke: C('border') });
-    c2.plate(B(box2.x + 1, box2.y + 1, box2.w - 2, 40), { name: 'header', fill: C('surfaceAlt'), radius: 'none' });
+    c2.plate(B(box2.x + 1, box2.y + 1, box2.w - 2, 40), { name: 'header', fill: C('surfaceAlt'), radius: 'md' });
     [0.16, 0.28, 0.2, 0.2].forEach(function (f, i) {
       var xx = box2.x + 16 + [0, 0.34, 0.6, 0.8][i] * (box2.w - 32);
       c2.plate(B(xx, box2.y + 14, (box2.w - 32) * f * (i ? 0.6 : 1), 12), { name: 'sk·head', fill: C('border'), radius: 'xs' });
@@ -3190,9 +3296,9 @@ return (function () {
     ctx.text(String(o.title === undefined ? 'List item' : o.title), B(tx, titleY, textW, 22),
       { size: 14, color: S === 'disabled' ? C('muted') : C('ink'), weight: 500, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
     if (lines >= 2) ctx.text(String(o.sub === undefined ? 'Secondary line, one row only' : o.sub), B(tx, titleY + 20, textW, 18),
-      { size: 13, color: C('muted'), opacity: stateAlpha(S), align: 'left', valign: 'top', refit: false });
+      { size: 13, color: (S === 'selected' || S === 'hover' || S === 'focus') ? C('ink') : C('muted'), opacity: stateAlpha(S), align: 'left', valign: 'top', refit: false });
     if (lines >= 3) ctx.text(String(o.meta || 'Tertiary detail'), B(tx, titleY + 40, textW, 16),
-      { size: 12, color: C('muted'), opacity: stateAlpha(S, 0.8), align: 'left', valign: 'top', refit: false });
+      { size: 12, color: (S === 'selected' || S === 'hover' || S === 'focus') ? C('ink') : C('muted'), opacity: stateAlpha(S, 0.8), align: 'left', valign: 'top', refit: false });
     if (o.trailing === 'meta') ctx.text(String(o.metaRight || '2h'), B(box.x + box.w - padX - trailW, box.y, trailW, h),
       { size: 12, color: C('muted'), align: 'right', valign: 'middle', refit: false });
     else if (o.trailing === 'chevron') ctx.glyph('chevronRight', B(box.x + box.w - padX - 16, box.y + (h - 16) / 2, 16, 16), { color: C('muted') });
@@ -3522,7 +3628,7 @@ return (function () {
       if (!isSel && dnum === (o.hoverDay === undefined ? today : o.hoverDay) && (ST === 'hover' || ST === 'pressed'))
         ctx.plate(B(r.x, r.y, cell, cell), { name: 'day·' + (ST === 'pressed' ? 'pressed' : 'hover'), fills: CF.fills(null, ST), radius: 'control' });
       ctx.text(String(dnum), r, { size: 12, weight: isSel || dnum === today ? 600 : 400,
-        color: isSel ? C('onPrimary') : (dnum === today ? C('primaryInk') : (muted ? C('muted') : C('ink'))), align: 'center', valign: 'middle', refit: false });
+        color: isSel ? C('onPrimary') : (dnum === today ? C('ink') : (muted ? C('muted') : C('ink'))), align: 'center', valign: 'middle', refit: false });
       if (events.indexOf(dnum) >= 0 && !isSel) ctx.plate(B(r.x + cell / 2 - 2, r.y + cell - 6, 4, 4), { name: 'dot·' + dnum, fill: C('primaryInk'), radius: 'xs' });
       if (o.hit) ctx.hitPad(r, o.hit);                          // 32 cells are a desktop sidebar affordance; touch tiers pass 44
       if (o.marks && o.marks[dnum]) ctx.text(String(o.marks[dnum]), B(r.x, r.y + 1, cell, 12), { size: 11, role: 'axis', color: C('muted'), align: 'center', valign: 'top', refit: false });
@@ -3567,6 +3673,9 @@ return (function () {
       ctx.text(label.toUpperCase(), B(box.x + padX, box.y, box.w - padX * 2, box.h),
         { size: 12, color: o.onDark ? C('mutedOnInk') : C('muted'), weight: 600, opacity: stateAlpha(S), align: 'left', valign: 'middle', refit: false });
       await ctx.settle(); ctx.place();
+      // A group label is still a nav item: without the birth stamp the gate reads it as generic-kit chrome.
+      CF.profStamp(ctx.host, prof, { h: h, padX: padX, radius: CF.radius(np.radius !== undefined ? np.radius : 0), fs: 12 },
+        { family: 'navitem', size: L.key, type: 'group', state: S, ink: o.onDark ? 'mutedOnInk' : 'muted' });
       return ctx.host;
     }
     var sel = !!o.selected;
@@ -3612,6 +3721,9 @@ return (function () {
     try { ctx.host.clipContent = false; } catch (e) {}
     if (S === 'focus') ctx.ring(B(ctx.host.x, ctx.host.y, ctx.host.width, h), { radius: rad, offset: 0 });
     if (rail) ctx.hitPad(B(box.x, box.y, w, h), 44);
+    // The rail item floats on hover/press like the other nav pills: without the family role the state was a fill
+    // tint with 0 shadows, which is exactly what `hover_flat` indicts (measured 2026-10-27 on NavItem·Rail).
+    CF.elevate(ctx.host, 'NavItem');
     CF.profStamp(ctx.host, prof, { h: h, padX: padX, radius: rad, fs: L.fs },
       { family: 'navitem', size: L.key, selected: sel, indicator: indicator, state: S, ink: sel ? selInkTok : (np.ink || 'ink') });
     return ctx.host;
@@ -3724,7 +3836,7 @@ return (function () {
       else if (i === o.hover) ctx.plate(B(cellBox.x, cellBox.y, cellBox.w, cellBox.h), { name: 'tint·' + i, fills: CF.fills(null, 'hover'), radius: CF.radius('xs') });
       if (c.glyph) { ctx.glyph(iconOf(c.glyph, 'folder'), B(x + 2, box.y + (h - 14) / 2, 14, 14), { color: C('muted') }); x += 18; }
       ctx.text(txt, B(x + (tint ? 2 : 0), box.y, max(8, cellBox.w - (tint ? 4 : 0)), h),
-        { size: fs, color: c.last ? C((prof && prof.ink) || 'ink') : C(o.onDark ? 'onPrimary' : ((prof && prof.linkInk) || 'muted')), weight: c.last ? ((prof && prof.weight) || 500) : 400,
+        { size: fs, color: c.last ? C((prof && prof.ink) || 'ink') : C(o.onDark ? 'onPrimary' : ((prof && prof.linkInk) || 'ink')), weight: c.last ? ((prof && prof.weight) || 500) : 400,
           opacity: o.state === 'disabled' ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle', refit: false });
       x += tw;
       if (c.menu) { ctx.glyph('dots', B(x - 14, box.y + (h - 12) / 2, 12, 12), { color: C('muted'), fill: C('muted'), anchor: 'right' }); }
@@ -3773,7 +3885,7 @@ return (function () {
     var disabled = S === 'disabled', al = disabled ? CF.STATE.disabledContent : 1;
     var fxB = null;
     var cellRad = pp.radius !== undefined ? CF.radius(pp.radius) : CF.radius('sm');
-    var selFill = (prof && prof.activeFill) || 'primary';
+    var selFill = (prof && prof.activeFill) || 'primaryInk';
     var cellBtn = function (bx, kind, sel) {
       var st = disabled ? 'disabled' : (sel ? 'selected' : (kind === 'num' && i === o.hover ? 'hover' : 'default'));
       var cb = ctx.plate(B(bx, cy, cell, cell), { name: 'cell·' + (sel ? 'active' : kind), fills: sel ? CF.fills(C(selFill), null) : CF.fills(null, st === 'hover' ? 'hover' : null),
@@ -3865,7 +3977,9 @@ return (function () {
         if (st === 'process') ctx.ellipse(B(nx + cs / 2 - 2, ny + cs / 2 - 2, 4, 4), { name: 'node·inner', fill: C('surface') });
         return;
       }
-      ctx.ellipse(B(nx, ny, cs, cs), { name: 'node·' + st, fill: st === 'process' ? C('primary') : (st === 'error' ? C('surface') : (st === 'finish' ? C('surface') : C('surfaceAlt'))),
+      // The active node carries the white step number: white on the 6-level hue is 3.56:1, so the fill is the tone's
+      // INK step (§4: the 7–8 level is the only one allowed to carry copy; 4.72:1 here).
+      ctx.ellipse(B(nx, ny, cs, cs), { name: 'node·' + st, fill: st === 'process' ? C('primaryInk') : (st === 'error' ? C('surface') : (st === 'finish' ? C('surface') : C('surfaceAlt'))),
         stroke: st === 'wait' ? C('borderStrong') : (st === 'error' ? C('error') : (st === 'finish' ? C('primary') : null)), strokeW: 2 });
       var icn = Math.round(cs * 0.5);
       if (c.icon) ctx.glyph(iconOf(c.icon, 'flag'), B(nx + (cs - icn) / 2, ny + (cs - icn) / 2, icn, icn), { color: active ? C('onPrimary') : C('muted'), strokeW: 1.8 });
@@ -3879,7 +3993,7 @@ return (function () {
         var ny = box.y + i * vrow + (labelRight ? (vrow - cs) / 2 : 0);
         node(box.x, ny, c, i);
         if (i < cells.length - 1) {
-          ctx.plate(B(box.x + cs / 2 - 1, ny + cs + 4, 2, max(4, vrow - cs - 12)),
+          ctx.plate(B(box.x + cs / 2 - 1, ny + cs, 2, max(4, vrow - cs)),
             { name: 'tail·' + i, fill: c.status === 'finish' ? C('primary') : C('border') });
         }
         var tx = box.x + cs + 12;
@@ -3924,7 +4038,7 @@ return (function () {
     await ctx.settle(); ctx.place();
     // §1.3 reserved: the boundary is authored around the node the keyboard is on (a circle → the ladder's circle step),
     // the perceivable cue is the 12% wash ctx.ring draws under it.
-    if (ST === 'focus' && focusBox) ctx.ring(focusBox, { radius: 'lg' });
+    if (ST === 'focus' && focusBox) ctx.ring(focusBox, { radius: 'full' });
     return ctx.host;
   };
 
@@ -4107,8 +4221,9 @@ return (function () {
       ctx.text(String(it.label), B(tx, ly, box.w - (tx - box.x) - (o.counters ? 30 : 8), rowH),
         { size: fs, color: on ? C('primary') : (it.disabled ? C('muted') : ((ST === 'hover' || ST === 'pressed') ? C('ink') : '#52525B')), weight: on ? 500 : 400,
           opacity: it.disabled ? CF.STATE.disabledContent : 1, align: 'left', valign: 'middle', refit: false });
+      // The counter sits on the same row plate as the label: muted on the hover wash is 4.11:1, so a washed row lifts it.
       if (o.counters) ctx.text(String(it.count === undefined ? (i + 1) * 3 : it.count), B(box.x + box.w - 30, ly, 22, rowH),
-        { size: 12, color: C('muted'), align: 'right', valign: 'middle', refit: false });
+        { size: 12, color: (on || ST === 'hover' || ST === 'pressed') ? C('ink') : C('muted'), align: 'right', valign: 'middle', refit: false });
     });
     await ctx.settle(); ctx.place();
     if (ST === 'focus') ctx.ring(B(box.x + 4, box.y + (act >= 0 ? act * rowH : 0), box.w - 8, rowH), { radius: 'xs' });
@@ -4246,7 +4361,7 @@ return (function () {
       { parent: o.parent, fill: tFill, radius: tRad, stroke: dark ? null : C('border'), strokeW: 1, shadow: T.material ? 0 : (dark ? 3 : 2) });
     var ink = dark ? C(T.ink || 'onPrimary') : C('ink');
     var x = box.x + padx;
-    if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'check', B(x, box.y + pady + 1, 18, 18), { color: tone === 'neutral' ? ink : C(TONEMAP[tone] ? TONEMAP[tone][1] : 'success'), strokeW: 1.8 }); x += 18 + 8; }
+    if (iconW) { ctx.glyph(SEVERITY_GLYPH[tone] || 'check', B(x, box.y + pady + (CF.lineH(fs) - 18) / 2, 18, 18), { color: tone === 'neutral' ? ink : C(TONEMAP[tone] ? TONEMAP[tone][1] : 'success'), strokeW: 1.8 }); x += 18 + 8; }
     ctx.text(msg, B(x, box.y + pady, box.w - (x - box.x) - padx - actW - (actW ? 8 : 0), fs + 6),
       { size: fs, color: ink, align: 'left', valign: 'top', refit: false });
     if (actW) ctx.text(String(o.action), B(box.x + box.w - padx - actW + 4, box.y + pady, actW - 4, fs + 6),
@@ -4383,7 +4498,9 @@ return (function () {
     var ctx = CF.build(CF.name('Popconfirm', { tone: tone, state: o.state }), bb.host, { parent: o.parent });
     if (arrow) bubbleDraw(ctx, bb, { radius: CF.radius('md'), shadow: 4 });
     else { ctx.host.fills = [{ fillColor: C('surface'), fillOpacity: 1 }]; ctx.host.borderRadius = CF.radius('md'); ctx._stroke(ctx.host, C('border'), 1); ctx.host.shadows = CF.shadow(4); }
-    ctx.glyph(SEVERITY_GLYPH[tone] || 'warning', B(panel.x + pad, panel.y + pad, 20, 20), { color: C(soft[1]), strokeW: 1.8 });
+    // One row, one axis: the mark is centred on the copy's LINE BOX (13px at leading 1.85 is 25px tall), not on its
+    // top — a 20px icon at the text's y put its ink centre 3px above the message (measured 2026-10-27, rule 45b).
+    ctx.glyph(SEVERITY_GLYPH[tone] || 'warning', B(panel.x + pad, panel.y + pad + (CF.lineH(title ? fs : dfs) - 20) / 2, 20, 20), { color: C(soft[1]), strokeW: 1.8 });
     var tx = panel.x + pad + 20 + 12, tw = panel.w - pad * 2 - 32;
     var y = panel.y + pad;
     if (title) { ctx.text(title, B(tx, y, tw, fs + 4), { size: fs, color: C('ink'), weight: 600, align: 'left', valign: 'top', refit: false }); y += fs + 6; }
@@ -4610,7 +4727,7 @@ return (function () {
       await CF.button({ parent: ctx.host, x: N(box.x + pad), y: N(y), w: N(box.w - pad * 2), label: String(o.cancel === true ? 'Cancel' : o.cancel), size: 'lg', type: 'default' });
       y += 44;
     }
-    if (safe) ctx.plate(B(box.x, box.y + box.h - safe, box.w, safe), { name: 'safe·area', fill: C('surfaceAlt'), opacity: 0.5 });
+    if (safe) ctx.plate(B(box.x, box.y + box.h - safe, box.w, safe), { name: 'safe·area', fill: C('surfaceAlt'), opacity: 0.5, radius: 'md' });
     await ctx.settle(); ctx.place();
     return ctx.host;
   };
@@ -4859,7 +4976,9 @@ return (function () {
       await CF.button({ parent: ctx.host, x: N(last.x), y: N(linkY + 32 + 40), w: N(last.w), label: 'Subscribe', size: 'md', type: 'primary' });
     }
     var legal = slot.legal;
-    ctx.plate(B(legal.x, legal.y - 16, legal.w, 1), { name: 'hairline·legal', fill: dark ? '#FFFFFF' : C('border'), opacity: dark ? 0.14 : 1 });
+    // A footer's legal row is separated from the link columns by a REGION boundary, not by a content divider:
+    // naming it `hairline·` made rule 43 read it as a separator that whitespace should have bought.
+    ctx.plate(B(legal.x, legal.y - 16, legal.w, 1), { name: 'boundary·legal', fill: dark ? '#FFFFFF' : C('border'), opacity: dark ? 0.14 : 1 });
     ctx.text(String(o.legal === undefined ? CF.brandLegal() : o.legal), B(legal.x, legal.y, max(120, legal.w - 120), legal.h),
       { size: 12, color: sub, opacity: 0.6, align: 'left', valign: 'middle', refit: false });
     ['globe', 'chat', 'mail'].forEach(function (g, i) {
@@ -5236,6 +5355,428 @@ return (function () {
              note: 'estMs is a conservative 1 s/cell; if parts.length > 1 build ONE part per execute_code, stacking each board at previous bottom + 32' };
   };
 
+  // ---------------------------------------------------------------- the spec matrix contract (component-library §3)
+  /** What a STATE COLUMN means in factory props. The column names come from the paired manifest (a headless library
+      spells its own axes: `off`/`on`, `closed`/`open`, `selected`), and a factory only understands `state` plus a few
+      content flags — so the translation lives here, once, instead of being re-guessed per page. */
+  CF.stateCell = function (a) {
+    var k = String(a === undefined ? 'default' : a).toLowerCase();
+    if (k === 'error' || k === 'invalid') return { state: 'default', status: 'error' };
+    if (k === 'dragging') return { state: 'default', dragging: true };
+    if (k === 'closed') return { state: 'default', open: false };
+    if (k === 'open' || k === 'expanded') return { state: 'default', open: true };
+    if (k === 'off' || k === 'unchecked') return { state: 'default', checked: false };
+    if (k === 'on' || k === 'checked') return { state: 'default', checked: true };
+    if (k === 'indeterminate') return { state: 'default', indeterminate: true };
+    if (k === 'filled') return { state: 'default', value: 'Filled value' };
+    if (k === 'loading' || k === 'skeleton') return { state: 'default', loading: true };
+    if (/^(hover|focus|pressed|selected|readonly|active|disabled)$/.test(k)) return { state: k };
+    return { state: 'default' };
+  };
+  CF.stateCells = function (axes) { return (axes && axes.length ? axes : ['default']).map(CF.stateCell); };
+
+  /** THE VARIANT ROWS a family's spec board must draw — the §3 "Min variant set", as real factory props.
+      Keyed by design family. A row that the factory cannot draw cannot be written here, which is the point: the
+      sheet is the factory's contract, not an invention. `cellsByAxis` overrides the state translation for a family
+      whose axis is a content axis rather than a pseudo-state (Segmented's `off`/`on` is which segment is active).
+      A family with no entry falls back to its single representative and the gate reports it (`variant_sparse`).
+      ROW BUDGET: one block page carries exactly one `Family·Spec` board, and one `execute_code` call has a ~30 s
+      ceiling at ≈1.3 s/cell — so keep `rows × states ≤ 20` and let `LM.buildEntry` trim, never split, the sheet. */
+  CF.SPEC = {
+    // ---------------------------------------------------------------- 03 · Actions
+    Button: [
+      { label: 'Primary · MD', props: { type: 'primary' } },
+      { label: 'Secondary · SM', props: { type: 'secondary', size: 'sm' } },
+      { label: 'Danger · MD', props: { type: 'danger' } },
+      { label: 'Icon start · SM', props: { type: 'text', size: 'sm', lead: 'download' } },
+      { label: 'Icon only · MD', props: { type: 'default', iconOnly: true, lead: 'dots' } }
+    ],
+    IconButton: [
+      { label: 'Default · MD', props: { type: 'default' } },
+      { label: 'Primary tile · SM', props: { type: 'primary', glyph: 'download', size: 'sm' } },
+      { label: 'Badge on tile', props: { type: 'default', glyph: 'bell', badge: true } },
+      { label: 'Secondary · LG', props: { type: 'secondary', size: 'lg', glyph: 'grid' }, cellsByAxis: { pressed: { state: 'selected' } } }
+    ],
+    ButtonGroup: [
+      { label: 'Primary start', props: { items: [{ label: 'Save', type: 'primary' }, { label: 'Cancel' }, { glyph: 'chevronDown' }] } },
+      { label: 'Neutral · SM', props: { size: 'sm', items: [{ label: 'Prev' }, { label: 'Next' }] } },
+      { label: 'Vertical', props: { direction: 'vertical', items: [{ label: 'Cut' }, { label: 'Copy' }, { label: 'Paste' }] } },
+      { label: 'Icon only · LG', props: { size: 'lg', items: [{ glyph: 'bold' }, { glyph: 'italic' }, { glyph: 'underline' }] } }
+    ],
+    SplitButton: [
+      { label: 'Primary · MD', props: { type: 'primary' } },
+      { label: 'Outlined · SM', props: { type: 'outlined', size: 'sm' } },
+      { label: 'Danger · MD', props: { type: 'danger' } }
+    ],
+    FAB: [
+      { label: 'Primary · MD', props: {} },
+      { label: 'Surface · SM', props: { tone: 'surface', size: 'sm' } },
+      { label: 'Extended · LG', props: { extended: true, label: 'New note', size: 'lg' } }
+    ],
+    Link: [
+      { label: 'Brand · MD', props: {} },
+      { label: 'Neutral · SM', props: { tone: 'neutral', size: 'sm' } },
+      { label: 'Underline · MD', props: { underline: true } },
+      { label: 'Icon trail · SM', props: { trail: true, size: 'sm' } }
+    ],
+    Toggle: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'LG', props: { size: 'lg' } }
+    ],
+    ToggleGroup: [
+      { label: 'MD', props: {}, cellsByAxis: { off: { active: 0 }, on: { active: 1 } } },
+      { label: 'SM', props: { size: 'sm', items: ['Day', 'Week'] }, cellsByAxis: { off: { active: 0 }, on: { active: 1 } } },
+      { label: 'Ink · MD', props: { dark: true }, cellsByAxis: { off: { active: 0 }, on: { active: 1 } } }
+    ],
+
+    // ---------------------------------------------------------------- 04 · Text fields
+    Field: [{ label: 'Label + input', props: { label: 'Email' } }],
+    Input: [
+      { label: 'Outlined · MD', props: { placeholder: 'you@example.com' } },
+      { label: 'Outlined · SM', props: { size: 'sm', placeholder: 'City' } },
+      { label: 'Filled · MD', props: { variant: 'filled', value: 'laplace@studio.io' } },
+      { label: 'Icon start · SM', props: { variant: 'filled', size: 'sm', lead: 'mail' } }
+    ],
+    Textarea: [
+      { label: 'Outlined · MD', props: { placeholder: 'Add a note' } },
+      { label: 'Filled · MD', props: { variant: 'filled', rows: 5 } },
+      { label: 'Borderless · SM', props: { variant: 'borderless', size: 'sm' } }
+    ],
+    Search: [
+      { label: 'MD', props: { clear: false, placeholder: 'Search files' } },
+      { label: 'SM', props: { clear: false, size: 'sm' } },
+      { label: 'LG', props: { clear: false, size: 'lg' } },
+      { label: 'Filled · MD', props: { clear: false, variant: 'filled', value: 'quarterly report' } }
+    ],
+    MaskedInput: [
+      { label: 'Phone · MD', props: { clear: false } },
+      { label: 'Card · SM', props: { clear: false, mask: 'card', size: 'sm' } },
+      { label: 'Date · LG', props: { clear: false, mask: 'date', size: 'lg' } }
+    ],
+    PasswordInput: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'Filled · MD', props: { variant: 'filled', revealed: true } }
+    ],
+    NumberInput: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm', value: 7 } },
+      { label: 'Filled · MD', props: { variant: 'filled' } }
+    ],
+    PinInput: [
+      { label: '6 digits', props: {} },
+      { label: '4 digits', props: { length: 4 } },
+      { label: '6 + resend', props: { resend: true } }
+    ],
+    TagsInput: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'Filled · MD', props: { variant: 'filled', value: ['Draft', 'Shared'] } }
+    ],
+    FileUpload: [
+      { label: 'Dropzone', props: {} },
+      { label: 'Image grid', props: { grid: true } },
+      { label: 'File list', props: { files: ['report.pdf', 'notes.md'] } }
+    ],
+    Transfer: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'LG', props: { size: 'lg' } }
+    ],
+
+    // ---------------------------------------------------------------- 05 · Selection & pickers
+    Checkbox: [
+      { label: 'MD', props: { label: 'Remember me' } },
+      { label: 'SM', props: { label: 'Compact', size: 'sm' } },
+      { label: 'LG', props: { label: 'Select all', size: 'lg' } }
+    ],
+    RadioGroup: [{ label: 'Radio', props: { label: 'Weekly digest' } }],
+    Switch: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'Loading · MD', props: { loading: true } }
+    ],
+    Slider: [
+      { label: 'Value', props: { value: 40 } },
+      { label: 'Range', props: { range: true } },
+      { label: 'Marks', props: { marks: true, value: 70 } }
+    ],
+    RatingGroup: [
+      { label: 'MD', props: { value: 3 } },
+      { label: 'SM', props: { size: 'sm', value: 4 } },
+      { label: 'LG', props: { size: 'lg', value: 2 } }
+    ],
+    ColorPicker: [
+      { label: 'Hex · MD', props: {} },
+      { label: 'Swatch · MD', props: { showHex: false } },
+      { label: 'Hex · SM', props: { size: 'sm' } }
+    ],
+    Select: [
+      { label: 'Closed · MD', props: {} },
+      { label: 'Open · MD', props: { open: true }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Closed · SM', props: { size: 'sm' } }
+    ],
+    Listbox: [
+      { label: 'Open · MD', props: { open: true }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Open · SM', props: { open: true, size: 'sm' }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Open · LG', props: { open: true, size: 'lg' }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } }
+    ],
+    Combobox: [
+      { label: 'Closed · MD', props: {} },
+      { label: 'Open · MD', props: { open: true }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Closed · SM', props: { size: 'sm' } }
+    ],
+    DatePicker: [
+      { label: 'Closed · MD', props: {} },
+      { label: 'Open · MD', props: { open: true }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Closed · SM', props: { size: 'sm' } }
+    ],
+    TimePicker: [
+      { label: 'Closed · MD', props: {} },
+      { label: 'Open · MD', props: { open: true }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Closed · SM', props: { size: 'sm' } }
+    ],
+    SegmentGroup: [
+      { label: 'MD', props: {}, cellsByAxis: { off: { active: 0 }, on: { active: 1 } } },
+      { label: 'SM', props: { size: 'sm', items: ['Day', 'Week'] }, cellsByAxis: { off: { active: 0 }, on: { active: 1 } } },
+      { label: 'Ink · MD', props: { dark: true }, cellsByAxis: { off: { active: 0 }, on: { active: 1 } } }
+    ],
+
+    // ---------------------------------------------------------------- 06 · Data & lists
+    Carousel: [
+      { label: 'Dots', props: {} },
+      { label: 'Arrows', props: { arrows: true } },
+      { label: 'Caption', props: { captions: true } }
+    ],
+    Descriptions: [
+      { label: 'Plain · 2 col', props: {} },
+      { label: 'Bordered · 2 col', props: { bordered: true } },
+      { label: 'Plain · 1 col', props: { columns: 1 } }
+    ],
+    ListItem: [
+      { label: '1-line', props: { label: 'Quarterly report.pdf' } },
+      { label: '2-line', props: { label: 'Ana Ruiz', sub: 'ana@studio.io' } },
+      { label: 'Trailing', props: { label: 'Design tokens', trailing: 'chevron' } }
+    ],
+    MiniCalendar: [
+      { label: 'Month', props: {} },
+      { label: 'Selected day', props: { selected: 14 } }
+    ],
+    TableHeader: [
+      { label: 'Plain', props: {} },
+      { label: 'Sorted asc', props: { sort: 'asc' } },
+      { label: 'Sorted desc', props: { sort: 'desc' } },
+      { label: 'Filter active', props: { filter: true } }
+    ],
+    TableRow: [
+      { label: 'Plain', props: {} },
+      { label: 'Expandable', props: { expandable: true } },
+      { label: 'Editing', props: { editing: true } }
+    ],
+    TableState: [
+      { label: 'Empty', props: {} },
+      { label: 'Loading', props: { loading: true } },
+      { label: 'Error', props: { error: true } }
+    ],
+    Timeline: [
+      { label: 'Default', props: {} },
+      { label: 'Alternate', props: { alternate: true } },
+      { label: 'Label left', props: { labelLeft: true } }
+    ],
+
+    // ---------------------------------------------------------------- 07 · Display & media
+    Avatar: [
+      { label: 'Initials', props: { content: 'initials' } },
+      { label: 'Status · online', props: { status: 'online' } },
+      { label: 'Editable', props: { editable: true } },
+      { label: 'Small', props: { size: 'sm' } }
+    ],
+    AvatarGroup: [
+      { label: 'MD', props: { members: ['Ana', 'Bo', 'Cy'] } },
+      { label: 'SM', props: { size: 'sm', members: ['Ana', 'Bo'] } },
+      { label: 'LG', props: { size: 'lg', members: ['Ana', 'Bo', 'Cy', 'De', 'Ed'] } }
+    ],
+    Badge: [
+      { label: 'Count', props: { value: 12 } },
+      { label: 'Dot', props: { dotOnly: true } },
+      { label: 'Overline', props: { dot: true } },
+      { label: 'Status', props: { status: 'success' } }
+    ],
+    Card: [
+      // 345px × 5 state columns cannot share one grid row inside the canvas, and a sheet that does not fit falls back
+      // to absolutely attached cells (`free_layout`). The specimen is drawn at a fitted 280 so the grid holds.
+      { label: 'Elevated', props: { tone: 'elevated', w: 280 } },
+      { label: 'Outlined', props: { tone: 'outlined', w: 280 } },
+      { label: 'With cover', props: { cover: true, title: 'Field study', w: 280 } },
+      { label: 'Selectable', props: { selectable: true, title: 'Shared with team', w: 280 } }
+    ],
+    Chip: [
+      { label: 'Input', props: { label: 'Draft' } },
+      { label: 'Display', props: { label: 'Published', kind: 'display' } },
+      { label: 'Closable', props: { label: 'Mobile', closable: true } },
+      { label: 'Error tone', props: { label: 'Failed', tone: 'error' } }
+    ],
+    EmptyState: [
+      { label: 'Icon', props: {} },
+      { label: 'Illustration', props: { kind: 'illustration' } },
+      { label: 'First run', props: { firstRun: true } }
+    ],
+    KPI: [
+      { label: 'Delta up', props: { label: 'Active users', value: '12.4k', delta: 8.2 } },
+      { label: 'Delta down', props: { label: 'Churn', value: '1.9%', delta: -0.4 } },
+      { label: 'Sparkline', props: { label: 'Sessions', value: '3.1k', spark: true } },
+      { label: 'Compact', props: { label: 'Uptime', value: '99.9%' } }
+    ],
+    Skeleton: [
+      { label: 'Text', props: { variant: 'text', rows: 3 } },
+      { label: 'List', props: { variant: 'list', rows: 3 } },
+      { label: 'Circle', props: { variant: 'circle' } },
+      { label: 'Button', props: { variant: 'button' } }
+    ],
+    StatusText: [
+      { label: 'Success', props: { tone: 'success', label: 'Published' } },
+      { label: 'Warning', props: { tone: 'warning', label: 'Needs review' } },
+      { label: 'Error', props: { tone: 'error', label: 'Failed' } },
+      { label: 'Neutral', props: { label: 'Draft' } }
+    ],
+    Progress: [
+      { label: 'Determinate', props: { value: 62 } },
+      { label: 'Indeterminate', props: { indeterminate: true } },
+      { label: 'Steps', props: { steps: 5, value: 3 } },
+      { label: 'Line', props: { line: true, value: 40 } }
+    ],
+
+    // ---------------------------------------------------------------- 08 · Navigation
+    Accordion: [
+      { label: 'Bordered · multi', props: {} },
+      { label: 'Ghost', props: { ghost: true } },
+      { label: 'Single', props: { accordion: true } }
+    ],
+    Menu: [
+      { label: 'Closed', props: {} },
+      { label: 'Open', props: { open: true }, only: ['default','disabled'], cellsByAxis: { closed: { open: true }, open: { open: true }, disabled: { open: true, state: 'disabled' } } },
+      { label: 'Selectable', props: { selectable: true } }
+    ],
+    Pagination: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'Simple', props: { simple: true } }
+    ],
+    Steps: [
+      { label: 'Horizontal', props: {} },
+      { label: 'Vertical', props: { direction: 'vertical' } },
+      { label: 'Dot', props: { dot: true } },
+      { label: 'Bottom labels', props: { labelPlacement: 'bottom' } }
+    ],
+    Tabs: [
+      { label: 'Line · MD', props: {} },
+      { label: 'Card · MD', props: { type: 'card' } },
+      { label: 'Line · SM', props: { size: 'sm' } },
+      { label: 'Closable', props: { closable: true } }
+    ],
+    TabBand: [
+      { label: 'Band', props: {} },
+      { label: 'Scrollable', props: { scrollable: true } },
+      { label: 'Add', props: { add: true } }
+    ],
+    Toc: [
+      { label: 'Rail', props: {} },
+      { label: 'Dots', props: { dots: true } },
+      { label: 'Counters', props: { counters: true } }
+    ],
+    Breadcrumb: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'Back', props: { back: true } },
+      { label: 'Truncated', props: { truncated: true } }
+    ],
+    CommandPalette: [
+      { label: 'Default', props: {} },
+      { label: 'Preview', props: { preview: true } }
+    ],
+    NavItem: [
+      { label: 'Icon + label', props: { label: 'Home', glyph: 'home' } },
+      { label: 'Group', props: { label: 'Workspace', group: true } },
+      { label: 'Rail', props: { rail: true, glyph: 'home' } },
+      { label: 'Small', props: { label: 'Trash', glyph: 'trash', size: 'sm' } }
+    ],
+
+    // ---------------------------------------------------------------- 09 · Overlays & feedback
+    Dialog: [
+      { label: 'Default', props: {} },
+      { label: 'Confirm', props: { confirm: true } },
+      { label: 'Wide', props: { width: 'wide' } },
+      { label: 'No footer', props: { footer: false } }
+    ],
+    Drawer: [
+      { label: 'End', props: {} },
+      { label: 'Start', props: { side: 'left' } },
+      { label: 'Bottom', props: { bottom: true } },
+      { label: 'No footer', props: { footer: false } }
+    ],
+    Popover: [
+      { label: 'Text', props: {} },
+      { label: 'Title', props: { title: 'Share this file' } },
+      { label: 'Actions', props: { actions: ['Copy link', 'Invite'] } }
+    ],
+    Toast: [
+      { label: 'Dark · neutral', props: {} },
+      { label: 'Light · success', props: { surface: 'light', tone: 'success' } },
+      { label: 'Action', props: { action: 'Undo' } },
+      { label: 'Timed', props: { duration: true } }
+    ],
+    Tooltip: [
+      { label: 'Dark', props: {} },
+      { label: 'Light', props: { surface: 'light' } },
+      { label: 'With title', props: { title: 'Save' } }
+    ],
+    Alert: [
+      { label: 'Info', props: { tone: 'info' } },
+      { label: 'Success', props: { tone: 'success' } },
+      { label: 'Warning', props: { tone: 'warning' } },
+      { label: 'Danger', props: { tone: 'danger' } }
+    ],
+    Notification: [
+      { label: 'Neutral', props: {} },
+      { label: 'Success', props: { tone: 'success' } },
+      { label: 'With action', props: { action: 'Retry' } }
+    ],
+    Popconfirm: [
+      { label: 'Danger', props: {} },
+      { label: 'Neutral', props: { tone: 'neutral' } },
+      { label: 'Warning', props: { tone: 'warning' } }
+    ],
+    Sheet: [
+      { label: 'Options', props: {} },
+      { label: 'Title', props: { title: 'Share' } },
+      { label: 'Cancel', props: { cancel: true } }
+    ],
+    Spin: [
+      { label: 'MD', props: {} },
+      { label: 'SM', props: { size: 'sm' } },
+      { label: 'Label right', props: { label: 'Loading…' } },
+      { label: 'Label bottom', props: { label: 'Loading…', below: true } }
+    ]
+  };
+  /** The matrix plan for one paired component: rows from `CF.SPEC`, columns from the manifest's declared states. */
+  CF.specPlan = function (family, entry) {
+    var rows = CF.SPEC[String(family || '')];
+    if (!rows || !rows.length) return null;
+    var axes = (entry && entry.states && entry.states.length) ? entry.states.slice() : ['default'];
+    var factory = (entry && entry.factory) || null;
+    return { family: family, factory: factory, axes: axes,
+      rows: rows.map(function (r) {
+        var byAxis = r.cellsByAxis || {};
+        // `only` limits a row to the named columns — a row that paints a whole calendar/menu panel must not paint it
+        // once per state (measured 2026-10-27: `DatePicker·Spec` grew five open panels and the auditor could no
+        // longer finish the page inside the MCP ceiling).
+        var cols = r.only && r.only.length ? axes.filter(function (a) { return r.only.indexOf(String(a).toLowerCase()) >= 0; }) : axes;
+        return { label: r.label, factory: r.factory || factory, props: r.props || {},
+                 cells: cols.map(function (a) { return Object.assign({}, CF.stateCell(a), byAxis[String(a).toLowerCase()] || {}); }) };
+      }) };
+  };
+
   // ---------------------------------------------------------------- components: register / place / switch (C2/C3)
   /** The library record for a CF name — scanned, not cached, because the library outlives `storage`; a name lookup
       still works after a crash rebuild (post-crash checklist §5). Returns null when nothing matches. */
@@ -5282,6 +5823,16 @@ return (function () {
     o = o || {};
     var map = CF.map(), known = {};
     Object.keys(map).forEach(function (g) { if (g !== 'composer') map[g].forEach(function (k) { known[String(k).toLowerCase()] = 1; }); });
+    // A PAIRED catalog registers its cells under the DESIGN family head (`Dialog`, not `Modal`; `PinInput`, not
+    // `OTP`), and `CF.map()` only knows the factory key. Without the manifest vocabulary those hosts read as
+    // foreign chrome and were silently skipped — the page kept its board but lost every master (measured 2026-10-27).
+    try {
+      var man = storage.LM && storage.LM.manifest;
+      ((man && man.components) || []).forEach(function (c) {
+        var d = String(c.designFamily || c.name || '').toLowerCase();
+        if (d) known[d] = 1;
+      });
+    } catch (e) {}
     var STATE = /·(Hover|Focus|Pressed|Selected|Disabled|Loading|Error)/;
     var roots = o.roots;
     if (!roots) {
@@ -5499,7 +6050,7 @@ return (function () {
   /** §3 registry — every row's CF key, so the docs and this file can be diffed mechanically (gate G12). */
   CF.map = function () {
     return {
-      actions: ['button', 'iconButton', 'buttonGroup', 'splitButton', 'fab', 'link', 'segmented'],
+      actions: ['button', 'iconButton', 'buttonGroup', 'splitButton', 'fab', 'link', 'toggle', 'segmented'],
       forms: ['field', 'fieldBox', 'input', 'textarea', 'searchField', 'passwordField', 'maskedInput', 'otpInput', 'numberField',
               'select', 'combobox', 'multiSelect', 'datePicker', 'timePicker', 'switch', 'checkbox', 'radio', 'slider', 'rating',
               'colorPicker', 'upload', 'transfer', 'tree'],
@@ -5563,6 +6114,22 @@ return (function () {
         if (role === 'full' || role === 'none' || role === 'tile') CF.ROLE.control = role;
       });
       if (sh.IconButton && sh.IconButton.length === 1 && /^(tile|full|none)$/.test(String(sh.IconButton[0]))) CF.ROLE.tile = sh.IconButton[0];
+      // `tile` is a SHAPE word, not a token step. Left unresolved, `CF.radius('tile')` answered the fallback kit and
+      // every measured tile drifted (2026-10-27: 14 `reference_drift` findings on IconButton, all r16 vs the 0 the
+      // role resolved to). Bind the shape word to the ladder step the source actually measured.
+      if (CF.ROLE.tile === 'tile') {
+        var ib = (r.actions && r.actions.iconbutton) || {};
+        var want = Number((ib.size && ib.size.radius) !== undefined ? ib.size.radius : ib.radius);
+        if (want > 0 && storage.TK && storage.TK.declared) {
+          try {
+            var step = null, best = Infinity;
+            (storage.TK.declared().radii || []).forEach(function (x) {
+              var v = Number(x.value); if (Math.abs(v - want) < best) { best = Math.abs(v - want); step = String(x.name).replace(/^radius\./, ''); }
+            });
+            if (step && best <= 1) CF.ROLE.tile = step;
+          } catch (e) {}
+        }
+      }
     } catch (e) {}
     return { control: CF.ROLE.control, tile: CF.ROLE.tile };
   };
@@ -5639,7 +6206,7 @@ return (function () {
       Aliases let one source measurement back several draws of the same control (Textarea/Search are Input fields).
       The actions inventory keeps `families` as an array; that is not a family entry and is ignored here. */
   CF.PROFILE_ALIAS = {
-    input: ['input'], textarea: ['textarea'], search: ['search'],
+    input: ['input'], textarea: ['textarea'], search: ['search', 'searchfield'], maskedinput: ['maskedinput', 'input'],
     field: ['field'], switch: ['switch'], checkbox: ['checkbox'], radio: ['radio'], slider: ['slider'],
     card: ['card'], kpi: ['kpi'], navitem: ['navitem', 'nav'], tabs: ['tabs'], accordion: ['accordion'],
     breadcrumb: ['breadcrumb'], pagination: ['pagination'], menu: ['menu'],

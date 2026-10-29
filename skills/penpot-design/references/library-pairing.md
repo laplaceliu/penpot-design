@@ -61,15 +61,26 @@ See `libraries/codesign-ui.md`.
 
 ## 3. Headless libraries: anatomy, not styled variants
 
-codesign-ui is unstyled (Zag.js). A **styled variant matrix** (primary/secondary/danger) is an invention and fails
-pairing. A paired headless component draws:
+codesign-ui is unstyled (Zag.js), so a spec sheet may only show variants the **factory can name**: the rows come from
+`CF.SPEC[family]` (real `CF.*` props), never from a styling idea invented at the call site. A paired headless
+component draws one of two sheets:
 
-1. one representative anatomy (the factory's default or a neutral part board),
-2. its public parts with labels,
-3. its behavioural states (`closed/open`, `checked/unchecked`, `disabled`, …) as **documentation**, not as restyled
-   variants.
+1. **its variant × state matrix** (a factory-backed family). Pairing binds the page INVENTORY — one component per
+   block page — never the depth of the sheet. Rows are the naming axes the factory actually produces (Button →
+   primary / secondary-sm / danger / icon-start / icon-only), columns are the states the manifest declares
+   (`default · hover · focus · pressed · disabled`). The sheet is one `Family·Spec` board built by `CF.matrix`, and
+   the first cell of the first row is the manifest `representative`: it carries the bare family master name
+   (`Button`), because a screen places `Button`, while the other cells register as the state masters. A one-cell
+   sheet is a gate failure (`state_coverage` / `variant_sparse`), so when a family needs more rows, extend its
+   `CF.SPEC` entry with props the factory names.
+2. **or a source-derived anatomy board** (a `custom` family). No factory means no states to draw, so `storage.AN`
+   renders the component's own example tree from the host repo (a named empty leaf gets a labelled placeholder).
+   It is anatomy documentation — a registered master, not a usable control until a factory exists.
 
-The design system's own theme (colors/type/radius/elevation) still applies to the representative; it is the
+Either way the sheet also carries the component's public parts and its behavioural states (`closed/open`,
+`checked/unchecked`, `disabled`, …) as documentation, not as restyled inventions.
+
+The design system's own theme (colors/type/radius/elevation) still applies to what is drawn; it is the
 *integration theme*, not a claim that the host library ships visual variants.
 
 ## 4. Build in paired mode

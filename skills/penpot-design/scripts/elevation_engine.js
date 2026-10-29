@@ -649,10 +649,23 @@
       if (sh.length && !tok.shadow) {
         var nm = String(s.name || '');
         var rec = fallback || 'card';
-        if (/handle|knob|dot|avatar|indicator|switch/i.test(nm) || (s.type === 'ellipse' && s.width <= 96)) rec = 'chip';
+        // A small unit, a handle or a MEDIA placeholder inside a control is not a card: the `chip` stack is its own
+        // (two drops + insets, no sheen). Adopting a tile as `card` demanded a radial top-light over a photo slot.
+        if (/handle|knob|dot|avatar|indicator|switch|tile|media|thumb|cover|placeholder|image/i.test(nm) || (s.type === 'ellipse' && s.width <= 96)) rec = 'chip';
         if (EL.has(rec)) {
           var r = EL.apply(s, rec);
-          if (r && r.ok) { adopted.push({ shape: nm, recipe: rec }); byRecipe[rec] = (byRecipe[rec] || 0) + 1; }
+          if (r && r.ok) {
+            adopted.push({ shape: nm, recipe: rec }); byRecipe[rec] = (byRecipe[rec] || 0) + 1;
+            // The adopted recipe's material includes its top-light: `LM.finish` repairs typed shadows with `card`,
+            // and a repaired host without the sheen plate was indicted `sheen_missing` one line later (measured
+            // 2026-10-27: every Sheet/Swap spec host). `adopt` is a REPAIR, so it must leave the host whole.
+            if (EL.sheen(rec)) {
+              try {
+                var hasSheen = kids(s).some(function (k) { return /^sheen·/.test(String(k.name || '')); });
+                if (!hasSheen) EL.sheenFor(s, rec, { parent: s, radius: s.borderRadius || 0 });
+              } catch (e) {}
+            }
+          }
         }
       }
       Array.from(s.children || []).forEach(walk);

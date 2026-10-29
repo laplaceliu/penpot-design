@@ -39,6 +39,10 @@
 //       call MOUNTS into it (`mode:'mount'`) so the same record re-run never duplicates a screen; only `{rebuild:true}`
 //       removes and re-creates. Nothing is created and then deleted in a retry loop.
 //   S8  the 30 s ceiling is planned for: build the record once, then call `SC.build({sections:['nav','intro']})`,
+//   S9  **component-first bands**: a `Screen·*` board is an assembly — every band (a direct child ≥40% of the screen
+//       width, ≥56 high) must be a component copy, and ≥50% of its structural children must be copies. A raw band is
+//       reported by gate G17b (`raw_assembly`) with the screen's structural/instance ratio (`out.assembly`). Build
+//       the band once as a master on page 10 and place it; never draw a section inline.
 //       then the next group — the census reports `sectionsLeft`, so a screen is finished by continuing, not by re-trying.
 
 return (async function () {

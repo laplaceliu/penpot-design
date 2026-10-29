@@ -1071,7 +1071,17 @@ return (function () {
     if (String(sh.type) !== 'board') return false;
     const n = ringName(sh);
     if (RING_CONTAINER.test(n)) return false;
-    return n.indexOf('·') >= 0;
+    if (n.indexOf('·') >= 0) return true;
+    // A paired-library host is named by its design family alone (`TimePicker`, `Swap`, `Combobox`). The old `·` test
+    // called that a container, so a ring mounted inside it resolved as floating on the spec shelf and every perfectly
+    // centred focus ring was indicted `ring_detached` (measured 2026-10-27: Combobox/TimePicker, 0px from their field).
+    try {
+      const man = storage.LM && storage.LM.manifest;
+      if (man && (man.components || []).some(function (c) {
+        return c.kind !== 'nonVisual' && String(c.designFamily || c.name || '').toLowerCase() === n.toLowerCase();
+      })) return true;
+    } catch (e) {}
+    return false;
   }
   function isOwnable(sh) {
     const t = String(sh.type);
@@ -1873,7 +1883,7 @@ return (function () {
         made.push(e.name);
       }
       try { t.name = e.name; } catch (err) {}
-      const f = famName ? penpot.fonts.findByName(famName) : null;
+      const f = famName ? ((penpot.fonts.all || []).filter(function (x) { return String(x.name) === String(famName); })[0] || penpot.fonts.findByName(famName)) : null;
       const wantW = String(v.fontWeight || '400');
       if (f) {
         const variant = f.variants.find((x) => String(x.fontWeight) === wantW)

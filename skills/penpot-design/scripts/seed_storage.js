@@ -92,11 +92,12 @@ return (function () {
   // 6th param fontRole: 'display' uses the display font (replace _display per DESIGN.md), others use the body font.
   // Iron rule: **this parameter must be present from the very start**. Adding a font option to mkText halfway through
   // would make the display font inconsistent between early and late batches, and this kind of inconsistency can't be caught by the geometry audit (only via auditPage().fonts histogram).
-  const _noto = penpot.fonts.findByName('Noto Sans SC');
+  const _exactFont = function (n) { try { var a = penpot.fonts.all || []; for (var i = 0; i < a.length; i++) if (String(a[i].name) === String(n)) return a[i]; } catch (e) {} return penpot.fonts.findByName(n); };
+  const _noto = _exactFont('Noto Sans SC');
   // fonts come from the system contract (storage.T), not from hard-coded families — a re-skinned file must not keep
   // drawing in the default stack (same single-source rule as the palette: design-tokens §8.1)
-  const _latin = penpot.fonts.findByName((T && T.bodyFont) || 'Nunito');
-  const _display = penpot.fonts.findByName((T && T.displayFont) || 'Anton');
+  const _latin = _exactFont((T && T.bodyFont) || 'Nunito');
+  const _display = _exactFont((T && T.displayFont) || 'Anton');
   const _variant = (f, w) => f.variants.find(v => v.fontWeight === String(w)) || f.variants.find(v => v.fontWeight === '400');
   /** The FAMILY the token ramp declares, for a (size, weight) pair. A JS fallback family is only legal when the file
       has no ramp at all: measured 2026-10-23 on the reference, every factory label was born Nunito while the file declared
@@ -143,7 +144,7 @@ return (function () {
     const declared = explicit ? null : _declaredFamily(size, weight || 400, lh0);
     const famName = cjk ? ((T && T.cjkFont) || 'Noto Sans SC')
       : (explicit || declared || (fontRole === 'display' ? 'Anton' : 'Nunito'));
-    const font = cjk ? _noto : (penpot.fonts.findByName(famName) || (fontRole === 'display' ? _display : _latin));
+    const font = cjk ? _noto : (_exactFont(famName) || (fontRole === 'display' ? _display : _latin));
     // §3.2 enforcement at birth: a size the declared type ramp does not contain is snapped onto the nearest step of
     // the SAME family before the font variant is applied, so the drawn shape can never hold an undeclared step.
     // (audit_design `type_off_ramp` catches the same thing after the fact; TK.bindBoard then turns the snapped values

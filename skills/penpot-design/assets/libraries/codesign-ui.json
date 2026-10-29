@@ -1545,7 +1545,7 @@
    "category": "Forms & Inputs",
    "group": "actions",
    "page": "03",
-   "factory": "button",
+   "factory": "toggle",
    "kind": "visual",
    "states": [
     "off",
@@ -1568,7 +1568,7 @@
    "category": "Forms & Inputs",
    "group": "actions",
    "page": "03",
-   "factory": "custom",
+   "factory": "segmented",
    "kind": "visual",
    "states": [
     "off",
@@ -2675,7 +2675,10 @@
     "pressed",
     "disabled"
    ],
-   "order": 1
+   "order": 1,
+   "representative": {
+    "type": "primary"
+   }
   },
   {
    "name": "ButtonGroup",
@@ -3113,7 +3116,10 @@
     "invalid",
     "disabled"
    ],
-   "order": 3
+   "order": 3,
+   "representative": {
+    "clear": false
+   }
   },
   {
    "name": "Sheet",
