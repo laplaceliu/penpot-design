@@ -1,0 +1,2481 @@
+{
+  "version": 1,
+  "name": "penpot-design core components",
+  "contract": "token-contract.json",
+  "packs": {
+    "core": [
+      "Button",
+      "IconButton",
+      "Link",
+      "FAB",
+      "Input",
+      "Textarea",
+      "Select",
+      "Search",
+      "Checkbox",
+      "Radio",
+      "Switch",
+      "Slider",
+      "Badge",
+      "Chip",
+      "Avatar",
+      "Card",
+      "Progress",
+      "Tabs",
+      "Breadcrumb",
+      "Pagination",
+      "Alert",
+      "Toast",
+      "Tooltip",
+      "Modal"
+    ]
+  },
+  "components": [
+    {
+      "id": "Button",
+      "name": "Button",
+      "group": "actions",
+      "factory": "button",
+      "purpose": "Primary action. One component, variants change material through tokens, never through a new geometry.",
+      "props": {
+        "type": {
+          "values": [
+            "primary",
+            "secondary",
+            "default",
+            "outlined",
+            "danger",
+            "ghost",
+            "link",
+            "text",
+            "ink"
+          ],
+          "default": "primary"
+        },
+        "size": {
+          "values": [
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "2xl",
+            "xl2"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "pressed",
+            "selected",
+            "disabled",
+            "loading"
+          ],
+          "default": "default"
+        },
+        "lead": {
+          "values": [
+            "glyph-name",
+            null
+          ],
+          "default": null
+        },
+        "trail": {
+          "values": [
+            "glyph-name",
+            null
+          ],
+          "default": null
+        },
+        "iconOnly": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        },
+        "block": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "label": "Button",
+        "type": "primary",
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "selected",
+        "disabled",
+        "loading"
+      ],
+      "slots": [
+        "iconStart",
+        "iconEnd",
+        "iconOnly",
+        "loading",
+        "block"
+      ],
+      "requires": [
+        "color.brand",
+        "color.brand-ink",
+        "color.on-brand",
+        "color.surface",
+        "color.surface-alt",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "primary"
+            ]
+          },
+          "role": "color.brand"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "danger"
+            ]
+          },
+          "role": "color.danger"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "secondary"
+            ]
+          },
+          "role": "color.surface-alt"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "default",
+              "outlined",
+              "dashed"
+            ]
+          },
+          "role": "color.surface"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "ink"
+            ]
+          },
+          "role": "color.inverse"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "primary",
+              "danger",
+              "ink"
+            ]
+          },
+          "role": "color.on-brand"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "secondary",
+              "default",
+              "outlined",
+              "dashed"
+            ]
+          },
+          "role": "color.text"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "link",
+              "text",
+              "accent"
+            ]
+          },
+          "role": "color.brand"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        },
+        {
+          "part": "ring",
+          "prop": "strokeWidth",
+          "role": "stroke.focus",
+          "optional": true,
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "IconButton",
+      "name": "IconButton",
+      "group": "actions",
+      "factory": "iconButton",
+      "purpose": "Icon-only action. The tile corner and the glyph are token-driven; the state does not change the hue.",
+      "props": {
+        "type": {
+          "values": [
+            "primary",
+            "default",
+            "outlined",
+            "ghost",
+            "danger",
+            "ink"
+          ],
+          "default": "default"
+        },
+        "size": {
+          "values": [
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "2xl"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "pressed",
+            "selected",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "glyph": {
+          "values": [
+            "glyph-name"
+          ],
+          "default": "dots"
+        },
+        "shape": {
+          "values": [
+            "tile",
+            "circle"
+          ],
+          "default": "tile"
+        }
+      },
+      "defaults": {
+        "glyph": "dots",
+        "type": "default",
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "selected",
+        "disabled"
+      ],
+      "slots": [
+        "badge",
+        "circle"
+      ],
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.surface-alt",
+        "color.text",
+        "color.border",
+        "radius.control",
+        "radius.badge"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "primary"
+            ]
+          },
+          "role": "color.brand"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "default",
+              "outlined",
+              "ghost"
+            ]
+          },
+          "role": "color.surface"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": [
+              "ink"
+            ]
+          },
+          "role": "color.inverse"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "when": {
+            "shape": "circle"
+          },
+          "role": "radius.control"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "when": {
+            "shape": "tile"
+          },
+          "role": "radius.badge"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Link",
+      "name": "Link",
+      "group": "actions",
+      "factory": "link",
+      "purpose": "Inline navigation. The label is a type token bound to the brand role.",
+      "props": {
+        "tone": {
+          "values": [
+            "brand",
+            "neutral"
+          ],
+          "default": "brand"
+        },
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "pressed",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "underline": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        },
+        "trail": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "label": "Link",
+        "tone": "brand",
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [
+        "underline",
+        "iconEnd"
+      ],
+      "requires": [
+        "color.brand",
+        "color.text",
+        "type.label",
+        "color.focus"
+      ],
+      "bindings": [
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "tone": "brand"
+          },
+          "role": "color.brand"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "tone": "neutral"
+          },
+          "role": "color.text"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FAB",
+      "name": "FAB",
+      "group": "actions",
+      "factory": "fab",
+      "purpose": "Floating primary action. A pill by geometry, a brand token by material.",
+      "props": {
+        "tone": {
+          "values": [
+            "primary",
+            "surface",
+            "ink",
+            "danger"
+          ],
+          "default": "primary"
+        },
+        "size": {
+          "values": [
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "extended": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "label": "New",
+        "tone": "primary",
+        "size": "md"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [
+        "extended"
+      ],
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "tone": "primary"
+          },
+          "role": "color.brand"
+        },
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "tone": "surface"
+          },
+          "role": "color.surface"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label",
+          "when": {
+            "extended": true
+          }
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "extended": true
+          },
+          "role": "color.on-brand"
+        },
+        {
+          "part": "host",
+          "prop": "shadow",
+          "role": "shadow.control",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "Input",
+      "name": "Input",
+      "group": "forms",
+      "factory": "input",
+      "purpose": "Single-line field. The field plate, its border and its corner are the token surface; the host wrapper stays transparent.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled",
+            "readonly",
+            "error",
+            "success",
+            "warning"
+          ],
+          "default": "default"
+        },
+        "variant": {
+          "values": [
+            "outlined",
+            "filled",
+            "underlined",
+            "borderless"
+          ],
+          "default": "outlined"
+        },
+        "placeholder": {
+          "values": [
+            "text",
+            null
+          ],
+          "default": "you@example.com"
+        },
+        "value": {
+          "values": [
+            "text",
+            null
+          ],
+          "default": null
+        },
+        "lead": {
+          "values": [
+            "glyph-name",
+            null
+          ],
+          "default": null
+        },
+        "trail": {
+          "values": [
+            "glyph-name",
+            null
+          ],
+          "default": null
+        }
+      },
+      "defaults": {
+        "placeholder": "you@example.com",
+        "size": "md",
+        "state": "default",
+        "variant": "outlined"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "readonly",
+        "error",
+        "success",
+        "warning"
+      ],
+      "slots": [
+        "iconStart",
+        "iconEnd",
+        "suffix",
+        "count"
+      ],
+      "requires": [
+        "color.surface",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body"
+      ],
+      "bindings": [
+        {
+          "part": "field",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "field",
+          "prop": "strokeColor",
+          "role": "color.border"
+        },
+        {
+          "part": "field",
+          "prop": "borderRadius",
+          "role": "radius.field"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.body"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        },
+        {
+          "part": "ring",
+          "prop": "strokeWidth",
+          "role": "stroke.focus",
+          "optional": true,
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Textarea",
+      "name": "Textarea",
+      "group": "forms",
+      "factory": "textarea",
+      "purpose": "Multi-line field. Same field token surface as Input; height is a rows decision, not a token.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled",
+            "readonly",
+            "error"
+          ],
+          "default": "default"
+        },
+        "variant": {
+          "values": [
+            "outlined",
+            "filled",
+            "underlined",
+            "borderless"
+          ],
+          "default": "outlined"
+        },
+        "rows": {
+          "values": [
+            "number"
+          ],
+          "default": 3
+        }
+      },
+      "defaults": {
+        "placeholder": "Add a note",
+        "size": "md",
+        "state": "default",
+        "variant": "outlined",
+        "rows": 3
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "readonly",
+        "error"
+      ],
+      "slots": [
+        "resize",
+        "count"
+      ],
+      "requires": [
+        "color.surface",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body"
+      ],
+      "bindings": [
+        {
+          "part": "field",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "field",
+          "prop": "strokeColor",
+          "role": "color.border"
+        },
+        {
+          "part": "field",
+          "prop": "borderRadius",
+          "role": "radius.field"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.body"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Select",
+      "name": "Select",
+      "group": "forms",
+      "factory": "select",
+      "purpose": "Single-choice trigger plus popup. The trigger field uses the field role; rows bind by value to surface/text tokens.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "pressed",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "variant": {
+          "values": [
+            "outlined",
+            "filled"
+          ],
+          "default": "outlined"
+        },
+        "value": {
+          "values": [
+            "text",
+            null
+          ],
+          "default": "Draft"
+        }
+      },
+      "defaults": {
+        "value": "Draft",
+        "size": "md",
+        "state": "default",
+        "variant": "outlined"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [
+        "iconEnd",
+        "clear",
+        "search"
+      ],
+      "requires": [
+        "color.surface",
+        "color.surface-alt",
+        "color.surface-raised",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.brand",
+        "radius.field",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": [
+        {
+          "part": "field",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "field",
+          "prop": "strokeColor",
+          "role": "color.border"
+        },
+        {
+          "part": "field",
+          "prop": "borderRadius",
+          "role": "radius.field"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.body"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Search",
+      "name": "Search",
+      "group": "forms",
+      "factory": "searchField",
+      "purpose": "Search field. A field role with a leading search icon and an optional clear slot.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "variant": {
+          "values": [
+            "outlined",
+            "filled"
+          ],
+          "default": "outlined"
+        },
+        "clear": {
+          "values": [
+            true,
+            false
+          ],
+          "default": true
+        }
+      },
+      "defaults": {
+        "placeholder": "Search files",
+        "size": "md",
+        "state": "default",
+        "variant": "outlined",
+        "clear": true
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [
+        "iconStart",
+        "clear"
+      ],
+      "requires": [
+        "color.surface",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body"
+      ],
+      "bindings": [
+        {
+          "part": "field",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "field",
+          "prop": "strokeColor",
+          "role": "color.border"
+        },
+        {
+          "part": "field",
+          "prop": "borderRadius",
+          "role": "radius.field"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.body"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Checkbox",
+      "name": "Checkbox",
+      "group": "selection",
+      "factory": "checkbox",
+      "purpose": "Binary selection. The box material and the label type are tokens; the check mark inherits the onBrand role.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled",
+            "error"
+          ],
+          "default": "default"
+        },
+        "checked": {
+          "values": [
+            true,
+            false,
+            "indeterminate"
+          ],
+          "default": false
+        },
+        "label": {
+          "values": [
+            "text"
+          ],
+          "default": "Label"
+        }
+      },
+      "defaults": {
+        "label": "Label",
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "checked",
+        "error"
+      ],
+      "slots": [
+        "indeterminate"
+      ],
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.text",
+        "color.focus",
+        "radius.badge",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "box",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "box",
+          "prop": "strokeColor",
+          "role": "color.border-strong"
+        },
+        {
+          "part": "box",
+          "prop": "borderRadius",
+          "role": "radius.badge"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "role": "color.text"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Radio",
+      "name": "Radio",
+      "group": "selection",
+      "factory": "radio",
+      "purpose": "One-of-many selection. Circles get circle corners; the ring takes the host's shape.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "checked": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        },
+        "label": {
+          "values": [
+            "text"
+          ],
+          "default": "Label"
+        }
+      },
+      "defaults": {
+        "label": "Label",
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "checked"
+      ],
+      "slots": [],
+      "requires": [
+        "color.brand",
+        "color.surface",
+        "color.border-strong",
+        "color.text",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "parts": {
+        "ringPlate": {
+          "match": "^ring$",
+          "pick": "first"
+        }
+      },
+      "bindings": [
+        {
+          "part": "ringPlate",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "ringPlate",
+          "prop": "strokeColor",
+          "role": "color.border-strong"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "role": "color.text"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Switch",
+      "name": "Switch",
+      "group": "selection",
+      "factory": "switch",
+      "purpose": "Immediate on/off. The track and handle are token-bound; on/off changes material, not the corner.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "checked": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        },
+        "label": {
+          "values": [
+            "text",
+            null
+          ],
+          "default": null
+        }
+      },
+      "defaults": {
+        "size": "md",
+        "state": "default",
+        "checked": false
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "checked"
+      ],
+      "slots": [
+        "label"
+      ],
+      "requires": [
+        "color.brand",
+        "color.surface",
+        "color.surface-alt",
+        "color.border",
+        "color.text",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "track",
+          "prop": "fill",
+          "role": "color.surface-alt"
+        },
+        {
+          "part": "track",
+          "prop": "strokeColor",
+          "role": "color.border"
+        },
+        {
+          "part": "track",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "handle",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Slider",
+      "name": "Slider",
+      "group": "selection",
+      "factory": "slider",
+      "purpose": "Continuous value. Track and fill use surface/brand roles; the handle is a circle.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "value": {
+          "values": [
+            "number"
+          ],
+          "default": 40
+        }
+      },
+      "defaults": {
+        "value": 40,
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [
+        "ticks",
+        "value"
+      ],
+      "requires": [
+        "color.brand",
+        "color.surface",
+        "color.surface-alt",
+        "color.border",
+        "color.focus",
+        "radius.control"
+      ],
+      "bindings": [
+        {
+          "part": "track",
+          "prop": "fill",
+          "role": "color.surface-alt"
+        },
+        {
+          "part": "track",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "trackActive",
+          "prop": "fill",
+          "role": "color.brand"
+        },
+        {
+          "part": "handle",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "ring",
+          "prop": "strokeColor",
+          "role": "color.focus",
+          "when": {
+            "state": "focus"
+          }
+        }
+      ],
+      "parts": {
+        "trackActive": {
+          "match": "^track·active$",
+          "pick": "first"
+        }
+      }
+    },
+    {
+      "id": "Badge",
+      "name": "Badge",
+      "group": "data",
+      "factory": "badge",
+      "purpose": "Small status marker. A pill by default; tone changes the token, not the geometry.",
+      "props": {
+        "tone": {
+          "values": [
+            "primary",
+            "secondary",
+            "success",
+            "warning",
+            "error",
+            "info",
+            "neutral"
+          ],
+          "default": "primary"
+        },
+        "size": {
+          "values": [
+            "xs",
+            "sm",
+            "md"
+          ],
+          "default": "sm"
+        },
+        "dot": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        },
+        "text": {
+          "values": [
+            "text"
+          ],
+          "default": "New"
+        }
+      },
+      "defaults": {
+        "tone": "primary",
+        "size": "sm",
+        "text": "New"
+      },
+      "states": [
+        "default",
+        "disabled"
+      ],
+      "slots": [
+        "dot",
+        "count"
+      ],
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface-alt",
+        "color.text",
+        "radius.control"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "tone": "primary"
+          },
+          "role": "color.brand"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.caption",
+          "optional": true
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "when": {
+            "tone": "primary"
+          },
+          "role": "color.on-brand"
+        }
+      ]
+    },
+    {
+      "id": "Chip",
+      "name": "Chip",
+      "group": "data",
+      "factory": "chip",
+      "purpose": "Removable token/tag. A pill; the label and the remove affordance are separate slots.",
+      "props": {
+        "size": {
+          "values": [
+            "xs",
+            "sm",
+            "md"
+          ],
+          "default": "sm"
+        },
+        "tone": {
+          "values": [
+            "neutral",
+            "primary",
+            "success",
+            "warning",
+            "error",
+            "info"
+          ],
+          "default": "neutral"
+        },
+        "label": {
+          "values": [
+            "text"
+          ],
+          "default": "Chip"
+        },
+        "removable": {
+          "values": [
+            true,
+            false
+          ],
+          "default": true
+        },
+        "avatar": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "label": "Chip",
+        "tone": "neutral",
+        "size": "sm",
+        "removable": true
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "selected",
+        "disabled"
+      ],
+      "slots": [
+        "avatar",
+        "remove",
+        "dot"
+      ],
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "role": "color.surface-alt"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "role": "color.text"
+        }
+      ]
+    },
+    {
+      "id": "Avatar",
+      "name": "Avatar",
+      "group": "data",
+      "factory": "avatar",
+      "purpose": "Identity marker. A circle takes the full corner; initials sit on the surfaceAlt role.",
+      "props": {
+        "size": {
+          "values": [
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl"
+          ],
+          "default": "md"
+        },
+        "shape": {
+          "values": [
+            "circle",
+            "square"
+          ],
+          "default": "circle"
+        }
+      },
+      "defaults": {
+        "size": "md",
+        "shape": "circle"
+      },
+      "states": [
+        "default",
+        "disabled"
+      ],
+      "slots": [
+        "image",
+        "fallback",
+        "status"
+      ],
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "radius.control"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "role": "color.surface-alt"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "when": {
+            "shape": "circle"
+          },
+          "role": "radius.control"
+        }
+      ]
+    },
+    {
+      "id": "Card",
+      "name": "Card",
+      "group": "data",
+      "factory": "card",
+      "purpose": "Raised content surface. The surface plate, corner and elevation are tokens; content is composed from instances.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "elevation": {
+          "values": [
+            "flat",
+            "raised",
+            "floating"
+          ],
+          "default": "raised"
+        },
+        "media": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "size": "md"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [
+        "media",
+        "cover",
+        "actions",
+        "footer"
+      ],
+      "requires": [
+        "color.surface-raised",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.title",
+        "type.body"
+      ],
+      "parts": {
+        "title": {
+          "select": "text",
+          "pick": "largest"
+        },
+        "body": {
+          "select": "text",
+          "pick": "largest-rest"
+        }
+      },
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "role": "color.surface-raised"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.card"
+        },
+        {
+          "part": "host",
+          "prop": "shadow",
+          "role": "shadow.card",
+          "optional": true
+        },
+        {
+          "part": "title",
+          "prop": "typography",
+          "role": "type.title"
+        }
+      ]
+    },
+    {
+      "id": "Progress",
+      "name": "Progress",
+      "group": "data",
+      "factory": "progress",
+      "purpose": "Determinate progress. Track and bar are token surfaces, not two typed greys.",
+      "props": {
+        "value": {
+          "values": [
+            "0..100"
+          ],
+          "default": 60
+        },
+        "tone": {
+          "values": [
+            "primary",
+            "success",
+            "warning",
+            "error",
+            "info"
+          ],
+          "default": "primary"
+        },
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        }
+      },
+      "defaults": {
+        "value": 60,
+        "tone": "primary",
+        "size": "md"
+      },
+      "states": [
+        "default",
+        "indeterminate"
+      ],
+      "slots": [
+        "label",
+        "value"
+      ],
+      "requires": [
+        "color.brand",
+        "color.surface-alt",
+        "color.text-muted",
+        "radius.control"
+      ],
+      "bindings": [
+        {
+          "part": "track",
+          "prop": "fill",
+          "role": "color.surface-alt"
+        },
+        {
+          "part": "track",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "bar",
+          "prop": "fill",
+          "role": "color.brand"
+        },
+        {
+          "part": "bar",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        }
+      ]
+    },
+    {
+      "id": "Tabs",
+      "name": "Tabs",
+      "group": "navigation",
+      "factory": "tabs",
+      "purpose": "Section switcher. Selection is a fill/ink role; the corner depends on the tab material.",
+      "props": {
+        "type": {
+          "values": [
+            "line",
+            "pill",
+            "enclosed",
+            "card"
+          ],
+          "default": "line"
+        },
+        "size": {
+          "values": [
+            "sm",
+            "md"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "selected": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        },
+        "label": {
+          "values": [
+            "text"
+          ],
+          "default": "Tab"
+        }
+      },
+      "defaults": {
+        "label": "Tab",
+        "type": "line",
+        "size": "md",
+        "state": "default",
+        "selected": false
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "selected"
+      ],
+      "slots": [
+        "iconStart",
+        "count",
+        "close"
+      ],
+      "requires": [
+        "color.brand",
+        "color.brand-soft",
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "when": {
+            "type": "pill",
+            "selected": true
+          },
+          "role": "color.brand-soft"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "inkBar",
+          "prop": "fill",
+          "when": {
+            "selected": true
+          },
+          "role": "color.brand"
+        }
+      ]
+    },
+    {
+      "id": "Breadcrumb",
+      "name": "Breadcrumb",
+      "group": "navigation",
+      "factory": "breadcrumb",
+      "purpose": "Hierarchy trail. Links bind to text roles; the current item is not a link.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md"
+          ],
+          "default": "md"
+        },
+        "sep": {
+          "values": [
+            "chevron",
+            "slash"
+          ],
+          "default": "chevron"
+        },
+        "back": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "items": [
+          "Workspace",
+          "Projects",
+          "Design"
+        ],
+        "size": "md",
+        "sep": "chevron"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ],
+      "slots": [
+        "back",
+        "menu"
+      ],
+      "requires": [
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        }
+      ]
+    },
+    {
+      "id": "Pagination",
+      "name": "Pagination",
+      "group": "navigation",
+      "factory": "pagination",
+      "purpose": "Page navigation. The active page is a brand surface; the rest are text.",
+      "props": {
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "state": {
+          "values": [
+            "default",
+            "hover",
+            "focus",
+            "disabled"
+          ],
+          "default": "default"
+        },
+        "pages": {
+          "values": [
+            "number"
+          ],
+          "default": 6
+        },
+        "page": {
+          "values": [
+            "number"
+          ],
+          "default": 1
+        }
+      },
+      "defaults": {
+        "pages": 6,
+        "page": 1,
+        "size": "md",
+        "state": "default"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [
+        "prev",
+        "next",
+        "ellipsis"
+      ],
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "role": "color.surface"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.control"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.label"
+        }
+      ]
+    },
+    {
+      "id": "Alert",
+      "name": "Alert",
+      "group": "feedback",
+      "factory": "alert",
+      "purpose": "Inline message. Tone selects a wash+ink pair; the component itself has one geometry.",
+      "props": {
+        "tone": {
+          "values": [
+            "info",
+            "success",
+            "warning",
+            "error",
+            "neutral"
+          ],
+          "default": "info"
+        },
+        "title": {
+          "values": [
+            "text"
+          ],
+          "default": "Heads up"
+        },
+        "description": {
+          "values": [
+            "text"
+          ],
+          "default": "Something needs your attention."
+        },
+        "dismissible": {
+          "values": [
+            true,
+            false
+          ],
+          "default": true
+        }
+      },
+      "defaults": {
+        "tone": "info",
+        "title": "Heads up",
+        "description": "Something needs your attention."
+      },
+      "states": [
+        "default",
+        "dismissed"
+      ],
+      "slots": [
+        "icon",
+        "dismiss",
+        "action"
+      ],
+      "requires": [
+        "color.info-soft",
+        "color.info",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.label",
+        "type.body"
+      ],
+      "parts": {
+        "title": {
+          "select": "text",
+          "pick": "largest"
+        },
+        "body": {
+          "select": "text",
+          "pick": "largest-rest"
+        }
+      },
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.card"
+        },
+        {
+          "part": "title",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "title",
+          "prop": "fill",
+          "role": "color.text"
+        },
+        {
+          "part": "body",
+          "prop": "typography",
+          "role": "type.body"
+        },
+        {
+          "part": "body",
+          "prop": "fill",
+          "role": "color.text-muted"
+        }
+      ]
+    },
+    {
+      "id": "Toast",
+      "name": "Toast",
+      "group": "feedback",
+      "factory": "toast",
+      "purpose": "Transient notification. A raised surface with copy and an optional meter.",
+      "props": {
+        "tone": {
+          "values": [
+            "default",
+            "success",
+            "warning",
+            "error",
+            "info"
+          ],
+          "default": "default"
+        },
+        "title": {
+          "values": [
+            "text"
+          ],
+          "default": "Saved"
+        },
+        "description": {
+          "values": [
+            "text",
+            null
+          ],
+          "default": "All changes are up to date."
+        },
+        "actions": {
+          "values": [
+            "text",
+            null
+          ],
+          "default": "Undo"
+        }
+      },
+      "defaults": {
+        "tone": "default",
+        "title": "Saved",
+        "description": "All changes are up to date.",
+        "actions": "Undo"
+      },
+      "states": [
+        "default",
+        "hover",
+        "dismissed"
+      ],
+      "slots": [
+        "icon",
+        "actions",
+        "close",
+        "meter"
+      ],
+      "requires": [
+        "color.surface-raised",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.label",
+        "type.body"
+      ],
+      "parts": {
+        "title": {
+          "select": "text",
+          "pick": "largest"
+        },
+        "body": {
+          "select": "text",
+          "pick": "largest-rest"
+        }
+      },
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "role": "color.surface-raised"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.card"
+        },
+        {
+          "part": "host",
+          "prop": "shadow",
+          "role": "shadow.card",
+          "optional": true
+        },
+        {
+          "part": "title",
+          "prop": "typography",
+          "role": "type.label"
+        },
+        {
+          "part": "body",
+          "prop": "typography",
+          "role": "type.body"
+        }
+      ]
+    },
+    {
+      "id": "Tooltip",
+      "name": "Tooltip",
+      "group": "feedback",
+      "factory": "tooltip",
+      "purpose": "Short contextual copy. An inverse surface by token, never a typed dark hex.",
+      "props": {
+        "placement": {
+          "values": [
+            "top",
+            "bottom",
+            "left",
+            "right"
+          ],
+          "default": "top"
+        },
+        "label": {
+          "values": [
+            "text"
+          ],
+          "default": "Tooltip"
+        }
+      },
+      "defaults": {
+        "label": "Tooltip",
+        "placement": "top"
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ],
+      "slots": [
+        "arrow"
+      ],
+      "requires": [
+        "color.inverse",
+        "color.on-inverse",
+        "radius.badge"
+      ],
+      "bindings": [
+        {
+          "part": "panel",
+          "prop": "fill",
+          "role": "color.inverse"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.badge"
+        },
+        {
+          "part": "label",
+          "prop": "typography",
+          "role": "type.caption",
+          "optional": true
+        },
+        {
+          "part": "label",
+          "prop": "fill",
+          "role": "color.on-inverse"
+        }
+      ],
+      "parts": {
+        "panel": {
+          "match": "^panel$",
+          "pick": "first"
+        }
+      }
+    },
+    {
+      "id": "Modal",
+      "name": "Modal",
+      "group": "feedback",
+      "factory": "modal",
+      "purpose": "Dialog surface and its footer actions. The panel is one raised plate; actions are Button instances.",
+      "props": {
+        "type": {
+          "values": [
+            "default",
+            "confirm",
+            "wide"
+          ],
+          "default": "default"
+        },
+        "size": {
+          "values": [
+            "sm",
+            "md",
+            "lg"
+          ],
+          "default": "md"
+        },
+        "title": {
+          "values": [
+            "text"
+          ],
+          "default": "Share"
+        },
+        "description": {
+          "values": [
+            "text"
+          ],
+          "default": "Anyone with the link can comment."
+        },
+        "footer": {
+          "values": [
+            true,
+            false
+          ],
+          "default": true
+        },
+        "scrim": {
+          "values": [
+            true,
+            false
+          ],
+          "default": false
+        }
+      },
+      "defaults": {
+        "title": "Share",
+        "description": "Anyone with the link can comment.",
+        "type": "default",
+        "size": "md"
+      },
+      "states": [
+        "default",
+        "open",
+        "closed"
+      ],
+      "slots": [
+        "header",
+        "body",
+        "footer",
+        "close",
+        "scrim",
+        "iconAlert"
+      ],
+      "requires": [
+        "color.surface-raised",
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.inverse",
+        "radius.card",
+        "type.title",
+        "type.body"
+      ],
+      "parts": {
+        "title": {
+          "select": "text",
+          "pick": "largest"
+        },
+        "body": {
+          "select": "text",
+          "pick": "largest-rest"
+        }
+      },
+      "bindings": [
+        {
+          "part": "host",
+          "prop": "fill",
+          "role": "color.surface-raised"
+        },
+        {
+          "part": "host",
+          "prop": "borderRadius",
+          "role": "radius.card"
+        },
+        {
+          "part": "host",
+          "prop": "shadow",
+          "role": "shadow.card",
+          "optional": true
+        },
+        {
+          "part": "title",
+          "prop": "typography",
+          "role": "type.title"
+        },
+        {
+          "part": "title",
+          "prop": "fill",
+          "role": "color.text"
+        },
+        {
+          "part": "body",
+          "prop": "typography",
+          "role": "type.body"
+        },
+        {
+          "part": "body",
+          "prop": "fill",
+          "role": "color.text-muted"
+        }
+      ]
+    }
+  ]
+}

@@ -33,7 +33,7 @@ This file covers only Flutter-specific parts; the general principles and viewpor
 ## 6. Acceptance means
 
 - Flutter natively supports **Golden tests**: `expectLater(find.byWidget(w), matchesGoldenFile('button.png'))` (`flutter test` generates / compares pixels) — the closest fit to pixel-perfect.
-- Also use `integration_test` screenshots or external bitmap export; then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width: web 1440 / pad 834 / mobile 375).
+- Also use `integration_test` screenshots or external bitmap export; then compare with `references/verification.md` + `scripts/pixel-diff.py` (DPR=1, animations off, window = that tier's baseline width: web 1440 / pad 834 / mobile 375).
 
 ## 7. Known pitfalls
 

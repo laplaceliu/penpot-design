@@ -1,81 +1,75 @@
-# Verification Guide: PIL pixel-level comparison (pixel-perfect acceptance)
+# Verification — penetration and pixel acceptance
 
-**The only acceptance criterion: implementation screenshots compared pixel-by-pixel against Penpot exports must meet the bar.** Code-side "looks right" does not count; you must produce images and numbers.
+> Code-side “looks right” does not count. Produce an image and a number. The component-layer gate is `CK.audit`; this
+> file covers visual fidelity and theme proof.
 
-## 1. Principle and tools
+## 1. Artifacts
 
-- Baseline image: the component-board/whole-page image exported from Penpot via `export_shape({shapeId, format:'png'})` (export the currently active page).
-- Measured image: implementation-side screenshot (see §3).
-- Tool: Python **PIL/Pillow** (`scripts/pixel_diff.py`), per-channel diff + tolerance + heatmap + metrics.
-- Reference-image naming: `design/<component>.png`; measured image `impl/<component>.png`; output `diff/<component>.diff.png` + `.json`.
+- **Baseline**: `export_shape({shapeId, format:'png'})` for a component master, a screen board, or the current page.
+- **Measured**: implementation screenshot at the tier baseline width (web 1440 / pad 834 / mobile 375), DPR=1.
+- **Tool**: `scripts/pixel-diff.py` (PIL/Pillow): per-channel diff, tolerance, heatmap, JSON metrics.
+- Naming: `design/<name>.png` · `impl/<name>.png` · `diff/<name>.diff.png` + `.json`.
 
-## 2. Judgment criteria
+## 2. Thresholds
 
-| Metric | Meaning | Default threshold |
+| Metric | Meaning | Threshold |
 |---|---|---|
-| `diff_ratio` | Pixel ratio exceeding tolerance | ≤ 0.5% (whole page) / ≤ 0.2% (single component) |
-| `max_channel_delta` | Max single-channel difference | ≤ 12 (anti-aliasing / sub-pixel render tolerance) |
-| `diff_bbox` | Difference bounding box | Must be scattered (edge band), no large solid regions |
+| `diff_ratio` | pixels over tolerance | ≤0.5 % whole page / ≤0.2 % component |
+| `max_channel_delta` | max single-channel delta | ≤12 (anti-aliasing) |
+| `diff_bbox` | difference region | scattered edge band; no large solid block |
 
-- Large continuous differences = layout/size/asset error, out of tolerance scope, **must be fixed**.
-- Single-pixel edge differences (anti-aliasing) are accepted within tolerance.
-- Exit code: 0 pass / 1 over threshold / 2 size mismatch (size mismatch is an immediate reject, no scaled comparison).
+A size mismatch exits 2 and is an immediate reject; never scale one image to fit the other.
 
-## 3. Screenshot method (standardize first, then screenshot)
+## 3. Screenshot standardization
 
-- **Qt**: QWidget route `widget->grab().save(path)` (hide scrollbars/focus frames); window fixed to **that tier's baseline width** (web 1440 / pad 834 / mobile 375); `QT_SCALE_FACTOR=1`. Qt5 enables AA_UseHighDpiPixmaps but compare at DPR=1.
-- **Web**: Playwright `page.screenshot({ clip })` or element `locator.screenshot()`; viewport width = **that tier's baseline width** (web 1440 / pad 834 / mobile 375), `deviceScaleFactor: 1`.
-- **Standardize**: before comparing, freeze animations (inject CSS `* { transition: none !important; animation: none !important }`; Qt uses static state), unify background (opaque base color), screenshot after fonts finish loading (`document.fonts.ready`).
+- Freeze animations: inject `* { transition:none !important; animation:none !important }`.
+- Wait for fonts (`document.fonts.ready`), use an opaque background, hide scrollbars/focus frames.
+- Viewport/window equals the design board width; DPR=1 (`QT_SCALE_FACTOR=1` for Qt).
+- Take an element/screen screenshot, not a desktop crop.
 
-## 4. Flow (run after each layer is implemented)
+## 4. Loop
 
-1. Export baseline (PENPOT) → `design/`
-2. Screenshot measured → `impl/`
-3. Run:
-   ```bash
-   python3 scripts/pixel_diff.py design/Button.png impl/Button.png \
-       --out diff/Button.diff.png --threshold 12 --max-diff-ratio 0.002
-   ```
-4. Read JSON metrics and heatmap:
-   - Size mismatch → check design annotation and implementation fixed size / image export multiplier.
-   - Large-block difference → locate by difference type: position offset (spacing/box model), color (token value), font (type-scale mapping), icon (asset reference/scaling).
-   - Only edge scatter → pass.
-5. After fixing, return to step 2 and loop until it passes.
-6. After all component layers pass, do a **whole-page comparison** of every screen board on pages `14–16`, separately per selected tier (threshold 0.5%).
-7. Summary report: component × metric table (user prefers tabular progress), with diff heatmap paths attached.
+```bash
+python3 scripts/pixel-diff.py design/Button.png impl/Button.png \
+    --out diff/Button.diff.png --threshold 12 --max-diff-ratio 0.002
+```
 
-## 5. Common differences → root-cause quick ref
+1. Export baseline → screenshot measured → compare.
+2. Read JSON + heatmap:
+   - size mismatch → box model / export multiplier;
+   - large solid block → position/spacing, token color, font mapping, or wrong asset;
+   - edge scatter only → pass.
+3. Fix the source (token, component definition, layout), re-export, repeat.
+4. After atoms/composites pass, compare whole screens per accepted recipe × tier and per color scheme.
+5. Output a component × metric table with heatmap paths.
 
-| Heatmap shape | Root cause | Fix direction |
+## 5. Root-cause quick reference
+
+| Heatmap shape | Likely cause | Fix |
 |---|---|---|
-| Overall uniform offset by a few px | Box model / border / layout spacing | border-box, padding, layout gap aligned to annotation |
-| Text-area difference | Font family / weight / line-height / letter-spacing | align to F2 type scale; no synthetic bold |
-| Icon-area difference | Wrong asset reference / scaling / coloring | check @2x naming, SVG currentColor |
-| Solid image-area difference | Wrong image / wrong size multiplier | check assets manifest and export multiplier |
-| Solid color block difference | Wrong token value | trace back to DESIGN.md tokens (single source of truth) |
-| Shadow/glow missing or clipped | Container clip / effect not implemented | make clip overflow visible, add shadow effect |
+| uniform offset | box model / border / layout gap | align to spacing token / flow |
+| text-area difference | family/weight/leading/tracking | use the declared typography token |
+| icon-area difference | wrong asset / scale / color | check @2x naming and currentColor |
+| solid image-area difference | wrong asset or multiplier | fix the asset manifest / export size |
+| solid color block | wrong token value | trace to DESIGN.md → token → role |
+| shadow missing/clipped | clip or missing elevation recipe | release clip / apply `EL` recipe |
 
-## 6. Use PIL to assist color picking (reuse for Entry B image analysis)
+## 6. Component and theme acceptance
+
+- Export each core master (or a contact sheet); check fill, border, type, corner and shadow.
+- `CK.theme(group,name).changed > 0` for a switchable theme; export after the switch and judge the **paint**, not the
+  binding map.
+- A board/screen never exported is not “verified”.
+- For a source recreation, compare against the source screenshot at the same width × scheme; report the diff ratio per
+  component and per screen.
+
+## 7. Color sampling
 
 ```python
 from PIL import Image
 im = Image.open("ref.png").convert("RGB")
-for xy in [(x, y)]:          # sample key points of the design image
-    print(xy, '#%02X%02X%02X' % im.getpixel(xy))
+print('#%02X%02X%02X' % im.getpixel((x, y)))
 ```
 
-After quantifying the main colors, backfill DESIGN.md; mark estimated values in prose as "estimated from image".
-
-## Elevation acceptance (gate G18, measured 2026-10-23)
-
-A visual diff of a flat page can still match a flat export pixel-perfectly, so shadows need their own acceptance:
-
-- **Read the census**: `storage.EL.audit()` → `unbound: 0`, `flat: 0`; on a page with cards/nav/panels `inner > 0`;
-  `SC.audit()` → `ASSEMBLED`; `SC.coverage()` → `COMPLETE`.
-- **Read the render, not the count**: export one card, one control and one hover cell. The card must show the **bottom
-  lip** and **top highlight** (the inset pair) in addition to the drop; the hover cell must show a visibly larger shadow
-  than its default. `shadows.length` is a claim; the PNG is the proof.
-- **Two known false positives are fixed**: a `sheen·` rectangle created with a `{w,h}` box used to stay 100×100
-  (`audit_layout.crash_100x100` catches it), and background `surface·` plates are exempt from `header_collision`.
-- **Hover reachability**: Penpot has no switch-variant-on-hover action, so a runtime hover is not authorable. Acceptance is
-  the **state variant / matrix cell**, not a click test. Do not claim a working hover prototype.
+Quantized colors from an image are estimates; write them into DESIGN.md as measured values and mark inferred values in
+prose.

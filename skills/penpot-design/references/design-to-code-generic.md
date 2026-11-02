@@ -5,9 +5,9 @@ The common parts of the original Qt / Web guides have been pulled here; adapters
 
 ## 0. Three-tier constraints (read before starting)
 
-- **Viewport tier `targetProfiles`**: see `references/viewport-profiles.md`; acceptance viewport/window width = that tier's baseline width, compared tier by tier.
+- **Viewport tier `targetProfiles`**: see `references/viewport-and-themes.md`; acceptance viewport/window width = that tier's baseline width, compared tier by tier.
 - **Tech-stack tier `targetStacks`**: see `references/stack-profiles.md`; **do not enter code generation without confirmation, defaulting to React/Web is forbidden**.
-- **Color mode `colorSchemes`**: see `references/color-schemes.md`; with two schemes you **must use the same set of semantic tokens**,
+- **Color mode `colorSchemes`**: see `references/viewport-and-themes.md`; with two schemes you **must use the same set of semantic tokens**,
   never hard-code the second scheme's values inside components, and **acceptance combination count = tiers × schemes** (each tier × each scheme screenshotted and compared separately).
   The switch mechanism and persistence (follow system / manual / remember or not) are read from the declarations in DESIGN.md `## Colors` and Do's and Don'ts.
 - The three are orthogonal: one design system can simultaneously target (stack, profile, scheme) combinations, e.g. web+React+dark and mobile+Flutter+light.

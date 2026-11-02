@@ -3,7 +3,8 @@
 > **All conclusions here were obtained by testing on a real Penpot file with `execute_code`**. Where they conflict with official docs / high-level overview, this article wins and is marked `[docs wrong]`.
 > The three official reference articles (design-tokens / what-are-design-tokens / design-tokens-with-penpot) are old; **use them only for concepts, don't copy the API**.
 >
-> Companion executable engine: `scripts/token_engine.js` (paste and use, includes set build / verify / apply / audit).
+> Companion runtime: `scripts/token-engine.js` (set build / verify / apply / audit).
+> Tokens-panel JSON interchange: `scripts/designmd-tokens.py` + `references/designmd-tokens.md`.
 
 ## 0. Seven iron rules (learn these first; the rest are details)
 
@@ -19,12 +20,10 @@
 5. **`resolvedValue` is only non-null after the set is activated**. To check if a token is usable, look at whether `resolvedValue`/`resolvedValueString` is empty.
 6. **Split sets by "whether to activate together", never by type**. `type` is the token's own attribute; the UI automatically groups by type **inside each set** (`tokensByType`), one set can hold all 17 kinds. Splitting by `Color`/`Radius`/`Spacing` is
    a category error: these three are always active together, splitting just turns 1 switch into N. See §1.1.
-7. **The 01–02 token capacity is fixed; the values are brand-configurable.** Every project declares exactly
-   `CAT.CAPACITY` (`references/catalog-standard.md`): **57 colours · 12 typography steps · 14 spacing steps · 9 radii ·
-   13 shadow recipes · 2 dimensions · 4 border/divider colour roles · 10 semantic tone triples**. The counts come from
-   the Foundations/Color boards' layout, so a missing or extra token re-flows pages 01/02 and is a `catalog_drift`
-   finding (rule 62). Add a project-only token on a later page, or bump `CAT.CAPACITY` and rebuild 01/02 deliberately —
-   never append it to the standard chapter.
+7. **The token set is project-declared; v3 has no fixed capacity.** The core components resolve semantic roles
+   (`color.brand`, `color.surface`, `radius.control`, `type.label`…); a project may declare more colors/types/radii or
+   rename them through the contract aliases. What matters is that every `requires` role resolves and every bound paint
+   reads back, not a global count.
 
 ## 1. Object model
 
@@ -239,13 +238,13 @@ There is a third surface beside sets and themes: the **library style records** t
 proved it: 40 active `typography` tokens, `themes: []`, `typographies.length === 0` → the Typography panel was empty,
 and every design rule still passed, because every rule reads the shape tree or the token set.
 
-`storage.TP.seed()` (in `token_engine.js`) closes that gap: one `LibraryTypography` per declared ramp step, **named
+`storage.TP.seed()` (in `token-engine.js`) closes that gap: one `LibraryTypography` per declared ramp step, **named
 exactly like its token**, fields written then read back (`drift: []`), idempotent (second run makes nothing), plus
 `TP.audit()` (tokens ↔ styles diff) and `TP.apply(shape)`. Note the measured trap in the apply path:
 `style.applyToText(shape)` transfers family/size/weight/tracking but **forces `lineHeight` to 1.2** regardless of the
 record (1.05 → 1.2, 1.4 → 1.2), so `TP.apply` re-asserts the style's own leading, and a style pass over already-bound
 text is a rhythm regression — register styles for consumers, keep `tokens.typography` as the binding of record.
-`audit_design` rule 30 `no_type_styles` fails a text-bearing board whose library has 0 styles.
+A library with no typography styles is legal, but a text-bearing component that should carry a ramp style is easier to consume when `TP.seed()` has run.
 
 ## 6. Applying tokens
 
@@ -336,73 +335,39 @@ Using it avoids hand-copying values; but **DTCG type names don't map 1:1 to Penp
 
 ### 8.1 A tone seeds as three `color` tokens, and the override set must carry all three
 
-`design-guide.md §4.1` defines each tone as the triple **wash · hue · ink**; the names below are the contract between
-`TK.seed`, the palette in `seed_storage.js` (`storage.T`), the mirror in `CF.P` and `CF.theme(map)` — keep them identical,
-or a re-skinned file silently keeps drawing the default blue.
+Each tone is the triple **wash · hue · ink**; the names below are the contract between `TK.seed`, the palette in
+`seed-storage.js` (`storage.T`), the mirror in `CF.P` and the component roles:
 
 ```
 color.primary        #2563EB   hue   → graphics only (icon, 3px bar, ring, chart)
-color.primarySoft    #DBEAFE   wash  → background that the ink sits on
-color.primaryInk     #1E40AF   ink   → the ONLY step that carries copy (on wash 7.15:1, under white 7.09–8.72:1)
-color.onPrimary      #FFFFFF   copy on an ink-step solid
+color.primary-soft    #DBEAFE   wash  → background that the ink sits on
+color.primary-ink     #1E40AF   ink   → the step that carries copy
+color.on-primary      #FFFFFF   copy on an ink-step solid
 ```
 
-Same three-way split for `info` / `success` / `warning` / `error` (`*Soft` + `*Ink`), plus the neutral roles
-(`color.ink` `color.muted` `color.surface` `color.surfaceAlt` `color.border`).
+Same split for `info` / `success` / `warning` / `error` (`*Soft` + `*Ink`), plus the neutral roles
+(`color.surface` `color.surface-alt` `color.surface-raised` `color.text-bright` `color.text-muted` `color.border`
+`color.border-strong` `color.inverse-raised` `color.on-inverse`).
 
-**Consequence for themes**: `· Dark` must override **`color.primaryInk`**, not only `color.primary`. In dark the wash becomes a
-low-alpha tint and the ink step has to *lift* (`color-schemes.md §4.1`); a dark set that overrides only the hue leaves copy at
-the light ink on a dark surface, which `audit_design.js` reports as `contrast`. Reference the pair instead of repeating hexes
-where you can (`{color.primaryInk}` inside a typography token), so one override propagates.
+**Consequence for themes**: a `· Dark` set must override **`color.primary-ink`**, not only `color.primary`. In dark the
+wash becomes a low-alpha tint and the ink step has to *lift*; overriding only the hue leaves light ink on a dark surface.
+Reference the pair where possible (`{color.primary-ink}` inside a typography token) so one override propagates.
 
-### 8.2 The `borderRadius` set is the only source of a corner
+### 8.2 A corner comes from the `borderRadius` set
 
-`design-guide.md §5.1` makes this a HARD rule, and the mechanics that make it checkable are here:
+- **Seed the ladder from DESIGN.md's Shapes section**, then never write a corner number at a call site. `TK.seed`
+  records `radius.none/xs/sm/md/lg/full`; a source's own ladder (for example `0 / 4 / 10 / 26 / 9999`) is the truth for a
+  recreation.
+- **`CF.radius(role)`** resolves the role against the live set; a number that is not a declared step is snapped and
+  recorded in `CF.coerced`. `full = 9999` renders as a clean pill, so a control's corner is a token value, not `h/2`.
+- **A component binds the role** (`radius.control`, `radius.field`, `radius.card`, `radius.badge`) through
+  `CK.applyBinding`; `CK.coverage` checks the four corner token keys Penpot actually stores.
+- **Ring ownership**: a ring takes its host's corner and is mounted inside the control it outlines. On a circle, the ring
+  is circular. These are component decisions, not post-build repairs.
 
-- **Seed the ladder as tokens, then never write a corner again.** `TK.seed` records `radius.none / xs / sm / md / lg / full`
-  from DESIGN.md's `Shapes` section — for a recreation, **the source site's own ladder** (for example
-  `0 / 4 / 10 / 26 / 50 / 80 / 9999`), not the engine's default ladder. A recreated file that invents its own steps
-  documents a system the source does not have.
-- **Every writer goes through `CF.radius(role)`** (`ctx.plate`, `ctx.ring`, `ctx.clip`, `CF.build`, `NL.frame`, `NL.gridFrame`,
-  `mkAbsBoard`, `mkRect`). A number that is not a declared step is *snapped* to the nearest one and recorded in `CF.coerced`, so
-  an invented value is visible in the registry instead of silently drawn.
-- **`full = 9999` is a real step, not a trick.** It renders as a clean pill (see pitfall 7 above), so a control's corner is
-  `radius.full`, and a pill's `h/2` derivation is gone: the value comes from the set, so retuning the set retunes every pill.
-- **Gate**: rules **35 `radius_off_ladder`**, **36 `radius_unbound`**, **37 `ring_off_host`** and **38 `ring_detached`** judge
-  the ladder, the binding, the ring↔host corner pair and the ring↔host **mounting**, from the LIVE declared set
-  (`TK.declared().radii`), never from `CF.RAD`.
-- **`TK.roleSweep()` — the repair for a corner that is legal but wrong (rule 37's twin).** 35/36 can only judge values that
-  exist, so the two real defects of a rebuilt file are invisible to them: a control host still square because an older
-  factory generation drew it, and a `ring·*` layer that disagrees with that host. Both are judged against the **source's own
-  contract**: `TK.CONTROL_FAMS` (button · iconbutton · splitbutton · fab · chip · badge · tag) is the set of families DESIGN.md
-  binds to the control step (`CF.radius('control')`) — a family absent from the table is never judged — and `CF.ROLE.ring = 'host'` supplies the second
-  rule. `TK.roleStart()` + `TK.roleSweep({budget})` until `done: true`, then `TK.rolePages()` for the per-page table and a
-  **dry re-read** for the proof (measured: 136 pages → 367 hosts (241 masters + 23 copies) + 192 rings repaired, re-read 0/0/0).
-- **`TK.ringSweep()` — the repair for a ring that is bound, correctly rounded, and in the wrong place (rule 38).**
-  37 compares a ring's *corner* to its host; it cannot see a ring that drifted off the plate it outlines, which is what a
-  user reports as "this element moved". `TK.ringHost(shape)` resolves the owner in one place for both the auditor and the
-  repairer — nearest control ancestor (≤4 up) → deep subtree scan for a plate the ring **encloses** (margin 0–12 per axis)
-  and is **concentric** with (Δ ≤ 3) → expanded-containment for a flat row band → page-wide size match — and returns
-  `{host, control, concentric, floating, contained, ox, oy, via, kind, dist}`. `TK.ringStart(null)` (or a page-name list) then
-  `TK.ringSweep({dry:true})` / `{budget, settle}` is the census and the fix, and `TK.ringPages()` reads the per-page defect
-  table **after** a pass; the write re-applies the ring's **own measured
-  margins** (`ox`/`oy`, default `TK.RING_OFF` = 2), never a forced 2, re-mounts it inside the owning control (`clip·` plates
-  keep their ring one level up), copies the host corner only when the host is a control *board*, and then
-  `TK.bindPage(n, {only:'radius'})`, because the geometry write dropped the binding. Measured 2026-10-22: 231 rings over
-  pages 03–16 → 224 ok + 3 contained row rings + **7 floating drifts of 10–72px, all repaired**; dry re-read 41/41 ok, 0
-  drift (idempotent); negative control +24px → `NEEDS_REPAIR {ring_detached:1}` → restore → `CLEAN`.
-  Why the margins are not a constant, and the ±2 test that produced 47 false findings, are in `api-pitfalls.md §17` and
-  `engines.md` §"Ring mounting".
-- **Two measured facts that decide the sweep's scope** (`api-pitfalls.md §17`): a component's own shape answers
-  `isComponentInstance() === true` **and** `isComponentMainInstance() === true`, so "skip instances" would skip every master
-  and fix nothing; and a plugin-side write to a master **does not re-sync the copies already placed in the file** (measured:
-  `Button·SM` on `14 · Screens · app` still read `r0` after its master was set to 9999 and the page re-opened). So the sweep
-  visits masters, plain boards **and** copies, and does not call `resetOverrides()` — that would also revert the label and
-  paint a screen deliberately set.
+## 9. Acceptance recipe (must run)
 
-## 9. Acceptance recipe [Gate G9] (must run)
-
-After pasting `scripts/token_engine.js`:
+After pasting `scripts/token-engine.js`:
 
 ```js
 return storage.TK.audit();    // full health check
@@ -423,7 +388,7 @@ Health-check items (any failure = not qualified):
 
 Bindings and paint are read at different moments, and this build separates them: adding a later active set changes the
 token's `resolvedValueString` while **the already-bound shape keeps its old fill** — only a **theme activation**
-re-skins it (capabilities §6). So `tokens.fill === 'color.primary'` proves nothing about what a reviewer sees. The
+re-skins it (references/api-pitfalls.md). So `tokens.fill === 'color.primary'` proves nothing about what a reviewer sees. The
 acceptance loop, run after the light/dark sets and the `Scheme` group exist:
 
 ```js
@@ -437,10 +402,10 @@ storage.TK.changed(before, storage.TK.paint(shapes)); // {changed: n, rows:[{key
 Requirements on that read: `changed === 0` while a switch was requested is a **failure** (nothing re-skinned), a stable
 second run must report `changed: 0`, and the comparison is case-insensitive on purpose — this build lowercases hex
 fills on readback (`#2563EB` reads back `#2563eb`). After the switch, settle and **re-export** before judging
-(capabilities §0.2: the render is the referee).
+(references/api-pitfalls.md: the render is the referee).
 
-Same rule on the library-color channel (`scripts/palette_engine.js`): edit `c.color`, settle, read the bound shape's
-`fillColor` — the ref surviving is what proves the paint came from the channel and not from a literal write.
+The token channel is the only repaint channel in v3: edit the token/set, settle, and read the bound shape's
+`fillColor`; a surviving token binding is what proves the paint came from the token.
 
 ## 10. Doc-vs-implementation discrepancy list (following docs will trip you up)
 

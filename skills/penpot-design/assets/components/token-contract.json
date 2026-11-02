@@ -1,0 +1,374 @@
+{
+  "version": 1,
+  "name": "penpot-design semantic token roles",
+  "description": "Components bind to roles, never to raw values. A role resolves to one live Penpot token; aliases cover the naming variants emitted by DESIGN.md and by older projects.",
+  "roles": {
+    "color.brand": {
+      "type": "color",
+      "token": "color.primary",
+      "aliases": [
+        "color.brand",
+        "color.accent"
+      ],
+      "description": "Brand hue. Graphics, rings, solid brand fills."
+    },
+    "color.brand-ink": {
+      "type": "color",
+      "token": "color.primary-ink",
+      "aliases": [
+        "color.brand-ink"
+      ],
+      "description": "Readable brand step for copy on a wash and for solid brand surfaces that carry white copy."
+    },
+    "color.brand-soft": {
+      "type": "color",
+      "token": "color.primary-soft",
+      "aliases": [
+        "color.brand-soft"
+      ],
+      "description": "Brand wash."
+    },
+    "color.on-brand": {
+      "type": "color",
+      "token": "color.on-primary",
+      "aliases": [
+        "color.on-brand"
+      ],
+      "description": "Copy on a brand-ink solid."
+    },
+    "color.surface": {
+      "type": "color",
+      "token": "color.surface",
+      "aliases": [
+        "color.bg",
+        "color.background"
+      ],
+      "description": "Default surface."
+    },
+    "color.surface-alt": {
+      "type": "color",
+      "token": "color.surface-alt",
+      "aliases": [
+        "color.surface-alt2",
+        "color.neutral"
+      ],
+      "description": "Quiet surface / filled field."
+    },
+    "color.surface-raised": {
+      "type": "color",
+      "token": "color.surface-raised",
+      "aliases": [
+        "color.raised",
+        "color.surface"
+      ],
+      "description": "Raised panel (card, modal, popover)."
+    },
+    "color.text": {
+      "type": "color",
+      "token": "color.text-bright",
+      "aliases": [
+        "color.ink",
+        "color.on-surface"
+      ],
+      "description": "Primary copy."
+    },
+    "color.text-muted": {
+      "type": "color",
+      "token": "color.text-muted",
+      "aliases": [
+        "color.muted",
+        "color.secondary"
+      ],
+      "description": "Secondary copy."
+    },
+    "color.border": {
+      "type": "color",
+      "token": "color.border",
+      "aliases": [
+        "color.divider",
+        "color.outline"
+      ],
+      "description": "Hairline border."
+    },
+    "color.border-strong": {
+      "type": "color",
+      "token": "color.border-strong",
+      "aliases": [
+        "color.outline-strong"
+      ],
+      "description": "Control border / stronger divider."
+    },
+    "color.focus": {
+      "type": "color",
+      "token": "color.primary",
+      "aliases": [
+        "color.focus",
+        "color.ring",
+        "color.brand"
+      ],
+      "description": "Focus ring. Falls back to the brand hue."
+    },
+    "color.inverse": {
+      "type": "color",
+      "token": "color.inverse-raised",
+      "aliases": [
+        "color.inverse",
+        "color.dark-raised",
+        "color.ink-raised"
+      ],
+      "description": "Dark/inverse raised surface (tooltip, dark toast)."
+    },
+    "color.on-inverse": {
+      "type": "color",
+      "token": "color.on-inverse",
+      "aliases": [
+        "color.on-dark"
+      ],
+      "description": "Copy on an inverse surface."
+    },
+    "color.danger": {
+      "type": "color",
+      "token": "color.error-ink",
+      "aliases": [
+        "color.danger",
+        "color.danger-ink"
+      ],
+      "description": "Danger solid (readable ink step)."
+    },
+    "color.danger-soft": {
+      "type": "color",
+      "token": "color.error-soft",
+      "aliases": [
+        "color.danger-soft"
+      ],
+      "description": "Danger wash."
+    },
+    "color.on-danger": {
+      "type": "color",
+      "token": "color.on-primary",
+      "aliases": [
+        "color.on-error",
+        "color.on-danger"
+      ],
+      "description": "Copy on a danger solid."
+    },
+    "color.success": {
+      "type": "color",
+      "token": "color.success-ink",
+      "aliases": [
+        "color.success"
+      ],
+      "description": "Success solid / ink step."
+    },
+    "color.success-soft": {
+      "type": "color",
+      "token": "color.success-soft",
+      "aliases": [],
+      "description": "Success wash."
+    },
+    "color.warning": {
+      "type": "color",
+      "token": "color.warning-ink",
+      "aliases": [
+        "color.warning"
+      ],
+      "description": "Warning solid / ink step."
+    },
+    "color.warning-soft": {
+      "type": "color",
+      "token": "color.warning-soft",
+      "aliases": [],
+      "description": "Warning wash."
+    },
+    "color.info": {
+      "type": "color",
+      "token": "color.info-ink",
+      "aliases": [
+        "color.info"
+      ],
+      "description": "Info solid / ink step."
+    },
+    "color.info-soft": {
+      "type": "color",
+      "token": "color.info-soft",
+      "aliases": [],
+      "description": "Info wash."
+    },
+    "type.title": {
+      "type": "typography",
+      "token": "type.h3",
+      "aliases": [
+        "type.title",
+        "type.heading-md",
+        "type.heading"
+      ],
+      "description": "Component/panel title."
+    },
+    "type.heading": {
+      "type": "typography",
+      "token": "type.h2",
+      "aliases": [
+        "type.heading",
+        "type.heading-lg",
+        "type.h1"
+      ],
+      "description": "Screen heading."
+    },
+    "type.body": {
+      "type": "typography",
+      "token": "type.body",
+      "aliases": [
+        "type.body-md",
+        "type.paragraph",
+        "type.text"
+      ],
+      "description": "Body copy."
+    },
+    "type.label": {
+      "type": "typography",
+      "token": "type.label",
+      "aliases": [
+        "type.label-md",
+        "type.button",
+        "type.control"
+      ],
+      "description": "Control label."
+    },
+    "type.caption": {
+      "type": "typography",
+      "token": "type.caption",
+      "aliases": [
+        "type.small",
+        "type.overline"
+      ],
+      "description": "Caption / metadata."
+    },
+    "radius.control": {
+      "type": "borderRadius",
+      "token": "radius.full",
+      "aliases": [
+        "radius.pill",
+        "radius.control"
+      ],
+      "description": "Control corner. A pill is the default; a project may map this role to its own control step."
+    },
+    "radius.field": {
+      "type": "borderRadius",
+      "token": "radius.md",
+      "aliases": [
+        "radius.input",
+        "radius.field"
+      ],
+      "description": "Field / input corner."
+    },
+    "radius.card": {
+      "type": "borderRadius",
+      "token": "radius.lg",
+      "aliases": [
+        "radius.panel",
+        "radius.card",
+        "radius.surface"
+      ],
+      "description": "Card / panel / modal corner."
+    },
+    "radius.badge": {
+      "type": "borderRadius",
+      "token": "radius.sm",
+      "aliases": [
+        "radius.tag",
+        "radius.badge",
+        "radius.chip"
+      ],
+      "description": "Small box / badge / checkbox corner."
+    },
+    "radius.none": {
+      "type": "borderRadius",
+      "token": "radius.none",
+      "aliases": [
+        "radius.0"
+      ],
+      "description": "Square corner."
+    },
+    "space.xs": {
+      "type": "spacing",
+      "token": "spacing.xs",
+      "aliases": [
+        "spacing.1",
+        "space.xs"
+      ],
+      "description": "Tight gap."
+    },
+    "space.sm": {
+      "type": "spacing",
+      "token": "spacing.sm",
+      "aliases": [
+        "spacing.2",
+        "space.sm"
+      ],
+      "description": "Inline gap."
+    },
+    "space.md": {
+      "type": "spacing",
+      "token": "spacing.md",
+      "aliases": [
+        "spacing.3",
+        "space.md"
+      ],
+      "description": "Control/internal gap."
+    },
+    "space.lg": {
+      "type": "spacing",
+      "token": "spacing.lg",
+      "aliases": [
+        "spacing.4",
+        "space.lg"
+      ],
+      "description": "Block gap."
+    },
+    "shadow.card": {
+      "type": "shadow",
+      "token": "shadow.card",
+      "aliases": [
+        "shadow.raised",
+        "elevation.card"
+      ],
+      "description": "Raised card / modal stack."
+    },
+    "shadow.control": {
+      "type": "shadow",
+      "token": "shadow.control",
+      "aliases": [
+        "shadow.button",
+        "elevation.control"
+      ],
+      "description": "Lifted control stack."
+    },
+    "stroke.focus": {
+      "type": "borderWidth",
+      "token": "border-width.focus",
+      "aliases": [
+        "border.focus"
+      ],
+      "description": "Focus ring width."
+    },
+    "stroke.hairline": {
+      "type": "borderWidth",
+      "token": "border-width.1",
+      "aliases": [
+        "border.1"
+      ],
+      "description": "Hairline border width."
+    }
+  },
+  "required": [
+    "color.brand",
+    "color.on-brand",
+    "color.surface",
+    "color.text",
+    "color.text-muted",
+    "color.border",
+    "radius.control",
+    "type.label",
+    "type.body"
+  ]
+}

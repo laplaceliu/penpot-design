@@ -31,7 +31,7 @@ This file covers only MAUI-specific parts; the general principles and viewport-t
 
 ## 6. Acceptance means
 
-- Run on emulator / simulator / real device or Windows desktop, screenshot (Xharness / platform screenshot tools / desktop screenshot); then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width: web 1440 / pad 834 / mobile 375).
+- Run on emulator / simulator / real device or Windows desktop, screenshot (Xharness / platform screenshot tools / desktop screenshot); then compare with `references/verification.md` + `scripts/pixel-diff.py` (DPR=1, animations off, window = that tier's baseline width: web 1440 / pad 834 / mobile 375).
 - MAUI has no built-in golden tests; relies on device/simulator screenshots + layer-by-layer comparison.
 
 ## 7. Known pitfalls

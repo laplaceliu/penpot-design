@@ -2,18 +2,18 @@
 
 **The decision this skill ships with:** a **text icon catalog embedded in the skill** (Lucide, ISC) + one import
 engine, instead of a downloaded `.penpot` library or a link guide. Everything below is either measured in
-`penpot-capabilities.md` or a consequence of the workflow (paste → build → gate).
+`runtime.md` or a consequence of the workflow (paste → build → gate).
 
 ## 0. The three options, evaluated
 
 | Option | Verdict | Why |
 |---|---|---|
-| **Bundle `.penpot` icon libraries from penpothub** | ❌ as the embedded default | Importing a `.penpot` file is a **UI-only** operation — the plugin API has no import method, so the skill cannot do it in-session, cannot retry it, and no gate can verify it. Consuming a library that *is* already in the file goes through `connectLibrary`, which is still on the **unverified** list (capabilities §12). Binary assets are also unreadable to this workflow: a script cannot inspect, diff or repair them, and each library carries its own license decision |
+| **Bundle `.penpot` icon libraries from penpothub** | ❌ as the embedded default | Importing a `.penpot` file is a **UI-only** operation — the plugin API has no import method, so the skill cannot do it in-session, cannot retry it, and no gate can verify it. Consuming a library that *is* already in the file goes through `connectLibrary`, which is still on the **unverified** list (references/api-pitfalls.md). Binary assets are also unreadable to this workflow: a script cannot inspect, diff or repair them, and each library carries its own license decision |
 | **A guide only** (links + manual steps) | ❌ as the only answer | links rot, the manual step breaks the "one call, one page" loop, and nothing can be gated |
-| **A famous SVG library, embedded as text** | ✅ **chosen** | `createShapeFromSvg` turns an SVG into **editable vectors** (capabilities §9), so the data form the file needs is text: grep-able, pasteable into `execute_code`, license-clear, works offline in any file. `assets/icons/lucide.jsonl` (1966 icons, 24×24, ISC) ships inside the skill; `scripts/icon_engine.js` (`storage.IC`) imports them |
+| **A famous SVG library, embedded as text** | ✅ **chosen** | `createShapeFromSvg` turns an SVG into **editable vectors** (references/api-pitfalls.md), so the data form the file needs is text: grep-able, pasteable into `execute_code`, license-clear, works offline in any file. `assets/icons/lucide.jsonl` (1966 icons, 24×24, ISC) ships inside the skill; `scripts/icon-engine.js` (`storage.IC`) imports them |
 
 **Why Lucide specifically**: 24-grid, `stroke-width: 2`, round caps/joins — the exact geometry `CF.glyph` and
-`design-guide §iconography` already assume, so glyphs and catalog icons look like one family. Its license is **ISC**
+`design-principles.md §8` already assume, so glyphs and catalog icons look like one family. Its license is **ISC**
 (`assets/icons/LICENSE` — a copyright notice in copies is the only obligation). Font Awesome Free's *icons* are
 **CC BY 4.0** (attribution must travel with the design) and Material Symbols is Apache-2.0 — both are usable through
 the same mechanism, see §4; they are not bundled because Lucide covers the need with the lightest obligation.
@@ -31,7 +31,7 @@ that is the same defect as a hand-drawn control (G12 spirit): it cannot be re-sk
 
 **Why the 85 hand-drawn kinds are not redundant** (the "does the catalog replace them?" question, measured):
 
-* **102 synchronous call sites** inside `component_factory.js` (`ctx.glyph('chevronDown', …)` etc.) — factory code is
+* **102 synchronous call sites** inside `component-factory.js` (`ctx.glyph('chevronDown', …)` etc.) — factory code is
   synchronous and draws **1–2 `path` shapes with the control's palette color**, `anchor`/`strokeW`/`opacity` overrides.
   `IC.place` cannot serve that contract today: it is async (every call site would need `await`), it returns a **group**
   of imported shapes, and it needs the icon's catalog line seeded first — a button whose chevron depends on a pasted
@@ -41,13 +41,11 @@ that is the same defect as a hand-drawn control (G12 spirit): it cannot be re-sk
   `M/L/C/O/R` exists precisely because it was converted to what `path.d` survives). Replacing `G` with catalog data
   means either a build-time arc→bezier conversion of every body (a data regeneration + visual re-verification of all
   85, not a deletion) or routing all 102 call sites through `createShapeFromSvg`.
-* **`CF.glyphKinds` is a contract, not just storage**: the `01 · Foundations` **Icons** board is enumerated from it
-  (`scaffold_structure.js` → `penpot-structure.md §2`), and the design→code side is specified to take **the same names**
-  (SKILL.md), so the code icon set matches that board. Removing `G` rewrites a page of the fixed structure and the
-  codegen naming agreement.
-* **The Icons board is `FN`'s only declared exemption on `01.xx`** (`FN.EXEMPT['01'] = ['Icons']`, gate G16): a catalog of
-  1966 glyphs is not one record type, so `IC.grid` composes it — still token-filled, still gated by all 30 other rules,
-  and `not_projected` skips it **by that name only**. Every other board on 01/02 must be projected.
+* **`CF.glyphKinds` is a contract, not just storage**: the icon documentation grid is enumerated from it, and the
+  design→code side takes **the same names**, so the code icon set matches the design system. Removing `G` rewrites that
+  naming agreement.
+* **The icon grid is documentation, not a component master**: `IC.grid` composes a labeled sheet of the bundled glyphs;
+  it is token-filled but is not part of the component library inventory.
 
 So the split is deliberate: `G` = the guaranteed, synchronous, palette-native marks *inside* controls; `IC` = the
 extensible catalog *outside* them. If one source is ever wanted, the viable path is **generated** data (Lucide →
@@ -75,7 +73,7 @@ const grid = await storage.IC.grid({ names: ['inbox','search','bell','settings',
 // grid → { count, missing:[…], box:{x,y,w,h}, cells:[…] } — `missing` is a real answer, not a placeholder
 ```
 
-Rules the engine encodes (measured, capabilities §7/§9): the import lands at world (0,0) so it goes through a
+Rules the engine encodes (measured, references/api-pitfalls.md/§9): the import lands at world (0,0) so it goes through a
 throwaway board (and a no-`parent` group is moved to the page root **before** the throwaway is deleted — otherwise it
 is deleted with it); the platform's `base-background` rectangle is removed; `currentColor` is substituted before
 import; **size is applied with `group.resize(size, size)` after the import** — the svg root `width/height` is ignored
@@ -109,7 +107,7 @@ escaped as usual when pasted (or pass it inside backticks).
 | Material Symbols | Apache-2.0 (keep the notice) | no | `@iconify-json/material-symbols` → `IC.add` |
 | Font Awesome Free | icons **CC BY 4.0** (attribution in the design), code MIT | no | same path; **carry the attribution** in the delivered spec page if used |
 | Heroicons / Remix / Tabler | MIT | no | same path |
-| penpothub `.penpot` libraries | per-library | no | **manual UI import only**, then probe `connectLibrary` (unverified, capabilities §12) — a guide, never an automated step |
+| penpothub `.penpot` libraries | per-library | no | **manual UI import only**, then probe `connectLibrary` (unverified, references/api-pitfalls.md) — a guide, never an automated step |
 | the target system's own SVGs (Entry C) | whatever the target ships | n/a | `CF.svgIcon(svg, …)` — this is the fidelity path: the recreated library keeps *its* icons |
 
 ## 5. SVG constraints when passing your own

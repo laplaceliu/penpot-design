@@ -32,7 +32,7 @@ This file covers only ImGui-specific parts; the general principles and viewport-
 
 ## 6. Acceptance means
 
-- After rendering to the framebuffer, save PNG (backend screenshot / `glReadPixels` / software-render dump); then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width).
+- After rendering to the framebuffer, save PNG (backend screenshot / `glReadPixels` / software-render dump); then compare with `references/verification.md` + `scripts/pixel-diff.py` (DPR=1, animations off, window = that tier's baseline width).
 - Immediate mode needs a fixed frame (frozen at the same interaction state) before screenshotting, to avoid the picture jumping with input.
 
 ## 7. Known pitfalls

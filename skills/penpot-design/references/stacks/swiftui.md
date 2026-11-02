@@ -32,7 +32,7 @@ This file covers only SwiftUI-specific parts; the general principles and viewpor
 
 ## 6. Acceptance means
 
-- Use **snapshot testing** (e.g. `swift-snapshot-testing` or XCTest `XCTAttachment(image:)` screenshot) to export PNG; then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width: pad 834 / mobile 375).
+- Use **snapshot testing** (e.g. `swift-snapshot-testing` or XCTest `XCTAttachment(image:)` screenshot) to export PNG; then compare with `references/verification.md` + `scripts/pixel-diff.py` (DPR=1, animations off, window = that tier's baseline width: pad 834 / mobile 375).
 - Fix the preview environment (`.previewDevice` / fixed size) to ensure reproducibility.
 
 ## 7. Known pitfalls

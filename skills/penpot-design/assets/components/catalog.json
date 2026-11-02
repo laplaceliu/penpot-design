@@ -1,0 +1,5113 @@
+{
+  "version": 1,
+  "name": "codesign-ui catalog components",
+  "kind": "catalog",
+  "contract": "token-contract.json",
+  "source": "https://github.com/codesign-chat/codesign-ui",
+  "packs": {
+    "catalog": [
+      "Accordion",
+      "AngleSlider",
+      "Avatar",
+      "Carousel",
+      "Checkbox",
+      "ClientOnly",
+      "Clipboard",
+      "Collapsible",
+      "Collection",
+      "ColorPicker",
+      "Combobox",
+      "DateInput",
+      "DatePicker",
+      "Dialog",
+      "DownloadTrigger",
+      "Drawer",
+      "Editable",
+      "Field",
+      "Fieldset",
+      "FileUpload",
+      "FloatingPanel",
+      "FocusTrap",
+      "Format",
+      "Frame",
+      "Highlight",
+      "HoverCard",
+      "ImageCropper",
+      "JsonTreeView",
+      "Listbox",
+      "Marquee",
+      "Menu",
+      "NavigationMenu",
+      "NumberInput",
+      "Pagination",
+      "PasswordInput",
+      "PinInput",
+      "Popover",
+      "Portal",
+      "Presence",
+      "Progress",
+      "QrCode",
+      "RadioGroup",
+      "RatingGroup",
+      "ScrollArea",
+      "SegmentGroup",
+      "Select",
+      "SignaturePad",
+      "Slider",
+      "Splitter",
+      "Steps",
+      "Swap",
+      "Switch",
+      "Tabs",
+      "TagsInput",
+      "Timer",
+      "Toast",
+      "Toc",
+      "Toggle",
+      "ToggleGroup",
+      "Tooltip",
+      "Tour",
+      "TreeView",
+      "Agent",
+      "Artifact",
+      "Attachments",
+      "ChainOfThought",
+      "Checkpoint",
+      "CodeBlock",
+      "Commit",
+      "Confirmation",
+      "Context",
+      "Conversation",
+      "EnvironmentVariables",
+      "InlineCitation",
+      "JSXPreview",
+      "Message",
+      "ModelSelector",
+      "PackageInfo",
+      "Plan",
+      "PromptInput",
+      "Question",
+      "Queue",
+      "Reasoning",
+      "Sandbox",
+      "SchemaDisplay",
+      "Shimmer",
+      "Snippet",
+      "Sources",
+      "StackTrace",
+      "Suggestion",
+      "Task",
+      "Terminal",
+      "TestResults",
+      "Tool",
+      "WebPreview",
+      "Alert",
+      "AvatarGroup",
+      "Badge",
+      "Breadcrumb",
+      "Button",
+      "ButtonGroup",
+      "Card",
+      "Chip",
+      "CommandPalette",
+      "Descriptions",
+      "EmptyState",
+      "FAB",
+      "IconButton",
+      "Input",
+      "KPI",
+      "Link",
+      "ListItem",
+      "MaskedInput",
+      "MiniCalendar",
+      "NavItem",
+      "Notification",
+      "Popconfirm",
+      "Search",
+      "Sheet",
+      "Skeleton",
+      "Spin",
+      "SplitButton",
+      "StatusText",
+      "TabBand",
+      "TableHeader",
+      "TableRow",
+      "TableState",
+      "Textarea",
+      "TimePicker",
+      "Timeline",
+      "Transfer"
+    ]
+  },
+  "components": [
+    {
+      "id": "Accordion",
+      "name": "Accordion",
+      "group": "navigation",
+      "factory": "accordion",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 5,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/accordion",
+      "parts": [
+        "AccordionItem",
+        "AccordionItemContent",
+        "AccordionItemIndicator",
+        "AccordionItemTrigger",
+        "AccordionRoot"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "AngleSlider",
+      "name": "AngleSlider",
+      "group": "forms",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "04",
+      "order": 6,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/angle-slider",
+      "parts": [
+        "AngleSliderControl",
+        "AngleSliderHiddenInput",
+        "AngleSliderLabel",
+        "AngleSliderMarker",
+        "AngleSliderMarkerGroup",
+        "AngleSliderRoot",
+        "AngleSliderThumb",
+        "AngleSliderValueText"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Avatar",
+      "name": "Avatar",
+      "group": "data",
+      "factory": "avatar",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 9,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/avatar",
+      "parts": [
+        "AvatarFallback",
+        "AvatarImage",
+        "AvatarRoot"
+      ],
+      "states": [
+        "default",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Carousel",
+      "name": "Carousel",
+      "group": "data",
+      "factory": "carousel",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 8,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/carousel",
+      "parts": [
+        "CarouselAutoplayIndicator",
+        "CarouselAutoplayTrigger",
+        "CarouselControl",
+        "CarouselIndicator",
+        "CarouselIndicatorGroup",
+        "CarouselItem",
+        "CarouselItemGroup",
+        "CarouselNextTrigger",
+        "CarouselPrevTrigger",
+        "CarouselProgressText",
+        "CarouselRoot"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Checkbox",
+      "name": "Checkbox",
+      "group": "selection",
+      "factory": "checkbox",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 1,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/checkbox",
+      "parts": [
+        "CheckboxControl",
+        "CheckboxGroup",
+        "CheckboxHiddenInput",
+        "CheckboxIndicator",
+        "CheckboxLabel",
+        "CheckboxRoot"
+      ],
+      "states": [
+        "off",
+        "on",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ClientOnly",
+      "name": "ClientOnly",
+      "group": "utility",
+      "factory": "custom",
+      "renderer": "none",
+      "kind": "nonVisual",
+      "page": "13",
+      "order": 99,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/client-only",
+      "parts": [
+        "ClientOnly"
+      ],
+      "states": [],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Clipboard",
+      "name": "Clipboard",
+      "group": "actions",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "03",
+      "order": 7,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/clipboard",
+      "parts": [
+        "ClipboardControl",
+        "ClipboardIndicator",
+        "ClipboardInput",
+        "ClipboardLabel",
+        "ClipboardRoot",
+        "ClipboardTrigger",
+        "ClipboardValueText"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Collapsible",
+      "name": "Collapsible",
+      "group": "navigation",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "08",
+      "order": 6,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/collapsible",
+      "parts": [
+        "CollapsibleContent",
+        "CollapsibleIndicator",
+        "CollapsibleRoot",
+        "CollapsibleTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Collection",
+      "name": "Collection",
+      "group": "utility",
+      "factory": "custom",
+      "renderer": "none",
+      "kind": "nonVisual",
+      "page": "13",
+      "order": 99,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/collection",
+      "parts": [],
+      "states": [],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ColorPicker",
+      "name": "ColorPicker",
+      "group": "selection",
+      "factory": "colorPicker",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 2,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/color-picker",
+      "parts": [
+        "ColorPickerArea",
+        "ColorPickerAreaBackground",
+        "ColorPickerAreaThumb",
+        "ColorPickerChannelInput",
+        "ColorPickerChannelSlider",
+        "ColorPickerChannelSliderLabel",
+        "ColorPickerChannelSliderThumb",
+        "ColorPickerChannelSliderTrack",
+        "ColorPickerChannelSliderValueText",
+        "ColorPickerContent",
+        "ColorPickerControl",
+        "ColorPickerEyeDropperTrigger",
+        "ColorPickerFormatSelect",
+        "ColorPickerFormatTrigger",
+        "ColorPickerHiddenInput",
+        "ColorPickerLabel",
+        "ColorPickerPositioner",
+        "ColorPickerRoot",
+        "ColorPickerSwatch",
+        "ColorPickerSwatchGroup",
+        "ColorPickerSwatchIndicator",
+        "ColorPickerSwatchTrigger",
+        "ColorPickerTransparencyGrid",
+        "ColorPickerTrigger",
+        "ColorPickerValueSwatch",
+        "ColorPickerValueText",
+        "ColorPickerView"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Combobox",
+      "name": "Combobox",
+      "group": "selection",
+      "factory": "combobox",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 3,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/combobox",
+      "parts": [
+        "ComboboxClearTrigger",
+        "ComboboxContent",
+        "ComboboxControl",
+        "ComboboxEmpty",
+        "ComboboxInput",
+        "ComboboxItem",
+        "ComboboxItemGroup",
+        "ComboboxItemGroupLabel",
+        "ComboboxItemIndicator",
+        "ComboboxItemText",
+        "ComboboxLabel",
+        "ComboboxList",
+        "ComboboxPositioner",
+        "ComboboxRoot",
+        "ComboboxTrigger"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "DateInput",
+      "name": "DateInput",
+      "group": "forms",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "04",
+      "order": 7,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/date-input",
+      "parts": [
+        "DateInputControl",
+        "DateInputHiddenInput",
+        "DateInputLabel",
+        "DateInputRoot",
+        "DateInputSegment",
+        "DateInputSegmentGroup"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "DatePicker",
+      "name": "DatePicker",
+      "group": "selection",
+      "factory": "datePicker",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 4,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/date-picker",
+      "parts": [
+        "DatePickerClearTrigger",
+        "DatePickerContent",
+        "DatePickerControl",
+        "DatePickerInput",
+        "DatePickerLabel",
+        "DatePickerMonthSelect",
+        "DatePickerNextTrigger",
+        "DatePickerPositioner",
+        "DatePickerPresetTrigger",
+        "DatePickerPrevTrigger",
+        "DatePickerRangeText",
+        "DatePickerRoot",
+        "DatePickerTable",
+        "DatePickerTableBody",
+        "DatePickerTableCell",
+        "DatePickerTableCellTrigger",
+        "DatePickerTableHead",
+        "DatePickerTableHeader",
+        "DatePickerTableRow",
+        "DatePickerTrigger",
+        "DatePickerValueText",
+        "DatePickerView",
+        "DatePickerViewControl",
+        "DatePickerViewTrigger",
+        "DatePickerWeekNumberCell",
+        "DatePickerWeekNumberHeaderCell",
+        "DatePickerYearSelect"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Dialog",
+      "name": "Dialog",
+      "group": "feedback",
+      "factory": "modal",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 6,
+      "layer": "components",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/components/dialog",
+      "parts": [
+        "DialogBackdrop",
+        "DialogCloseTrigger",
+        "DialogContent",
+        "DialogDescription",
+        "DialogPositioner",
+        "DialogRoot",
+        "DialogTitle",
+        "DialogTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "DownloadTrigger",
+      "name": "DownloadTrigger",
+      "group": "actions",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "03",
+      "order": 8,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/download-trigger",
+      "parts": [
+        "DownloadTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Drawer",
+      "name": "Drawer",
+      "group": "feedback",
+      "factory": "drawer",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 7,
+      "layer": "components",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/components/drawer",
+      "parts": [
+        "DrawerBackdrop",
+        "DrawerCloseTrigger",
+        "DrawerContent",
+        "DrawerDescription",
+        "DrawerGrabber",
+        "DrawerGrabberIndicator",
+        "DrawerIndent",
+        "DrawerIndentBackground",
+        "DrawerPositioner",
+        "DrawerRoot",
+        "DrawerStack",
+        "DrawerSwipeArea",
+        "DrawerTitle",
+        "DrawerTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Editable",
+      "name": "Editable",
+      "group": "forms",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "04",
+      "order": 8,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/editable",
+      "parts": [
+        "EditableArea",
+        "EditableCancelTrigger",
+        "EditableControl",
+        "EditableEditTrigger",
+        "EditableInput",
+        "EditableLabel",
+        "EditablePreview",
+        "EditableRoot",
+        "EditableSubmitTrigger"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Field",
+      "name": "Field",
+      "group": "forms",
+      "factory": "field",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 9,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/field",
+      "parts": [
+        "FieldErrorText",
+        "FieldHelperText",
+        "FieldInput",
+        "FieldItem",
+        "FieldLabel",
+        "FieldRequiredIndicator",
+        "FieldRoot",
+        "FieldSelect",
+        "FieldTextarea"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Fieldset",
+      "name": "Fieldset",
+      "group": "forms",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "04",
+      "order": 10,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/fieldset",
+      "parts": [
+        "FieldsetErrorText",
+        "FieldsetHelperText",
+        "FieldsetLegend",
+        "FieldsetRoot"
+      ],
+      "states": [
+        "default",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "FileUpload",
+      "name": "FileUpload",
+      "group": "forms",
+      "factory": "upload",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 11,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/file-upload",
+      "parts": [
+        "FileUploadClearTrigger",
+        "FileUploadDropzone",
+        "FileUploadHiddenInput",
+        "FileUploadItem",
+        "FileUploadItemDeleteTrigger",
+        "FileUploadItemGroup",
+        "FileUploadItemName",
+        "FileUploadItemPreview",
+        "FileUploadItemPreviewImage",
+        "FileUploadItemSizeText",
+        "FileUploadLabel",
+        "FileUploadRoot",
+        "FileUploadTrigger"
+      ],
+      "states": [
+        "default",
+        "dragging",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "FloatingPanel",
+      "name": "FloatingPanel",
+      "group": "feedback",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "09",
+      "order": 8,
+      "layer": "components",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/components/floating-panel",
+      "parts": [
+        "FloatingPanelBody",
+        "FloatingPanelCloseTrigger",
+        "FloatingPanelContent",
+        "FloatingPanelControl",
+        "FloatingPanelDragTrigger",
+        "FloatingPanelHeader",
+        "FloatingPanelPositioner",
+        "FloatingPanelResizeTrigger",
+        "FloatingPanelRoot",
+        "FloatingPanelStageTrigger",
+        "FloatingPanelTitle",
+        "FloatingPanelTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "FocusTrap",
+      "name": "FocusTrap",
+      "group": "utility",
+      "factory": "custom",
+      "renderer": "none",
+      "kind": "nonVisual",
+      "page": "13",
+      "order": 99,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/focus-trap",
+      "parts": [
+        "FocusTrap"
+      ],
+      "states": [],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Format",
+      "name": "Format",
+      "group": "utility",
+      "factory": "custom",
+      "renderer": "none",
+      "kind": "nonVisual",
+      "page": "13",
+      "order": 99,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/format",
+      "parts": [
+        "FormatByte",
+        "FormatNumber",
+        "FormatRelativeTime",
+        "FormatTime"
+      ],
+      "states": [],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Frame",
+      "name": "Frame",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 10,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/frame",
+      "parts": [
+        "Frame"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Highlight",
+      "name": "Highlight",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 11,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/highlight",
+      "parts": [
+        "Highlight"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "HoverCard",
+      "name": "HoverCard",
+      "group": "feedback",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "09",
+      "order": 9,
+      "layer": "components",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/components/hover-card",
+      "parts": [
+        "HoverCardArrow",
+        "HoverCardArrowTip",
+        "HoverCardContent",
+        "HoverCardPositioner",
+        "HoverCardRoot",
+        "HoverCardTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ImageCropper",
+      "name": "ImageCropper",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 12,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/image-cropper",
+      "parts": [
+        "ImageCropperGrid",
+        "ImageCropperHandle",
+        "ImageCropperImage",
+        "ImageCropperRoot",
+        "ImageCropperSelection",
+        "ImageCropperViewport"
+      ],
+      "states": [
+        "default",
+        "dragging"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "JsonTreeView",
+      "name": "JsonTreeView",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "06",
+      "order": 9,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/json-tree-view",
+      "parts": [
+        "JsonTreeViewRoot",
+        "JsonTreeViewTree"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Listbox",
+      "name": "Listbox",
+      "group": "data",
+      "factory": "select",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 10,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/listbox",
+      "parts": [
+        "ListboxContent",
+        "ListboxEmpty",
+        "ListboxInput",
+        "ListboxItem",
+        "ListboxItemGroup",
+        "ListboxItemGroupLabel",
+        "ListboxItemIndicator",
+        "ListboxItemText",
+        "ListboxLabel",
+        "ListboxRoot",
+        "ListboxValueText"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Marquee",
+      "name": "Marquee",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 13,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/marquee",
+      "parts": [
+        "MarqueeContent",
+        "MarqueeEdge",
+        "MarqueeItem",
+        "MarqueeRoot",
+        "MarqueeViewport"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Menu",
+      "name": "Menu",
+      "group": "navigation",
+      "factory": "menu",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 7,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/menu",
+      "parts": [
+        "MenuArrow",
+        "MenuArrowTip",
+        "MenuCheckboxItem",
+        "MenuContent",
+        "MenuContextTrigger",
+        "MenuIndicator",
+        "MenuItem",
+        "MenuItemGroup",
+        "MenuItemGroupLabel",
+        "MenuItemIndicator",
+        "MenuItemText",
+        "MenuPositioner",
+        "MenuRadioItem",
+        "MenuRadioItemGroup",
+        "MenuRoot",
+        "MenuSeparator",
+        "MenuTrigger",
+        "MenuTriggerItem"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "NavigationMenu",
+      "name": "NavigationMenu",
+      "group": "navigation",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "08",
+      "order": 8,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/navigation-menu",
+      "parts": [
+        "NavigationMenuArrow",
+        "NavigationMenuContent",
+        "NavigationMenuIndicator",
+        "NavigationMenuItem",
+        "NavigationMenuItemIndicator",
+        "NavigationMenuLink",
+        "NavigationMenuList",
+        "NavigationMenuRoot",
+        "NavigationMenuTrigger",
+        "NavigationMenuViewport",
+        "NavigationMenuViewportPositioner"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "NumberInput",
+      "name": "NumberInput",
+      "group": "forms",
+      "factory": "numberField",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 12,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/number-input",
+      "parts": [
+        "NumberInputControl",
+        "NumberInputDecrementTrigger",
+        "NumberInputIncrementTrigger",
+        "NumberInputInput",
+        "NumberInputLabel",
+        "NumberInputRoot",
+        "NumberInputScrubber",
+        "NumberInputValueText"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Pagination",
+      "name": "Pagination",
+      "group": "navigation",
+      "factory": "pagination",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 9,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/pagination",
+      "parts": [
+        "PaginationEllipsis",
+        "PaginationFirstTrigger",
+        "PaginationItem",
+        "PaginationLastTrigger",
+        "PaginationNextTrigger",
+        "PaginationPrevTrigger",
+        "PaginationRoot"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "PasswordInput",
+      "name": "PasswordInput",
+      "group": "forms",
+      "factory": "passwordField",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 13,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/password-input",
+      "parts": [
+        "PasswordInputControl",
+        "PasswordInputIndicator",
+        "PasswordInputInput",
+        "PasswordInputLabel",
+        "PasswordInputRoot",
+        "PasswordInputVisibilityTrigger"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "PinInput",
+      "name": "PinInput",
+      "group": "forms",
+      "factory": "otpInput",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 14,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/pin-input",
+      "parts": [
+        "PinInputControl",
+        "PinInputHiddenInput",
+        "PinInputInput",
+        "PinInputLabel",
+        "PinInputRoot"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Popover",
+      "name": "Popover",
+      "group": "feedback",
+      "factory": "popover",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 10,
+      "layer": "components",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/components/popover",
+      "parts": [
+        "PopoverAnchor",
+        "PopoverArrow",
+        "PopoverArrowTip",
+        "PopoverCloseTrigger",
+        "PopoverContent",
+        "PopoverDescription",
+        "PopoverIndicator",
+        "PopoverPositioner",
+        "PopoverRoot",
+        "PopoverTitle",
+        "PopoverTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Portal",
+      "name": "Portal",
+      "group": "utility",
+      "factory": "custom",
+      "renderer": "none",
+      "kind": "nonVisual",
+      "page": "13",
+      "order": 99,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/portal",
+      "parts": [
+        "Portal"
+      ],
+      "states": [],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Presence",
+      "name": "Presence",
+      "group": "utility",
+      "factory": "custom",
+      "renderer": "none",
+      "kind": "nonVisual",
+      "page": "13",
+      "order": 99,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/presence",
+      "parts": [],
+      "states": [],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Progress",
+      "name": "Progress",
+      "group": "data",
+      "factory": "progress",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 14,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/progress",
+      "parts": [
+        "ProgressCircle",
+        "ProgressCircleRange",
+        "ProgressCircleTrack",
+        "ProgressLabel",
+        "ProgressRange",
+        "ProgressRoot",
+        "ProgressTrack",
+        "ProgressValueText",
+        "ProgressView"
+      ],
+      "states": [
+        "default",
+        "indeterminate"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "QrCode",
+      "name": "QrCode",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 15,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/qr-code",
+      "parts": [
+        "QrCodeDownloadTrigger",
+        "QrCodeFrame",
+        "QrCodeOverlay",
+        "QrCodePattern",
+        "QrCodeRoot"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "RadioGroup",
+      "name": "RadioGroup",
+      "group": "selection",
+      "factory": "radio",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 6,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/radio-group",
+      "parts": [
+        "RadioGroupIndicator",
+        "RadioGroupItem",
+        "RadioGroupItemControl",
+        "RadioGroupItemHiddenInput",
+        "RadioGroupItemText",
+        "RadioGroupLabel",
+        "RadioGroupRoot"
+      ],
+      "states": [
+        "off",
+        "on",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "RatingGroup",
+      "name": "RatingGroup",
+      "group": "selection",
+      "factory": "rating",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 7,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/rating-group",
+      "parts": [
+        "RatingGroupControl",
+        "RatingGroupHiddenInput",
+        "RatingGroupItem",
+        "RatingGroupLabel",
+        "RatingGroupRoot"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ScrollArea",
+      "name": "ScrollArea",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 16,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/scroll-area",
+      "parts": [
+        "ScrollAreaContent",
+        "ScrollAreaCorner",
+        "ScrollAreaRoot",
+        "ScrollAreaScrollbar",
+        "ScrollAreaThumb",
+        "ScrollAreaViewport"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "SegmentGroup",
+      "name": "SegmentGroup",
+      "group": "selection",
+      "factory": "segmented",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 8,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/segment-group",
+      "parts": [
+        "SegmentGroupIndicator",
+        "SegmentGroupItem",
+        "SegmentGroupItemControl",
+        "SegmentGroupItemHiddenInput",
+        "SegmentGroupItemText",
+        "SegmentGroupLabel",
+        "SegmentGroupRoot"
+      ],
+      "states": [
+        "off",
+        "on",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Select",
+      "name": "Select",
+      "group": "selection",
+      "factory": "select",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 9,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/select",
+      "parts": [
+        "SelectClearTrigger",
+        "SelectContent",
+        "SelectControl",
+        "SelectHiddenSelect",
+        "SelectIndicator",
+        "SelectItem",
+        "SelectItemGroup",
+        "SelectItemGroupLabel",
+        "SelectItemIndicator",
+        "SelectItemText",
+        "SelectLabel",
+        "SelectList",
+        "SelectPositioner",
+        "SelectRoot",
+        "SelectTrigger",
+        "SelectValueText"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "SignaturePad",
+      "name": "SignaturePad",
+      "group": "forms",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "04",
+      "order": 15,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/signature-pad",
+      "parts": [
+        "SignaturePadClearTrigger",
+        "SignaturePadControl",
+        "SignaturePadGuide",
+        "SignaturePadHiddenInput",
+        "SignaturePadLabel",
+        "SignaturePadRoot",
+        "SignaturePadSegment"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Slider",
+      "name": "Slider",
+      "group": "selection",
+      "factory": "slider",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 10,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/slider",
+      "parts": [
+        "SliderControl",
+        "SliderDraggingIndicator",
+        "SliderHiddenInput",
+        "SliderLabel",
+        "SliderMarker",
+        "SliderMarkerGroup",
+        "SliderRange",
+        "SliderRoot",
+        "SliderThumb",
+        "SliderTrack",
+        "SliderValueText"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Splitter",
+      "name": "Splitter",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 17,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/splitter",
+      "parts": [
+        "SplitterPanel",
+        "SplitterResizeTrigger",
+        "SplitterResizeTriggerIndicator",
+        "SplitterRoot"
+      ],
+      "states": [
+        "default",
+        "focus"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Steps",
+      "name": "Steps",
+      "group": "navigation",
+      "factory": "steps",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 10,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/steps",
+      "parts": [
+        "StepsCompletedContent",
+        "StepsContent",
+        "StepsIndicator",
+        "StepsItem",
+        "StepsList",
+        "StepsNextTrigger",
+        "StepsPrevTrigger",
+        "StepsProgress",
+        "StepsRoot",
+        "StepsSeparator",
+        "StepsTrigger"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Swap",
+      "name": "Swap",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 18,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/swap",
+      "parts": [
+        "SwapIndicator",
+        "SwapRoot"
+      ],
+      "states": [
+        "off",
+        "on"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Switch",
+      "name": "Switch",
+      "group": "selection",
+      "factory": "switch",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 11,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/switch",
+      "parts": [
+        "SwitchControl",
+        "SwitchHiddenInput",
+        "SwitchLabel",
+        "SwitchRoot",
+        "SwitchThumb"
+      ],
+      "states": [
+        "off",
+        "on",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Tabs",
+      "name": "Tabs",
+      "group": "navigation",
+      "factory": "tabs",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 11,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/tabs",
+      "parts": [
+        "TabsRoot"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "selected"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TagsInput",
+      "name": "TagsInput",
+      "group": "forms",
+      "factory": "multiSelect",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 16,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/tags-input",
+      "parts": [
+        "TagsInputClearTrigger",
+        "TagsInputControl",
+        "TagsInputHiddenInput",
+        "TagsInputInput",
+        "TagsInputItem",
+        "TagsInputItemDeleteTrigger",
+        "TagsInputItemInput",
+        "TagsInputItemPreview",
+        "TagsInputItemText",
+        "TagsInputLabel",
+        "TagsInputRoot"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Timer",
+      "name": "Timer",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "07",
+      "order": 19,
+      "layer": "components",
+      "category": "Data Display",
+      "source": "packages/react/src/components/timer",
+      "parts": [
+        "TimerActionTrigger",
+        "TimerArea",
+        "TimerControl",
+        "TimerItem",
+        "TimerRoot",
+        "TimerSeparator"
+      ],
+      "states": [
+        "default",
+        "running",
+        "paused"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Toast",
+      "name": "Toast",
+      "group": "feedback",
+      "factory": "toast",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 11,
+      "layer": "components",
+      "category": "Utilities",
+      "source": "packages/react/src/components/toast",
+      "parts": [
+        "ToastActionTrigger",
+        "ToastCloseTrigger",
+        "ToastDescription",
+        "ToastRoot",
+        "ToastTitle",
+        "Toaster"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Toc",
+      "name": "Toc",
+      "group": "navigation",
+      "factory": "anchor",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 12,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/toc",
+      "parts": [
+        "TocContent",
+        "TocIndicator",
+        "TocItem",
+        "TocLink",
+        "TocList",
+        "TocNav",
+        "TocRoot",
+        "TocTitle"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Toggle",
+      "name": "Toggle",
+      "group": "actions",
+      "factory": "toggle",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 9,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/toggle",
+      "parts": [
+        "ToggleIndicator",
+        "ToggleRoot"
+      ],
+      "states": [
+        "off",
+        "on",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ToggleGroup",
+      "name": "ToggleGroup",
+      "group": "actions",
+      "factory": "segmented",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 10,
+      "layer": "components",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/components/toggle-group",
+      "parts": [
+        "ToggleGroupItem",
+        "ToggleGroupRoot"
+      ],
+      "states": [
+        "off",
+        "on",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Tooltip",
+      "name": "Tooltip",
+      "group": "feedback",
+      "factory": "tooltip",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 12,
+      "layer": "components",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/components/tooltip",
+      "parts": [
+        "TooltipArrow",
+        "TooltipArrowTip",
+        "TooltipContent",
+        "TooltipPositioner",
+        "TooltipRoot",
+        "TooltipTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Tour",
+      "name": "Tour",
+      "group": "feedback",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "09",
+      "order": 13,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/tour",
+      "parts": [
+        "TourActionTrigger",
+        "TourActions",
+        "TourArrow",
+        "TourArrowTip",
+        "TourBackdrop",
+        "TourCloseTrigger",
+        "TourContent",
+        "TourControl",
+        "TourDescription",
+        "TourPositioner",
+        "TourProgressText",
+        "TourRoot",
+        "TourSpotlight",
+        "TourTitle"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TreeView",
+      "name": "TreeView",
+      "group": "data",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "06",
+      "order": 11,
+      "layer": "components",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/components/tree-view",
+      "parts": [
+        "TreeViewBranch",
+        "TreeViewBranchContent",
+        "TreeViewBranchControl",
+        "TreeViewBranchIndentGuide",
+        "TreeViewBranchIndicator",
+        "TreeViewBranchText",
+        "TreeViewBranchTrigger",
+        "TreeViewItem",
+        "TreeViewItemIndicator",
+        "TreeViewItemText",
+        "TreeViewLabel",
+        "TreeViewNodeCheckbox",
+        "TreeViewNodeCheckboxIndicator",
+        "TreeViewNodeRenameInput",
+        "TreeViewRoot",
+        "TreeViewTree"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "selected",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Agent",
+      "name": "Agent",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 17,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/agent",
+      "parts": [
+        "Agent",
+        "AgentContent",
+        "AgentHeader",
+        "AgentInstructions",
+        "AgentOutput",
+        "AgentTool",
+        "AgentTools"
+      ],
+      "states": [
+        "idle",
+        "running",
+        "done"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Artifact",
+      "name": "Artifact",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 18,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/artifact",
+      "parts": [
+        "Artifact",
+        "ArtifactAction",
+        "ArtifactActions",
+        "ArtifactContent",
+        "ArtifactDescription",
+        "ArtifactHeader",
+        "ArtifactTitle"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Attachments",
+      "name": "Attachments",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 5,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/attachments",
+      "parts": [
+        "Attachment",
+        "AttachmentEmpty",
+        "AttachmentInfo",
+        "AttachmentPreview",
+        "AttachmentRemove",
+        "Attachments"
+      ],
+      "states": [
+        "default",
+        "hover"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ChainOfThought",
+      "name": "ChainOfThought",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 10,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/chain-of-thought",
+      "parts": [
+        "ChainOfThought",
+        "ChainOfThoughtContent",
+        "ChainOfThoughtHeader",
+        "ChainOfThoughtImage",
+        "ChainOfThoughtSearchResult",
+        "ChainOfThoughtSearchResults",
+        "ChainOfThoughtStep"
+      ],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Checkpoint",
+      "name": "Checkpoint",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 29,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/checkpoint",
+      "parts": [
+        "Checkpoint",
+        "CheckpointIcon",
+        "CheckpointTrigger"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "CodeBlock",
+      "name": "CodeBlock",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 19,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/code-block",
+      "parts": [
+        "CodeBlock",
+        "CodeBlockActions",
+        "CodeBlockContainer",
+        "CodeBlockContent",
+        "CodeBlockCopyButton",
+        "CodeBlockFilename",
+        "CodeBlockHeader",
+        "CodeBlockTitle"
+      ],
+      "states": [
+        "default",
+        "copied"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Commit",
+      "name": "Commit",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 28,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/commit",
+      "parts": [
+        "Commit",
+        "CommitActions",
+        "CommitAuthor",
+        "CommitAuthorAvatar",
+        "CommitContent",
+        "CommitCopyButton",
+        "CommitFile",
+        "CommitFileAdditions",
+        "CommitFileChanges",
+        "CommitFileDeletions",
+        "CommitFileInfo",
+        "CommitFilePath",
+        "CommitFileStatus",
+        "CommitFiles",
+        "CommitHash",
+        "CommitHeader",
+        "CommitInfo",
+        "CommitMessage",
+        "CommitMetadata",
+        "CommitSeparator",
+        "CommitTimestamp"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Confirmation",
+      "name": "Confirmation",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 15,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/confirmation",
+      "parts": [
+        "Confirmation",
+        "ConfirmationAccepted",
+        "ConfirmationAction",
+        "ConfirmationActions",
+        "ConfirmationRejected",
+        "ConfirmationRequest",
+        "ConfirmationTitle"
+      ],
+      "states": [
+        "request",
+        "accepted",
+        "rejected"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Context",
+      "name": "Context",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 30,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/context",
+      "parts": [
+        "Context",
+        "ContextCacheUsage",
+        "ContextContent",
+        "ContextContentBody",
+        "ContextContentFooter",
+        "ContextContentHeader",
+        "ContextInputUsage",
+        "ContextOutputUsage",
+        "ContextReasoningUsage",
+        "ContextTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Conversation",
+      "name": "Conversation",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 1,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/conversation",
+      "parts": [
+        "Conversation",
+        "ConversationContent",
+        "ConversationEmptyState",
+        "ConversationScrollToBottom"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "EnvironmentVariables",
+      "name": "EnvironmentVariables",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 26,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/environment-variables",
+      "parts": [
+        "EnvironmentVariable",
+        "EnvironmentVariableCopyButton",
+        "EnvironmentVariableGroup",
+        "EnvironmentVariableName",
+        "EnvironmentVariableRequired",
+        "EnvironmentVariableValue",
+        "EnvironmentVariables",
+        "EnvironmentVariablesContent",
+        "EnvironmentVariablesHeader",
+        "EnvironmentVariablesTitle",
+        "EnvironmentVariablesToggle"
+      ],
+      "states": [
+        "default",
+        "revealed"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "InlineCitation",
+      "name": "InlineCitation",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 8,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/inline-citation",
+      "parts": [
+        "InlineCitation",
+        "InlineCitationCard",
+        "InlineCitationCardBody",
+        "InlineCitationCardTrigger",
+        "InlineCitationCarousel",
+        "InlineCitationCarouselContent",
+        "InlineCitationCarouselHeader",
+        "InlineCitationCarouselIndex",
+        "InlineCitationCarouselItem",
+        "InlineCitationCarouselNext",
+        "InlineCitationCarouselPrev",
+        "InlineCitationQuote",
+        "InlineCitationSource",
+        "InlineCitationText"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "JSXPreview",
+      "name": "JsxPreview",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 24,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/jsx-preview",
+      "parts": [
+        "JSXPreview",
+        "JSXPreviewContent",
+        "JSXPreviewError"
+      ],
+      "states": [
+        "default",
+        "error"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Message",
+      "name": "Message",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 2,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/message",
+      "parts": [
+        "Message",
+        "MessageAction",
+        "MessageActions",
+        "MessageBranch",
+        "MessageBranchContent",
+        "MessageBranchNext",
+        "MessageBranchPage",
+        "MessageBranchPrevious",
+        "MessageBranchSelector",
+        "MessageContent",
+        "MessageToolbar"
+      ],
+      "states": [
+        "default",
+        "hover"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ModelSelector",
+      "name": "ModelSelector",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 4,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/model-selector",
+      "parts": [
+        "ModelSelector",
+        "ModelSelectorContent",
+        "ModelSelectorEmpty",
+        "ModelSelectorGroup",
+        "ModelSelectorInput",
+        "ModelSelectorItem",
+        "ModelSelectorList",
+        "ModelSelectorLogo",
+        "ModelSelectorLogoGroup",
+        "ModelSelectorName",
+        "ModelSelectorSeparator",
+        "ModelSelectorShortcut",
+        "ModelSelectorTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "PackageInfo",
+      "name": "PackageInfo",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 27,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/package-info",
+      "parts": [
+        "PackageInfo",
+        "PackageInfoChangeType",
+        "PackageInfoContent",
+        "PackageInfoDependencies",
+        "PackageInfoDependency",
+        "PackageInfoDescription",
+        "PackageInfoHeader",
+        "PackageInfoName",
+        "PackageInfoVersion"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Plan",
+      "name": "Plan",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 11,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/plan",
+      "parts": [
+        "Plan",
+        "PlanAction",
+        "PlanBody",
+        "PlanContent",
+        "PlanDescription",
+        "PlanFooter",
+        "PlanHeader",
+        "PlanTitle",
+        "PlanTrigger"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "PromptInput",
+      "name": "PromptInput",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 3,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/prompt-input",
+      "parts": [
+        "PromptInput",
+        "PromptInputActionAddAttachments",
+        "PromptInputActionAddScreenshot",
+        "PromptInputActionMenu",
+        "PromptInputActionMenuContent",
+        "PromptInputActionMenuItem",
+        "PromptInputActionMenuTrigger",
+        "PromptInputBody",
+        "PromptInputButton",
+        "PromptInputFooter",
+        "PromptInputHeader",
+        "PromptInputSubmit",
+        "PromptInputTextarea",
+        "PromptInputTools"
+      ],
+      "states": [
+        "default",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Question",
+      "name": "Question",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 16,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/question",
+      "parts": [
+        "Question",
+        "QuestionActions",
+        "QuestionDescription",
+        "QuestionInput",
+        "QuestionOption",
+        "QuestionOptions",
+        "QuestionPrompt",
+        "QuestionSubmit"
+      ],
+      "states": [
+        "default",
+        "answered"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Queue",
+      "name": "Queue",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 14,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/queue",
+      "parts": [
+        "Queue",
+        "QueueItem",
+        "QueueItemAction",
+        "QueueItemActions",
+        "QueueItemAttachment",
+        "QueueItemContent",
+        "QueueItemDescription",
+        "QueueItemFile",
+        "QueueItemImage",
+        "QueueItemIndicator",
+        "QueueList",
+        "QueueSection",
+        "QueueSectionContent",
+        "QueueSectionLabel",
+        "QueueSectionTrigger"
+      ],
+      "states": [
+        "default",
+        "hover"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Reasoning",
+      "name": "Reasoning",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 9,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/reasoning",
+      "parts": [
+        "Reasoning",
+        "ReasoningContent",
+        "ReasoningTrigger"
+      ],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Sandbox",
+      "name": "Sandbox",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 22,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/sandbox",
+      "parts": [
+        "Sandbox",
+        "SandboxContent",
+        "SandboxHeader",
+        "SandboxTabContent",
+        "SandboxTabs",
+        "SandboxTabsBar",
+        "SandboxTabsList",
+        "SandboxTabsTrigger"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "SchemaDisplay",
+      "name": "SchemaDisplay",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 25,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/schema-display",
+      "parts": [
+        "SchemaDisplay",
+        "SchemaDisplayContent",
+        "SchemaDisplayDescription",
+        "SchemaDisplayExample",
+        "SchemaDisplayHeader",
+        "SchemaDisplayMethod",
+        "SchemaDisplayParameter",
+        "SchemaDisplayPath",
+        "SchemaDisplayProperty",
+        "SchemaDisplaySection"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Shimmer",
+      "name": "Shimmer",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 33,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/shimmer",
+      "parts": [
+        "Shimmer"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Snippet",
+      "name": "Snippet",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 20,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/snippet",
+      "parts": [
+        "Snippet",
+        "SnippetAddon",
+        "SnippetCopyButton",
+        "SnippetInput",
+        "SnippetText"
+      ],
+      "states": [
+        "default",
+        "copied"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Sources",
+      "name": "Sources",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 7,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/sources",
+      "parts": [
+        "Source",
+        "Sources",
+        "SourcesContent",
+        "SourcesTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "StackTrace",
+      "name": "StackTrace",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 31,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/stack-trace",
+      "parts": [
+        "StackTrace",
+        "StackTraceActions",
+        "StackTraceContent",
+        "StackTraceCopyButton",
+        "StackTraceErrorMessage",
+        "StackTraceErrorType",
+        "StackTraceFrames",
+        "StackTraceHeader"
+      ],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Suggestion",
+      "name": "Suggestion",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 6,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/suggestion",
+      "parts": [
+        "Suggestion",
+        "Suggestions"
+      ],
+      "states": [
+        "default",
+        "hover"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Task",
+      "name": "Task",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 13,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/task",
+      "parts": [
+        "Task",
+        "TaskContent",
+        "TaskItem",
+        "TaskItemFile",
+        "TaskTrigger"
+      ],
+      "states": [
+        "pending",
+        "running",
+        "done"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Terminal",
+      "name": "Terminal",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 21,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/terminal",
+      "parts": [
+        "Terminal",
+        "TerminalActions",
+        "TerminalClearButton",
+        "TerminalContent",
+        "TerminalCopyButton",
+        "TerminalHeader",
+        "TerminalStatus",
+        "TerminalTitle"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TestResults",
+      "name": "TestResults",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 32,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/test-results",
+      "parts": [
+        "Test",
+        "TestDuration",
+        "TestError",
+        "TestErrorMessage",
+        "TestErrorStack",
+        "TestName",
+        "TestResults",
+        "TestResultsContent",
+        "TestResultsDuration",
+        "TestResultsHeader",
+        "TestResultsProgress",
+        "TestResultsSummary",
+        "TestStatus",
+        "TestSuite",
+        "TestSuiteContent",
+        "TestSuiteName",
+        "TestSuiteStats"
+      ],
+      "states": [
+        "default",
+        "expanded"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Tool",
+      "name": "Tool",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 12,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/tool",
+      "parts": [
+        "Tool",
+        "ToolContent",
+        "ToolHeader",
+        "ToolInput",
+        "ToolOutput"
+      ],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "WebPreview",
+      "name": "WebPreview",
+      "group": "ai",
+      "factory": "custom",
+      "renderer": "anatomy",
+      "kind": "visual",
+      "page": "18",
+      "order": 23,
+      "layer": "ai",
+      "category": "AI & Agents",
+      "source": "packages/react/src/ai/web-preview",
+      "parts": [
+        "WebPreview",
+        "WebPreviewBody",
+        "WebPreviewConsole",
+        "WebPreviewNavigation",
+        "WebPreviewNavigationButton",
+        "WebPreviewUrl"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Alert",
+      "name": "Alert",
+      "group": "feedback",
+      "factory": "alert",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 1,
+      "layer": "kit",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/kit/alert",
+      "parts": [
+        "Alert",
+        "AlertAction",
+        "AlertDescription",
+        "AlertIcon",
+        "AlertTitle"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "AvatarGroup",
+      "name": "AvatarGroup",
+      "group": "data",
+      "factory": "avatarGroup",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 4,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/avatar-group",
+      "parts": [
+        "AvatarGroup",
+        "AvatarGroupItem"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Badge",
+      "name": "Badge",
+      "group": "data",
+      "factory": "badge",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 1,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/badge",
+      "parts": [
+        "Badge"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Breadcrumb",
+      "name": "Breadcrumb",
+      "group": "navigation",
+      "factory": "breadcrumb",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 3,
+      "layer": "kit",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/kit/breadcrumb",
+      "parts": [
+        "Breadcrumb",
+        "BreadcrumbCurrent",
+        "BreadcrumbItem",
+        "BreadcrumbLink",
+        "BreadcrumbList",
+        "BreadcrumbSeparator"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Button",
+      "name": "Button",
+      "group": "actions",
+      "factory": "button",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 1,
+      "layer": "kit",
+      "category": "Actions",
+      "source": "packages/react/src/kit/button",
+      "parts": [
+        "Button",
+        "ButtonIcon",
+        "ButtonLabel"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ButtonGroup",
+      "name": "ButtonGroup",
+      "group": "actions",
+      "factory": "buttonGroup",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 3,
+      "layer": "kit",
+      "category": "Actions",
+      "source": "packages/react/src/kit/button-group",
+      "parts": [
+        "ButtonGroup",
+        "ButtonGroupItem"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Card",
+      "name": "Card",
+      "group": "data",
+      "factory": "card",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 5,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/card",
+      "parts": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardFooter",
+        "CardHeader",
+        "CardTitle"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "selected",
+        "focus"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Chip",
+      "name": "Chip",
+      "group": "data",
+      "factory": "chip",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 3,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/chip",
+      "parts": [
+        "Chip",
+        "ChipLabel",
+        "ChipRemoveTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "CommandPalette",
+      "name": "CommandPalette",
+      "group": "navigation",
+      "factory": "commandPalette",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 4,
+      "layer": "kit",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/kit/command-palette",
+      "parts": [
+        "CommandPalette",
+        "CommandPaletteEmpty",
+        "CommandPaletteGroup",
+        "CommandPaletteInput",
+        "CommandPaletteItem",
+        "CommandPaletteList"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Descriptions",
+      "name": "Descriptions",
+      "group": "data",
+      "factory": "descriptions",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 5,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/descriptions",
+      "parts": [
+        "Descriptions",
+        "DescriptionsItem",
+        "DescriptionsLabel",
+        "DescriptionsValue"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "EmptyState",
+      "name": "EmptyState",
+      "group": "data",
+      "factory": "emptyState",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 8,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/empty-state",
+      "parts": [
+        "EmptyState",
+        "EmptyStateAction",
+        "EmptyStateDescription",
+        "EmptyStateIcon",
+        "EmptyStateTitle"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "FAB",
+      "name": "Fab",
+      "group": "actions",
+      "factory": "fab",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 5,
+      "layer": "kit",
+      "category": "Actions",
+      "source": "packages/react/src/kit/fab",
+      "parts": [
+        "FabIcon",
+        "FabLabel",
+        "FabRoot"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "IconButton",
+      "name": "IconButton",
+      "group": "actions",
+      "factory": "iconButton",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 2,
+      "layer": "kit",
+      "category": "Actions",
+      "source": "packages/react/src/kit/icon-button",
+      "parts": [
+        "IconButton",
+        "IconButtonIcon"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Input",
+      "name": "Input",
+      "group": "forms",
+      "factory": "input",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 1,
+      "layer": "kit",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/kit/input",
+      "parts": [
+        "Input"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "KPI",
+      "name": "Kpi",
+      "group": "data",
+      "factory": "kpi",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 6,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/kpi",
+      "parts": [
+        "KpiDelta",
+        "KpiLabel",
+        "KpiRoot",
+        "KpiValue"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Link",
+      "name": "Link",
+      "group": "actions",
+      "factory": "link",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 6,
+      "layer": "kit",
+      "category": "Actions",
+      "source": "packages/react/src/kit/link",
+      "parts": [
+        "Link"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "ListItem",
+      "name": "ListItem",
+      "group": "data",
+      "factory": "listItem",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 4,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/list-item",
+      "parts": [
+        "ListItem",
+        "ListItemContent",
+        "ListItemDescription",
+        "ListItemTitle",
+        "ListItemTrailing"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "selected",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "MaskedInput",
+      "name": "MaskedInput",
+      "group": "forms",
+      "factory": "maskedInput",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 4,
+      "layer": "kit",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/kit/masked-input",
+      "parts": [
+        "MaskedInput"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "MiniCalendar",
+      "name": "MiniCalendar",
+      "group": "data",
+      "factory": "miniCalendar",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 7,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/mini-calendar",
+      "parts": [
+        "MiniCalendar",
+        "MiniCalendarDay",
+        "MiniCalendarGrid"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "NavItem",
+      "name": "NavItem",
+      "group": "navigation",
+      "factory": "navItem",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 1,
+      "layer": "kit",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/kit/nav-item",
+      "parts": [
+        "NavItem",
+        "NavItemIcon",
+        "NavItemLabel",
+        "NavItemTrailing"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Notification",
+      "name": "Notification",
+      "group": "feedback",
+      "factory": "notification",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 2,
+      "layer": "kit",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/kit/notification",
+      "parts": [
+        "Notification",
+        "NotificationAction",
+        "NotificationCloseTrigger",
+        "NotificationDescription",
+        "NotificationIcon",
+        "NotificationTitle"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Popconfirm",
+      "name": "Popconfirm",
+      "group": "feedback",
+      "factory": "popconfirm",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 3,
+      "layer": "kit",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/kit/popconfirm",
+      "parts": [
+        "Popconfirm",
+        "PopconfirmActions",
+        "PopconfirmContent",
+        "PopconfirmDescription",
+        "PopconfirmTitle",
+        "PopconfirmTrigger"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Search",
+      "name": "Search",
+      "group": "forms",
+      "factory": "searchField",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 3,
+      "layer": "kit",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/kit/search",
+      "parts": [
+        "Search",
+        "SearchClearTrigger",
+        "SearchIcon",
+        "SearchInput"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Sheet",
+      "name": "Sheet",
+      "group": "feedback",
+      "factory": "sheet",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 5,
+      "layer": "kit",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/kit/sheet",
+      "parts": [
+        "Sheet",
+        "SheetBody",
+        "SheetCloseTrigger",
+        "SheetContent",
+        "SheetFooter",
+        "SheetHeader",
+        "SheetTitle"
+      ],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Skeleton",
+      "name": "Skeleton",
+      "group": "data",
+      "factory": "skeleton",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 7,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/skeleton",
+      "parts": [
+        "Skeleton"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Spin",
+      "name": "Spin",
+      "group": "feedback",
+      "factory": "spin",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "09",
+      "order": 4,
+      "layer": "kit",
+      "category": "Overlays & Dialogs",
+      "source": "packages/react/src/kit/spin",
+      "parts": [
+        "Spin",
+        "SpinIndicator",
+        "SpinLabel"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.inverse",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body",
+        "shadow.card"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "SplitButton",
+      "name": "SplitButton",
+      "group": "actions",
+      "factory": "splitButton",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "03",
+      "order": 4,
+      "layer": "kit",
+      "category": "Actions",
+      "source": "packages/react/src/kit/split-button",
+      "parts": [
+        "SplitButton",
+        "SplitButtonAction",
+        "SplitButtonTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.text",
+        "color.border",
+        "color.focus",
+        "radius.control",
+        "type.label",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "StatusText",
+      "name": "StatusText",
+      "group": "data",
+      "factory": "statusText",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "07",
+      "order": 2,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/status-text",
+      "parts": [
+        "StatusText",
+        "StatusTextIndicator"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TabBand",
+      "name": "TabBand",
+      "group": "navigation",
+      "factory": "tabBand",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "08",
+      "order": 2,
+      "layer": "kit",
+      "category": "Layout & Navigation",
+      "source": "packages/react/src/kit/tab-band",
+      "parts": [
+        "TabBand",
+        "TabBandItem",
+        "TabBandList"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.brand",
+        "color.border",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TableHeader",
+      "name": "TableHeader",
+      "group": "data",
+      "factory": "tableHeader",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 1,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/table-header",
+      "parts": [
+        "TableHeader",
+        "TableHeaderCell",
+        "TableHeaderSortTrigger"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TableRow",
+      "name": "TableRow",
+      "group": "data",
+      "factory": "tableRow",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 2,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/table-row",
+      "parts": [
+        "TableRow",
+        "TableRowCell"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "selected",
+        "focus",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TableState",
+      "name": "TableState",
+      "group": "data",
+      "factory": "tableState",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 3,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/table-state",
+      "parts": [
+        "TableState",
+        "TableStateAction",
+        "TableStateDescription",
+        "TableStateIcon",
+        "TableStateTitle"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Textarea",
+      "name": "Textarea",
+      "group": "forms",
+      "factory": "textarea",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 2,
+      "layer": "kit",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/kit/textarea",
+      "parts": [
+        "Textarea"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "invalid",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "TimePicker",
+      "name": "TimePicker",
+      "group": "selection",
+      "factory": "timePicker",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "05",
+      "order": 5,
+      "layer": "kit",
+      "category": "Selection & Pickers",
+      "source": "packages/react/src/kit/time-picker",
+      "parts": [
+        "TimePicker",
+        "TimePickerContent",
+        "TimePickerInput",
+        "TimePickerTrigger"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.brand",
+        "color.on-brand",
+        "color.surface",
+        "color.border-strong",
+        "color.focus",
+        "radius.control",
+        "type.label"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Timeline",
+      "name": "Timeline",
+      "group": "data",
+      "factory": "timeline",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "06",
+      "order": 6,
+      "layer": "kit",
+      "category": "Data Display",
+      "source": "packages/react/src/kit/timeline",
+      "parts": [
+        "Timeline",
+        "TimelineContent",
+        "TimelineIndicator",
+        "TimelineItem"
+      ],
+      "states": [
+        "default"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface-raised",
+        "color.surface-alt",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "radius.card",
+        "type.body"
+      ],
+      "bindings": []
+    },
+    {
+      "id": "Transfer",
+      "name": "Transfer",
+      "group": "forms",
+      "factory": "transfer",
+      "renderer": "factory",
+      "kind": "visual",
+      "page": "04",
+      "order": 5,
+      "layer": "kit",
+      "category": "Forms & Inputs",
+      "source": "packages/react/src/kit/transfer",
+      "parts": [
+        "Transfer",
+        "TransferActions",
+        "TransferItem",
+        "TransferList",
+        "TransferPanel"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled"
+      ],
+      "slots": [],
+      "defaults": {},
+      "requires": [
+        "color.surface",
+        "color.text",
+        "color.text-muted",
+        "color.border",
+        "color.focus",
+        "radius.field",
+        "type.body",
+        "stroke.focus"
+      ],
+      "bindings": []
+    }
+  ]
+}

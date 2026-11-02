@@ -32,7 +32,7 @@ This file covers only Compose-specific parts; the general principles and viewpor
 
 ## 6. Acceptance means
 
-- Use **Compose UI test screenshot**: `composeTestRule.onRoot().captureToImage()` saves PNG (or Paparazzi / Shot libraries for golden); then compare with `references/verification.md` + `scripts/pixel_diff.py` (DPR=1, animations off, window = that tier's baseline width: pad 834 / mobile 375).
+- Use **Compose UI test screenshot**: `composeTestRule.onRoot().captureToImage()` saves PNG (or Paparazzi / Shot libraries for golden); then compare with `references/verification.md` + `scripts/pixel-diff.py` (DPR=1, animations off, window = that tier's baseline width: pad 834 / mobile 375).
 
 ## 7. Known pitfalls
 
